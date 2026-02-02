@@ -20,6 +20,10 @@ import {
   CheckSquare,
   Link2,
   BarChart3,
+  Bot,
+  Activity,
+  ClipboardList,
+  Palette,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -96,6 +100,31 @@ const navItems: (NavItem | NavSection)[] = [
     title: 'Finance',
     href: '/admin/financial',
     icon: DollarSign,
+  },
+  {
+    title: 'Outils',
+    items: [
+      {
+        title: 'Tracking',
+        href: '/admin/tracking',
+        icon: Activity,
+      },
+      {
+        title: 'Chatbot',
+        href: '/admin/chatbot',
+        icon: Bot,
+      },
+      {
+        title: 'Demandes dev',
+        href: '/admin/development-requests',
+        icon: ClipboardList,
+      },
+      {
+        title: 'Branding',
+        href: '/admin/branding',
+        icon: Palette,
+      },
+    ],
   },
   {
     title: 'Paramètres',

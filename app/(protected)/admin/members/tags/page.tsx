@@ -91,7 +91,10 @@ export default function AdminMembersTagsPage() {
   // Query pour lister tous les tags
   const { data: tags = [], isLoading, error } = useQuery({
     queryKey: queryKeys.members.tags.all,
-    queryFn: () => api.get<MemberTag[]>('/api/admin/tags'),
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: MemberTag[] }>('/api/admin/tags');
+      return response.data;
+    },
   });
 
   // Mutation pour créer un tag
@@ -107,7 +110,8 @@ export default function AdminMembersTagsPage() {
         title: 'Tag créé',
         description: 'Le tag a été créé avec succès',
       });
-      queryClient.invalidateQueries({ queryKey: queryKeys.members.tags.all });
+      // Force refetch immediately (bypasses staleTime)
+      queryClient.refetchQueries({ queryKey: queryKeys.members.tags.all });
       resetForm();
       setDialogOpen(false);
     },
@@ -133,7 +137,8 @@ export default function AdminMembersTagsPage() {
         title: 'Tag modifié',
         description: 'Le tag a été modifié avec succès',
       });
-      queryClient.invalidateQueries({ queryKey: queryKeys.members.tags.all });
+      // Force refetch immediately (bypasses staleTime)
+      queryClient.refetchQueries({ queryKey: queryKeys.members.tags.all });
       resetForm();
       setEditingTag(null);
       setDialogOpen(false);
@@ -155,7 +160,8 @@ export default function AdminMembersTagsPage() {
         title: 'Tag supprimé',
         description: 'Le tag a été supprimé avec succès',
       });
-      queryClient.invalidateQueries({ queryKey: queryKeys.members.tags.all });
+      // Force refetch immediately (bypasses staleTime)
+      queryClient.refetchQueries({ queryKey: queryKeys.members.tags.all });
       setTagToDelete(null);
       setAlertOpen(false);
     },
@@ -400,7 +406,7 @@ export default function AdminMembersTagsPage() {
                 Nom du tag <span className="text-destructive">*</span>
               </Label>
               <Input
-                id="name"
+                id="name" name="name"
                 placeholder="ex: VIP, Ambassadeur, Contributeur"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}

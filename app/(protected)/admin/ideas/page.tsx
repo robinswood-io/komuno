@@ -69,7 +69,7 @@ export default function AdminIdeasPage() {
   // Query pour lister les idées
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.ideas.list({ page, limit: 20 }),
-    queryFn: () => api.get<PaginatedResponse<Idea>>('/api/ideas', { page, limit: 20 }),
+    queryFn: () => api.get<PaginatedResponse<Idea>>('/api/admin/ideas', { page, limit: 20 }),
   });
 
   // Mutation pour mettre à jour le statut
@@ -285,7 +285,7 @@ export default function AdminIdeasPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card data-testid="ideas-list">
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
@@ -297,7 +297,7 @@ export default function AdminIdeasPage() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={statusFilter} onValueChange={(value: IdeaStatus | 'all') => setStatusFilter(value)}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[180px]" data-testid="ideas-status-filter">
                   <SelectValue placeholder="Filtrer par statut" />
                 </SelectTrigger>
                 <SelectContent>
@@ -314,7 +314,7 @@ export default function AdminIdeasPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table data-testid="ideas-table">
             <TableHeader>
               <TableRow>
                 <TableHead>Titre</TableHead>
@@ -330,7 +330,9 @@ export default function AdminIdeasPage() {
                 filteredIdeas.map((idea: Idea) => (
                   <TableRow key={idea.id}>
                     <TableCell className="font-medium max-w-xs truncate">
-                      {idea.title}
+                      <span className="idea-title" data-testid="idea-title">
+                        {idea.title}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
@@ -339,12 +341,14 @@ export default function AdminIdeasPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(idea.status)}>
+                      <Badge className={`status-badge ${getStatusColor(idea.status)}`} data-testid="idea-status-badge">
                         {getStatusLabel(idea.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm font-medium">{idea.voteCount || 0}</span>
+                      <span className="text-sm font-medium" data-testid="idea-votes">
+                        {idea.voteCount || 0}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm text-muted-foreground">
@@ -358,6 +362,8 @@ export default function AdminIdeasPage() {
                           size="icon"
                           onClick={() => handleViewDetails(idea)}
                           title="Voir les détails"
+                          aria-label={`Voir les détails de l'idée ${idea.title}`}
+                          data-testid="idea-details-button"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>

@@ -38,6 +38,10 @@ export default function AdminLayout({
       crm: 'CRM',
       content: 'Contenu',
       finance: 'Finance',
+      tracking: 'Tracking',
+      chatbot: 'Chatbot',
+      'development-requests': 'Demandes dev',
+      branding: 'Branding',
     };
 
     return titles[lastSegment] || lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1);

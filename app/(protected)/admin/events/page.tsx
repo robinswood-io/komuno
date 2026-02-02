@@ -89,7 +89,7 @@ export default function AdminEventsPage() {
   // Query pour lister les événements
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.events.list({ page, limit: 20 }),
-    queryFn: () => api.get<PaginatedResponse<Event>>('/api/events', { page, limit: 20 }),
+    queryFn: () => api.get<PaginatedResponse<Event>>('/api/admin/events', { page, limit: 20 }),
   });
 
   // Query pour les inscriptions d'un événement
@@ -375,7 +375,7 @@ export default function AdminEventsPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card data-testid="events-list">
         <CardHeader>
           <CardTitle>Liste des événements</CardTitle>
           <CardDescription>
@@ -383,7 +383,7 @@ export default function AdminEventsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table data-testid="events-table">
             <TableHeader>
               <TableRow>
                 <TableHead>Titre</TableHead>
@@ -398,8 +398,15 @@ export default function AdminEventsPage() {
               {events.length > 0 ? (
                 events.map((event: Event) => (
                   <TableRow key={event.id}>
-                    <TableCell className="font-medium max-w-xs truncate">
-                      {event.title}
+                    <TableCell className="font-medium max-w-xs">
+                      <div className="flex flex-col gap-1">
+                        <span>{event.title}</span>
+                        {event.description ? (
+                          <p className="event-description text-xs text-muted-foreground whitespace-pre-line">
+                            {event.description}
+                          </p>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -429,6 +436,8 @@ export default function AdminEventsPage() {
                         size="sm"
                         onClick={() => openInscriptionsModal(event)}
                         className="flex items-center gap-2"
+                        title="Gérer les inscriptions"
+                        data-testid="event-inscriptions-button"
                       >
                         <Users className="h-4 w-4" />
                         <span>{event.inscriptionCount || 0}</span>

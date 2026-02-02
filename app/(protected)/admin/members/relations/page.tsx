@@ -55,7 +55,7 @@ interface MemberRelation {
   id: string;
   memberEmail: string;
   relatedMemberEmail: string;
-  relationType: 'sponsor' | 'godparent' | 'colleague' | 'friend' | 'business_partner';
+  relationType: 'sponsor' | 'team' | 'custom';
   description?: string;
   createdAt: string;
   createdBy?: string;
@@ -66,7 +66,7 @@ interface MemberRelation {
 interface RelationFormData {
   memberEmail: string;
   relatedMemberEmail: string;
-  relationType: 'sponsor' | 'godparent' | 'colleague' | 'friend' | 'business_partner' | '';
+  relationType: 'sponsor' | 'team' | 'custom' | '';
   description?: string;
 }
 
@@ -79,35 +79,27 @@ interface FormErrors {
 
 const RELATION_TYPES = [
   { value: 'sponsor', label: 'Parrain/marraine', icon: '👤' },
-  { value: 'godparent', label: 'Filleul/filleule', icon: '👶' },
-  { value: 'colleague', label: 'Collègue', icon: '🤝' },
-  { value: 'friend', label: 'Ami', icon: '❤️' },
-  { value: 'business_partner', label: 'Partenaire d\'affaires', icon: '💼' },
+  { value: 'team', label: 'Équipe/collègue', icon: '🤝' },
+  { value: 'custom', label: 'Personnalisé', icon: '💼' },
 ] as const;
 
 const RELATION_TYPE_LABELS: Record<string, string> = {
   sponsor: 'Parrain/marraine',
-  godparent: 'Filleul/filleule',
-  colleague: 'Collègue',
-  friend: 'Ami',
-  business_partner: 'Partenaire d\'affaires',
+  team: 'Équipe/collègue',
+  custom: 'Personnalisé',
 };
 
 const RELATION_TYPE_ICONS: Record<string, string> = {
   sponsor: '👤',
-  godparent: '👶',
-  colleague: '🤝',
-  friend: '❤️',
-  business_partner: '💼',
+  team: '🤝',
+  custom: '💼',
 };
 
 const getRelationBadgeColor = (type: string) => {
   const colors: Record<string, string> = {
     sponsor: 'bg-blue-50 text-blue-900 border-blue-200',
-    godparent: 'bg-purple-50 text-purple-900 border-purple-200',
-    colleague: 'bg-green-50 text-green-900 border-green-200',
-    friend: 'bg-pink-50 text-pink-900 border-pink-200',
-    business_partner: 'bg-orange-50 text-orange-900 border-orange-200',
+    team: 'bg-green-50 text-green-900 border-green-200',
+    custom: 'bg-purple-50 text-purple-900 border-purple-200',
   };
   return colors[type] || 'bg-gray-50 text-gray-900 border-gray-200';
 };
@@ -126,7 +118,7 @@ export default function AdminMembersRelationsPage() {
   const [relationToDelete, setRelationToDelete] = useState<MemberRelation | null>(null);
 
   // Filter states
-  const [relationTypeFilter, setRelationTypeFilter] = useState<'all' | 'sponsor' | 'godparent' | 'colleague' | 'friend' | 'business_partner'>('all');
+  const [relationTypeFilter, setRelationTypeFilter] = useState<'all' | 'sponsor' | 'team' | 'custom'>('all');
   const [memberFilter, setMemberFilter] = useState<string>('all');
 
   // Form state
@@ -142,7 +134,10 @@ export default function AdminMembersRelationsPage() {
   // Query pour lister tous les membres
   const { data: membersData } = useQuery({
     queryKey: queryKeys.members.all,
-    queryFn: () => api.get<Member[]>('/api/admin/members'),
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: Member[] }>('/api/admin/members');
+      return response.data;
+    },
   });
 
   const members = membersData || [];
@@ -152,7 +147,10 @@ export default function AdminMembersRelationsPage() {
   // Pas de fallback pour éviter les boucles infinies de requêtes
   const { data: relations = [], isLoading, error } = useQuery({
     queryKey: queryKeys.members.relations.all,
-    queryFn: () => api.get<MemberRelation[]>('/api/admin/relations'),
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: MemberRelation[] }>('/api/admin/relations');
+      return response.data;
+    },
   });
 
   // Enrichir les relations avec les noms des membres

@@ -26,6 +26,13 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [authMode, setAuthMode] = useState<AuthMode>('oauth');
+  const devLoginEnabled = process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true';
+  const [skipAuthUserQuery, setSkipAuthUserQuery] = useState(() => {
+    if (!devLoginEnabled || typeof window === 'undefined') {
+      return false;
+    }
+    return Boolean(window.localStorage.getItem('admin-user'));
+  });
 
   // Récupérer le mode d'authentification au démarrage
   useEffect(() => {
@@ -42,6 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchAuthMode();
   }, []);
 
+  useEffect(() => {
+    if (!devLoginEnabled || typeof window === 'undefined') {
+      return;
+    }
+
+    setSkipAuthUserQuery(Boolean(window.localStorage.getItem('admin-user')));
+  }, [devLoginEnabled]);
+
   const {
     data: user,
     error,
@@ -49,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } = useQuery<SelectUser | undefined, Error>({
     queryKey: ["/api/auth/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !skipAuthUserQuery,
   });
 
   const loginMutation = useMutation({

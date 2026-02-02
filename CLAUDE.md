@@ -569,3 +569,52 @@ MINIO_SECRET_KEY=minioadmin
 - `scripts/start-dev.sh` - Automated dev environment setup
 - `scripts/setup-authentik.sh` - Authentik configuration automation
 - `scripts/build-and-copy-to-vps.sh` - VPS deployment with local build
+
+---
+
+## BMAD Deployment Verification (DoD)
+
+**Definition of Done - Staging/Dev uniquement**
+
+Avant de considérer une tâche terminée, vérifier:
+
+- [ ] **TypeScript:** `npx tsc --noEmit` (exit 0)
+- [ ] **Tests:** `npm test` (100% pass)
+- [ ] **Container:** `docker ps | grep cjd80` (running, uptime > 30s)
+- [ ] **Logs:** `docker logs cjd80 --tail 100 | grep -i error` (0 matches)
+- [ ] **Browser:** Playwright test at `https://cjd80.rbw.ovh` (0 console errors)
+- [ ] **Health check:** `curl https://cjd80.rbw.ovh/api/health` (200 OK)
+- [ ] **PWA:** Service worker installé, offline ready
+
+**IMPORTANT:** Ces vérifications valident le staging (.rbw.ovh).
+Production = serveur distant via CI/CD.
+
+## Deployment
+
+### Dev/Staging (ce serveur)
+
+```bash
+cd /srv/workspace
+docker compose -f docker-compose.apps.yml up -d cjd80
+docker compose -f docker-compose.apps.yml logs -f cjd80
+```
+
+**URL Staging:** https://cjd80.rbw.ovh
+
+### Production (CI/CD uniquement)
+
+Déploiement production via:
+- `/deploy-remote cjd80 production clients-vps`
+- `/github-deploy` (GitHub Actions)
+
+**Voir workflow complet:**
+`/opt/ia-webdev/rulebook-ai/packs/robinswood-core/rules/bmad-mapping.md`
+
+## Environment Distinctions
+
+| Environment | Location | URLs | Stack |
+|-------------|----------|------|-------|
+| **Dev/Staging** | `/srv/workspace/` | `cjd80.rbw.ovh` | Next.js 15 + React 19 + NestJS |
+| **Production** | Clients VPS | Production domain | Same stack, optimized build |
+
+**Hot Reload:** 99% modifications sans restart Docker (bind mounts + Turbopack).

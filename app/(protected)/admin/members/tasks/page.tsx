@@ -201,6 +201,7 @@ export default function AdminMemberTasksPage() {
         title: 'Tâche créée',
         description: 'La tâche a été créée avec succès',
       });
+      loadAllTasks();
       setCreateDialogOpen(false);
       setCreateFormData({
         memberEmail: '',
@@ -210,7 +211,6 @@ export default function AdminMemberTasksPage() {
         status: 'todo',
         dueDate: '',
       });
-      loadAllTasks();
     },
     onError: (error: Error) => {
       toast({
@@ -238,9 +238,9 @@ export default function AdminMemberTasksPage() {
         title: 'Tâche modifiée',
         description: 'La tâche a été modifiée avec succès',
       });
+      loadAllTasks();
       setEditDialogOpen(false);
       setSelectedTask(null);
-      loadAllTasks();
     },
     onError: (error: Error) => {
       toast({

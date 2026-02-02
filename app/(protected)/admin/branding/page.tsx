@@ -1,78 +1,221 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-// Force dynamic rendering to prevent SSR prerendering issues with hooks
-export const dynamic = 'force-dynamic';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Save, Palette, RotateCcw } from 'lucide-react';
-import { brandingCore } from '@/lib/config/branding-core';
+import { Badge } from '@/components/ui/badge';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Loader2, Palette, RotateCcw, Save } from 'lucide-react';
+import { brandingCore, type BrandingCore } from '@/lib/config/branding-core';
+import { api, type ApiResponse } from '@/lib/api/client';
 
-/**
- * Page Configuration Branding
- * Permet de personnaliser les couleurs et textes de l'application
- */
+export const dynamic = 'force-dynamic';
+
+interface AdminUser {
+  id: string;
+  email: string;
+  role: string;
+}
+
+interface BrandingApiData {
+  config?: string;
+  isDefault?: boolean;
+}
+
+const appKeys: Array<keyof BrandingCore['app']> = ['name', 'shortName', 'description', 'ideaBoxName'];
+const orgKeys: Array<keyof BrandingCore['organization']> = ['name', 'fullName', 'tagline', 'url', 'email'];
+const colorKeys: Array<keyof BrandingCore['colors']> = [
+  'primary',
+  'primaryDark',
+  'primaryLight',
+  'secondary',
+  'accent',
+];
+const pwaKeys: Array<keyof BrandingCore['pwa']> = [
+  'themeColor',
+  'backgroundColor',
+  'display',
+  'orientation',
+  'lang',
+];
+const linkKeys: Array<keyof BrandingCore['links']> = ['website', 'support'];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function createDefaultConfig(): BrandingCore {
+  return {
+    organization: { ...(brandingCore.organization as Record<string, unknown>) } as typeof brandingCore.organization,
+    app: { ...(brandingCore.app as Record<string, unknown>) } as typeof brandingCore.app,
+    colors: { ...(brandingCore.colors as Record<string, unknown>) } as typeof brandingCore.colors,
+    fonts: { ...(brandingCore.fonts as Record<string, unknown>) } as typeof brandingCore.fonts,
+    pwa: { ...(brandingCore.pwa as Record<string, unknown>) } as typeof brandingCore.pwa,
+    social: { ...(brandingCore.social as Record<string, unknown>) } as typeof brandingCore.social,
+    links: { ...(brandingCore.links as Record<string, unknown>) } as typeof brandingCore.links,
+  };
+}
+
+function mergeConfig(raw: unknown): BrandingCore {
+  const base = createDefaultConfig();
+  if (!isRecord(raw)) {
+    return base;
+  }
+
+  if (isRecord(raw.app)) {
+    appKeys.forEach((key) => {
+      const value = getString((raw.app as Record<string, unknown>)?.[key as string]);
+      if (value !== undefined) {
+        (base.app as Record<string, unknown>)[key] = value;
+      }
+    });
+  }
+
+  if (isRecord(raw.organization)) {
+    orgKeys.forEach((key) => {
+      const value = getString((raw.organization as Record<string, unknown>)?.[key as string]);
+      if (value !== undefined) {
+        (base.organization as Record<string, unknown>)[key] = value;
+      }
+    });
+  }
+
+  if (isRecord(raw.colors)) {
+    colorKeys.forEach((key) => {
+      const value = getString((raw.colors as Record<string, unknown>)?.[key as string]);
+      if (value !== undefined) {
+        (base.colors as Record<string, unknown>)[key] = value;
+      }
+    });
+  }
+
+  if (isRecord(raw.pwa)) {
+    pwaKeys.forEach((key) => {
+      const value = getString((raw.pwa as Record<string, unknown>)?.[key as string]);
+      if (value !== undefined) {
+        (base.pwa as Record<string, unknown>)[key] = value;
+      }
+    });
+  }
+
+  if (isRecord(raw.links)) {
+    linkKeys.forEach((key) => {
+      const value = getString((raw.links as Record<string, unknown>)?.[key as string]);
+      if (value !== undefined) {
+        (base.links as Record<string, unknown>)[key] = value;
+      }
+    });
+  }
+
+  return base;
+}
+
+function isDefaultBranding(config: BrandingCore): boolean {
+  const defaults = createDefaultConfig();
+  const appMatches = appKeys.every((key) => config.app[key] === defaults.app[key]);
+  const orgMatches = orgKeys.every((key) => config.organization[key] === defaults.organization[key]);
+  const colorMatches = colorKeys.every((key) => config.colors[key] === defaults.colors[key]);
+  return appMatches && orgMatches && colorMatches;
+}
+
 export default function AdminBrandingPage() {
   const { toast } = useToast();
+  const [config, setConfig] = useState<BrandingCore>(createDefaultConfig());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [config, setConfig] = useState<any>(null);
+  const [isDefault, setIsDefault] = useState(true);
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
 
-  // Charger la configuration branding
+  const hasAccess = adminUser?.role === 'super_admin';
+
+  const badgeLabel = useMemo(() => (isDefault ? 'Par défaut' : 'Personnalisé'), [isDefault]);
+
   useEffect(() => {
-    const fetchBranding = async () => {
-      try {
-        const response = await fetch('/api/branding/config');
-        if (!response.ok) throw new Error('Erreur de chargement');
-        const data = await response.json();
-
-        // Parser la config si c'est une string JSON
-        const parsedConfig = typeof data.config === 'string'
-          ? JSON.parse(data.config)
-          : data.config;
-
-        setConfig(parsedConfig);
-      } catch (error: any) {
-        toast({
-          title: 'Erreur',
-          description: error.message || 'Impossible de charger la configuration',
-          variant: 'destructive',
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('admin-user');
+    if (!stored) {
+      setAdminUser(null);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored) as unknown;
+      if (isRecord(parsed) && typeof parsed.role === 'string' && typeof parsed.email === 'string') {
+        setAdminUser({
+          id: String(parsed.id ?? ''),
+          email: parsed.email,
+          role: parsed.role,
         });
-      } finally {
-        setIsLoading(false);
       }
-    };
+    } catch {
+      setAdminUser(null);
+    }
+  }, []);
 
-    fetchBranding();
+  const fetchBranding = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get<ApiResponse<BrandingApiData>>('/api/admin/branding');
+      const rawConfig = response.data?.config;
+      const parsed = rawConfig ? JSON.parse(rawConfig) : null;
+      const merged = mergeConfig(parsed);
+      setConfig(merged);
+      setIsDefault(response.data?.isDefault ?? isDefaultBranding(merged));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Impossible de charger la configuration';
+      toast({
+        title: 'Erreur',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }, [toast]);
 
-  // Sauvegarder la configuration
+  useEffect(() => {
+    if (!hasAccess) {
+      setIsLoading(false);
+      return;
+    }
+    void fetchBranding();
+  }, [fetchBranding, hasAccess]);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch('/api/branding/config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          config: JSON.stringify(config),
-        }),
+      const response = await api.put<ApiResponse<BrandingApiData>>('/api/admin/branding', {
+        config: JSON.stringify(config),
       });
-
-      if (!response.ok) throw new Error('Erreur de sauvegarde');
-
-      toast({
-        title: 'Configuration sauvegardée',
-        description: 'Les modifications ont été enregistrées avec succès',
-      });
-    } catch (error: any) {
+      if (response.success) {
+        toast({
+          title: 'Branding sauvegardé avec succès',
+          description: 'Les modifications ont été enregistrées.',
+        });
+        setIsDefault(isDefaultBranding(config));
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Impossible de sauvegarder';
       toast({
         title: 'Erreur',
-        description: error.message || 'Impossible de sauvegarder',
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -80,12 +223,44 @@ export default function AdminBrandingPage() {
     }
   };
 
-  // Réinitialiser aux valeurs par défaut
-  const handleReset = () => {
-    if (confirm('Réinitialiser aux valeurs par défaut ?')) {
-      window.location.reload();
+  const handleReset = async () => {
+    try {
+      await api.delete<ApiResponse<BrandingApiData>>('/api/admin/branding');
+      const defaults = createDefaultConfig();
+      setConfig(defaults);
+      setIsDefault(true);
+      toast({
+        title: 'Configuration réinitialisée aux valeurs par défaut',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Impossible de réinitialiser';
+      toast({
+        title: 'Erreur',
+        description: message,
+        variant: 'destructive',
+      });
     }
   };
+
+  if (!hasAccess && !isLoading) {
+    return (
+      <div className="container py-8">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Accès refusé</CardTitle>
+            <CardDescription>
+              Cette page est réservée aux super-administrateurs uniquement.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild data-testid="button-back-admin">
+              <Link href="/admin">Retour à l'administration</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -95,206 +270,322 @@ export default function AdminBrandingPage() {
     );
   }
 
-  if (!config) {
-    return (
-      <div className="container py-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">Erreur</CardTitle>
-            <CardDescription>Configuration introuvable</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="container py-8 space-y-8">
-      <div className="flex justify-between items-center">
+    <div className="container py-8 space-y-6">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Configuration Branding</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Personnalisation Branding</h1>
           <p className="text-muted-foreground">
-            Personnalisez l'apparence de l'application
+            Personnalisation de l'application et de l'organisation.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleReset}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Réinitialiser
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Enregistrer
-          </Button>
-        </div>
+        <Badge data-testid="badge-branding-status">{badgeLabel}</Badge>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Informations générales */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Informations générales
-            </CardTitle>
-            <CardDescription>
-              Nom et description de l'application
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Nom de l'application</label>
-              <Input
-                value={config.appName || ''}
-                onChange={(e) =>
-                  setConfig({ ...config, appName: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Nom de l'association</label>
-              <Input
-                value={config.associationName || ''}
-                onChange={(e) =>
-                  setConfig({ ...config, associationName: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
-              <Input
-                value={config.description || ''}
-                onChange={(e) =>
-                  setConfig({ ...config, description: e.target.value })
-                }
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Couleurs */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Couleurs du thème</CardTitle>
-            <CardDescription>
-              Personnalisez les couleurs principales
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Couleur primaire</label>
-              <div className="flex gap-2">
-                <Input
-                  type="color"
-                  value={config.colors?.primary || brandingCore.colors.primary}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      colors: { ...config.colors, primary: e.target.value },
-                    })
-                  }
-                  className="w-20 h-10"
-                />
-                <Input
-                  value={config.colors?.primary || ''}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      colors: { ...config.colors, primary: e.target.value },
-                    })
-                  }
-                  placeholder={brandingCore.colors.primary}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Couleur secondaire</label>
-              <div className="flex gap-2">
-                <Input
-                  type="color"
-                  value={config.colors?.secondary || brandingCore.colors.secondary}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      colors: { ...config.colors, secondary: e.target.value },
-                    })
-                  }
-                  className="w-20 h-10"
-                />
-                <Input
-                  value={config.colors?.secondary || ''}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      colors: { ...config.colors, secondary: e.target.value },
-                    })
-                  }
-                  placeholder={brandingCore.colors.secondary}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Couleur accent</label>
-              <div className="flex gap-2">
-                <Input
-                  type="color"
-                  value={config.colors?.accent || brandingCore.colors.accent}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      colors: { ...config.colors, accent: e.target.value },
-                    })
-                  }
-                  className="w-20 h-10"
-                />
-                <Input
-                  value={config.colors?.accent || ''}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      colors: { ...config.colors, accent: e.target.value },
-                    })
-                  }
-                  placeholder={brandingCore.colors.accent}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap gap-3">
+        <Button onClick={handleSave} disabled={isSaving} data-testid="button-save-branding">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+          Enregistrer
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" data-testid="button-reset-branding">
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Réinitialiser
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmer la réinitialisation</AlertDialogTitle>
+              <AlertDialogDescription>
+                Toutes les personnalisations seront supprimées.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                data-testid="button-confirm-reset-branding"
+                onClick={() => void handleReset()}
+              >
+                Confirmer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
-      {/* Prévisualisation */}
       <Card>
         <CardHeader>
-          <CardTitle>Prévisualisation</CardTitle>
-          <CardDescription>
-            Aperçu des modifications
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Configuration
+          </CardTitle>
+          <CardDescription>Modifiez les informations et couleurs principales.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="p-6 rounded-lg border space-y-4">
-            <h2 className="text-2xl font-bold" style={{ color: config.colors?.primary }}>
-              {config.appName || 'Nom de l\'application'}
-            </h2>
-            <p className="text-muted-foreground">
-              {config.description || 'Description de l\'application'}
-            </p>
-            <div className="flex gap-2">
-              <Button style={{ backgroundColor: config.colors?.primary }}>
-                Bouton primaire
-              </Button>
-              <Button
-                variant="outline"
-                style={{ borderColor: config.colors?.accent, color: config.colors?.accent }}
-              >
-                Bouton accent
-              </Button>
-            </div>
-          </div>
+          <Accordion type="single" collapsible defaultValue="app">
+            <AccordionItem value="app">
+              <AccordionTrigger data-testid="accordion-trigger-app">Application</AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nom de l'application</label>
+                  <Input
+                    data-testid="input-app-name"
+                    value={config.app.name}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: { ...prev.app, name: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nom court</label>
+                  <Input
+                    data-testid="input-app-short-name"
+                    value={config.app.shortName}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: { ...prev.app, shortName: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Description</label>
+                  <Input
+                    data-testid="input-app-description"
+                    value={config.app.description}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: { ...prev.app, description: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nom boîte à idées</label>
+                  <Input
+                    data-testid="input-app-idea-box-name"
+                    value={config.app.ideaBoxName}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: { ...prev.app, ideaBoxName: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="organization">
+              <AccordionTrigger data-testid="accordion-trigger-organization">Organisation</AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nom de l'organisation</label>
+                  <Input
+                    data-testid="input-org-name"
+                    value={config.organization.name}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        organization: { ...prev.organization, name: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nom complet</label>
+                  <Input
+                    data-testid="input-org-full-name"
+                    value={config.organization.fullName}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        organization: { ...prev.organization, fullName: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Baseline</label>
+                  <Input
+                    data-testid="input-org-tagline"
+                    value={config.organization.tagline}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        organization: { ...prev.organization, tagline: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Site web</label>
+                  <Input
+                    data-testid="input-org-url"
+                    value={config.organization.url}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        organization: { ...prev.organization, url: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email</label>
+                  <Input
+                    data-testid="input-org-email"
+                    value={config.organization.email}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        organization: { ...prev.organization, email: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="appearance">
+              <AccordionTrigger data-testid="accordion-trigger-appearance">Apparence</AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Couleur primaire</label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      data-testid="input-color-primary"
+                      value={config.colors.primary}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          colors: { ...prev.colors, primary: event.target.value },
+                        } as BrandingCore))
+                      }
+                    />
+                    <Input
+                      type="color"
+                      aria-label="Couleur primaire"
+                      data-testid="input-color-primary-picker"
+                      value={config.colors.primary}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          colors: { ...prev.colors, primary: event.target.value },
+                        } as BrandingCore))
+                      }
+                      className="w-14 h-10 p-1"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Primaire sombre</label>
+                  <Input
+                    data-testid="input-color-primary-dark"
+                    value={config.colors.primaryDark}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        colors: { ...prev.colors, primaryDark: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Primaire claire</label>
+                  <Input
+                    data-testid="input-color-primary-light"
+                    value={config.colors.primaryLight}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        colors: { ...prev.colors, primaryLight: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Couleur secondaire</label>
+                  <Input
+                    data-testid="input-color-secondary"
+                    value={config.colors.secondary}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        colors: { ...prev.colors, secondary: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="pwa" data-testid="accordion-pwa">
+              <AccordionTrigger data-testid="accordion-trigger-pwa">PWA</AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Thème</label>
+                  <Input
+                    value={config.pwa.themeColor}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        pwa: { ...prev.pwa, themeColor: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Couleur de fond</label>
+                  <Input
+                    value={config.pwa.backgroundColor}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        pwa: { ...prev.pwa, backgroundColor: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="links" data-testid="accordion-links">
+              <AccordionTrigger data-testid="accordion-trigger-links">Liens</AccordionTrigger>
+              <AccordionContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Site principal</label>
+                  <Input
+                    value={config.links.website}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        links: { ...prev.links, website: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Support</label>
+                  <Input
+                    value={config.links.support}
+                    onChange={(event) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        links: { ...prev.links, support: event.target.value },
+                      } as BrandingCore))
+                    }
+                  />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </CardContent>
       </Card>
     </div>

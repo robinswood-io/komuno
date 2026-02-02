@@ -343,7 +343,7 @@ export default function AdminMembersPage() {
         </div>
       </div>
 
-      <Card>
+      <Card data-testid="members-list">
         <CardHeader>
           <CardTitle>Liste des membres</CardTitle>
           <CardDescription>
@@ -421,6 +421,7 @@ export default function AdminMembersPage() {
                       <Badge
                         variant={member.status === 'active' ? 'default' : 'outline'}
                         className={member.status === 'active' ? 'bg-green-50 text-green-900 border-green-200' : 'bg-orange-50 text-orange-900 border-orange-200'}
+                        data-testid="member-status-badge"
                       >
                         {member.status === 'active' ? '✓ Actif' : '○ Prospect'}
                       </Badge>
@@ -435,7 +436,9 @@ export default function AdminMembersPage() {
                             />
                           </div>
                           <span className="text-xs text-muted-foreground">
-                            {member.engagementScore || 0}
+                            <span data-testid="member-engagement-score">
+                              {member.engagementScore || 0}
+                            </span>
                           </span>
                         </div>
                       ) : (
@@ -452,6 +455,8 @@ export default function AdminMembersPage() {
                             setDetailsSheetOpen(true);
                           }}
                           title="Voir les détails"
+                          aria-label={`Voir les détails du membre ${member.firstName} ${member.lastName}`}
+                          data-testid="member-details-button"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>

@@ -114,7 +114,7 @@ export function MemberDetailsSheet({ email, open, onClose }: MemberDetailsSheetP
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto" data-testid="member-details-sheet">
         {detailsQuery.isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -133,9 +133,9 @@ export function MemberDetailsSheet({ email, open, onClose }: MemberDetailsSheetP
                   </SheetDescription>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  {getStatusBadge(member.status)}
+                  <span data-testid="member-status-badge">{getStatusBadge(member.status)}</span>
                   {member.engagementScore !== undefined && (
-                    <Badge variant="outline" className="gap-1">
+                    <Badge variant="outline" className="gap-1" data-testid="member-engagement-score-badge">
                       <TrendingUp className="h-3 w-3" />
                       Score: {member.engagementScore}
                     </Badge>
@@ -208,11 +208,11 @@ export function MemberDetailsSheet({ email, open, onClose }: MemberDetailsSheetP
             )}
 
             <Tabs defaultValue="subscriptions" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="subscriptions">Cotisations</TabsTrigger>
-                <TabsTrigger value="tags">Tags</TabsTrigger>
-                <TabsTrigger value="tasks">Tâches</TabsTrigger>
-                <TabsTrigger value="activities">Activités</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-4" data-testid="member-details-tabs">
+                <TabsTrigger value="subscriptions" data-testid="member-details-tab-subscriptions">Cotisations</TabsTrigger>
+                <TabsTrigger value="tags" data-testid="member-details-tab-tags">Tags</TabsTrigger>
+                <TabsTrigger value="tasks" data-testid="member-details-tab-tasks">Tâches</TabsTrigger>
+                <TabsTrigger value="activities" data-testid="member-details-tab-activities">Activités</TabsTrigger>
               </TabsList>
 
               <TabsContent value="subscriptions" className="space-y-4">
