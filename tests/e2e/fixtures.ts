@@ -26,14 +26,19 @@ const test = base.extend<{ autoCleanup: void }>({
 
     // Après le test (teardown) - nettoyer les données
     try {
-      const cleanupPromise = cleanupTestData();
-      // Timeout agressif pour éviter que le nettoyage bloque les tests
-      await Promise.race([
-        cleanupPromise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('[Test Cleanup] Timeout')), 5000)
-        )
-      ]);
+      // Optionnel: Skip cleanup si variable d'environnement définie
+      if (process.env.SKIP_E2E_CLEANUP === 'true') {
+        console.log('[Test Cleanup] ⏭️  Cleanup ignoré (SKIP_E2E_CLEANUP=true)');
+      } else {
+        const cleanupPromise = cleanupTestData();
+        // Timeout prudent pour éviter que le nettoyage bloque les tests (10s max)
+        await Promise.race([
+          cleanupPromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('[Test Cleanup] Timeout 10s')), 10000)
+          )
+        ]);
+      }
     } catch (error) {
       const errorMsg = String(error).toLowerCase();
       // Ignorer les erreurs de connexion réseau (tests locaux hors Docker)

@@ -20,99 +20,111 @@ import { storage } from '../../../server/storage';
 test.describe('Public API - Health Checks', () => {
   test('GET /api/health - should return healthy status with database info', async ({ page }) => {
     console.log('[TEST] Testing GET /api/health endpoint');
-    
+
     const response = await page.request.get('/api/health');
-    
+
     expect(response.status()).toBe(200);
-    
-    const data = await response.json();
-    console.log('[TEST] Health check response:', JSON.stringify(data, null, 2));
-    
+
+    const response_data = await response.json();
+    console.log('[TEST] Health check response:', JSON.stringify(response_data, null, 2));
+
+    // Vérifier la structure - peut être { success, data } ou plat
+    const data = response_data.data || response_data;
+
     // Vérifier la structure
     expect(data).toHaveProperty('status');
     expect(data).toHaveProperty('timestamp');
     expect(data).toHaveProperty('uptime');
     expect(data).toHaveProperty('database');
-    
+
     // Vérifier les valeurs
     expect(data.status).toBe('healthy');
     expect(data.database).toHaveProperty('connected');
     expect(data.database.connected).toBe(true);
-    
+
     // Vérifier le timestamp est valide
     const timestamp = new Date(data.timestamp);
     expect(timestamp.toString()).not.toBe('Invalid Date');
-    
+
     console.log('[TEST] ✅ Health check passed');
   });
 
   test('GET /api/health/db - should return database health with pool stats', async ({ page }) => {
     console.log('[TEST] Testing GET /api/health/db endpoint');
-    
+
     const response = await page.request.get('/api/health/db');
-    
+
     expect(response.status()).toBe(200);
-    
-    const data = await response.json();
-    console.log('[TEST] DB health response:', JSON.stringify(data, null, 2));
-    
+
+    const response_data = await response.json();
+    console.log('[TEST] DB health response:', JSON.stringify(response_data, null, 2));
+
+    // Vérifier la structure - peut être { success, data } ou plat
+    const data = response_data.data || response_data;
+
     // Vérifier la structure
     expect(data).toHaveProperty('status', 'healthy');
     expect(data).toHaveProperty('timestamp');
     expect(data).toHaveProperty('database');
-    
+
     // Vérifier les infos database
     expect(data.database).toHaveProperty('connected', true);
     expect(data.database).toHaveProperty('responseTime');
     expect(data.database).toHaveProperty('pool');
-    
+
     // Vérifier les pool stats
     expect(data.database.pool).toHaveProperty('totalCount');
     expect(data.database.pool).toHaveProperty('idleCount');
     expect(data.database.pool).toHaveProperty('waitingCount');
-    
+
     console.log('[TEST] ✅ DB health check passed');
   });
 
   test('GET /api/health/ready - should return ready status', async ({ page }) => {
     console.log('[TEST] Testing GET /api/health/ready endpoint');
-    
+
     const response = await page.request.get('/api/health/ready');
-    
+
     expect(response.status()).toBe(200);
-    
-    const data = await response.json();
-    console.log('[TEST] Readiness check response:', JSON.stringify(data, null, 2));
-    
+
+    const response_data = await response.json();
+    console.log('[TEST] Readiness check response:', JSON.stringify(response_data, null, 2));
+
+    // Vérifier la structure - peut être { success, data } ou plat
+    const data = response_data.data || response_data;
+
     // Vérifier la structure
     expect(data).toHaveProperty('status', 'ready');
     expect(data).toHaveProperty('timestamp');
-    
+
     // Vérifier le timestamp est valide
     const timestamp = new Date(data.timestamp);
     expect(timestamp.toString()).not.toBe('Invalid Date');
-    
+
     console.log('[TEST] ✅ Readiness check passed');
   });
 
   test('GET /api/health/live - should return alive status', async ({ page }) => {
     console.log('[TEST] Testing GET /api/health/live endpoint');
-    
+
     const response = await page.request.get('/api/health/live');
-    
+
     expect(response.status()).toBe(200);
-    
-    const data = await response.json();
-    console.log('[TEST] Liveness check response:', JSON.stringify(data, null, 2));
-    
+
+    const response_data = await response.json();
+    console.log('[TEST] Liveness check response:', JSON.stringify(response_data, null, 2));
+
+    // Vérifier la structure - peut être { success, data } ou plat
+    const data = response_data.data || response_data;
+
     // Vérifier la structure
     expect(data).toHaveProperty('status', 'alive');
     expect(data).toHaveProperty('timestamp');
-    
+
     // Vérifier le timestamp est valide
     const timestamp = new Date(data.timestamp);
     expect(timestamp.toString()).not.toBe('Invalid Date');
-    
+
     console.log('[TEST] ✅ Liveness check passed');
   });
 });
