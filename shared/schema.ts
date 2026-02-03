@@ -1114,19 +1114,39 @@ export const insertPatronDonationSchema = z.object({
     .uuid("L'identifiant du mécène n'est pas valide")
     .transform(sanitizeText),
   donatedAt: z.string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD")
-    .transform((val) => new Date(val + 'T00:00:00.000Z')),
+    .regex(/^\d{4}-\d{2}-\d{2}T|^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD ou ISO")
+    .transform((val) => {
+      // Handle both ISO format and YYYY-MM-DD
+      if (val.includes('T')) {
+        return new Date(val);
+      }
+      return new Date(val + 'T00:00:00.000Z');
+    }),
+  amountInCents: z.number()
+    .int("Le montant doit être un nombre entier")
+    .min(0, "Le montant ne peut pas être négatif")
+    .optional(),
   amount: z.number()
     .int("Le montant doit être un nombre entier")
-    .min(0, "Le montant ne peut pas être négatif"),
+    .min(0, "Le montant ne peut pas être négatif")
+    .optional(),
   occasion: z.string()
-    .min(3, "L'occasion doit contenir au moins 3 caractères")
+    .min(1, "L'occasion est obligatoire")
     .max(200, "L'occasion ne peut pas dépasser 200 caractères")
-    .transform(sanitizeText),
+    .optional()
+    .transform(val => val ? sanitizeText(val) : undefined),
   recordedBy: z.string()
     .email("Email de l'administrateur invalide")
     .transform(sanitizeText),
-});
+}).refine(
+  (data) => data.amountInCents !== undefined || data.amount !== undefined,
+  { message: "Soit 'amountInCents' soit 'amount' doit être fourni" }
+).transform((data) => ({
+  ...data,
+  // Normalize to 'amount' field for database
+  amount: data.amountInCents ?? data.amount,
+  amountInCents: undefined,
+}));
 
 // Pure Zod v4 schema
 export const insertPatronUpdateSchema = z.object({
@@ -1158,7 +1178,8 @@ export const insertPatronUpdateSchema = z.object({
     .transform(val => val ? sanitizeText(val) : undefined),
   createdBy: z.string()
     .email("Email de l'administrateur invalide")
-    .transform(sanitizeText),
+    .optional()
+    .pipe(z.string().transform(sanitizeText).optional()),
 });
 
 export const updatePatronUpdateSchema = z.object({
@@ -1262,17 +1283,25 @@ export const updateIdeaPatronProposalSchema = z.object({
 // Pure Zod v4 schema
 export const insertEventSponsorshipSchema = z.object({
   eventId: z.string()
-    .uuid("L'identifiant de l'événement n'est pas valide")
+    .min(1, "L'identifiant de l'événement est requis")
     .transform(sanitizeText),
   patronId: z.string()
     .uuid("L'identifiant du mécène n'est pas valide")
     .transform(sanitizeText),
   level: z.enum(["platinum", "gold", "silver", "bronze", "partner"], {
     message: "Niveau de sponsoring invalide"
-  }),
+  }).optional(),
+  type: z.enum(["platinum", "gold", "silver", "bronze", "partner"], {
+    message: "Type de sponsoring invalide"
+  }).optional(),
+  amountInCents: z.number()
+    .int("Le montant doit être un nombre entier")
+    .min(0, "Le montant ne peut pas être négatif")
+    .optional(),
   amount: z.number()
     .int("Le montant doit être un nombre entier")
-    .min(0, "Le montant ne peut pas être négatif"),
+    .min(0, "Le montant ne peut pas être négatif")
+    .optional(),
   benefits: z.string()
     .max(2000, "Les contreparties ne peuvent pas dépasser 2000 caractères")
     .transform(val => val ? sanitizeText(val) : undefined)
@@ -1289,6 +1318,10 @@ export const insertEventSponsorshipSchema = z.object({
     .max(500, "L'URL du site web est trop longue")
     .transform(val => val ? sanitizeText(val) : undefined)
     .optional(),
+  notes: z.string()
+    .max(2000, "Les notes ne peuvent pas dépasser 2000 caractères")
+    .transform(val => val ? sanitizeText(val) : undefined)
+    .optional(),
   proposedByAdminEmail: z.string()
     .email("Email de l'administrateur invalide")
     .transform(sanitizeText),
@@ -1299,7 +1332,22 @@ export const insertEventSponsorshipSchema = z.object({
       if (!val) return null;
       return val;
     }),
-});
+}).refine(
+  (data) => data.level || data.type,
+  { message: "Soit 'level' soit 'type' doit être fourni" }
+).refine(
+  (data) => data.amountInCents || data.amount,
+  { message: "Soit 'amountInCents' soit 'amount' doit être fourni" }
+).transform((data) => ({
+  ...data,
+  // Normalize to 'level' field for database
+  level: data.level ?? data.type,
+  // Normalize to 'amount' field for database
+  amount: data.amountInCents ?? data.amount,
+  // Remove the original fields to avoid duplication
+  type: undefined,
+  amountInCents: undefined,
+}));
 
 export const updateEventSponsorshipSchema = z.object({
   level: z.enum(["platinum", "gold", "silver", "bronze", "partner"]).optional(),

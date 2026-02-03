@@ -338,14 +338,42 @@ export async function loginAsAdminQuick(
   }, devUser);
 
   // CRITICAL: Wait for session cookie to be set and persisted
-  // Increased to 2000ms and added network idle wait for stability
+  // Use polling to ensure cookie is set, not just wait time
   if (verbose) {
     console.log('[Auth Helper] Waiting for session cookie persistence...');
   }
-  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
-    if (verbose) console.log('[Auth Helper] Network idle timeout, continuing...');
-  });
-  await page.waitForTimeout(2000);
+
+  const maxWaitMs = 10000; // 10 second maximum
+  const pollIntervalMs = 200; // Check every 200ms
+  const startTime = Date.now();
+  let cookieFound = false;
+
+  while (Date.now() - startTime < maxWaitMs) {
+    const currentCookies = await page.context().cookies();
+    const hasCookie = currentCookies.some(c =>
+      c.name === 'connect.sid' ||
+      c.name.includes('session') ||
+      c.name.includes('sess') ||
+      c.name.includes('auth')
+    );
+
+    if (hasCookie) {
+      cookieFound = true;
+      if (verbose) {
+        console.log('[Auth Helper] Session cookie detected via polling');
+      }
+      break;
+    }
+
+    await page.waitForTimeout(pollIntervalMs);
+  }
+
+  if (!cookieFound && verbose) {
+    console.log('[Auth Helper] WARNING: Cookie not found during polling, will verify again below');
+  }
+
+  // Extra stability wait for session to be fully persisted in store
+  await page.waitForTimeout(500);
 
   // Verify session cookie exists and is properly configured
   if (verbose) {
@@ -362,15 +390,14 @@ export async function loginAsAdminQuick(
 
   if (!sessionCookie) {
     const cookieNames = cookies.map(c => c.name).join(', ');
-    // Log mais ne pas throw - permet aux tests de continuer
-    console.warn(
-      '[Auth Helper] WARNING: Session cookie not found after login. ' +
-      `Available cookies: ${cookieNames}. Continuing anyway...`
+    throw new Error(
+      '[Auth Helper] CRITICAL: Session cookie not found after login. ' +
+      `Available cookies: ${cookieNames}. This indicates the login failed to persist the session.`
     );
   }
 
   if (verbose) {
-    console.log(`[Auth Helper] OK Session cookie found: ${sessionCookie.name}`);
+    console.log(`[Auth Helper] ✓ Session cookie found: ${sessionCookie.name}`);
     console.log(`  - Domain: ${sessionCookie.domain}`);
     console.log(`  - Path: ${sessionCookie.path}`);
     console.log(`  - HttpOnly: ${sessionCookie.httpOnly}`);

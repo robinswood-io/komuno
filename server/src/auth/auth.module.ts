@@ -49,6 +49,12 @@ if (devLoginEnabled) {
             httpOnly: true,
             sameSite: 'lax', // Nécessaire pour PATCH/POST requests
             maxAge: 24 * 60 * 60 * 1000, // 24 hours
+            // Set domain for cross-subdomain cookies (important for Traefik routing)
+            // In dev/test, this allows https://cjd80.rbw.ovh to access cookies
+            domain: process.env.NODE_ENV === 'production'
+              ? '.cjd80.local' // Production domain
+              : '.rbw.ovh',    // Dev/test domain for .rbw.ovh
+            path: '/',
           },
         };
         return sessionSettings;

@@ -114,7 +114,15 @@ export class AuthController {
               return res.status(500).json({ message: 'Erreur lors de la connexion' });
             }
 
-            logger.info('[Auth] Connexion locale réussie', { email: user.email });
+            // Log session cookie info for debugging
+            const sessionId = (req as any).sessionID;
+            const cookies = res.getHeaders()['set-cookie'];
+            logger.info('[Auth] Connexion locale réussie', {
+              email: user.email,
+              sessionID: sessionId,
+              cookies: Array.isArray(cookies) ? cookies.map(c => c.split(';')[0]) : [cookies],
+            });
+
             res.json(this.authService.getUserWithoutPassword(user));
             resolve();
           });

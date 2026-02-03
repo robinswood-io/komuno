@@ -3,11 +3,12 @@ import { cleanupTestData } from './helpers/cleanup';
 
 /**
  * Custom test fixture avec nettoyage automatique après chaque test
- * 
+ * + Gestion robuste des cookies de session
+ *
  * Utilisation:
  * ```typescript
  * import { test, expect } from '../fixtures';
- * 
+ *
  * test.describe('My tests', () => {
  *   test('should create and cleanup test data', async ({ page }) => {
  *     // Vos tests ici - les données seront automatiquement nettoyées après
@@ -22,7 +23,7 @@ const test = base.extend<{ autoCleanup: void }>({
   autoCleanup: [async ({}, use) => {
     // Avant le test (setup) - rien à faire ici
     await use();
-    
+
     // Après le test (teardown) - nettoyer les données
     try {
       await cleanupTestData();
