@@ -39,8 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchAuthMode = async () => {
       try {
         const response = await fetch('/api/auth/mode');
-        const data = await response.json();
-        setAuthMode(data.mode || 'oauth');
+        const result = await response.json();
+        // L'API retourne {success: true, data: {mode: "local"}}
+        setAuthMode(result.data?.mode || 'oauth');
       } catch {
         // Par défaut, utiliser oauth si la requête échoue
         setAuthMode('oauth');
