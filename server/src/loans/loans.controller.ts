@@ -74,6 +74,7 @@ export class LoansController {
  * Controller Admin Loans - Routes admin pour la gestion des prêts
  */
 @ApiTags('loans')
+@ApiBearerAuth()
 @Controller('api/admin/loan-items')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AdminLoansController {

@@ -17,6 +17,7 @@ import {
   updateDevelopmentRequestStatusSchema,
   ADMIN_ROLES,
   type Idea,
+  type Admin,
   type DevelopmentRequest
 } from '../../../shared/schema';
 import { ZodError } from 'zod';
@@ -244,11 +245,9 @@ export class AdminService {
 
   // ===== Routes Admin Administrators =====
 
-  private sanitizeAdmin(admin: any) {
-    return {
-      ...admin,
-      password: undefined,
-    };
+  private sanitizeAdmin(admin: Admin) {
+    const { password, ...sanitized } = admin;
+    return sanitized;
   }
 
   async getAllAdministrators() {
@@ -927,7 +926,7 @@ export class AdminService {
     }
 
     logger.info('[Test Email] Admins récupérés:', { count: adminsResult.data?.length || 0 });
-    const activeAdmins = adminsResult.data?.filter((a: any) => a.isActive && a.status === 'active') || [];
+    const activeAdmins = adminsResult.data?.filter((a: Admin) => a.isActive && a.status === 'active') || [];
     logger.info('[Test Email] Admins actifs:', { count: activeAdmins.length });
 
     if (activeAdmins.length === 0) {

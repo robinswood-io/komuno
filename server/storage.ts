@@ -5163,8 +5163,11 @@ export class DatabaseStorage implements IStorage {
         createdAt: memberSubscriptions.createdAt,
       }).from(memberSubscriptions);
       const sponsorships = await db.select().from(eventSponsorships)
-        .where(sql`${eventSponsorships.status} IN ('confirmed', 'completed')`);
-      
+        .where(or(
+          eq(eventSponsorships.status, 'confirmed'),
+          eq(eventSponsorships.status, 'completed')
+        ));
+
       // Calculer les moyennes historiques par catégorie
       const incomeCategories = await db.select().from(financialCategories)
         .where(sql`${financialCategories.type} = 'income'`);
@@ -5272,8 +5275,11 @@ export class DatabaseStorage implements IStorage {
         createdAt: memberSubscriptions.createdAt,
       }).from(memberSubscriptions);
       const sponsorships = await db.select().from(eventSponsorships)
-        .where(sql`${eventSponsorships.status} IN ('confirmed', 'completed')`);
-      
+        .where(or(
+          eq(eventSponsorships.status, 'confirmed'),
+          eq(eventSponsorships.status, 'completed')
+        ));
+
       let actualRevenues = subscriptions.reduce((sum, s) => sum + s.amountInCents, 0) +
         sponsorships.reduce((sum, s) => sum + s.amount, 0);
       
@@ -5377,7 +5383,10 @@ export class DatabaseStorage implements IStorage {
           createdAt: memberSubscriptions.createdAt,
         }).from(memberSubscriptions);
         const sponsorships = await db.select().from(eventSponsorships)
-          .where(sql`${eventSponsorships.status} IN ('confirmed', 'completed')`);
+          .where(or(
+            eq(eventSponsorships.status, 'confirmed'),
+            eq(eventSponsorships.status, 'completed')
+          ));
         const expenses = await db.select().from(financialExpenses);
         
         // Filtrer par année
@@ -5483,8 +5492,11 @@ export class DatabaseStorage implements IStorage {
         createdAt: memberSubscriptions.createdAt,
       }).from(memberSubscriptions);
       const sponsorships = await db.select().from(eventSponsorships)
-        .where(sql`${eventSponsorships.status} IN ('confirmed', 'completed')`);
-      
+        .where(or(
+          eq(eventSponsorships.status, 'confirmed'),
+          eq(eventSponsorships.status, 'completed')
+        ));
+
       let periodSubscriptions = 0;
       let periodSponsorships = 0;
       

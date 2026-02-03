@@ -6,6 +6,7 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 
 @ApiTags('chatbot')
+@ApiBearerAuth()
 @Controller('api/admin/chatbot')
 export class ChatbotController {
   constructor(private readonly chatbotService: ChatbotService) {}

@@ -12,6 +12,7 @@ import {
   updateMemberTaskSchema,
   insertMemberRelationSchema,
   DuplicateError,
+  type MemberTask,
 } from '../../../shared/schema';
 import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
@@ -398,7 +399,7 @@ export class MembersService {
   async updateTask(id: string, data: unknown, userEmail?: string) {
     try {
       const validatedData = updateMemberTaskSchema.parse(data);
-      const updateData: any = { ...validatedData };
+      const updateData: Partial<MemberTask> = { ...validatedData };
       if (validatedData.status === 'completed' && !validatedData.completedBy) {
         updateData.completedBy = userEmail;
       }

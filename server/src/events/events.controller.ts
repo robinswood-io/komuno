@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { User } from '../auth/decorators/user.decorator';
+import type { Admin } from '@shared/schema';
 
 @ApiTags('events')
 @Controller('api/events')
@@ -76,7 +77,7 @@ export class EventsController {
   @ApiResponse({ status: 400, description: 'Données invalides' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
-  async createEvent(@Body() body: unknown, @User() user: any) {
+  async createEvent(@Body() body: unknown, @User() user: Admin) {
     return await this.eventsService.createEvent(body, user);
   }
 
@@ -100,7 +101,7 @@ export class EventsController {
   @ApiResponse({ status: 400, description: 'Données invalides' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
-  async createEventWithInscriptions(@Body() body: unknown, @User() user: any) {
+  async createEventWithInscriptions(@Body() body: unknown, @User() user: Admin) {
     return await this.eventsService.createEventWithInscriptions(body, user);
   }
 

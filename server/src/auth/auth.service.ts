@@ -64,8 +64,8 @@ export class AuthService {
   /**
    * Obtenir l'utilisateur actuel sans le mot de passe
    */
-  getUserWithoutPassword(user: any): any {
-    if (!user) return null;
+  getUserWithoutPassword(user: Admin): Omit<Admin, 'password'> {
+    if (!user) return null as any; // Runtime guard, TS allows null for compatibility
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }

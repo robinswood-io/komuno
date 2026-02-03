@@ -83,7 +83,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Connexion réussie', schema: { type: 'object', properties: { email: { type: 'string' }, role: { type: 'string' } } } })
   @ApiResponse({ status: 401, description: 'Identifiants invalides' })
   @ApiResponse({ status: 400, description: 'Données invalides' })
-  async login(@Req() req: Request, @Res() res: Response, @Body() body: any) {
+  async login(@Req() req: Request, @Res() res: Response, @Body() body: unknown) {
     try {
       const validatedData = loginSchema.parse(body);
 
@@ -150,7 +150,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Email envoyé (si le compte existe)' })
   @ApiResponse({ status: 400, description: 'Email invalide' })
-  async forgotPassword(@Body() body: any) {
+  async forgotPassword(@Body() body: unknown) {
     try {
       const validatedData = forgotPasswordSchema.parse(body);
       
@@ -205,7 +205,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Mot de passe réinitialisé avec succès' })
   @ApiResponse({ status: 400, description: 'Données invalides ou token expiré' })
-  async resetPassword(@Body() body: any) {
+  async resetPassword(@Body() body: unknown) {
     try {
       const validatedData = resetPasswordSchema.parse(body);
       

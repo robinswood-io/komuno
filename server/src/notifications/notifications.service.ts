@@ -22,7 +22,7 @@ export class NotificationsService {
           ...data,
           createdAt: new Date(),
           updatedAt: new Date(),
-        } as any)
+        })
         .returning();
 
       this.logger.debug(`Notification créée: ${result[0]?.id}`);
@@ -251,7 +251,7 @@ export class NotificationsService {
     notificationId: string,
     data: UpdateNotification
   ): Promise<Notification> {
-    const updateData: any = { updatedAt: new Date() };
+    const updateData: Partial<Notification> = { updatedAt: new Date() };
 
     if (data.isRead !== undefined) {
       updateData.isRead = data.isRead;
