@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import { Database } from '../common/database/database.providers';
+import { DATABASE } from '../common/database/database.providers';
+import { DrizzleDb } from '../common/database/types';
 import { notifications, Notification, InsertNotification, UpdateNotification, NotificationMetadata } from '../../../shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 
@@ -8,7 +9,7 @@ import { eq, and, desc, sql } from 'drizzle-orm';
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(@Inject('DB') private db: Database) {}
+  constructor(@Inject(DATABASE) private db: DrizzleDb) {}
 
   /**
    * Create a new notification
@@ -100,11 +101,12 @@ export class NotificationsService {
 
     for (const notif of userNotifications) {
       let groupKey = 'ungrouped';
+      const metadata = (notif.metadata as Record<string, unknown>) ?? {};
 
-      if (groupBy === 'project' && notif.metadata?.projectId) {
-        groupKey = notif.metadata.projectId;
-      } else if (groupBy === 'offer' && notif.metadata?.offerId) {
-        groupKey = notif.metadata.offerId;
+      if (groupBy === 'project' && metadata.projectId) {
+        groupKey = String(metadata.projectId);
+      } else if (groupBy === 'offer' && metadata.offerId) {
+        groupKey = String(metadata.offerId);
       } else if (groupBy === 'entity' && notif.entityId) {
         groupKey = `${notif.entityType}:${notif.entityId}`;
       }
