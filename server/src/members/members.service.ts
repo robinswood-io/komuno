@@ -399,14 +399,14 @@ export class MembersService {
   async updateTask(id: string, data: unknown, userEmail?: string) {
     try {
       const validatedData = updateMemberTaskSchema.parse(data);
-      const updateData: Partial<MemberTask> = { ...validatedData };
+      const updateData: Record<string, unknown> = { ...validatedData };
       if (validatedData.status === 'completed' && !validatedData.completedBy) {
         updateData.completedBy = userEmail;
       }
       if (updateData.dueDate === null) {
         updateData.dueDate = undefined;
       }
-      const result = await this.storageService.instance.updateTask(id, updateData);
+      const result = await this.storageService.instance.updateTask(id, updateData as Parameters<typeof this.storageService.instance.updateTask>[1]);
       if (!result.success) {
         if (('error' in result ? result.error : new Error('Unknown error')).name === 'NotFoundError') {
           throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
