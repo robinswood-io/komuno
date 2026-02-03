@@ -86,7 +86,8 @@ test.describe('US-IDEAS-001: Consulter les idées publiques', () => {
     await page.goto(BASE_URL);
 
     // Vérifier le titre de la page
-    await expect(page.locator('h1, h2')).toContainText(/Idées|Boîte à Kiffs/i);
+    const heading = page.locator('h1, h2').first();
+    await expect(heading).toContainText(/Idées|Boîte à Kiffs/i);
 
     // Attendre le chargement des données
     await page.waitForTimeout(2000);
@@ -127,7 +128,8 @@ test.describe('US-EVENTS-001: Consulter les événements à venir', () => {
     }
 
     // Vérifier que la page événements est affichée
-    await expect(page.locator('h1, h2')).toContainText(/Événements/i);
+    const heading = page.locator('h1, h2').first();
+    await expect(heading).toContainText(/Événements/i);
 
     // Vérifier l'état vide OU les événements affichés
     const eventsContent = page.locator('text=/Aucun événement|événement/i');
@@ -161,7 +163,8 @@ test.describe('US-ADMIN-001: Accéder au dashboard admin', () => {
     await page.waitForURL(/\/admin/, { timeout: 10000 });
 
     // 3. Vérifier présence du dashboard
-    await expect(page.locator('h1, h2')).toContainText(/Dashboard|Administration/i, { timeout: 5000 });
+    const heading = page.locator('h1, h2').first();
+    await expect(heading).toContainText(/Dashboard|Administration/i, { timeout: 5000 });
 
     // 4. Vérifier API /api/admin/stats (si disponible)
     const response = await page.request.get(`${BASE_URL}/api/admin/stats`);

@@ -26,12 +26,25 @@ const test = base.extend<{ autoCleanup: void }>({
 
     // Après le test (teardown) - nettoyer les données
     try {
-      await cleanupTestData();
+      const cleanupPromise = cleanupTestData();
+      // Timeout agressif pour éviter que le nettoyage bloque les tests
+      await Promise.race([
+        cleanupPromise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('[Test Cleanup] Timeout')), 5000)
+        )
+      ]);
     } catch (error) {
-      console.error('[Test Cleanup] Erreur lors du nettoyage automatique:', error);
+      const errorMsg = String(error).toLowerCase();
+      // Ignorer les erreurs de connexion réseau (tests locaux hors Docker)
+      if (errorMsg.includes('eai_again') || errorMsg.includes('getaddrinfo') || errorMsg.includes('timeout')) {
+        console.log('[Test Cleanup] ⚠️  Nettoyage timeout/inaccessible - ignoré (tests locaux?)');
+      } else {
+        console.error('[Test Cleanup] Erreur lors du nettoyage automatique:', error);
+      }
       // On ne fait pas échouer le test si le nettoyage échoue
     }
-  }, { auto: true }] // auto: true force l'exécution pour chaque test
+  }, { auto: true, timeout: 30000 }] // Timeout de 30s pour la fixture
 });
 
 export { test, expect };
