@@ -96,8 +96,8 @@ export default function AdminLoansPage() {
     }) => api.post('/api/admin/loan-items', data),
     onSuccess: () => {
       toast({
-        title: 'Item créé',
-        description: 'L\'item de prêt a été créé avec succès',
+        title: 'Objet créé',
+        description: 'L\'objet de prêt a été ajouté avec succès',
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.loans.all });
       setShowCreateModal(false);
@@ -187,10 +187,10 @@ export default function AdminLoansPage() {
   };
 
   const handleCreate = () => {
-    if (!formData.title || !formData.lenderName || !formData.proposedBy || !formData.proposedByEmail) {
+    if (!formData.title || !formData.lenderName) {
       toast({
         title: 'Erreur',
-        description: 'Tous les champs obligatoires doivent être remplis',
+        description: 'Le nom et le prêteur sont obligatoires',
         variant: 'destructive',
       });
       return;
@@ -201,8 +201,8 @@ export default function AdminLoansPage() {
       description: formData.description || undefined,
       lenderName: formData.lenderName,
       photoUrl: formData.photoUrl || undefined,
-      proposedBy: formData.proposedBy,
-      proposedByEmail: formData.proposedByEmail,
+      proposedBy: formData.proposedBy || 'Admin',
+      proposedByEmail: formData.proposedByEmail || 'admin@cjd-amiens.fr',
     });
   };
 
@@ -542,6 +542,7 @@ export default function AdminLoansPage() {
               <Label htmlFor="title">Nom de l'item *</Label>
               <Input
                 id="title"
+                name="name"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Ex: Vidéoprojecteur Epson"
@@ -551,6 +552,7 @@ export default function AdminLoansPage() {
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
+                name="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Description détaillée de l'item"
@@ -562,6 +564,7 @@ export default function AdminLoansPage() {
                 <Label htmlFor="lenderName">Nom du prêteur *</Label>
                 <Input
                   id="lenderName"
+                  name="lenderName"
                   value={formData.lenderName}
                   onChange={(e) => setFormData({ ...formData, lenderName: e.target.value })}
                   placeholder="Nom de la personne qui prête"
@@ -587,22 +590,24 @@ export default function AdminLoansPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="proposedBy">Proposé par *</Label>
+                <Label htmlFor="proposedBy">Proposé par</Label>
                 <Input
                   id="proposedBy"
+                  name="proposedBy"
                   value={formData.proposedBy}
                   onChange={(e) => setFormData({ ...formData, proposedBy: e.target.value })}
-                  placeholder="Nom"
+                  placeholder="Nom (optionnel)"
                 />
               </div>
               <div>
-                <Label htmlFor="proposedByEmail">Email *</Label>
+                <Label htmlFor="proposedByEmail">Email</Label>
                 <Input
                   id="proposedByEmail"
+                  name="proposedByEmail"
                   type="email"
                   value={formData.proposedByEmail}
                   onChange={(e) => setFormData({ ...formData, proposedByEmail: e.target.value })}
-                  placeholder="email@exemple.com"
+                  placeholder="email@exemple.com (optionnel)"
                 />
               </div>
             </div>
@@ -620,7 +625,7 @@ export default function AdminLoansPage() {
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>
               Annuler
             </Button>
-            <Button onClick={handleCreate} disabled={createMutation.isPending}>
+            <Button type="submit" onClick={handleCreate} disabled={createMutation.isPending}>
               {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Créer
             </Button>

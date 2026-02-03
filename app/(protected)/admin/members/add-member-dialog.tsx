@@ -147,6 +147,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
             <div className="col-span-3">
               <Input
                 id="firstName"
+                name="firstName"
                 placeholder="Jean"
                 value={formData.firstName}
                 onChange={(e) => handleInputChange('firstName', e.target.value)}
@@ -166,6 +167,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
             <div className="col-span-3">
               <Input
                 id="lastName"
+                name="lastName"
                 placeholder="Dupont"
                 value={formData.lastName}
                 onChange={(e) => handleInputChange('lastName', e.target.value)}
@@ -185,6 +187,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
             <div className="col-span-3">
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="jean.dupont@example.com"
                 value={formData.email}
@@ -205,6 +208,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
             <div className="col-span-3">
               <Input
                 id="company"
+                name="company"
                 placeholder="Entreprise SAS"
                 value={formData.company}
                 onChange={(e) => handleInputChange('company', e.target.value)}
@@ -251,7 +255,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
             Annuler
           </Button>
           <Button
-            type="button"
+            type="submit"
             onClick={handleSubmit}
             disabled={createMutation.isPending}
           >
