@@ -2542,25 +2542,49 @@ export class DatabaseStorage implements IStorage {
   
   async createEventSponsorship(sponsorship: InsertEventSponsorship): Promise<Result<EventSponsorship>> {
     try {
+      // Build sponsorshipData without undefined/null fields
       const sponsorshipData: any = {
-        ...sponsorship,
+        eventId: sponsorship.eventId,
+        patronId: sponsorship.patronId,
+        level: sponsorship.level,
+        amount: sponsorship.amount,
+        proposedByAdminEmail: sponsorship.proposedByAdminEmail,
       };
 
+      // Add optional fields only if they're provided and not null
+      if (sponsorship.benefits) {
+        sponsorshipData.benefits = sponsorship.benefits;
+      }
+      if (sponsorship.isPubliclyVisible !== undefined) {
+        sponsorshipData.isPubliclyVisible = sponsorship.isPubliclyVisible;
+      }
+      if (sponsorship.status) {
+        sponsorshipData.status = sponsorship.status;
+      }
+      if (sponsorship.logoUrl) {
+        sponsorshipData.logoUrl = sponsorship.logoUrl;
+      }
+      if (sponsorship.websiteUrl) {
+        sponsorshipData.websiteUrl = sponsorship.websiteUrl;
+      }
       if (sponsorship.confirmedAt) {
         sponsorshipData.confirmedAt = new Date(sponsorship.confirmedAt);
+      }
+      if (sponsorship.notes) {
+        sponsorshipData.notes = sponsorship.notes;
       }
 
       const [newSponsorship] = await db
         .insert(eventSponsorships)
         .values(sponsorshipData)
         .returning();
-      
-      logger.info('Event sponsorship created', { 
-        sponsorshipId: newSponsorship.id, 
-        eventId: newSponsorship.eventId, 
+
+      logger.info('Event sponsorship created', {
+        sponsorshipId: newSponsorship.id,
+        eventId: newSponsorship.eventId,
         patronId: newSponsorship.patronId,
         level: newSponsorship.level,
-        amount: newSponsorship.amount 
+        amount: newSponsorship.amount
       });
       return { success: true, data: newSponsorship };
     } catch (error) {

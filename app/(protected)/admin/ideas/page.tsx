@@ -518,6 +518,7 @@ export default function AdminIdeasPage() {
               <Label htmlFor="title">Titre *</Label>
               <Input
                 id="title"
+                name="title"
                 placeholder="Ex: Organiser un afterwork mensuel"
                 value={createFormData.title}
                 onChange={(e) => setCreateFormData({ ...createFormData, title: e.target.value })}
@@ -531,6 +532,7 @@ export default function AdminIdeasPage() {
               <Label htmlFor="description">Description (optionnelle)</Label>
               <textarea
                 id="description"
+                name="description"
                 className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="Décrivez votre idée en détail..."
                 value={createFormData.description}
@@ -546,6 +548,7 @@ export default function AdminIdeasPage() {
                 <Label htmlFor="proposedBy">Nom du proposant *</Label>
                 <Input
                   id="proposedBy"
+                  name="proposedBy"
                   placeholder="Ex: Jean Dupont"
                   value={createFormData.proposedBy}
                   onChange={(e) => setCreateFormData({ ...createFormData, proposedBy: e.target.value })}
@@ -555,6 +558,7 @@ export default function AdminIdeasPage() {
                 <Label htmlFor="proposedByEmail">Email du proposant *</Label>
                 <Input
                   id="proposedByEmail"
+                  name="proposedByEmail"
                   type="email"
                   placeholder="Ex: jean.dupont@exemple.fr"
                   value={createFormData.proposedByEmail}

@@ -1141,12 +1141,14 @@ export const insertPatronDonationSchema = z.object({
 }).refine(
   (data) => data.amountInCents !== undefined || data.amount !== undefined,
   { message: "Soit 'amountInCents' soit 'amount' doit être fourni" }
-).transform((data) => ({
-  ...data,
-  // Normalize to 'amount' field for database
-  amount: data.amountInCents ?? data.amount,
-  amountInCents: undefined,
-}));
+).transform((data) => {
+  const { amountInCents, ...rest } = data;
+  return {
+    ...rest,
+    // Normalize to 'amount' field for database
+    amount: data.amountInCents ?? data.amount,
+  };
+});
 
 // Pure Zod v4 schema
 export const insertPatronUpdateSchema = z.object({
@@ -1338,16 +1340,21 @@ export const insertEventSponsorshipSchema = z.object({
 ).refine(
   (data) => data.amountInCents || data.amount,
   { message: "Soit 'amountInCents' soit 'amount' doit être fourni" }
-).transform((data) => ({
-  ...data,
-  // Normalize to 'level' field for database
-  level: data.level ?? data.type,
-  // Normalize to 'amount' field for database
-  amount: data.amountInCents ?? data.amount,
-  // Remove the original fields to avoid duplication
-  type: undefined,
-  amountInCents: undefined,
-}));
+).transform((data) => {
+  const { type, amountInCents, confirmedAt, ...rest } = data;
+  const result: any = {
+    ...rest,
+    // Normalize to 'level' field for database
+    level: data.level ?? data.type,
+    // Normalize to 'amount' field for database
+    amount: data.amountInCents ?? data.amount,
+  };
+  // Only include confirmedAt if it's not null
+  if (confirmedAt !== null && confirmedAt !== undefined) {
+    result.confirmedAt = confirmedAt;
+  }
+  return result;
+});
 
 export const updateEventSponsorshipSchema = z.object({
   level: z.enum(["platinum", "gold", "silver", "bronze", "partner"]).optional(),

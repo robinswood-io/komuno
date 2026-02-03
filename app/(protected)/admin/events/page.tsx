@@ -525,6 +525,7 @@ export default function AdminEventsPage() {
               <Label htmlFor="title">Titre *</Label>
               <Input
                 id="title"
+                name="title"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Titre de l'événement"
@@ -534,6 +535,7 @@ export default function AdminEventsPage() {
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
+                name="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Description de l'événement"
@@ -545,6 +547,7 @@ export default function AdminEventsPage() {
                 <Label htmlFor="date">Date et heure *</Label>
                 <Input
                   id="date"
+                  name="date"
                   type="datetime-local"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
@@ -554,6 +557,7 @@ export default function AdminEventsPage() {
                 <Label htmlFor="location">Lieu</Label>
                 <Input
                   id="location"
+                  name="location"
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   placeholder="Lieu de l'événement"
