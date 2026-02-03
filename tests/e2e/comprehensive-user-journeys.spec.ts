@@ -65,18 +65,21 @@ test.describe('PARCOURS 1: Admin - Gestion Complète Idées', () => {
     await page.goto('/admin/ideas');
 
     // Cliquer sur bouton créer
-    await page.click('button:has-text("Nouvelle idée"), button:has-text("Ajouter"), button:has-text("Créer")');
+    await page.click('button:has-text("Nouvelle idée")');
+    await page.waitForTimeout(500); // Attendre que le modal s'ouvre
 
     // Remplir formulaire
-    await page.fill('input[name="title"], input[placeholder*="titre"]', 'Idée Test Admin ' + Date.now());
-    await page.fill('textarea[name="description"], textarea[placeholder*="description"]', 'Description de test pour l\'idée admin');
+    await page.fill('input[name="title"]', 'Idée Test Admin ' + Date.now());
+    await page.fill('textarea[name="description"]', 'Description de test pour l\'idée admin');
+    await page.fill('input[name="proposedBy"]', 'Admin Test');
+    await page.fill('input[name="proposedByEmail"]', 'admin@test.local');
 
-    // Soumettre
-    await page.click('button[type="submit"]');
-    await page.waitForTimeout(2000);
+    // Soumettre - le bouton dit "Créer l'idée"
+    await page.click('button:has-text("Créer l\'idée")');
+    await page.waitForTimeout(1000);
 
-    // Vérifier création
-    await expect(page.locator('text=/Idée.*créée|créée avec succès/i')).toBeVisible({ timeout: 10000 });
+    // Vérifier création (utiliser first() car notification peut avoir plusieurs éléments)
+    await expect(page.locator('text=/Idée.*créée|créée avec succès/i').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('1.5 Approuver une idée pending', async ({ page }) => {
@@ -167,19 +170,22 @@ test.describe('PARCOURS 2: Admin - Événements Complet', () => {
     await page.goto('/admin/events');
 
     await page.click('button:has-text("Nouvel événement"), button:has-text("Créer")');
+    await page.waitForTimeout(500); // Attendre que le modal s'ouvre
 
     await page.fill('input[name="title"]', 'Événement Test ' + Date.now());
     await page.fill('textarea[name="description"]', 'Description complète de l\'événement de test');
     await page.fill('input[name="location"]', 'Amiens, France');
 
-    // Date (si date picker)
-    const dateInput = page.locator('input[type="date"], input[name="date"]');
+    // Date datetime-local nécessite format complet: YYYY-MM-DDTHH:MM
+    const dateInput = page.locator('input[type="datetime-local"], input[name="date"]');
     if (await dateInput.count() > 0) {
-      await dateInput.fill('2026-03-15');
+      await dateInput.fill('2026-03-15T14:00');
     }
 
-    await page.click('button[type="submit"]');
-    await expect(page.locator('text=/événement.*créé/i')).toBeVisible();
+    // Cliquer sur le bouton de soumission dans le modal
+    await page.click('button:has-text("Créer"):not(:has-text("Créer un événement"))');
+    await page.waitForTimeout(1000);
+    await expect(page.locator('text=/événement.*créé/i').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('2.3 Publier événement (draft → published)', async ({ page }) => {
@@ -670,7 +676,7 @@ test.describe('PARCOURS 10: Erreurs & Edge Cases', () => {
 
   test('10.5 Accéder ressource inexistante', async ({ page }) => {
     await page.goto('/this-page-does-not-exist-123456789');
-    await expect(page.locator('text=/404|introuvable|not found/i')).toBeVisible();
+    await expect(page.locator('h1:has-text("404")')).toBeVisible();
   });
 
   test('10.6 Navigation back browser', async ({ page }) => {
