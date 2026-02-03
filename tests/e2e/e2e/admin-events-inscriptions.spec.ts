@@ -130,9 +130,10 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
           await page.waitForTimeout(1500);
 
           // Verify inscriptions modal/page appeared
-          const inscriptionsContent = page.locator(
-            'text=/Inscription|Gestion/i, [role="dialog"], [role="main"]'
-          ).first();
+          const inscriptionsContent = page
+            .locator('[role="dialog"], [role="main"]')
+            .filter({ hasText: /Inscription|Gestion/i })
+            .first();
 
           await expect(inscriptionsContent).toBeVisible({ timeout: 5000 });
           console.log('[TEST] Inscriptions list displayed successfully');

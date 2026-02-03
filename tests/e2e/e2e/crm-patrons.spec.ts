@@ -33,7 +33,7 @@ import { loginAsAdminQuick } from '../helpers/auth';
 const BASE_URL = 'https://cjd80.rbw.ovh';
 const API_BASE = `${BASE_URL}/api`;
 
-interface PatronResponse {
+interface PatronData {
   id: string;
   firstName: string;
   lastName: string;
@@ -45,8 +45,13 @@ interface PatronResponse {
   status?: string;
 }
 
+interface PatronResponse {
+  success: boolean;
+  data: PatronData;
+}
+
 interface PaginatedPatronResponse {
-  data: PatronResponse[];
+  data: PatronData[];
   total: number;
   page: number;
   limit: number;
@@ -131,7 +136,12 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     expect(createResponse.ok()).toBeTruthy();
     expect(createResponse.status()).toBe(201);
 
-    const createdPatron = await createResponse.json() as PatronResponse;
+    const response = await createResponse.json() as PatronResponse;
+    expect(response).toHaveProperty('success');
+    expect(response.success).toBe(true);
+    expect(response).toHaveProperty('data');
+
+    const createdPatron = response.data;
     expect(createdPatron).toHaveProperty('id');
     expect(createdPatron.firstName).toBe(TEST_PATRON.firstName);
     expect(createdPatron.lastName).toBe(TEST_PATRON.lastName);
@@ -163,8 +173,8 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json() as PatronResponse;
-    const patronId = patron.id;
+    const response = await createResponse.json() as PatronResponse;
+    const patronId = response.data.id;
 
     // Enregistrer un don
     const donationData = {
@@ -211,8 +221,8 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json() as PatronResponse;
-    const patronId = patron.id;
+    const response = await createResponse.json() as PatronResponse;
+    const patronId = response.data.id;
 
     // Créer un sponsoring
     const sponsorshipData = {
@@ -261,8 +271,8 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json() as PatronResponse;
-    const patronId = patron.id;
+    const response = await createResponse.json() as PatronResponse;
+    const patronId = response.data.id;
 
     // Enregistrer une interaction (meeting)
     const updateData = {
@@ -315,8 +325,8 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json() as PatronResponse;
-    const patronId = patron.id;
+    const response = await createResponse.json() as PatronResponse;
+    const patronId = response.data.id;
 
     // Enregistrer plusieurs dons
     const donations = [
@@ -365,8 +375,8 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json() as PatronResponse;
-    const patronId = patron.id;
+    const response = await createResponse.json() as PatronResponse;
+    const patronId = response.data.id;
 
     // Mettre à jour le mécène
     const updatedEmail = uniqueEmail('patron-updated');
@@ -651,8 +661,8 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json() as PatronResponse;
-    const patronId = patron.id;
+    const response = await createResponse.json() as PatronResponse;
+    const patronId = response.data.id;
 
     // Récupérer les propositions
     const proposalsResponse = await page.request.get(

@@ -436,10 +436,16 @@ test.describe('CRM Members: Tags Management', () => {
   test('11. Validation: nom de tag requis', async ({ page }) => {
     console.log('[TEST 11] Validation nom requis');
 
+    // Attendre que la page soit stable
+    await page.waitForLoadState('networkidle');
+
     // Ouvrir modal
     const createButton = page.locator('button').filter({ hasText: /nouveau|créer|ajouter/i }).first();
     await createButton.click();
     await page.waitForTimeout(500);
+
+    // Attendre que la page soit stable après le clic
+    await page.waitForLoadState('domcontentloaded');
 
     // Vérifier que le modal est ouvert
     const modal = page.locator('[role="dialog"]').first();

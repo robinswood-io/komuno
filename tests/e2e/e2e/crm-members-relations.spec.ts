@@ -659,10 +659,16 @@ test.describe('CRM Members: Relations Management', () => {
   test('18. Validation: deux membres obligatoires', async ({ page }) => {
     console.log('[TEST 18] Validation deux membres obligatoires');
 
+    // Attendre que la page soit stable
+    await page.waitForLoadState('networkidle');
+
     // Ouvrir modal
     const createButton = page.locator('button').filter({ hasText: /créer|nouvelle|ajouter/i }).first();
     await createButton.click();
     await page.waitForTimeout(500);
+
+    // Attendre que la page soit stable après le clic
+    await page.waitForLoadState('domcontentloaded');
 
     // Vérifier que le modal est ouvert
     const modal = page.locator('[role="dialog"]').first();
