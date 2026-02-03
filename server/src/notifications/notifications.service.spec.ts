@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NotificationsService } from './notifications.service';
 import type { Database } from '../common/database/database.providers';
 import { notifications } from '../../../shared/schema';
@@ -6,14 +7,14 @@ import { eq, and, desc, sql } from 'drizzle-orm';
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
-  let mockDb: jest.Mocked<Database>;
+  let mockDb: Partial<Database>;
 
   beforeEach(async () => {
     // Mock the database
     mockDb = {
-      insert: jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([
             {
               id: 'notif-1',
               userId: 'user-123',
@@ -30,25 +31,25 @@ describe('NotificationsService', () => {
           ]),
         }),
       }),
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            orderBy: jest.fn().mockResolvedValue([]),
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([]),
           }),
         }),
       }),
-      update: jest.fn().mockReturnValue({
-        set: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            returning: jest.fn().mockResolvedValue([
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([
               { id: 'notif-1', isRead: true },
             ]),
           }),
         }),
       }),
-      delete: jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([{ id: 'notif-1' }]),
+      delete: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 'notif-1' }]),
         }),
       }),
     } as any;
@@ -64,7 +65,7 @@ describe('NotificationsService', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('createNotification', () => {

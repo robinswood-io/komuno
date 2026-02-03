@@ -20,6 +20,10 @@ describe('TrackingController', () => {
     controller = new TrackingController(service);
   });
 
+  const createMockRequest = (): Partial<typeof import('express').Request> => ({
+    user: { email: 'test@example.com' },
+  });
+
   describe('getTrackingDashboard', () => {
     it('should call service and return dashboard data', async () => {
       const mockDashboard = {
@@ -159,10 +163,11 @@ describe('TrackingController', () => {
       };
 
       const user = { email: 'admin@example.com' };
+      const req = createMockRequest() as never;
 
       vi.mocked(service.createTrackingMetric).mockResolvedValueOnce(mockCreatedMetric);
 
-      const result = await controller.createTrackingMetric(requestBody, user);
+      const result = await controller.createTrackingMetric(requestBody, req, user);
 
       expect(result).toEqual(mockCreatedMetric);
 
@@ -180,13 +185,14 @@ describe('TrackingController', () => {
       };
 
       const user = { email: 'admin@example.com' };
+      const req = createMockRequest() as never;
 
       vi.mocked(service.createTrackingMetric).mockResolvedValueOnce({
         success: true,
         data: {} as never,
       });
 
-      await controller.createTrackingMetric(requestBody, user);
+      await controller.createTrackingMetric(requestBody, req, user);
 
       expect(service.createTrackingMetric).toHaveBeenCalledWith(requestBody, user.email);
     });
@@ -330,10 +336,11 @@ describe('TrackingController', () => {
       };
 
       const user = { email: 'admin@example.com' };
+      const req = createMockRequest() as never;
 
       vi.mocked(service.createTrackingAlert).mockResolvedValueOnce(mockCreatedAlert);
 
-      const result = await controller.createTrackingAlert(requestBody, user);
+      const result = await controller.createTrackingAlert(requestBody, req, user);
 
       expect(result).toEqual(mockCreatedAlert);
 
@@ -351,13 +358,14 @@ describe('TrackingController', () => {
       };
 
       const user = { email: 'manager@example.com' };
+      const req = createMockRequest() as never;
 
       vi.mocked(service.createTrackingAlert).mockResolvedValueOnce({
         success: true,
         data: {} as never,
       });
 
-      await controller.createTrackingAlert(requestBody, user);
+      await controller.createTrackingAlert(requestBody, req, user);
 
       expect(service.createTrackingAlert).toHaveBeenCalledWith(requestBody, 'manager@example.com');
     });
@@ -389,10 +397,11 @@ describe('TrackingController', () => {
       };
 
       const user = { email: 'admin@example.com' };
+      const req = createMockRequest() as never;
 
       vi.mocked(service.updateTrackingAlert).mockResolvedValueOnce(mockUpdatedAlert);
 
-      const result = await controller.updateTrackingAlert(alertId, requestBody, user);
+      const result = await controller.updateTrackingAlert(alertId, requestBody, req, user);
 
       expect(result).toEqual(mockUpdatedAlert);
 
@@ -407,13 +416,14 @@ describe('TrackingController', () => {
       };
 
       const user = { email: 'manager@example.com' };
+      const req = createMockRequest() as never;
 
       vi.mocked(service.updateTrackingAlert).mockResolvedValueOnce({
         success: true,
         data: {} as never,
       });
 
-      await controller.updateTrackingAlert(alertId, requestBody, user);
+      await controller.updateTrackingAlert(alertId, requestBody, req, user);
 
       expect(service.updateTrackingAlert).toHaveBeenCalledWith(alertId, requestBody, user.email);
     });
@@ -425,13 +435,14 @@ describe('TrackingController', () => {
       };
 
       const user = { email: 'admin@example.com' };
+      const req = createMockRequest() as never;
 
       vi.mocked(service.updateTrackingAlert).mockResolvedValueOnce({
         success: true,
         data: {} as never,
       });
 
-      await controller.updateTrackingAlert(alertId, requestBody, user);
+      await controller.updateTrackingAlert(alertId, requestBody, req, user);
 
       expect(service.updateTrackingAlert).toHaveBeenCalledWith(alertId, requestBody, 'admin@example.com');
     });
@@ -518,7 +529,8 @@ describe('TrackingController', () => {
       vi.mocked(service.createTrackingMetric).mockResolvedValueOnce(createdMetric);
 
       const user = { email: 'admin@example.com' };
-      const createResult = await controller.createTrackingMetric(createMetricBody, user);
+      const req = createMockRequest() as never;
+      const createResult = await controller.createTrackingMetric(createMetricBody, req, user);
 
       expect(createResult.success).toBe(true);
       expect(createResult.data.id).toBe('metric-1');
@@ -575,10 +587,11 @@ describe('TrackingController', () => {
       };
 
       const user = { email: 'admin@example.com' };
+      const req = createMockRequest() as never;
 
       vi.mocked(service.createTrackingAlert).mockResolvedValueOnce(createdAlert);
 
-      const createResult = await controller.createTrackingAlert(createAlertBody, user);
+      const createResult = await controller.createTrackingAlert(createAlertBody, req, user);
 
       expect(createResult.success).toBe(true);
       expect(createResult.data.id).toBe('alert-1');
@@ -599,7 +612,7 @@ describe('TrackingController', () => {
 
       vi.mocked(service.updateTrackingAlert).mockResolvedValueOnce(updatedAlert);
 
-      const updateResult = await controller.updateTrackingAlert('alert-1', updateAlertBody, user);
+      const updateResult = await controller.updateTrackingAlert('alert-1', updateAlertBody, req, user);
 
       expect(updateResult.success).toBe(true);
       expect(updateResult.data.isRead).toBe(true);
