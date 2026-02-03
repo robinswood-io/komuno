@@ -29,42 +29,78 @@ describe('EventsController', () => {
   describe('getEvents - GET /api/events', () => {
     it('devrait retourner la liste des événements sans paramètres', async () => {
       const mockData = {
-        data: [{ id: '1', title: 'Event 1' }],
-        total: 1,
+        success: true,
+        data: {
+          data: [{ id: '1', title: 'Event 1' }],
+          total: 1,
+          page: 1,
+          limit: 20,
+        },
       };
       mockEventsService.getEvents.mockResolvedValue(mockData);
 
       const result = await eventsController.getEvents();
 
       expect(mockEventsService.getEvents).toHaveBeenCalledWith(1, 20);
-      expect(result).toEqual(mockData);
+      expect(result.success).toBe(true);
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
     });
 
     it('devrait accepter page et limit en query params', async () => {
-      const mockData = { data: [], total: 0 };
+      const mockData = {
+        success: true,
+        data: {
+          data: [],
+          total: 0,
+          page: 2,
+          limit: 50,
+        },
+      };
       mockEventsService.getEvents.mockResolvedValue(mockData);
 
-      await eventsController.getEvents('2', '50');
+      const result = await eventsController.getEvents('2', '50');
 
       expect(mockEventsService.getEvents).toHaveBeenCalledWith(2, 50);
+      expect(result.success).toBe(true);
     });
 
     it('devrait convertir les strings en nombres', async () => {
-      mockEventsService.getEvents.mockResolvedValue({ data: [] });
+      const mockData = {
+        success: true,
+        data: {
+          data: [],
+          total: 0,
+          page: 5,
+          limit: 100,
+        },
+      };
+      mockEventsService.getEvents.mockResolvedValue(mockData);
 
-      await eventsController.getEvents('5', '100');
+      const result = await eventsController.getEvents('5', '100');
 
       expect(mockEventsService.getEvents).toHaveBeenCalledWith(5, 100);
+      expect(result.success).toBe(true);
     });
 
     it('devrait utiliser les valeurs par défaut si params invalides', async () => {
-      mockEventsService.getEvents.mockResolvedValue({ data: [] });
+      const mockData = {
+        success: true,
+        data: {
+          data: [],
+          total: 0,
+          page: 1,
+          limit: 20,
+        },
+      };
+      mockEventsService.getEvents.mockResolvedValue(mockData);
 
       // parseInt('invalid', 10) retourne NaN, qui devient 1 avec le fallback
-      await eventsController.getEvents('invalid', 'invalid');
+      const result = await eventsController.getEvents('invalid', 'invalid');
 
       // NaN est falsy, donc les defaults s'appliquent
       expect(mockEventsService.getEvents).toHaveBeenCalled();
+      expect(result.success).toBe(true);
     });
   });
 
@@ -482,20 +518,29 @@ describe('Integration - Controllers with Service', () => {
 
   it('devrait gérer le flux complet: créer -> lister -> mettre à jour -> supprimer', async () => {
     // Create
-    mockEventsService.createEvent.mockResolvedValue({ id: 'uuid-1', title: 'Test' });
+    const createdEvent = { id: 'uuid-1', title: 'Test', date: '2026-02-15T19:00:00Z' };
+    mockEventsService.createEvent.mockResolvedValue(createdEvent);
     const created = await eventsController.createEvent({ title: 'Test', date: '2026-02-15T19:00:00Z' }, {});
     expect(created.id).toBe('uuid-1');
 
-    // Read
+    // Read (List all events) - must include success and proper structure
     mockEventsService.getEvents.mockResolvedValue({
-      data: [created],
-      total: 1,
+      success: true,
+      data: {
+        data: [createdEvent],
+        total: 1,
+        page: 1,
+        limit: 20,
+      },
     });
     const list = await eventsController.getEvents();
     expect(list.data).toHaveLength(1);
+    expect(list.total).toBe(1);
+    expect(list.success).toBe(true);
 
     // Update
-    mockEventsService.updateEvent.mockResolvedValue({ ...created, title: 'Updated' });
+    const updatedEvent = { ...createdEvent, title: 'Updated' };
+    mockEventsService.updateEvent.mockResolvedValue(updatedEvent);
     const updated = await eventsController.updateEvent('uuid-1', { title: 'Updated' });
     expect(updated.title).toBe('Updated');
 
