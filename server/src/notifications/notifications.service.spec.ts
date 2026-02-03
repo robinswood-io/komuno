@@ -3,8 +3,27 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NotificationsService } from './notifications.service';
 import type { Database } from '../common/database/database.providers';
 import { DATABASE } from '../common/database/database.providers';
-import { notifications } from '../../../shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
+
+// Mock the schema module
+vi.mock('../../../shared/schema', () => ({
+  notifications: {
+    id: {},
+    userId: {},
+    type: {},
+    title: {},
+    body: {},
+    icon: {},
+    isRead: {},
+    metadata: {},
+    entityType: {},
+    entityId: {},
+    relatedProjectId: {},
+    relatedOfferId: {},
+    createdAt: {},
+    updatedAt: {},
+  },
+}));
 
 describe('NotificationsService', () => {
   let service: NotificationsService;
@@ -178,7 +197,7 @@ describe('NotificationsService', () => {
         },
       ];
 
-      jest
+      vi
         .spyOn(service, 'getNotificationsByUser')
         .mockResolvedValue(mockNotifications as any);
 
@@ -219,7 +238,7 @@ describe('NotificationsService', () => {
         },
       ];
 
-      jest
+      vi
         .spyOn(service, 'getNotificationsByUser')
         .mockResolvedValue(mockNotifications as any);
 
@@ -309,6 +328,20 @@ describe('NotificationsService', () => {
     it('should search with project filter', async () => {
       const userId = 'user-123';
       const projectId = 'proj-1';
+
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                offset: vi.fn().mockResolvedValue([
+                  { id: 'notif-1', projectId },
+                ]),
+              }),
+            }),
+          }),
+        }),
+      });
 
       const result = await service.searchNotifications(userId, {
         projectId,
