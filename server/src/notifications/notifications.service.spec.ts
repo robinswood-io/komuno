@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NotificationsService } from './notifications.service';
 import type { Database } from '../common/database/database.providers';
+import { DATABASE } from '../common/database/database.providers';
 import { notifications } from '../../../shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 
@@ -57,7 +58,7 @@ describe('NotificationsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsService,
-        { provide: 'DB', useValue: mockDb },
+        { provide: DATABASE, useValue: mockDb },
       ],
     }).compile();
 
@@ -87,9 +88,9 @@ describe('NotificationsService', () => {
     });
 
     it('should handle errors during creation', async () => {
-      mockDb.insert = jest.fn().mockReturnValue({
-        values: jest.fn().mockReturnValue({
-          returning: jest.fn().mockRejectedValue(new Error('DB Error')),
+      mockDb.insert = vi.fn().mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockRejectedValue(new Error('DB Error')),
         }),
       });
 
@@ -110,10 +111,10 @@ describe('NotificationsService', () => {
     it('should fetch all notifications for a user', async () => {
       const userId = 'user-123';
 
-      mockDb.select = jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            orderBy: jest.fn().mockResolvedValue([
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([
               {
                 id: 'notif-1',
                 userId,
@@ -245,10 +246,10 @@ describe('NotificationsService', () => {
     it('should mark multiple notifications as read', async () => {
       const notificationIds = ['notif-1', 'notif-2', 'notif-3'];
 
-      mockDb.update = jest.fn().mockReturnValue({
-        set: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            returning: jest.fn().mockResolvedValue([
+      mockDb.update = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([
               { id: 'notif-1', isRead: true },
               { id: 'notif-2', isRead: true },
               { id: 'notif-3', isRead: true },
@@ -283,12 +284,12 @@ describe('NotificationsService', () => {
     it('should search with type filter', async () => {
       const userId = 'user-123';
 
-      mockDb.select = jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            orderBy: jest.fn().mockReturnValue({
-              limit: jest.fn().mockReturnValue({
-                offset: jest.fn().mockResolvedValue([
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                offset: vi.fn().mockResolvedValue([
                   { id: 'notif-1', type: 'idea_update' },
                 ]),
               }),
@@ -322,9 +323,9 @@ describe('NotificationsService', () => {
     it('should return unread count for user', async () => {
       const userId = 'user-123';
 
-      mockDb.select = jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockResolvedValue([{ count: 5 }]),
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ count: 5 }]),
         }),
       });
 
@@ -336,9 +337,9 @@ describe('NotificationsService', () => {
 
   describe('deleteOldNotifications', () => {
     it('should delete notifications older than specified days', async () => {
-      mockDb.delete = jest.fn().mockReturnValue({
-        where: jest.fn().mockReturnValue({
-          returning: jest.fn().mockResolvedValue([
+      mockDb.delete = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([
             { id: 'notif-1' },
             { id: 'notif-2' },
           ]),
