@@ -126,10 +126,10 @@ export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps)
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-cjd-green flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-cjd-green flex items-center gap-2" data-testid="ideas-page-title">
             <Lightbulb className="w-6 h-6 sm:w-8 sm:h-8" />
-            Boîte à Kiffs
-          </h2>
+            Idées - Boîte à Kiffs
+          </h1>
           <p className="text-gray-600 mt-1">Proposez vos idées et votez pour vos préférées</p>
         </div>
         {onNavigateToPropose && (

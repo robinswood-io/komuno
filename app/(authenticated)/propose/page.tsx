@@ -135,6 +135,7 @@ export default function ProposePage() {
                   Titre de l'idée *
                 </label>
                 <Input
+                  name="title"
                   value={formData.title}
                   onChange={(e) => handleChange('title', e.target.value)}
                   placeholder="Ex: Organiser un afterwork mensuel"
@@ -150,6 +151,7 @@ export default function ProposePage() {
                   Description
                 </label>
                 <Textarea
+                  name="description"
                   value={formData.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                   placeholder="Décrivez votre idée en détail..."
