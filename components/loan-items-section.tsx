@@ -192,7 +192,7 @@ export default function LoanItemsSection({ onNavigateToPropose: _onNavigateToPro
       {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl sm:text-4xl font-bold text-cjd-green mb-3" data-testid="loan-page-title">
-          📦 Matériel disponible au prêt
+          📦 Prêts - Objets disponibles
         </h1>
         <p className="text-gray-600 text-base sm:text-lg">
           Découvrez le matériel que les JDs mettent à disposition
