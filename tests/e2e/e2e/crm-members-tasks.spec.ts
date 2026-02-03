@@ -75,9 +75,15 @@ async function clickModalSubmit(page: any, buttonText: string | RegExp = /créer
   
   // Attendre que les autres éléments ne le bloquent pas
   await page.waitForTimeout(200);
-  
-  // Cliquer
-  await submitButton.click();
+
+  // Cliquer avec force pour bypasser les overlays
+  await submitButton.click({ force: true });
+
+  // Attendre que le modal se ferme
+  await expect(modal).not.toBeVisible({ timeout: 8000 });
+
+  // Attendre le rechargement des données (tasks prend plus de temps car charge par membre)
+  await page.waitForTimeout(3000);
 }
 
 test.describe('CRM Members: Tasks Management', () => {
@@ -105,10 +111,10 @@ test.describe('CRM Members: Tasks Management', () => {
     console.log('[TEST 1] ✅ Bouton créer tâche visible');
   });
 
-  test('2. API GET /api/admin/tasks retourne la liste', async ({ request }) => {
+  test('2. API GET /api/admin/tasks retourne la liste', async ({ page }) => {
     console.log('[TEST 2] Test API GET tasks');
 
-    const response = await request.get(`${BASE_URL}/api/admin/tasks`);
+    const response = await page.request.get(`${BASE_URL}/api/admin/tasks`);
 
     expect(response.ok()).toBeTruthy();
     expect(response.status()).toBe(200);
@@ -129,7 +135,7 @@ test.describe('CRM Members: Tasks Management', () => {
       expect(firstTask).toHaveProperty('id');
       expect(firstTask).toHaveProperty('title');
       expect(firstTask).toHaveProperty('status');
-      expect(firstTask).toHaveProperty('type');
+      expect(firstTask).toHaveProperty('taskType');
       console.log('[TEST 2] ✅ Structure task valide:', Object.keys(firstTask));
     }
   });
@@ -307,33 +313,35 @@ test.describe('CRM Members: Tasks Management', () => {
     await createButton.click();
     await waitForModalReady(page);
 
-    // Remplir le formulaire
+    // Sélectionner un membre EN PREMIER (Radix UI Select - id="create-member")
+    const memberTrigger = page.locator('#create-member');
+    await memberTrigger.click({ force: true });
+    await page.waitForTimeout(500);
+    const firstMemberOption = page.locator('[role="option"]').first();
+    if (await firstMemberOption.count() > 0) {
+      await firstMemberOption.click({ force: true });
+      console.log('[TEST 8] ✅ Membre sélectionné');
+    }
+    await page.waitForTimeout(500);
+
+    // Remplir le titre (controlled React component - use pressSequentially)
     const taskTitle = `Test Task ${Date.now()}`;
-    const titleInput = page.locator('input[name="title"], input[placeholder*="titre" i]').first();
-    await titleInput.fill(taskTitle);
+    const titleInput = page.locator('#create-title');
+    await titleInput.click();
+    await titleInput.clear();
+    await page.waitForTimeout(200);
+    await titleInput.pressSequentially(taskTitle, { delay: 50 });
+    await page.waitForTimeout(300);
     console.log('[TEST 8] Titre saisi:', taskTitle);
 
-    // Description (optionnel)
-    const descInput = page.locator('textarea[name="description"], textarea[placeholder*="description" i]').first();
+    // Description (optionnel - also controlled component)
+    const descInput = page.locator('#create-description');
     if (await descInput.count() > 0) {
-      await descInput.fill('Tâche de test créée automatiquement');
-    }
-
-    // Sélectionner un type
-    const typeSelect = page.locator('select[name="type"]').first();
-    if (await typeSelect.count() > 0) {
-      await typeSelect.selectOption('call');
-      console.log('[TEST 8] ✅ Type sélectionné: call');
-    }
-
-    // Sélectionner un membre (premier de la liste)
-    const memberSelect = page.locator('select[name="memberEmail"]').first();
-    if (await memberSelect.count() > 0) {
-      const options = await memberSelect.locator('option').count();
-      if (options > 1) {
-        await memberSelect.selectOption({ index: 1 }); // Premier membre (index 0 = placeholder)
-        console.log('[TEST 8] ✅ Membre sélectionné');
-      }
+      await descInput.click();
+      await descInput.clear();
+      await page.waitForTimeout(100);
+      await descInput.pressSequentially('Tâche de test créée automatiquement', { delay: 30 });
+      await page.waitForTimeout(200);
     }
 
     // Date d'échéance (optionnel)
@@ -348,7 +356,6 @@ test.describe('CRM Members: Tasks Management', () => {
 
     // Soumettre avec helper
     await clickModalSubmit(page);
-    await page.waitForTimeout(2000);
 
     // Vérifier que la tâche apparaît dans la liste
     const newTask = page.locator(`text="${taskTitle}"`);
@@ -357,11 +364,11 @@ test.describe('CRM Members: Tasks Management', () => {
     console.log('[TEST 8] ✅ Tâche créée et visible');
   });
 
-  test('9. API POST /api/admin/tasks crée une tâche', async ({ request }) => {
+  test('9. API POST /api/admin/tasks crée une tâche', async ({ page }) => {
     console.log('[TEST 9] Test API POST task');
 
     // D'abord récupérer un membre existant
-    const membersResponse = await request.get(`${BASE_URL}/api/admin/members?limit=1`);
+    const membersResponse = await page.request.get(`${BASE_URL}/api/admin/members?limit=1`);
     const membersData = await membersResponse.json();
 
     if (!membersData.data || membersData.data.length === 0) {
@@ -375,13 +382,13 @@ test.describe('CRM Members: Tasks Management', () => {
     const newTask = {
       title: `API Test Task ${Date.now()}`,
       description: 'Task created via API',
-      type: 'email',
+      taskType: 'email',
       status: 'todo',
       memberEmail: memberEmail,
       dueDate: new Date(Date.now() + 86400000).toISOString() // +1 jour
     };
 
-    const response = await request.post(`${BASE_URL}/api/admin/tasks`, {
+    const response = await page.request.post(`${BASE_URL}/api/admin/tasks`, {
       data: newTask
     });
 
@@ -568,16 +575,25 @@ test.describe('CRM Members: Tasks Management', () => {
     await createButton.click();
     await waitForModalReady(page);
 
-    const titleInput = page.locator('input[name="title"], input[placeholder*="titre" i]').first();
-    await titleInput.fill(uniqueTitle);
-
-    const typeSelect = page.locator('select[name="type"]').first();
-    if (await typeSelect.count() > 0) {
-      await typeSelect.selectOption('meeting');
+    // Sélectionner un membre EN PREMIER (requis - id="create-member")
+    const memberTrigger = page.locator('#create-member');
+    await memberTrigger.click({ force: true });
+    await page.waitForTimeout(500);
+    const firstMemberOption = page.locator('[role="option"]').first();
+    if (await firstMemberOption.count() > 0) {
+      await firstMemberOption.click({ force: true });
     }
+    await page.waitForTimeout(500);
+
+    // Puis remplir le titre (controlled React component)
+    const titleInput = page.locator('#create-title');
+    await titleInput.click();
+    await titleInput.clear();
+    await page.waitForTimeout(200);
+    await titleInput.pressSequentially(uniqueTitle, { delay: 50 });
+    await page.waitForTimeout(300);
 
     await clickModalSubmit(page);
-    await page.waitForTimeout(2000);
 
     const createdTask = page.locator(`text="${uniqueTitle}"`);
     await expect(createdTask.first()).toBeVisible({ timeout: 5000 });
@@ -592,9 +608,13 @@ test.describe('CRM Members: Tasks Management', () => {
       await editButton.click();
       await waitForModalReady(page);
 
-      const titleInputEdit = page.locator('input[name="title"]').first();
+      const titleInputEdit = page.locator('#edit-title');
       const modifiedTitle = uniqueTitle + ' (modifié)';
-      await titleInputEdit.fill(modifiedTitle);
+      await titleInputEdit.click();
+      await titleInputEdit.clear();
+      await page.waitForTimeout(200);
+      await titleInputEdit.pressSequentially(modifiedTitle, { delay: 50 });
+      await page.waitForTimeout(300);
 
       await clickModalSubmit(page, /enregistrer|save|mettre à jour/i);
       await page.waitForTimeout(2000);

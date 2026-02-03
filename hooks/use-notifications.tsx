@@ -151,7 +151,7 @@ export function useNotifications() {
 }
 
 // Fonctions utilitaires pour interagir avec le serveur
-async function getVapidPublicKey(): Promise<Uint8Array> {
+async function getVapidPublicKey(): Promise<BufferSource> {
   try {
     const response = await fetch('/api/notifications/vapid-key');
     const { publicKey } = await response.json();
@@ -206,16 +206,16 @@ async function removePushSubscription(subscription: PushSubscription): Promise<b
 }
 
 // Utilitaires de conversion
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): BufferSource {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = window.atob(base64);
   const outputArray = new Uint8Array(rawData.length);
-  
+
   for (let i = 0; i < rawData.length; ++i) {
     outputArray[i] = rawData.charCodeAt(i);
   }
-  
+
   return outputArray;
 }
 

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { loginAsAdminQuick } from '../helpers/auth';
 
 /**
  * Tests E2E pour US-ADMIN-003: Gestion des administrateurs
@@ -60,6 +61,12 @@ const ADMIN_STATUSES = {
   PENDING: 'pending'
 };
 
+const getAuthHeaders = (cookie: string | null) => ({
+  headers: {
+    Cookie: cookie ?? ''
+  }
+});
+
 // Types pour les logs
 interface ConsoleMessage {
   type: string;
@@ -79,6 +86,7 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
   let consoleMessages: ConsoleMessage[] = [];
   let networkRequests: NetworkRequest[] = [];
   let testAdminEmail: string | null = null;
+  let authCookieHeader: string | null = null;
 
   test.beforeEach(async ({ page }) => {
     consoleMessages = [];
@@ -113,6 +121,19 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
         console.log('[NETWORK ERROR] ' + status + ' ' + method + ' ' + url);
       }
     });
+
+    await loginAsAdminQuick(page, BASE_URL);
+
+    const cookies = await page.context().cookies();
+    const sessionCookie = cookies.find((cookie) =>
+      cookie.name.includes('sid') || cookie.name.includes('session')
+    );
+
+    if (!sessionCookie) {
+      throw new Error('Session cookie not found after login.');
+    }
+
+    authCookieHeader = `${sessionCookie.name}=${sessionCookie.value}`;
   });
 
   test.afterEach(async () => {
@@ -169,7 +190,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
   test('2. Voir liste des administrateurs (GET /api/admin/administrators)', async ({ page, request }) => {
     console.log('\n[TEST 2] Récupération de la liste des administrateurs...');
 
-    const response = await request.get(BASE_URL + '/api/admin/administrators');
+    const response = await request.get(
+      BASE_URL + '/api/admin/administrators',
+      getAuthHeaders(authCookieHeader)
+    );
 
     console.log('[TEST 2] Status: ' + response.status());
     expect(response.ok()).toBe(true);
@@ -196,7 +220,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
   test('3. Voir liste des administrateurs en attente (GET /api/admin/pending-admins)', async ({ page, request }) => {
     console.log('\n[TEST 3] Récupération de la liste des admins en attente...');
 
-    const response = await request.get(BASE_URL + '/api/admin/pending-admins');
+    const response = await request.get(
+      BASE_URL + '/api/admin/pending-admins',
+      getAuthHeaders(authCookieHeader)
+    );
 
     console.log('[TEST 3] Status: ' + response.status());
     expect(response.ok()).toBe(true);
@@ -211,7 +238,7 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
 
     // Tous les admins en attente doivent avoir le statut "pending"
     if (data.data.length > 0) {
-      const allPending = data.data.every((admin: any) => admin.status === ADMIN_STATUSES.PENDING);
+      const allPending = data.data.every((admin: { status?: string }) => admin.status === ADMIN_STATUSES.PENDING);
       console.log('[TEST 3] Tous les admins ont le statut "pending": ' + allPending);
       expect(allPending).toBe(true);
     }
@@ -232,6 +259,7 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     const response = await request.post(
       BASE_URL + '/api/admin/administrators',
       {
+        ...getAuthHeaders(authCookieHeader),
         data: {
           email: newAdminEmail,
           role: newAdminRole
@@ -260,7 +288,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     console.log('\n[TEST 5] Approbation d\'un administrateur en attente...');
 
     // D'abord récupérer un admin en attente
-    const listResponse = await request.get(BASE_URL + '/api/admin/pending-admins');
+    const listResponse = await request.get(
+      BASE_URL + '/api/admin/pending-admins',
+      getAuthHeaders(authCookieHeader)
+    );
     expect(listResponse.ok()).toBe(true);
 
     const listData = await listResponse.json();
@@ -275,7 +306,8 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
 
     // PATCH pour approuver
     const approveResponse = await request.patch(
-      BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/approve'
+      BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/approve',
+      getAuthHeaders(authCookieHeader)
     );
 
     console.log('[TEST 5] PATCH status: ' + approveResponse.status());
@@ -293,7 +325,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     console.log('\n[TEST 6] Rejet d\'un administrateur en attente...');
 
     // D'abord récupérer un admin en attente
-    const listResponse = await request.get(BASE_URL + '/api/admin/pending-admins');
+    const listResponse = await request.get(
+      BASE_URL + '/api/admin/pending-admins',
+      getAuthHeaders(authCookieHeader)
+    );
     expect(listResponse.ok()).toBe(true);
 
     const listData = await listResponse.json();
@@ -308,7 +343,8 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
 
     // DELETE pour rejeter
     const rejectResponse = await request.delete(
-      BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/reject'
+      BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/reject',
+      getAuthHeaders(authCookieHeader)
     );
 
     console.log('[TEST 6] DELETE status: ' + rejectResponse.status());
@@ -324,7 +360,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     console.log('\n[TEST 7] Modification du rôle d\'un administrateur...');
 
     // D'abord récupérer un admin actif
-    const listResponse = await request.get(BASE_URL + '/api/admin/administrators');
+    const listResponse = await request.get(
+      BASE_URL + '/api/admin/administrators',
+      getAuthHeaders(authCookieHeader)
+    );
     expect(listResponse.ok()).toBe(true);
 
     const listData = await listResponse.json();
@@ -347,7 +386,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     // PATCH pour modifier le rôle
     const patchResponse = await request.patch(
       BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/role',
-      { data: { role: newRole } }
+      {
+        ...getAuthHeaders(authCookieHeader),
+        data: { role: newRole }
+      }
     );
 
     console.log('[TEST 7] PATCH status: ' + patchResponse.status());
@@ -365,7 +407,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     console.log('\n[TEST 8] Modification du statut d\'un administrateur...');
 
     // D'abord récupérer un admin
-    const listResponse = await request.get(BASE_URL + '/api/admin/administrators');
+    const listResponse = await request.get(
+      BASE_URL + '/api/admin/administrators',
+      getAuthHeaders(authCookieHeader)
+    );
     expect(listResponse.ok()).toBe(true);
 
     const listData = await listResponse.json();
@@ -388,7 +433,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     // PATCH pour modifier le statut
     const patchResponse = await request.patch(
       BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/status',
-      { data: { status: newStatus } }
+      {
+        ...getAuthHeaders(authCookieHeader),
+        data: { status: newStatus }
+      }
     );
 
     console.log('[TEST 8] PATCH status: ' + patchResponse.status());
@@ -414,6 +462,7 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     const createResponse = await request.post(
       BASE_URL + '/api/admin/administrators',
       {
+        ...getAuthHeaders(authCookieHeader),
         data: {
           email: testAdminEmail,
           role: ADMIN_ROLES.IDEAS_READER
@@ -431,7 +480,8 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
 
     // DELETE pour supprimer
     const deleteResponse = await request.delete(
-      BASE_URL + '/api/admin/administrators/' + encodeURIComponent(testAdminEmail)
+      BASE_URL + '/api/admin/administrators/' + encodeURIComponent(testAdminEmail),
+      getAuthHeaders(authCookieHeader)
     );
 
     console.log('[TEST 9] DELETE status: ' + deleteResponse.status());
@@ -447,7 +497,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     console.log('\n[TEST 10] Vérification des permissions...');
 
     // Test GET /api/admin/administrators (requires admin.view)
-    const getResponse = await request.get(BASE_URL + '/api/admin/administrators');
+    const getResponse = await request.get(
+      BASE_URL + '/api/admin/administrators',
+      getAuthHeaders(authCookieHeader)
+    );
     console.log('[TEST 10] GET /api/admin/administrators status: ' + getResponse.status());
 
     // 200 si authentifié, 401/403 sinon
@@ -462,6 +515,7 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     const postResponse = await request.post(
       BASE_URL + '/api/admin/administrators',
       {
+        ...getAuthHeaders(authCookieHeader),
         data: {
           email: 'permission-test-' + timestamp + '@test.local',
           role: ADMIN_ROLES.IDEAS_MANAGER
@@ -477,7 +531,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     }
 
     // Test PATCH /api/admin/administrators/:email/role (requires admin.edit)
-    const listResponse = await request.get(BASE_URL + '/api/admin/administrators');
+    const listResponse = await request.get(
+      BASE_URL + '/api/admin/administrators',
+      getAuthHeaders(authCookieHeader)
+    );
     if (listResponse.ok()) {
       const listData = await listResponse.json();
       if (listData.data && listData.data.length > 0) {
@@ -485,7 +542,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
 
         const patchResponse = await request.patch(
           BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/role',
-          { data: { role: ADMIN_ROLES.EVENTS_READER } }
+          {
+            ...getAuthHeaders(authCookieHeader),
+            data: { role: ADMIN_ROLES.EVENTS_READER }
+          }
         );
 
         console.log('[TEST 10] PATCH /api/admin/administrators/:email/role status: ' + patchResponse.status());
@@ -506,7 +566,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     console.log('[TEST 11] Rôles à tester: ' + roles.join(', '));
 
     // Récupérer la liste actuelle des admins
-    const listResponse = await request.get(BASE_URL + '/api/admin/administrators');
+    const listResponse = await request.get(
+      BASE_URL + '/api/admin/administrators',
+      getAuthHeaders(authCookieHeader)
+    );
     expect(listResponse.ok()).toBe(true);
 
     const listData = await listResponse.json();
@@ -525,7 +588,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
 
       const patchResponse = await request.patch(
         BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/role',
-        { data: { role: role } }
+        {
+          ...getAuthHeaders(authCookieHeader),
+          data: { role: role }
+        }
       );
 
       console.log('[TEST 11]   Status: ' + patchResponse.status());
@@ -543,14 +609,20 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
 
     // 1. GET /api/admin/administrators
     console.log('[TEST 12] Testons: GET /api/admin/administrators');
-    const getResponse = await request.get(BASE_URL + '/api/admin/administrators');
+    const getResponse = await request.get(
+      BASE_URL + '/api/admin/administrators',
+      getAuthHeaders(authCookieHeader)
+    );
     expect(getResponse.ok()).toBe(true);
     const getData = await getResponse.json();
     console.log('[TEST 12] GET OK - ' + getData.data.length + ' administrateurs');
 
     // 2. GET /api/admin/pending-admins
     console.log('[TEST 12] Testons: GET /api/admin/pending-admins');
-    const pendingResponse = await request.get(BASE_URL + '/api/admin/pending-admins');
+    const pendingResponse = await request.get(
+      BASE_URL + '/api/admin/pending-admins',
+      getAuthHeaders(authCookieHeader)
+    );
     expect(pendingResponse.ok()).toBe(true);
     const pendingData = await pendingResponse.json();
     console.log('[TEST 12] GET pending-admins OK - ' + pendingData.data.length + ' admins en attente');
@@ -567,7 +639,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     console.log('[TEST 12] Testons: PATCH /api/admin/administrators/:email/role');
     const roleResponse = await request.patch(
       BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/role',
-      { data: { role: ADMIN_ROLES.IDEAS_MANAGER } }
+      {
+        ...getAuthHeaders(authCookieHeader),
+        data: { role: ADMIN_ROLES.IDEAS_MANAGER }
+      }
     );
     console.log('[TEST 12] PATCH role: ' + roleResponse.status());
     expect([200, 201, 400, 404]).toContain(roleResponse.status());
@@ -576,7 +651,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     console.log('[TEST 12] Testons: PATCH /api/admin/administrators/:email/status');
     const statusResponse = await request.patch(
       BASE_URL + '/api/admin/administrators/' + encodeURIComponent(adminEmail) + '/status',
-      { data: { status: ADMIN_STATUSES.ACTIVE } }
+      {
+        ...getAuthHeaders(authCookieHeader),
+        data: { status: ADMIN_STATUSES.ACTIVE }
+      }
     );
     console.log('[TEST 12] PATCH status: ' + statusResponse.status());
     expect([200, 201, 400, 404]).toContain(statusResponse.status());
@@ -596,6 +674,7 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
     const createResponse = await request.post(
       BASE_URL + '/api/admin/administrators',
       {
+        ...getAuthHeaders(authCookieHeader),
         data: {
           email: newAdminEmail,
           role: ADMIN_ROLES.IDEAS_MANAGER
@@ -613,17 +692,21 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
 
     // 2. Vérifier que l'admin est en attente
     console.log('[TEST 13] Étape 2: Vérification que l\'admin est en attente...');
-    const pendingResponse = await request.get(BASE_URL + '/api/admin/pending-admins');
+    const pendingResponse = await request.get(
+      BASE_URL + '/api/admin/pending-admins',
+      getAuthHeaders(authCookieHeader)
+    );
     expect(pendingResponse.ok()).toBe(true);
     const pendingData = await pendingResponse.json();
-    const createdAdmin = pendingData.data.find((a: any) => a.email === newAdminEmail);
+    const createdAdmin = pendingData.data.find((admin: { email?: string }) => admin.email === newAdminEmail);
     console.log('[TEST 13] Admin trouvé en attente: ' + (createdAdmin ? 'OUI' : 'NON'));
 
     // 3. Approuver l'admin
     if (createdAdmin) {
       console.log('[TEST 13] Étape 3: Approbation de l\'admin...');
       const approveResponse = await request.patch(
-        BASE_URL + '/api/admin/administrators/' + encodeURIComponent(newAdminEmail) + '/approve'
+        BASE_URL + '/api/admin/administrators/' + encodeURIComponent(newAdminEmail) + '/approve',
+        getAuthHeaders(authCookieHeader)
       );
 
       console.log('[TEST 13] PATCH approve status: ' + approveResponse.status());
@@ -636,7 +719,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
         console.log('[TEST 13] Étape 4: Modification du rôle...');
         const roleResponse = await request.patch(
           BASE_URL + '/api/admin/administrators/' + encodeURIComponent(newAdminEmail) + '/role',
-          { data: { role: ADMIN_ROLES.EVENTS_MANAGER } }
+          {
+            ...getAuthHeaders(authCookieHeader),
+            data: { role: ADMIN_ROLES.EVENTS_MANAGER }
+          }
         );
 
         console.log('[TEST 13] PATCH role status: ' + roleResponse.status());
@@ -646,7 +732,10 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
         console.log('[TEST 13] Étape 5: Modification du statut...');
         const statusResponse = await request.patch(
           BASE_URL + '/api/admin/administrators/' + encodeURIComponent(newAdminEmail) + '/status',
-          { data: { status: ADMIN_STATUSES.INACTIVE } }
+          {
+            ...getAuthHeaders(authCookieHeader),
+            data: { status: ADMIN_STATUSES.INACTIVE }
+          }
         );
 
         console.log('[TEST 13] PATCH status status: ' + statusResponse.status());
@@ -655,7 +744,8 @@ test.describe('US-ADMIN-003: Gestion des administrateurs', () => {
         // 6. Supprimer l'admin
         console.log('[TEST 13] Étape 6: Suppression de l\'admin...');
         const deleteResponse = await request.delete(
-          BASE_URL + '/api/admin/administrators/' + encodeURIComponent(newAdminEmail)
+          BASE_URL + '/api/admin/administrators/' + encodeURIComponent(newAdminEmail),
+          getAuthHeaders(authCookieHeader)
         );
 
         console.log('[TEST 13] DELETE status: ' + deleteResponse.status());

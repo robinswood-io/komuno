@@ -1,0 +1,5 @@
+# Archive files - keep in repo but don't clutter main files
+ARCHIVE/
+*.swp
+*.swo
+.DS_Store

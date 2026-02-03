@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { loginAsAdminQuick } from '../helpers/auth';
 
 /**
  * Tests E2E - US-MEMBERS-001: CRM - Gestion des membres
@@ -64,6 +65,7 @@ test.describe('US-MEMBERS-001: CRM - Gestion des membres', () => {
   let networkRequests: NetworkRequest[] = [];
 
   test.beforeEach(async ({ page }) => {
+    await loginAsAdminQuick(page, BASE_URL);
     consoleMessages = [];
     networkRequests = [];
 
@@ -97,17 +99,6 @@ test.describe('US-MEMBERS-001: CRM - Gestion des membres', () => {
       }
     });
 
-    // Mock admin authentication
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'test-jwt-token-admin');
-      localStorage.setItem('user', JSON.stringify({
-        id: 'admin-user-123',
-        email: TEST_ACCOUNTS.admin.email,
-        name: 'Admin User',
-        role: 'super_admin',
-        permissions: ['manage_members', 'manage_tags', 'manage_tasks']
-      }));
-    });
   });
 
   test.afterEach(async () => {

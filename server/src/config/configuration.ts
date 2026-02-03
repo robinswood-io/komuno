@@ -58,11 +58,11 @@ export default registerAs('app', () => ({
 
   // GitHub
   githubToken: process.env.GITHUB_TOKEN || '',
-  githubRepo: process.env.GITHUB_REPO || '',
-  githubOwner: process.env.GITHUB_OWNER || '',
+  githubRepo: process.env.GITHUB_REPO_NAME || process.env.GITHUB_REPO || '',
+  githubOwner: process.env.GITHUB_REPO_OWNER || process.env.GITHUB_OWNER || '',
+  githubWebhookSecret: process.env.GITHUB_WEBHOOK_SECRET || '',
 
   // Version
   appVersion: process.env.APP_VERSION || process.env.GIT_TAG || '1.0.0',
 }));
-
 

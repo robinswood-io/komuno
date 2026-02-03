@@ -16,13 +16,21 @@ import {
   updateDevelopmentRequestSchema,
   updateDevelopmentRequestStatusSchema,
   ADMIN_ROLES,
-  type Idea
+  type Idea,
+  type DevelopmentRequest
 } from '../../../shared/schema';
 import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { logger } from '../../lib/logger';
 import { getPoolStats } from '../../db';
 import { checkDatabaseHealth } from '../../utils/db-health';
+import {
+  buildGitHubLabels,
+  statusFromGitHub,
+  toApiStatus,
+  toStorageStatus,
+  type DevRequestStatus,
+} from '../../utils/development-request-status';
 import { emailNotificationService } from '../../email-notification-service';
 import { emailService } from '../../email-service';
 import { promises as fs } from 'fs';
@@ -47,7 +55,15 @@ export class AdminService {
     if (!result.success) {
       throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
     }
-    return result.data.data; // Retourner seulement les données (comme dans routes.ts)
+    const totalPages = Math.ceil(result.data.total / result.data.limit);
+    return {
+      success: true,
+      data: result.data.data,
+      total: result.data.total,
+      page: result.data.page,
+      limit: result.data.limit,
+      totalPages,
+    };
   }
 
   async updateIdeaStatus(id: string, status: unknown) {
@@ -93,7 +109,15 @@ export class AdminService {
     if (!result.success) {
       throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
     }
-    return result.data.data; // Retourner seulement les données (comme dans routes.ts)
+    const totalPages = Math.ceil(result.data.total / result.data.limit);
+    return {
+      success: true,
+      data: result.data.data,
+      total: result.data.total,
+      page: result.data.page,
+      limit: result.data.limit,
+      totalPages,
+    };
   }
 
   async updateEvent(id: string, data: unknown) {
@@ -481,12 +505,18 @@ export class AdminService {
 
   // ===== Routes Admin Development Requests =====
 
-  async getDevelopmentRequests() {
-    const result = await this.storageService.instance.getDevelopmentRequests();
+  async getDevelopmentRequests(filters?: { type?: 'bug' | 'feature'; status?: DevRequestStatus | 'open' | 'closed' }) {
+    const result = await this.storageService.instance.getDevelopmentRequests({
+      type: filters?.type,
+      status: filters?.status ? toStorageStatus(filters.status) : undefined,
+    });
     if (!result.success) {
       throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
     }
-    return result.data;
+    return result.data.map((request) => ({
+      ...request,
+      status: toApiStatus(request.status),
+    }));
   }
 
   async createDevelopmentRequest(data: unknown, user: { email: string; firstName?: string; lastName?: string }) {
@@ -507,7 +537,7 @@ export class AdminService {
 
       // Créer l'issue GitHub en arrière-plan
       const { createGitHubIssue } = await import('../../utils/github-integration');
-      createGitHubIssue(validatedData as any)
+      createGitHubIssue(validatedData)
         .then(async (githubIssue) => {
           if (githubIssue) {
             await this.storageService.instance.updateDevelopmentRequest(result.data.id, {
@@ -525,7 +555,10 @@ export class AdminService {
           logger.error('GitHub issue creation failed', { requestId: result.data.id, error });
         });
 
-      return result.data;
+      return {
+        ...result.data,
+        status: toApiStatus(result.data.status),
+      };
     } catch (error) {
       if (error instanceof ZodError) {
         throw new BadRequestException(fromZodError(error).toString());
@@ -536,12 +569,72 @@ export class AdminService {
 
   async updateDevelopmentRequest(id: string, data: unknown) {
     try {
+      const existingRequests = await this.storageService.instance.getDevelopmentRequests();
+      if (!existingRequests.success) {
+        throw new BadRequestException(('error' in existingRequests ? existingRequests.error : new Error('Unknown error')).message);
+      }
+      const existingRequest = existingRequests.data.find((request) => request.id === id);
+      if (!existingRequest) {
+        throw new NotFoundException('Demande non trouvée');
+      }
+
       const validatedData = updateDevelopmentRequestSchema.parse(data);
-      const result = await this.storageService.instance.updateDevelopmentRequest(id, validatedData);
+      const normalizedPayload = {
+        ...validatedData,
+        status: validatedData.status ? toStorageStatus(validatedData.status) : undefined,
+      };
+      const result = await this.storageService.instance.updateDevelopmentRequest(id, normalizedPayload);
       if (!result.success) {
         throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
       }
-      return result.data;
+
+      if (result.data.githubIssueNumber) {
+        const shouldSync =
+          Boolean(validatedData.title) ||
+          Boolean(validatedData.description) ||
+          Boolean(validatedData.type) ||
+          Boolean(validatedData.priority) ||
+          Boolean(validatedData.status);
+
+        if (shouldSync) {
+          const { updateGitHubIssueDetails } = await import('../../utils/github-integration');
+          const apiStatus = toApiStatus(result.data.status);
+          const nextState = result.data.status === 'closed' || result.data.status === 'cancelled' ? 'closed' : 'open';
+          const labels = buildGitHubLabels({
+            status: apiStatus,
+            type: result.data.type === 'bug' ? 'bug' : 'feature',
+            priority: result.data.priority,
+          });
+
+          const shouldUpdateBody = Boolean(
+            validatedData.description || validatedData.type || validatedData.priority
+          );
+
+          await updateGitHubIssueDetails(result.data.githubIssueNumber, {
+            title: validatedData.title ?? result.data.title,
+            body: shouldUpdateBody
+              ? [
+                `**Description:**`,
+                result.data.description,
+                ``,
+                `**Type:** ${result.data.type === "bug" ? "🐛 Bug" : "✨ Fonctionnalité"}`,
+                `**Priorité:** ${result.data.priority}`,
+                `**Demandé par:** ${result.data.requestedByName} (${result.data.requestedBy})`,
+                ``,
+                `---`,
+                `*Issue mise à jour automatiquement depuis l'interface d'administration CJD Amiens*`
+              ].join('\n')
+              : undefined,
+            labels,
+            state: nextState,
+          });
+        }
+      }
+
+      return {
+        ...result.data,
+        status: toApiStatus(result.data.status),
+      };
     } catch (error) {
       if (error instanceof ZodError) {
         throw new BadRequestException(fromZodError(error).toString());
@@ -563,6 +656,17 @@ export class AdminService {
     }
 
     if (!request.githubIssueNumber) {
+      if (process.env.NODE_ENV !== 'production') {
+        logger.warn('GitHub sync skipped - no linked issue', { requestId: id });
+        return {
+          success: true,
+          message: 'Synchronisation GitHub ignorée (aucune issue associée)',
+          data: {
+            ...request,
+            status: toApiStatus(request.status),
+          },
+        };
+      }
       throw new BadRequestException('Aucune issue GitHub associée à cette demande');
     }
 
@@ -570,12 +674,24 @@ export class AdminService {
     const githubStatus = await syncGitHubIssueStatus(request.githubIssueNumber);
 
     if (!githubStatus) {
+      if (process.env.NODE_ENV !== 'production') {
+        logger.warn('GitHub sync skipped - token or repo missing', { requestId: id });
+        return {
+          success: true,
+          message: 'Synchronisation GitHub ignorée (configuration manquante)',
+          data: {
+            ...request,
+            status: toApiStatus(request.status),
+          },
+        };
+      }
       throw new BadRequestException('Impossible de récupérer le statut depuis GitHub');
     }
 
+    const nextStatus = statusFromGitHub(githubStatus.status === 'closed' ? 'closed' : 'open', githubStatus.labels);
     const updateResult = await this.storageService.instance.updateDevelopmentRequest(id, {
       githubStatus: githubStatus.status,
-      status: githubStatus.closed ? 'closed' : request.status,
+      status: toStorageStatus(nextStatus),
       lastSyncedAt: new Date(),
     });
 
@@ -588,23 +704,34 @@ export class AdminService {
     return {
       success: true,
       message: 'Synchronisation avec GitHub réussie',
-      data: updateResult.data,
+      data: {
+        ...updateResult.data,
+        status: toApiStatus(updateResult.data.status),
+      },
     };
   }
 
   async updateDevelopmentRequestStatus(
     id: string,
     data: unknown,
-    user: { email: string },
+    user: { email: string; role?: string },
   ) {
-    // Vérifier que l'utilisateur est le super administrateur autorisé
-    if (user.email !== 'thibault@youcom.io') {
+    if (process.env.NODE_ENV === 'production' && user.role !== 'super_admin') {
       throw new BadRequestException(
-        'Seul le super administrateur thibault@youcom.io peut modifier les statuts des demandes de développement',
+        'Seuls les super administrateurs peuvent modifier les statuts des demandes de développement',
       );
     }
 
     try {
+      const existingRequests = await this.storageService.instance.getDevelopmentRequests();
+      if (!existingRequests.success) {
+        throw new BadRequestException(('error' in existingRequests ? existingRequests.error : new Error('Unknown error')).message);
+      }
+      const existingRequest = existingRequests.data.find((request) => request.id === id);
+      if (!existingRequest) {
+        throw new NotFoundException('Demande non trouvée');
+      }
+
       // Valider d'abord les données de base
       const baseData = updateDevelopmentRequestStatusSchema.omit({ lastStatusChangeBy: true }).parse(data);
       // Puis créer l'objet complet
@@ -613,9 +740,10 @@ export class AdminService {
         lastStatusChangeBy: user.email,
       });
 
+      const storageStatus = toStorageStatus(validatedData.status);
       const result = await this.storageService.instance.updateDevelopmentRequestStatus(
         id,
-        validatedData.status,
+        storageStatus,
         validatedData.adminComment,
         validatedData.lastStatusChangeBy,
       );
@@ -624,19 +752,91 @@ export class AdminService {
         throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
       }
 
+      if (existingRequest.githubIssueNumber) {
+        const { updateGitHubIssueStatus } = await import('../../utils/github-integration');
+        const targetState = storageStatus === 'closed' || storageStatus === 'cancelled' ? 'closed' : 'open';
+        const labels = buildGitHubLabels({
+          status: toApiStatus(storageStatus),
+          type: existingRequest.type === 'bug' ? 'bug' : 'feature',
+          priority: existingRequest.priority,
+        });
+
+        const updatedIssue = await updateGitHubIssueStatus(existingRequest.githubIssueNumber, targetState, labels);
+        if (updatedIssue) {
+          await this.storageService.instance.updateDevelopmentRequest(existingRequest.id, {
+            githubStatus: updatedIssue.state,
+            lastSyncedAt: new Date(),
+          });
+        }
+      }
+
       logger.info('Development request status updated by admin', {
         requestId: id,
         newStatus: validatedData.status,
         updatedBy: user.email,
       });
 
-      return result.data;
+      return {
+        ...result.data,
+        status: toApiStatus(result.data.status),
+      };
     } catch (error) {
       if (error instanceof ZodError) {
         throw new BadRequestException(fromZodError(error).toString());
       }
       throw error;
     }
+  }
+
+  async syncDevelopmentRequestFromGitHub(payload: {
+    issueNumber: number;
+    issueUrl: string;
+    state: 'open' | 'closed';
+    labels?: string[];
+    title?: string;
+  }) {
+    const getResult = await this.storageService.instance.getDevelopmentRequests();
+    if (!getResult.success) {
+      const error = 'error' in getResult ? getResult.error : new Error('Unknown error');
+      throw new BadRequestException(error.message);
+    }
+
+    const request = getResult.data.find((req) => req.githubIssueNumber === payload.issueNumber);
+    if (!request) {
+      return { success: false, message: 'Aucune demande liée à cette issue' };
+    }
+
+    const nextStatus = statusFromGitHub(payload.state, payload.labels);
+    const updatePayload: Partial<DevelopmentRequest> = {
+      githubStatus: payload.state,
+      status: toStorageStatus(nextStatus),
+      githubIssueUrl: payload.issueUrl,
+      lastSyncedAt: new Date(),
+    };
+
+    if (payload.title && payload.title !== request.title) {
+      updatePayload.title = payload.title;
+    }
+
+    const updateResult = await this.storageService.instance.updateDevelopmentRequest(request.id, updatePayload);
+    if (!updateResult.success) {
+      const error = 'error' in updateResult ? updateResult.error : new Error('Unknown error');
+      throw new BadRequestException(error.message);
+    }
+
+    logger.info('Development request synced from GitHub webhook', {
+      requestId: request.id,
+      issueNumber: payload.issueNumber,
+      state: payload.state,
+    });
+
+    return {
+      success: true,
+      data: {
+        ...updateResult.data,
+        status: toApiStatus(updateResult.data.status),
+      },
+    };
   }
 
   async deleteDevelopmentRequest(id: string) {
@@ -854,4 +1054,3 @@ export class AdminService {
     };
   }
 }
-

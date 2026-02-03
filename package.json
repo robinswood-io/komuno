@@ -8,7 +8,8 @@
     "test:coverage": "bun x vitest run --coverage",
     "test:bun": "bun test",
     "dev": "concurrently --kill-others=false \"npm run dev:next\" \"npm run dev:nest\"",
-    "dev:next": "next dev -p 3000 --turbopack",
+    "dev:next": "sh scripts/dev-frontend-wrapper.sh",
+    "dev:next:raw": "next dev -p 3000 --turbopack",
     "dev:nest": "dotenv -e .env -- nest start --watch",
     "dev:backend": "bun --watch server/src/main.ts",
     "dev:tsx": "dotenv -e .env -- tsx server/src/main.ts",
@@ -215,7 +216,7 @@
     "tsc-alias": "^1.8.16",
     "tsup": "^8.5.1",
     "tsx": "^4.19.1",
-    "typescript": "5.6.3",
+    "typescript": "^5.9.3",
     "vite": "^5.4.19",
     "vite-node": "^5.2.0",
     "vite-tsconfig-paths": "^6.0.4"

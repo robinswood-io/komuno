@@ -1,0 +1,45 @@
+{
+  "project": "cjd80",
+  "last_updated": "2026-02-01T10:49:43+00:00",
+  "updated_by_session": "17c4c366-8974-4b08-a599-c1b731e68fca",
+  "active_branches": [
+    {
+      "branch": "main",
+      "owner": null,
+      "status": "stable",
+      "summary": "Branche principale, stable",
+      "key_files": []
+    }
+  ],
+  "recent_decisions": [
+    {
+      "date": "2026-02-01",
+      "decision": "Exemple: Utiliser Zod v4 au lieu de v3",
+      "context": "Migration obligatoire selon rulebook",
+      "impact": "Tous les nouveaux schémas doivent utiliser v4"
+    }
+  ],
+  "known_issues": [
+    {
+      "issue": "Exemple: Tests E2E timeout sur CI",
+      "workaround": "Augmenter timeout à 30s dans playwright.config.ts",
+      "resolved": false,
+      "tracking": "Issue #123"
+    }
+  ],
+  "do_not_repeat": [
+    "Ne pas réinstaller @robinswood/auth (déprécié, utiliser auth-unified)",
+    "Ne pas modifier nginx global (règle Docker central)",
+    "CORS déjà configuré dans Traefik labels"
+  ],
+  "current_work": [
+    {
+      "session_id": "17c4c366-8974-4b08-a599-c1b731e68fca",
+      "tmux": "{TMUX_PANE}",
+      "branch": "{BRANCH}",
+      "task": "{TASK_SUMMARY}",
+      "files": ["{FILES}"],
+      "started": "2026-02-01T10:49:43+00:00"
+    }
+  ]
+}

@@ -43,6 +43,7 @@ async function bootstrap() {
     logger: process.env.NODE_ENV === 'development' ? ['log', 'error', 'warn', 'debug'] : ['error', 'warn'],
     abortOnError: false,
     bufferLogs: true,
+    rawBody: true,
   });
   logger.error('[DEBUG] ========== NestFactory.create() COMPLETED ==========');
 

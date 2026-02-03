@@ -11,6 +11,10 @@ export class ZodValidationPipe implements PipeTransform {
   constructor(private schema: z.ZodType<any>) {}
 
   transform(value: any, metadata: ArgumentMetadata) {
+    // Only validate explicit request data (body/query/param). Skip custom decorators like @Req/@User.
+    if (metadata.type === 'custom') {
+      return value;
+    }
     try {
       const parsedValue = this.schema.parse(value);
       return parsedValue;
@@ -22,4 +26,3 @@ export class ZodValidationPipe implements PipeTransform {
     }
   }
 }
-

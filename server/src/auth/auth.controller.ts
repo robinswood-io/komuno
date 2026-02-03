@@ -13,6 +13,7 @@ import {
   UnauthorizedException,
   BadRequestException
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -23,6 +24,7 @@ import { logger } from '../../lib/logger';
 import { JwtAuthGuard } from './guards/auth.guard';
 import { z } from 'zod';
 import passport from 'passport';
+import type { Admin } from '@shared/schema';
 
 // Schémas de validation
 const loginSchema = z.object({
@@ -259,12 +261,13 @@ export class AuthController {
    * GET /api/user
    */
   @Get('user')
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtenir les informations de l\'utilisateur connecté' })
   @ApiResponse({ status: 200, description: 'Utilisateur connecté', schema: { type: 'object', properties: { email: { type: 'string' }, role: { type: 'string' }, permissions: { type: 'array', items: { type: 'string' } } } } })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
-  getCurrentUser(@User() user: any) {
+  getCurrentUser(@User() user: Admin) {
     return this.authService.getUserWithoutPassword(user);
   }
 
@@ -273,6 +276,7 @@ export class AuthController {
    * GET /api/auth/mode
    */
   @Get('mode')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Obtenir le mode d\'authentification configuré' })
   @ApiResponse({ status: 200, description: 'Mode d\'authentification', schema: { type: 'object', properties: { mode: { type: 'string', enum: ['local', 'oauth'], example: 'oauth' } } } })
   getAuthMode() {

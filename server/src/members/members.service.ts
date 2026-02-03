@@ -464,5 +464,22 @@ export class MembersService {
       throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
     }
   }
-}
 
+  async getAllRelations() {
+    const result = await this.storageService.instance.getAllRelations();
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  // ===== Routes admin - Tasks =====
+
+  async getAllTasks(filters?: { status?: string; assignedTo?: string }) {
+    const result = await this.storageService.instance.getAllTasks(filters);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+}

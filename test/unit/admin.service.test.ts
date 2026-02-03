@@ -125,6 +125,8 @@ describe('AdminService', () => {
         data: {
           data: [{ id: '1', title: 'Idea 1', status: 'pending' }],
           total: 1,
+          page: 1,
+          limit: 20,
         },
       };
       mockStorage.getAllIdeas.mockResolvedValue(mockResult);
@@ -132,7 +134,14 @@ describe('AdminService', () => {
       const result = await adminService.getAllIdeas(1, 20);
 
       expect(mockStorage.getAllIdeas).toHaveBeenCalledWith({ page: 1, limit: 20 });
-      expect(result).toEqual(mockResult);
+      expect(result).toEqual({
+        success: true,
+        data: mockResult.data.data,
+        total: mockResult.data.total,
+        page: mockResult.data.page,
+        limit: mockResult.data.limit,
+        totalPages: 1,
+      });
     });
   });
 

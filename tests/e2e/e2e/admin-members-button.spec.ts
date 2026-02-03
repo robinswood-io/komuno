@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { loginAsAdminQuick } from '../helpers/auth';
 
 interface ConsoleMessage {
   type: string;
@@ -17,6 +18,7 @@ interface NetworkRequest {
 test.describe('Admin Members - Add Member Button Test', () => {
   let consoleMessages: ConsoleMessage[] = [];
   let networkRequests: NetworkRequest[] = [];
+  const baseUrl = 'https://cjd80.rbw.ovh';
 
   test.beforeEach(async ({ page }) => {
     consoleMessages = [];
@@ -52,17 +54,7 @@ test.describe('Admin Members - Add Member Button Test', () => {
       }
     });
 
-    // Mock admin authentication
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'test-jwt-token-admin');
-      localStorage.setItem('user', JSON.stringify({
-        id: 'admin-user-123',
-        email: 'admin@test.local',
-        name: 'Admin User',
-        role: 'admin',
-        permissions: ['manage_members']
-      }));
-    });
+    await loginAsAdminQuick(page, baseUrl);
   });
 
   test.afterEach(async () => {
@@ -101,7 +93,7 @@ test.describe('Admin Members - Add Member Button Test', () => {
   test('Navigate to /admin/members and verify page loads', async ({ page }) => {
     console.log('\n[TEST] Navigating to /admin/members...');
     
-    await page.goto('http://localhost:5000/admin/members', { waitUntil: 'domcontentloaded' });
+    await page.goto(`${baseUrl}/admin/members`, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
 
@@ -117,7 +109,7 @@ test.describe('Admin Members - Add Member Button Test', () => {
   test('Take snapshot of /admin/members page', async ({ page }) => {
     console.log('\n[TEST] Taking page snapshot...');
     
-    await page.goto('http://localhost:5000/admin/members');
+    await page.goto(`${baseUrl}/admin/members`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(500);
 
@@ -140,7 +132,7 @@ test.describe('Admin Members - Add Member Button Test', () => {
   test('Find and list all buttons on page', async ({ page }) => {
     console.log('\n[TEST] Searching for buttons...');
     
-    await page.goto('http://localhost:5000/admin/members');
+    await page.goto(`${baseUrl}/admin/members`);
     await page.waitForLoadState('networkidle');
 
     const allButtons = page.locator('button');
@@ -161,7 +153,7 @@ test.describe('Admin Members - Add Member Button Test', () => {
   test('Click the add member button and verify response', async ({ page }) => {
     console.log('\n[TEST] Testing add member button...');
     
-    await page.goto('http://localhost:5000/admin/members');
+    await page.goto(`${baseUrl}/admin/members`);
     await page.waitForLoadState('networkidle');
 
     // Find button with various possible texts
@@ -210,7 +202,7 @@ test.describe('Admin Members - Add Member Button Test', () => {
   test('Capture and report JavaScript errors', async ({ page }) => {
     console.log('\n[TEST] Capturing JavaScript errors...');
     
-    await page.goto('http://localhost:5000/admin/members');
+    await page.goto(`${baseUrl}/admin/members`);
     await page.waitForLoadState('networkidle');
 
     const errors = consoleMessages.filter(m => m.type === 'error');
@@ -239,7 +231,7 @@ test.describe('Admin Members - Add Member Button Test', () => {
     console.log('COMPLETE BEHAVIOR DOCUMENTATION');
     console.log('='.repeat(80));
     
-    await page.goto('http://localhost:5000/admin/members');
+    await page.goto(`${baseUrl}/admin/members`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
 
@@ -253,7 +245,7 @@ test.describe('Admin Members - Add Member Button Test', () => {
         index: idx,
         text: (btn.textContent || '').trim(),
         ariaLabel: btn.getAttribute('aria-label') || '(none)',
-        visible: (btn as any).offsetParent !== null,
+        visible: (btn as HTMLElement).offsetParent !== null,
         disabled: btn.hasAttribute('disabled')
       }));
     });

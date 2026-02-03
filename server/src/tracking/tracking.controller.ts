@@ -1,19 +1,22 @@
 import {
+  Body,
   Controller,
   Get,
+  Param,
   Post,
   Put,
-  Body,
-  Param,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { TrackingService } from './tracking.service';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { User } from '../auth/decorators/user.decorator';
+import { resolveRequestBody } from '../common/utils/request-body';
 
 /**
  * Controller Tracking - Routes tracking
@@ -91,9 +94,11 @@ export class TrackingController {
   @ApiResponse({ status: 403, description: 'Permission refusée' })
   async createTrackingMetric(
     @Body() body: unknown,
+    @Req() req: Request,
     @User() user: { email: string },
   ) {
-    return await this.trackingService.createTrackingMetric(body, user.email);
+    const resolvedBody = resolveRequestBody(body, req);
+    return await this.trackingService.createTrackingMetric(resolvedBody, user.email);
   }
 
   @Get('alerts')
@@ -148,9 +153,11 @@ export class TrackingController {
   @ApiResponse({ status: 403, description: 'Permission refusée' })
   async createTrackingAlert(
     @Body() body: unknown,
+    @Req() req: Request,
     @User() user: { email: string },
   ) {
-    return await this.trackingService.createTrackingAlert(body, user.email);
+    const resolvedBody = resolveRequestBody(body, req);
+    return await this.trackingService.createTrackingAlert(resolvedBody, user.email);
   }
 
   @Put('alerts/:id')
@@ -175,9 +182,11 @@ export class TrackingController {
   async updateTrackingAlert(
     @Param('id') id: string,
     @Body() body: unknown,
+    @Req() req: Request,
     @User() user: { email: string },
   ) {
-    return await this.trackingService.updateTrackingAlert(id, body, user.email);
+    const resolvedBody = resolveRequestBody(body, req);
+    return await this.trackingService.updateTrackingAlert(id, resolvedBody, user.email);
   }
 
   @Post('alerts/generate')
@@ -190,4 +199,3 @@ export class TrackingController {
     return await this.trackingService.generateTrackingAlerts();
   }
 }
-

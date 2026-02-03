@@ -22,13 +22,14 @@ import {
   suggestTimeout,
 } from '../../../utils/database-config.utils';
 import { logger } from '../../../lib/logger';
+import type { DrizzleDb } from './types';
 
 /**
  * Service exemple montrant les bonnes pratiques
  */
 @Injectable()
 export class DatabasePoolExampleService {
-  constructor(@Inject(DATABASE) private readonly db: any) {
+  constructor(@Inject(DATABASE) private readonly db: DrizzleDb) {
     this.startPoolMonitoring();
   }
 

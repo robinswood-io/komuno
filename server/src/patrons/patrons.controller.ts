@@ -61,7 +61,7 @@ export class PatronsController {
  */
 @ApiTags('patrons')
 @ApiBearerAuth()
-@Controller('api/patrons')
+@Controller(['api/patrons', 'api/admin/patrons'])
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AdminPatronsController {
   constructor(private readonly patronsService: PatronsService) {}
@@ -564,4 +564,3 @@ export class AdminSponsorshipsController {
     await this.patronsService.deleteEventSponsorship(id);
   }
 }
-

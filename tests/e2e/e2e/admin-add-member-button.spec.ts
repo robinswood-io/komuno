@@ -1,4 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
+import { loginAsAdminQuick } from '../helpers/auth';
+
+const BASE_URL = 'https://cjd80.rbw.ovh';
 
 test.describe('Admin Members - "Ajouter un membre" Button Test', () => {
   let page: Page;
@@ -29,6 +32,8 @@ test.describe('Admin Members - "Ajouter un membre" Button Test', () => {
         });
       }
     });
+
+    await loginAsAdminQuick(page, BASE_URL);
   });
 
   test.afterEach(async () => {
@@ -49,7 +54,7 @@ test.describe('Admin Members - "Ajouter un membre" Button Test', () => {
     console.log('\n[TEST] Loading /admin/members...');
     
     // Direct access to the page
-    await page.goto('http://localhost:5000/admin/members', {
+    await page.goto(`${BASE_URL}/admin/members`, {
       waitUntil: 'networkidle'
     });
 
@@ -62,7 +67,7 @@ test.describe('Admin Members - "Ajouter un membre" Button Test', () => {
   test('2. Verify page is loaded with content', async () => {
     console.log('\n[TEST] Verifying page content...');
     
-    await page.goto('http://localhost:5000/admin/members', {
+    await page.goto(`${BASE_URL}/admin/members`, {
       waitUntil: 'networkidle'
     });
 
@@ -82,7 +87,7 @@ test.describe('Admin Members - "Ajouter un membre" Button Test', () => {
   test('3. Find "Ajouter un membre" button', async () => {
     console.log('\n[TEST] Searching for add member button...');
     
-    await page.goto('http://localhost:5000/admin/members', {
+    await page.goto(`${BASE_URL}/admin/members`, {
       waitUntil: 'networkidle'
     });
 
@@ -120,7 +125,7 @@ test.describe('Admin Members - "Ajouter un membre" Button Test', () => {
   test('4. Analyze add member button properties', async () => {
     console.log('\n[TEST] Analyzing button properties...');
     
-    await page.goto('http://localhost:5000/admin/members', {
+    await page.goto(`${BASE_URL}/admin/members`, {
       waitUntil: 'networkidle'
     });
 
@@ -163,7 +168,7 @@ test.describe('Admin Members - "Ajouter un membre" Button Test', () => {
   test('5. Click the button and capture behavior', async () => {
     console.log('\n[TEST] Clicking add member button...');
     
-    await page.goto('http://localhost:5000/admin/members', {
+    await page.goto(`${BASE_URL}/admin/members`, {
       waitUntil: 'networkidle'
     });
 
@@ -207,7 +212,7 @@ test.describe('Admin Members - "Ajouter un membre" Button Test', () => {
     console.log('COMPLETE PAGE ANALYSIS');
     console.log('='.repeat(80));
     
-    await page.goto('http://localhost:5000/admin/members', {
+    await page.goto(`${BASE_URL}/admin/members`, {
       waitUntil: 'networkidle'
     });
 

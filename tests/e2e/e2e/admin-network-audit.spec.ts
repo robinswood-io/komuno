@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Response } from '@playwright/test';
+import { loginAsAdminQuick } from '../helpers/auth';
 
 interface NetworkError {
   url: string;
@@ -17,6 +18,7 @@ test.describe('Admin Network & Console Audit', () => {
   let networkErrors: NetworkError[] = [];
   let consoleErrors: ConsoleError[] = [];
   let allRequests: { url: string; status: number; method: string }[] = [];
+  const baseUrl = 'https://cjd80.rbw.ovh';
 
   test.beforeEach(async ({ page }) => {
     networkErrors = [];
@@ -30,7 +32,7 @@ test.describe('Admin Network & Console Audit', () => {
       const method = response.request().method();
 
       // Skip external resources
-      if (!url.includes('localhost') && !url.includes('127.0.0.1')) {
+      if (!url.startsWith(baseUrl)) {
         return;
       }
 
@@ -60,14 +62,7 @@ test.describe('Admin Network & Console Audit', () => {
       }
     });
 
-    // Mock super admin authentication
-    await page.addInitScript(() => {
-      window.localStorage.setItem('admin-user', JSON.stringify({
-        id: 'superadmin',
-        email: 'superadmin@test.com',
-        role: 'super_admin'
-      }));
-    });
+    await loginAsAdminQuick(page, baseUrl);
   });
 
   test.afterEach(async () => {
@@ -93,7 +88,7 @@ test.describe('Admin Network & Console Audit', () => {
   });
 
   test('Audit /admin - Dashboard principal', async ({ page }) => {
-    await page.goto('/admin');
+    await page.goto(`${baseUrl}/admin`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -117,7 +112,7 @@ test.describe('Admin Network & Console Audit', () => {
   });
 
   test('Audit /admin/branding - Configuration branding', async ({ page }) => {
-    await page.goto('/admin/branding');
+    await page.goto(`${baseUrl}/admin/branding`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -137,7 +132,7 @@ test.describe('Admin Network & Console Audit', () => {
   });
 
   test('Audit /admin/members - Gestion des membres', async ({ page }) => {
-    await page.goto('/admin/members');
+    await page.goto(`${baseUrl}/admin/members`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -154,7 +149,7 @@ test.describe('Admin Network & Console Audit', () => {
   });
 
   test('Audit /admin/patrons - Gestion des mécènes', async ({ page }) => {
-    await page.goto('/admin/patrons');
+    await page.goto(`${baseUrl}/admin/patrons`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -171,7 +166,7 @@ test.describe('Admin Network & Console Audit', () => {
   });
 
   test('Audit /admin/loans - Gestion des prêts', async ({ page }) => {
-    await page.goto('/admin/loans');
+    await page.goto(`${baseUrl}/admin/loans`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -184,7 +179,7 @@ test.describe('Admin Network & Console Audit', () => {
   });
 
   test('Audit /admin/financial - Dashboard financier', async ({ page }) => {
-    await page.goto('/admin/financial');
+    await page.goto(`${baseUrl}/admin/financial`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -204,7 +199,7 @@ test.describe('Admin Network & Console Audit', () => {
   });
 
   test('Audit /admin/tracking - Suivi', async ({ page }) => {
-    await page.goto('/admin/tracking');
+    await page.goto(`${baseUrl}/admin/tracking`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -213,13 +208,13 @@ test.describe('Admin Network & Console Audit', () => {
     ).toBe(0);
   });
 
-  test('Audit /admin/admins - Gestion administrateurs', async ({ page }) => {
-    await page.goto('/admin/admins');
+  test('Audit /admin/settings - Configuration', async ({ page }) => {
+    await page.goto(`${baseUrl}/admin/settings`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
     expect(networkErrors.filter(e => e.status === 404).length,
-      `Found ${networkErrors.filter(e => e.status === 404).length} 404 errors on /admin/admins`
+      `Found ${networkErrors.filter(e => e.status === 404).length} 404 errors on /admin/settings`
     ).toBe(0);
   });
 
@@ -232,7 +227,7 @@ test.describe('Admin Network & Console Audit', () => {
       '/admin/loans',
       '/admin/financial',
       '/admin/tracking',
-      '/admin/admins'
+      '/admin/settings'
     ];
 
     const routeErrors: { route: string; errors: NetworkError[] }[] = [];
@@ -241,26 +236,24 @@ test.describe('Admin Network & Console Audit', () => {
       const routeNetworkErrors: NetworkError[] = [];
 
       // Clear and listen for this route
-      const responseHandler = (response: any) => {
+      const responseHandler = (response: Response) => {
         const status = response.status();
         const url = response.url();
         const method = response.request().method();
 
-        if (url.includes('localhost') || url.includes('127.0.0.1')) {
-          if (status >= 400) {
-            routeNetworkErrors.push({
-              url,
-              status,
-              method,
-              timestamp: new Date().toISOString()
-            });
-          }
+        if (url.startsWith(baseUrl) && status >= 400) {
+          routeNetworkErrors.push({
+            url,
+            status,
+            method,
+            timestamp: new Date().toISOString()
+          });
         }
       };
 
       page.on('response', responseHandler);
 
-      await page.goto(route);
+      await page.goto(`${baseUrl}${route}`);
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(1500);
 

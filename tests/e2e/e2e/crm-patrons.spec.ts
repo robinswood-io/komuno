@@ -33,6 +33,47 @@ import { loginAsAdminQuick } from '../helpers/auth';
 const BASE_URL = 'https://cjd80.rbw.ovh';
 const API_BASE = `${BASE_URL}/api`;
 
+interface PatronResponse {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  company?: string;
+  phone?: string;
+  role?: string;
+  notes?: string;
+  status?: string;
+}
+
+interface PaginatedPatronResponse {
+  data: PatronResponse[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+interface DonationResponse {
+  id: string;
+  amountInCents: number;
+  occasion?: string;
+  donatedAt?: string;
+}
+
+interface SponsorshipResponse {
+  id: string;
+  eventId: string;
+  amountInCents: number;
+  type: string;
+  notes?: string;
+}
+
+interface PatronUpdateResponse {
+  id: string;
+  type: string;
+  notes?: string;
+  createdAt?: string;
+}
+
 // Données de test pour patron
 const TEST_PATRON = {
   firstName: 'Jean',
@@ -54,6 +95,8 @@ const TEST_PATRON_UPDATED = {
   notes: 'Mécène très important'
 };
 
+const uniqueEmail = (prefix: string) => `${prefix}-${Date.now()}@example.com`;
+
 test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
 
   // Se connecter avant chaque test pour obtenir une session authentifiée
@@ -69,7 +112,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     expect(response.ok()).toBeTruthy();
     expect(response.status()).toBe(200);
 
-    const data = await response.json();
+    const data = await response.json() as PaginatedPatronResponse;
     expect(data).toHaveProperty('data');
     expect(data).toHaveProperty('total');
     expect(data.page).toBe(1);
@@ -79,19 +122,20 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
 
   // ===== TEST 2: Créer mécène =====
   test('2. Créer mécène avec validations', async ({ page }) => {
+    const email = uniqueEmail('patron-create');
     // Créer un mécène via l'API
     const createResponse = await page.request.post(`${API_BASE}/patrons`, {
-      data: TEST_PATRON
+      data: { ...TEST_PATRON, email }
     });
 
     expect(createResponse.ok()).toBeTruthy();
     expect(createResponse.status()).toBe(201);
 
-    const createdPatron = await createResponse.json();
+    const createdPatron = await createResponse.json() as PatronResponse;
     expect(createdPatron).toHaveProperty('id');
     expect(createdPatron.firstName).toBe(TEST_PATRON.firstName);
     expect(createdPatron.lastName).toBe(TEST_PATRON.lastName);
-    expect(createdPatron.email).toBe(TEST_PATRON.email);
+    expect(createdPatron.email).toBe(email);
     expect(createdPatron.company).toBe(TEST_PATRON.company);
     expect(createdPatron.phone).toBe(TEST_PATRON.phone);
     expect(createdPatron.role).toBe(TEST_PATRON.role);
@@ -103,8 +147,8 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     const listResponse = await page.request.get(`${API_BASE}/patrons?search=${TEST_PATRON.firstName}`);
 
     expect(listResponse.ok()).toBeTruthy();
-    const listData = await listResponse.json();
-    const foundPatron = listData.data.find((p: any) => p.id === patronId);
+    const listData = await listResponse.json() as PaginatedPatronResponse;
+    const foundPatron = listData.data.find((patron) => patron.id === patronId);
     expect(foundPatron).toBeDefined();
   });
 
@@ -119,7 +163,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json();
+    const patron = await createResponse.json() as PatronResponse;
     const patronId = patron.id;
 
     // Enregistrer un don
@@ -139,7 +183,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     expect(donationResponse.ok()).toBeTruthy();
     expect(donationResponse.status()).toBe(201);
 
-    const donation = await donationResponse.json();
+    const donation = await donationResponse.json() as DonationResponse;
     expect(donation).toHaveProperty('id');
     expect(donation.amountInCents).toBe(donationData.amountInCents);
     expect(donation.occasion).toBe(donationData.occasion);
@@ -150,10 +194,10 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     );
 
     expect(historyResponse.ok()).toBeTruthy();
-    const donations = await historyResponse.json();
+    const donations = await historyResponse.json() as DonationResponse[];
     expect(Array.isArray(donations)).toBeTruthy();
     expect(donations.length).toBeGreaterThan(0);
-    expect(donations.some((d: any) => d.amountInCents === donationData.amountInCents)).toBeTruthy();
+    expect(donations.some((donationItem) => donationItem.amountInCents === donationData.amountInCents)).toBeTruthy();
   });
 
   // ===== TEST 4: Lier sponsoring à événement =====
@@ -167,7 +211,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json();
+    const patron = await createResponse.json() as PatronResponse;
     const patronId = patron.id;
 
     // Créer un sponsoring
@@ -188,7 +232,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     expect(sponsorshipResponse.ok()).toBeTruthy();
     expect(sponsorshipResponse.status()).toBe(201);
 
-    const sponsorship = await sponsorshipResponse.json();
+    const sponsorship = await sponsorshipResponse.json() as SponsorshipResponse;
     expect(sponsorship).toHaveProperty('id');
     expect(sponsorship.amountInCents).toBe(sponsorshipData.amountInCents);
     expect(sponsorship.type).toBe(sponsorshipData.type);
@@ -200,10 +244,10 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     );
 
     expect(listResponse.ok()).toBeTruthy();
-    const sponsorships = await listResponse.json();
+    const sponsorships = await listResponse.json() as SponsorshipResponse[];
     expect(Array.isArray(sponsorships)).toBeTruthy();
     expect(sponsorships.length).toBeGreaterThan(0);
-    expect(sponsorships.some((s: any) => s.type === 'gold')).toBeTruthy();
+    expect(sponsorships.some((item) => item.type === 'gold')).toBeTruthy();
   });
 
   // ===== TEST 5: Enregistrer interaction (meeting) =====
@@ -217,7 +261,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json();
+    const patron = await createResponse.json() as PatronResponse;
     const patronId = patron.id;
 
     // Enregistrer une interaction (meeting)
@@ -241,7 +285,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     expect(updateResponse.ok()).toBeTruthy();
     expect(updateResponse.status()).toBe(201);
 
-    const update = await updateResponse.json();
+    const update = await updateResponse.json() as PatronUpdateResponse;
     expect(update).toHaveProperty('id');
     expect(update.type).toBe('meeting');
     expect(update.subject).toBe(updateData.subject);
@@ -254,10 +298,10 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     );
 
     expect(historyResponse.ok()).toBeTruthy();
-    const updates = await historyResponse.json();
+    const updates = await historyResponse.json() as PatronUpdateResponse[];
     expect(Array.isArray(updates)).toBeTruthy();
     expect(updates.length).toBeGreaterThan(0);
-    expect(updates.some((u: any) => u.type === 'meeting')).toBeTruthy();
+    expect(updates.some((item) => item.type === 'meeting')).toBeTruthy();
   });
 
   // ===== TEST 6: Voir historique dons =====
@@ -271,7 +315,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json();
+    const patron = await createResponse.json() as PatronResponse;
     const patronId = patron.id;
 
     // Enregistrer plusieurs dons
@@ -297,37 +341,39 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     );
 
     expect(historyResponse.ok()).toBeTruthy();
-    const allDonations = await historyResponse.json();
+    const allDonations = await historyResponse.json() as DonationResponse[];
 
     // Vérifier que tous les dons sont présents
     expect(Array.isArray(allDonations)).toBeTruthy();
     expect(allDonations.length).toBe(donations.length);
 
     // Vérifier les montants
-    const amounts = allDonations.map((d: any) => d.amountInCents).sort((a: number, b: number) => a - b);
+    const amounts = allDonations.map((donation) => donation.amountInCents).sort((a, b) => a - b);
     expect(amounts).toEqual([50000, 75000, 100000]);
 
     // Vérifier le montant total
-    const totalAmount = allDonations.reduce((sum: number, d: any) => sum + d.amountInCents, 0);
+    const totalAmount = allDonations.reduce((sum, donation) => sum + donation.amountInCents, 0);
     expect(totalAmount).toBe(225000); // 2250 EUR total
   });
 
   // ===== TEST 7: Mettre à jour mécène =====
   test('7. Mettre à jour informations mécène', async ({ page }) => {
     // Créer un mécène d'abord
+    const createEmail = uniqueEmail('patron-update');
     const createResponse = await page.request.post(`${API_BASE}/patrons`, {
-      data: TEST_PATRON
+      data: { ...TEST_PATRON, email: createEmail }
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json();
+    const patron = await createResponse.json() as PatronResponse;
     const patronId = patron.id;
 
     // Mettre à jour le mécène
+    const updatedEmail = uniqueEmail('patron-updated');
     const updateResponse = await page.request.patch(
       `${API_BASE}/patrons/${patronId}`,
       {
-          data: TEST_PATRON_UPDATED
+          data: { ...TEST_PATRON_UPDATED, email: updatedEmail }
       }
     );
 
@@ -337,7 +383,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     const updatedPatron = await updateResponse.json();
     expect(updatedPatron.id).toBe(patronId);
     expect(updatedPatron.firstName).toBe(TEST_PATRON_UPDATED.firstName);
-    expect(updatedPatron.email).toBe(TEST_PATRON_UPDATED.email);
+    expect(updatedPatron.email).toBe(updatedEmail);
     expect(updatedPatron.company).toBe(TEST_PATRON_UPDATED.company);
     expect(updatedPatron.phone).toBe(TEST_PATRON_UPDATED.phone);
 
@@ -348,7 +394,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
 
     expect(getResponse.ok()).toBeTruthy();
     const verifiedPatron = await getResponse.json();
-    expect(verifiedPatron.email).toBe(TEST_PATRON_UPDATED.email);
+    expect(verifiedPatron.email).toBe(updatedEmail);
     expect(verifiedPatron.company).toBe(TEST_PATRON_UPDATED.company);
   });
 
@@ -364,7 +410,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json();
+    const patron = await createResponse.json() as PatronResponse;
     expect(patron.email).toBe(testEmail);
 
     // Chercher par email
@@ -395,11 +441,11 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     );
 
     expect(activeResponse.ok()).toBeTruthy();
-    const activeData = await activeResponse.json();
+    const activeData = await activeResponse.json() as PaginatedPatronResponse;
     expect(Array.isArray(activeData.data)).toBeTruthy();
 
     // Vérifier que tous les mécènes ont un statut cohérent
-    activeData.data.forEach((patron: any) => {
+    activeData.data.forEach((patron) => {
       expect(patron).toHaveProperty('status');
       expect(['active', 'proposed']).toContain(patron.status);
     });
@@ -556,11 +602,11 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     );
 
     expect(historyResponse.ok()).toBeTruthy();
-    const updates = await historyResponse.json();
+    const updates = await historyResponse.json() as PatronUpdateResponse[];
 
     // Vérifier que chaque type d'interaction est présent
     for (const type of interactionTypes) {
-      const found = updates.some((u: any) => u.type === type);
+      const found = updates.some((updateItem) => updateItem.type === type);
       expect(found).toBeTruthy();
     }
   });
@@ -586,11 +632,11 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     );
 
     expect(searchResponse.ok()).toBeTruthy();
-    const searchData = await searchResponse.json();
+    const searchData = await searchResponse.json() as PaginatedPatronResponse;
     expect(Array.isArray(searchData.data)).toBeTruthy();
 
     // Le mécène créé devrait être trouvé
-    const found = searchData.data.some((p: any) => p.firstName === uniqueFirstName);
+    const found = searchData.data.some((patronItem) => patronItem.firstName === uniqueFirstName);
     expect(found).toBeTruthy();
   });
 
@@ -605,7 +651,7 @@ test.describe('US-PATRONS-001: Gestion CRM des mécènes', () => {
     });
 
     expect(createResponse.ok()).toBeTruthy();
-    const patron = await createResponse.json();
+    const patron = await createResponse.json() as PatronResponse;
     const patronId = patron.id;
 
     // Récupérer les propositions

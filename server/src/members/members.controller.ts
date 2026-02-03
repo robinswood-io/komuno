@@ -471,6 +471,52 @@ export class AdminMemberTagsController {
 export class AdminMemberTasksController {
   constructor(private readonly membersService: MembersService) {}
 
+  @Get()
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Obtenir toutes les tâches' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filtrer par statut', example: 'pending' })
+  @ApiQuery({ name: 'assignedTo', required: false, description: 'Filtrer par assigné', example: 'user@example.com' })
+  @ApiResponse({ status: 200, description: 'Liste des tâches' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  async getAllTasks(
+    @Query('status') status?: string,
+    @Query('assignedTo') assignedTo?: string,
+  ) {
+    return await this.membersService.getAllTasks({
+      ...(status && { status }),
+      ...(assignedTo && { assignedTo }),
+    });
+  }
+
+  @Post()
+  @Permissions('admin.edit')
+  @ApiOperation({ summary: 'Créer une nouvelle tâche' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', example: 'Nouvelle tâche' },
+        description: { type: 'string', example: 'Description de la tâche' },
+        dueDate: { type: 'string', format: 'date', example: '2026-02-20' },
+        priority: { type: 'string', enum: ['low', 'medium', 'high'], example: 'medium' },
+        memberId: { type: 'string', example: 'uuid-member-123' },
+        memberEmail: { type: 'string', format: 'email', example: 'member@example.com' }
+      },
+      required: ['title', 'memberEmail']
+    }
+  })
+  @ApiResponse({ status: 201, description: 'Tâche créée avec succès' })
+  @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  async createTask(
+    @Body() body: unknown,
+    @User() user: { email?: string },
+  ) {
+    return await this.membersService.createMemberTask((body as any)?.memberEmail, body, user.email);
+  }
+
   @Patch(':id')
   @Permissions('admin.edit')
   @ApiOperation({ summary: 'Mettre à jour une tâche' })
@@ -523,6 +569,39 @@ export class AdminMemberTasksController {
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AdminMemberRelationsController {
   constructor(private readonly membersService: MembersService) {}
+
+  @Get()
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Récupérer toutes les relations entre membres' })
+  @ApiResponse({ status: 200, description: 'Liste de toutes les relations', schema: { type: 'object', properties: { success: { type: 'boolean' }, data: { type: 'array' } } } })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  async getAllRelations() {
+    return await this.membersService.getAllRelations();
+  }
+
+  @Post()
+  @Permissions('admin.edit')
+  @ApiOperation({ summary: 'Créer une nouvelle relation entre membres' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        memberEmail: { type: 'string', format: 'email', example: 'member1@example.com' },
+        relatedMemberEmail: { type: 'string', format: 'email', example: 'member2@example.com' },
+        relationType: { type: 'string', enum: ['sponsor', 'team', 'custom'], example: 'sponsor' },
+        description: { type: 'string', example: 'Description de la relation' }
+      },
+      required: ['memberEmail', 'relatedMemberEmail', 'relationType']
+    }
+  })
+  @ApiResponse({ status: 201, description: 'Relation créée avec succès' })
+  @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  async createRelation(@Body() body: unknown, @User() user: { email?: string }) {
+    return await this.membersService.createMemberRelation((body as any)?.memberEmail, body, user.email);
+  }
 
   @Delete(':id')
   @Permissions('admin.edit')

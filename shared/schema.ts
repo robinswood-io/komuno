@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, unique, index, serial, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, unique, index, serial, date, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -202,6 +202,40 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 }, (table) => ({
   endpointIdx: index("push_subscriptions_endpoint_idx").on(table.endpoint),
   emailIdx: index("push_subscriptions_email_idx").on(table.userEmail),
+}));
+
+// Notifications table - Grouped by project/offer with metadata
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(), // ID of the user receiving the notification
+  type: text("type").notNull(), // "idea_update", "event_update", "loan_update", etc.
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  icon: text("icon"), // Icon URL or emoji
+  isRead: boolean("is_read").default(false).notNull(),
+  // Metadata for grouping and filtering by project/offer
+  metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`), // {projectId?, offerId?, taskId?, entityType?, entityId?, priority?}
+  // Link to the entity that triggered the notification
+  entityType: text("entity_type"), // "idea", "event", "loan_item", "patron_proposal", etc.
+  entityId: varchar("entity_id"), // ID of the entity
+  relatedProjectId: varchar("related_project_id"), // Optional: link to project
+  relatedOfferId: varchar("related_offer_id"), // Optional: link to offer
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("notifications_user_id_idx").on(table.userId),
+  typeIdx: index("notifications_type_idx").on(table.type),
+  isReadIdx: index("notifications_is_read_idx").on(table.isRead),
+  entityIdx: index("notifications_entity_idx").on(table.entityType, table.entityId),
+  projectIdIdx: index("notifications_project_id_idx").on(table.relatedProjectId),
+  offerIdIdx: index("notifications_offer_id_idx").on(table.relatedOfferId),
+  metadataProjectIdx: index("notifications_metadata_project_idx").on(
+    sql`(metadata->>'projectId')`
+  ),
+  metadataOfferIdx: index("notifications_metadata_offer_idx").on(
+    sql`(metadata->>'offerId')`
+  ),
+  createdAtIdx: index("notifications_created_at_idx").on(table.createdAt.desc()),
 }));
 
 // Development requests table - For GitHub issues integration
@@ -1639,7 +1673,25 @@ export const insertDevelopmentRequestSchema = createInsertSchema(developmentRequ
 });
 
 export const updateDevelopmentRequestSchema = z.object({
-  status: z.enum(["open", "in_progress", "closed", "cancelled"]).optional(),
+  title: z.string()
+    .min(5, "Le titre doit contenir au moins 5 caractères")
+    .max(200, "Le titre ne peut pas dépasser 200 caractères")
+    .optional()
+    .transform((value) => value ? sanitizeText(value) : undefined),
+  description: z.string()
+    .min(20, "La description doit contenir au moins 20 caractères")
+    .max(3000, "La description ne peut pas dépasser 3000 caractères")
+    .optional()
+    .transform((value) => value ? sanitizeText(value) : undefined),
+  type: z.enum(["bug", "feature"], {
+    message: "Le type doit être 'bug' ou 'feature'"
+  }).optional(),
+  priority: z.enum(["low", "medium", "high", "critical"]).optional(),
+  adminComment: z.string()
+    .max(1000, "Le commentaire ne peut pas dépasser 1000 caractères")
+    .optional()
+    .transform((value) => value ? sanitizeText(value) : undefined),
+  status: z.enum(["pending", "in_progress", "done", "cancelled", "open", "closed"]).optional(),
   githubStatus: z.enum(["open", "closed"]).optional(),
   githubIssueNumber: z.number().int().positive().optional(),
   githubIssueUrl: z.string().url().optional(),
@@ -1648,7 +1700,7 @@ export const updateDevelopmentRequestSchema = z.object({
 
 // Schéma spécial pour les mises à jour de statut par le super administrateur
 export const updateDevelopmentRequestStatusSchema = z.object({
-  status: z.enum(["open", "in_progress", "closed", "cancelled"]),
+  status: z.enum(["pending", "in_progress", "done", "cancelled", "open", "closed"]),
   adminComment: z.string()
     .max(1000, "Le commentaire ne peut pas dépasser 1000 caractères")
     .optional()
@@ -1968,6 +2020,45 @@ export const adminUsers = admins;
 export const insertAdminUserSchema = insertAdminSchema;
 export const eventRegistrations = inscriptions;
 export const insertEventRegistrationSchema = insertInscriptionSchema;
+
+// ===================================
+// Notifications Schemas
+// ===================================
+
+// Metadata type for notifications grouping
+export const notificationMetadataSchema = z.object({
+  projectId: z.string().uuid().optional(),
+  offerId: z.string().uuid().optional(),
+  taskId: z.string().uuid().optional(),
+  priority: z.enum(['low', 'normal', 'high']).optional(),
+  tags: z.array(z.string()).optional(),
+}).strict();
+
+export type NotificationMetadata = z.infer<typeof notificationMetadataSchema>;
+
+// Insert notification schema
+export const insertNotificationSchema = z.object({
+  userId: z.string().uuid("ID utilisateur invalide"),
+  type: z.string().min(1, "Type de notification requis"),
+  title: z.string().min(1, "Titre requis").max(255),
+  body: z.string().min(1, "Corps requis").max(1000),
+  icon: z.string().url().optional().nullable(),
+  isRead: z.boolean().default(false),
+  metadata: notificationMetadataSchema.default({}),
+  entityType: z.string().optional().nullable(),
+  entityId: z.string().uuid().optional().nullable(),
+  relatedProjectId: z.string().uuid().optional().nullable(),
+  relatedOfferId: z.string().uuid().optional().nullable(),
+});
+
+export const updateNotificationSchema = z.object({
+  isRead: z.boolean().optional(),
+  metadata: notificationMetadataSchema.optional(),
+}).strict();
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type UpdateNotification = z.infer<typeof updateNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
 
 // ===================================
 // System Status / Health Check Types

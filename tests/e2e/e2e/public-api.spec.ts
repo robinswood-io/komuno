@@ -4,7 +4,7 @@ import {
   generateTestInscription,
   generateTestEmail
 } from '../helpers/test-data';
-import { storage } from '../../server/storage';
+import { storage } from '../../../server/storage';
 
 /**
  * Tests des routes API publiques (sans authentification)

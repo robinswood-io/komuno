@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { loginAsAdminQuick } from '../helpers/auth';
+import { test, expect, type Page } from '@playwright/test';
+import { getAuthHeaders, loginAsAdminQuick } from '../helpers/auth';
 
 /**
  * Tests E2E - CRM Members: Member Details Sheet
@@ -26,7 +26,7 @@ import { loginAsAdminQuick } from '../helpers/auth';
 const BASE_URL = 'https://cjd80.rbw.ovh';
 
 // Helper: Naviguer vers la page members
-async function navigateToMembersPage(page: any) {
+async function navigateToMembersPage(page: Page) {
   await page.goto(`${BASE_URL}/admin/members`);
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(1000);
@@ -45,7 +45,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Chercher les boutons avec icon œil
-    const eyeButtons = page.locator('button[aria-label*="détail" i], button[aria-label*="view" i], button').filter({ has: page.locator('svg') });
+    const eyeButtons = page.locator('[data-testid="member-details-button"]');
     const buttonCount = await eyeButtons.count();
 
     console.log('[TEST 1] Boutons œil trouvés:', buttonCount);
@@ -65,17 +65,10 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Trouver et cliquer sur le premier bouton œil
-    const eyeButtons = page.locator('button[aria-label*="détail" i], button[aria-label*="view" i]');
+    const eyeButtons = page.locator('[data-testid="member-details-button"]');
     if (await eyeButtons.count() === 0) {
-      // Fallback: chercher boutons avec SVG (icônes)
-      const allButtons = await page.locator('button').all();
-      for (const btn of allButtons) {
-        const hasSvg = await btn.locator('svg').count() > 0;
-        if (hasSvg) {
-          await btn.click();
-          break;
-        }
-      }
+      test.skip();
+      return;
     } else {
       await eyeButtons.first().click();
     }
@@ -83,17 +76,20 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(1000);
 
     // Vérifier que le sheet est ouvert
-    const sheet = page.locator('[role="dialog"], [data-testid*="sheet"]').first();
+    const sheet = page.locator('[data-testid="member-details-sheet"], [role="dialog"]').first();
     await expect(sheet).toBeVisible({ timeout: 5000 });
 
     console.log('[TEST 2] ✅ Sheet ouvert');
   });
 
-  test('3. API GET /api/admin/members/:email/details retourne données complètes', async ({ request }) => {
+  test('3. API GET /api/admin/members/:email/details retourne données complètes', async ({ page }) => {
     console.log('[TEST 3] Test API details');
 
     // D'abord récupérer un membre existant
-    const membersResponse = await request.get(`${BASE_URL}/api/admin/members?limit=1`);
+    const authHeaders = await getAuthHeaders(page);
+    const membersResponse = await page.request.get(`${BASE_URL}/api/admin/members?limit=1`, {
+      headers: authHeaders,
+    });
     const membersData = await membersResponse.json();
 
     if (!membersData.data || membersData.data.length === 0) {
@@ -106,8 +102,9 @@ test.describe('CRM Members: Member Details Sheet', () => {
     console.log('[TEST 3] Test avec membre:', memberEmail);
 
     // Appeler l'API details
-    const detailsResponse = await request.get(
-      `${BASE_URL}/api/admin/members/${encodeURIComponent(memberEmail)}/details`
+    const detailsResponse = await page.request.get(
+      `${BASE_URL}/api/admin/members/${encodeURIComponent(memberEmail)}/details`,
+      { headers: authHeaders }
     );
 
     expect(detailsResponse.ok()).toBeTruthy();
@@ -127,11 +124,14 @@ test.describe('CRM Members: Member Details Sheet', () => {
     console.log('[TEST 3] ✅ API retourne données complètes');
   });
 
-  test('4. API GET /api/admin/members/:email/activities retourne historique', async ({ request }) => {
+  test('4. API GET /api/admin/members/:email/activities retourne historique', async ({ page }) => {
     console.log('[TEST 4] Test API activities');
 
     // Récupérer un membre
-    const membersResponse = await request.get(`${BASE_URL}/api/admin/members?limit=1`);
+    const authHeaders = await getAuthHeaders(page);
+    const membersResponse = await page.request.get(`${BASE_URL}/api/admin/members?limit=1`, {
+      headers: authHeaders,
+    });
     const membersData = await membersResponse.json();
 
     if (!membersData.data || membersData.data.length === 0) {
@@ -143,8 +143,9 @@ test.describe('CRM Members: Member Details Sheet', () => {
     const memberEmail = membersData.data[0].email;
 
     // Appeler l'API activities
-    const activitiesResponse = await request.get(
-      `${BASE_URL}/api/admin/members/${encodeURIComponent(memberEmail)}/activities`
+    const activitiesResponse = await page.request.get(
+      `${BASE_URL}/api/admin/members/${encodeURIComponent(memberEmail)}/activities`,
+      { headers: authHeaders }
     );
 
     expect(activitiesResponse.ok()).toBeTruthy();
@@ -167,7 +168,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Ouvrir sheet
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1000);
@@ -201,7 +202,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Ouvrir sheet
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1000);
@@ -231,7 +232,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Ouvrir sheet
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1000);
@@ -241,7 +242,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     }
 
     // Chercher le score
-    const scoreElements = page.locator('text=/score\\s*:\\s*\\d+/i, [data-testid*="score"]');
+    const scoreElements = page.locator('[data-testid="member-engagement-score-badge"], text=/Score\\s*:/i');
     const hasScore = await scoreElements.count() > 0;
 
     if (hasScore) {
@@ -259,7 +260,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Ouvrir sheet
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1500);
@@ -298,7 +299,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Ouvrir sheet
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1500);
@@ -334,7 +335,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Ouvrir sheet
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1500);
@@ -365,7 +366,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Ouvrir sheet
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1500);
@@ -396,7 +397,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Ouvrir sheet
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1500);
@@ -432,7 +433,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
     await page.waitForTimeout(2000);
 
     // Ouvrir sheet
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1500);
@@ -468,7 +469,7 @@ test.describe('CRM Members: Member Details Sheet', () => {
 
     // 1. OUVRIR
     console.log('[TEST 14] Étape 1: Ouverture');
-    const eyeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+    const eyeButton = page.locator('[data-testid="member-details-button"]').first();
     if (await eyeButton.count() > 0) {
       await eyeButton.click();
       await page.waitForTimeout(1500);

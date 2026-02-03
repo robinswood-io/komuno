@@ -15,22 +15,28 @@ import { ChatbotModule } from './chatbot/chatbot.module';
 import { SetupModule } from './setup/setup.module';
 import { BrandingModule } from './branding/branding.module';
 import { AdminModule } from './admin/admin.module';
+import { GitHubModule } from './github/github.module';
 import { MembersModule } from './members/members.module';
 import { PatronsModule } from './patrons/patrons.module';
 import { LoansModule } from './loans/loans.module';
 import { FinancialModule } from './financial/financial.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { FeaturesModule } from './features/features.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { MinIOModule } from './integrations/minio/minio.module';
 import { ViteModule } from './integrations/vite/vite.module';
 import { DbMonitoringInterceptor } from './common/interceptors/db-monitoring.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 // Note: ServeStaticModule n'est plus utilisé
 // Le fallback SPA et le service des fichiers statiques sont maintenant gérés
 // entièrement par ViteModule/SpaFallbackController qui utilise un Controller NestJS
 // avec @Get('*') et res.sendFile() au lieu du middleware Express ServeStaticModule
+
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const throttlerLimit = isDevelopment ? 10000 : 100;
 
 @Module({
   imports: [
@@ -40,7 +46,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 1 minute
-        limit: 100, // 100 requêtes par minute
+        limit: throttlerLimit, // 100 requêtes en prod, 10k en dev/test
       },
     ]),
     // Schedule pour les tâches cron
@@ -56,12 +62,14 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     SetupModule,
     BrandingModule,
     AdminModule,
+    GitHubModule,
     MembersModule,
     PatronsModule,
     LoansModule,
     FinancialModule,
     TrackingModule,
     FeaturesModule,
+    NotificationsModule,
     MinIOModule,
     // ViteModule gère le SPA fallback et les fichiers statiques via SpaFallbackController
     ViteModule,
@@ -76,6 +84,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TransformResponseInterceptor,
     },
     // Exception filter global
     {

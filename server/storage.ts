@@ -265,7 +265,7 @@ export interface IStorage {
   }>>;
 
   // Development requests
-  getDevelopmentRequests(): Promise<Result<DevelopmentRequest[]>>;
+  getDevelopmentRequests(filters?: { type?: 'bug' | 'feature'; status?: 'open' | 'in_progress' | 'closed' | 'cancelled' }): Promise<Result<DevelopmentRequest[]>>;
   createDevelopmentRequest(request: InsertDevelopmentRequest): Promise<Result<DevelopmentRequest>>;
   updateDevelopmentRequest(id: string, data: Partial<DevelopmentRequest>): Promise<Result<DevelopmentRequest>>;
   updateDevelopmentRequestStatus(id: string, status: string, adminComment: string | undefined, updatedBy: string): Promise<Result<DevelopmentRequest>>;
@@ -398,12 +398,14 @@ export interface IStorage {
   
   // Member Relations
   getRelationsByMember(memberEmail: string): Promise<Result<MemberRelation[]>>;
+  getAllRelations(): Promise<Result<MemberRelation[]>>;
   createRelation(relation: InsertMemberRelation): Promise<Result<MemberRelation>>;
   deleteRelation(relationId: string): Promise<Result<void>>;
   
   // Branding configuration
   getBrandingConfig(): Promise<Result<BrandingConfig | null>>;
   updateBrandingConfig(config: string, updatedBy: string): Promise<Result<BrandingConfig>>;
+  deleteBrandingConfig(): Promise<Result<void>>;
   
   // Email configuration
   getEmailConfig(): Promise<Result<EmailConfig | null>>;
@@ -1843,14 +1845,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Development requests methods
-  async getDevelopmentRequests(): Promise<Result<DevelopmentRequest[]>> {
+  async getDevelopmentRequests(filters?: { type?: 'bug' | 'feature'; status?: 'open' | 'in_progress' | 'closed' | 'cancelled' }): Promise<Result<DevelopmentRequest[]>> {
     try {
+      const conditions = [];
+      if (filters?.type) {
+        conditions.push(eq(developmentRequests.type, filters.type));
+      }
+      if (filters?.status) {
+        conditions.push(eq(developmentRequests.status, filters.status));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
       // Utiliser runDbQuery avec profil 'background' - timeout 15s avec retry
       const requests = await runDbQuery(
-        async () => db
-          .select()
-          .from(developmentRequests)
-          .orderBy(desc(developmentRequests.createdAt)),
+        async () => {
+          const baseQuery = db
+            .select()
+            .from(developmentRequests)
+            .orderBy(desc(developmentRequests.createdAt));
+
+          if (!whereClause) {
+            return baseQuery;
+          }
+
+          return baseQuery.where(whereClause);
+        },
         'background'
       );
       
@@ -3378,6 +3398,18 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+
+  async getAllRelations(): Promise<Result<MemberRelation[]>> {
+    try {
+      const relations = await db.select()
+        .from(memberRelations)
+        .orderBy(desc(memberRelations.createdAt));
+      return { success: true, data: relations };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération de toutes les relations: ${error}`) };
+    }
+  }
+
   async createRelation(relation: InsertMemberRelation): Promise<Result<MemberRelation>> {
     try {
       // Vérifier que la relation n'existe pas déjà
@@ -3472,6 +3504,16 @@ export class DatabaseStorage implements IStorage {
       return { success: true, data: result };
     } catch (error) {
       return { success: false, error: new DatabaseError(`Erreur lors de la mise à jour de la configuration: ${error}`) };
+    }
+  }
+
+  async deleteBrandingConfig(): Promise<Result<void>> {
+    try {
+      await db.delete(brandingConfig);
+      logger.info('Branding configuration deleted');
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la suppression de la configuration: ${error}`) };
     }
   }
 
@@ -4422,7 +4464,12 @@ export class DatabaseStorage implements IStorage {
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
       // Souscriptions
-      const allSubscriptions = await db.select().from(memberSubscriptions);
+      const allSubscriptions = await db.select({
+        amountInCents: memberSubscriptions.amountInCents,
+        startDate: memberSubscriptions.startDate,
+        endDate: memberSubscriptions.endDate,
+        createdAt: memberSubscriptions.createdAt,
+      }).from(memberSubscriptions);
       const activeSubscriptions = allSubscriptions.filter(sub => {
         const start = new Date(sub.startDate);
         const end = new Date(sub.endDate);
@@ -5109,7 +5156,12 @@ export class DatabaseStorage implements IStorage {
   async generateForecasts(period: string, year: number): Promise<Result<FinancialForecast[]>> {
     try {
       // Récupérer les revenus historiques (souscriptions et sponsorings)
-      const subscriptions = await db.select().from(memberSubscriptions);
+      const subscriptions = await db.select({
+        amountInCents: memberSubscriptions.amountInCents,
+        startDate: memberSubscriptions.startDate,
+        endDate: memberSubscriptions.endDate,
+        createdAt: memberSubscriptions.createdAt,
+      }).from(memberSubscriptions);
       const sponsorships = await db.select().from(eventSponsorships)
         .where(sql`${eventSponsorships.status} IN ('confirmed', 'completed')`);
       
@@ -5213,7 +5265,12 @@ export class DatabaseStorage implements IStorage {
       const currentYear = year || new Date().getFullYear();
       
       // Revenus réels (souscriptions + sponsorings)
-      const subscriptions = await db.select().from(memberSubscriptions);
+      const subscriptions = await db.select({
+        amountInCents: memberSubscriptions.amountInCents,
+        startDate: memberSubscriptions.startDate,
+        endDate: memberSubscriptions.endDate,
+        createdAt: memberSubscriptions.createdAt,
+      }).from(memberSubscriptions);
       const sponsorships = await db.select().from(eventSponsorships)
         .where(sql`${eventSponsorships.status} IN ('confirmed', 'completed')`);
       
@@ -5313,7 +5370,12 @@ export class DatabaseStorage implements IStorage {
     try {
       // Calculer les revenus et dépenses pour chaque période
       const calculatePeriodData = async (period: string, year: number) => {
-        const subscriptions = await db.select().from(memberSubscriptions);
+        const subscriptions = await db.select({
+          amountInCents: memberSubscriptions.amountInCents,
+          startDate: memberSubscriptions.startDate,
+          endDate: memberSubscriptions.endDate,
+          createdAt: memberSubscriptions.createdAt,
+        }).from(memberSubscriptions);
         const sponsorships = await db.select().from(eventSponsorships)
           .where(sql`${eventSponsorships.status} IN ('confirmed', 'completed')`);
         const expenses = await db.select().from(financialExpenses);
@@ -5414,7 +5476,12 @@ export class DatabaseStorage implements IStorage {
   }>> {
     try {
       // Calculer les revenus
-      const subscriptions = await db.select().from(memberSubscriptions);
+      const subscriptions = await db.select({
+        amountInCents: memberSubscriptions.amountInCents,
+        startDate: memberSubscriptions.startDate,
+        endDate: memberSubscriptions.endDate,
+        createdAt: memberSubscriptions.createdAt,
+      }).from(memberSubscriptions);
       const sponsorships = await db.select().from(eventSponsorships)
         .where(sql`${eventSponsorships.status} IN ('confirmed', 'completed')`);
       

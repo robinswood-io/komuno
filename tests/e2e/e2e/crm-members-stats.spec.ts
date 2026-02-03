@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { loginAsAdminQuick } from '../helpers/auth';
 
 /**
  * Tests E2E - CRM Members Statistics Dashboard
@@ -10,6 +11,9 @@ const BASE_URL = 'https://cjd80.rbw.ovh';
 test.describe('CRM Members Statistics Dashboard', () => {
   // Simple test to verify the stats page loads correctly
   // when user is authenticated
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdminQuick(page, BASE_URL);
+  });
   
   test('[1] Stats page should be accessible when authenticated', async ({ page }) => {
     // Navigate to the stats page

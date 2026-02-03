@@ -86,7 +86,15 @@ export class PatronsService {
       throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
     }
 
-    return result.data;
+    const totalPages = Math.ceil(result.data.total / result.data.limit);
+    return {
+      success: true,
+      data: result.data.data,
+      total: result.data.total,
+      page: result.data.page,
+      limit: result.data.limit,
+      totalPages,
+    };
   }
 
   async searchPatronByEmail(email: string) {

@@ -49,6 +49,7 @@ const envSchema = z.object({
   GITHUB_TOKEN: z.string().optional(),
   GITHUB_REPO_OWNER: z.string().optional(),
   GITHUB_REPO_NAME: z.string().optional(),
+  GITHUB_WEBHOOK_SECRET: z.string().optional(),
 });
 
 export type ValidatedEnv = z.infer<typeof envSchema>;
@@ -101,6 +102,7 @@ export function validateEnvironment(): ValidatedEnv {
           GITHUB_TOKEN: process.env.GITHUB_TOKEN,
           GITHUB_REPO_OWNER: process.env.GITHUB_REPO_OWNER,
           GITHUB_REPO_NAME: process.env.GITHUB_REPO_NAME,
+          GITHUB_WEBHOOK_SECRET: process.env.GITHUB_WEBHOOK_SECRET,
         } as ValidatedEnv;
       }
     }

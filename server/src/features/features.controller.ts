@@ -8,6 +8,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiBody } from '@nestjs/swagger';
 import { FeaturesService } from './features.service';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
@@ -30,6 +31,7 @@ export class FeaturesController {
    * No authentication required so frontend can load features for all users
    */
   @Get()
+  @SkipThrottle()
   @ApiOperation({ summary: 'Obtenir toutes les fonctionnalités (publique)' })
   @ApiResponse({ status: 200, description: 'Liste des fonctionnalités' })
   async getAllFeatures() {
@@ -54,6 +56,7 @@ export class FeaturesController {
    * Get a single feature by key - Public endpoint
    */
   @Get(':featureKey')
+  @SkipThrottle()
   @ApiOperation({ summary: 'Obtenir une fonctionnalité par clé (publique)' })
   @ApiParam({ name: 'featureKey', description: 'Clé de la fonctionnalité', example: 'chatbot' })
   @ApiResponse({ status: 200, description: 'Détails de la fonctionnalité' })

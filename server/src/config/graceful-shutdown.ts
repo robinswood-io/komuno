@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../lib/logger';
 import { db, pool } from '../../db';
 
@@ -81,7 +82,7 @@ export function setupGracefulShutdown(app: INestApplication) {
  * Middleware pour rejeter les requêtes pendant le shutdown
  */
 export function rejectDuringShutdown() {
-  return (req: any, res: any, next: any) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     if (process.env.APP_SHUTTING_DOWN === 'true') {
       res.status(503).json({
         error: 'Service Unavailable',

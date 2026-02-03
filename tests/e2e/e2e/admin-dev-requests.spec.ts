@@ -173,7 +173,7 @@ test.describe('Admin: Development Requests - CRUD Operations', () => {
       data: {
         type: 'bug',
         title: 'Bug test modification',
-        description: 'Description initiale',
+        description: 'Description initiale pour modification.',
         priority: 'low'
       }
     });
@@ -219,7 +219,7 @@ test.describe('Admin: Development Requests - CRUD Operations', () => {
       data: {
         type: 'feature',
         title: 'Feature test status change',
-        description: 'Test changing status',
+        description: 'Test changing status end-to-end.',
         priority: 'medium'
       }
     });
@@ -277,7 +277,7 @@ test.describe('Admin: Development Requests - CRUD Operations', () => {
       data: {
         type: 'bug',
         title: 'Bug to be deleted',
-        description: 'This will be deleted',
+        description: 'This will be deleted after creation.',
         priority: 'low'
       }
     });
@@ -500,7 +500,7 @@ test.describe('Admin: Development Requests - Priority Levels', () => {
         data: {
           type: 'bug',
           title: `Bug with ${priority} priority`,
-          description: `Test priority: ${priority}`,
+          description: `Test priority: ${priority} for validation.`,
           priority: priority
         }
       });
@@ -531,7 +531,7 @@ test.describe('Admin: Development Requests - Status Workflow', () => {
       data: {
         type: 'feature',
         title: 'Feature workflow test',
-        description: 'Test status workflow',
+        description: 'Test status workflow complet.',
         priority: 'medium'
       }
     });
@@ -580,7 +580,7 @@ test.describe('Admin: Development Requests - Status Workflow', () => {
       data: {
         type: 'bug',
         title: 'Bug to cancel',
-        description: 'This will be cancelled',
+        description: 'This will be cancelled after update.',
         priority: 'low'
       }
     });

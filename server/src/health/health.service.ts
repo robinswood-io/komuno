@@ -7,11 +7,12 @@ import { dbResilience } from '../../db';
 import { MinIOService } from '../integrations/minio/minio.service';
 import { logger } from '../../lib/logger';
 import type { StatusResponse, StatusCheck } from '../../../shared/schema';
+import type { DrizzleDb } from '../common/database/types';
 
 @Injectable()
 export class HealthService {
   constructor(
-    @Inject(DATABASE) private readonly db: any,
+    @Inject(DATABASE) private readonly db: DrizzleDb,
     private readonly minioService: MinIOService
   ) {}
 

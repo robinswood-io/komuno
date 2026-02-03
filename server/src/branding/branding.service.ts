@@ -41,6 +41,20 @@ export class BrandingService {
     
     return result.data;
   }
-}
 
+  async resetBrandingConfig() {
+    const result = await this.storageService.instance.deleteBrandingConfig();
+
+    if (!result.success) {
+      const error = 'error' in result ? result.error : new Error('Unknown error');
+      throw new BadRequestException(error.message);
+    }
+
+    const { brandingCore } = await import('../../../lib/config/branding-core');
+    return {
+      config: JSON.stringify(brandingCore),
+      isDefault: true,
+    };
+  }
+}
 

@@ -192,3 +192,5 @@ docker-compose.local.yml
 deploy.sh.local
 *.local.sh
 local-*.sh
+# Claude Code local settings
+.claude/settings.json

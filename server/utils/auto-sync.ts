@@ -1,5 +1,6 @@
 import { storage } from "../storage";
 import { syncGitHubIssueStatus } from "./github-integration";
+import { statusFromGitHub, toStorageStatus } from "./development-request-status";
 
 /**
  * Synchronise automatiquement toutes les demandes de développement avec GitHub
@@ -35,15 +36,17 @@ export async function autoSyncAllDevelopmentRequests(): Promise<void> {
         const githubStatus = await syncGitHubIssueStatus(request.githubIssueNumber!);
         
         if (githubStatus) {
+          const nextStatus = statusFromGitHub(githubStatus.status, githubStatus.labels);
+          const storageStatus = toStorageStatus(nextStatus);
           // Mettre à jour le statut local si différent
           const needsUpdate = 
             request.githubStatus !== githubStatus.status ||
-            (githubStatus.closed && request.status !== "closed");
+            request.status !== storageStatus;
             
           if (needsUpdate) {
             const updateResult = await storage.updateDevelopmentRequest(request.id, {
               githubStatus: githubStatus.status,
-              status: githubStatus.closed ? "closed" : request.status,
+              status: storageStatus,
               lastSyncedAt: new Date()
             });
             

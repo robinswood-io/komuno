@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { loginAsAdminQuick } from '../helpers/auth';
 
 /**
@@ -38,7 +38,7 @@ const PRESET_COLORS = [
 ];
 
 // Helper: Naviguer vers la page tags
-async function navigateToTagsPage(page: any) {
+async function navigateToTagsPage(page: Page) {
   // Option 1: URL directe
   await page.goto(`${BASE_URL}/admin/members/tags`);
   await page.waitForLoadState('networkidle');
@@ -166,11 +166,12 @@ test.describe('CRM Members: Tags Management', () => {
     await createButton.click();
     await page.waitForTimeout(500);
 
-    // Remplir le nom
+    // Remplir le nom (controlled React input - use fill instead of pressSequentially)
     const tagName = `Test Tag ${Date.now()}`;
-    const nameInput = page.locator('input[name="name"], input[placeholder*="nom" i]').first();
+    const nameInput = page.locator('#name');
+    await nameInput.fill('');
     await nameInput.fill(tagName);
-    console.log('[TEST 5] Nom saisi:', tagName);
+    await page.waitForTimeout(500);
 
     // Sélectionner une couleur preset (la première - bleu)
     const firstColorButton = page.locator('button[style*="background-color"]').first();
@@ -185,17 +186,36 @@ test.describe('CRM Members: Tags Management', () => {
       console.log('[TEST 5] ✅ Preview badge visible');
     }
 
-    // Soumettre le formulaire
-    const submitButton = page.locator('button[type="submit"], button').filter({ hasText: /créer|enregistrer|save/i }).first();
+    // Soumettre le formulaire - chercher le bouton dans le DialogFooter
+    const dialog = page.locator('[role="dialog"]').first();
+    const submitButton = dialog.locator('button').filter({ hasText: /créer|enregistrer/i }).last(); // Use last to skip Annuler
+    await expect(submitButton).toBeVisible();
     await submitButton.click();
 
-    // Attendre la fermeture du modal et le rechargement des données
-    await page.waitForTimeout(2000);
+    // Attendre que le modal se ferme
+    const modal = page.locator('[role="dialog"]').first();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
 
-    // Vérifier que le tag apparaît dans la liste
-    const newTag = page.locator(`text="${tagName}"`);
-    await expect(newTag.first()).toBeVisible({ timeout: 5000 });
+    // Attendre que le loader disparaisse et les données rechargent
+    await page.waitForSelector('[class*="animate-spin"]', { state: 'detached', timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(2000); // Wait for refetch to complete
 
+    // Verify the tag appears in the table by scrolling through all rows
+    const allRows = page.locator('table tbody tr');
+    const rowCount = await allRows.count();
+
+    // Find the tag by scrolling through the table
+    let found = false;
+    for (let i = 0; i < rowCount; i++) {
+      const rowText = await allRows.nth(i).textContent();
+      if (rowText?.includes(tagName)) {
+        found = true;
+        await allRows.nth(i).scrollIntoViewIfNeeded();
+        break;
+      }
+    }
+
+    expect(found).toBe(true);
     console.log('[TEST 5] ✅ Tag créé et visible dans la liste');
   });
 
@@ -235,10 +255,12 @@ test.describe('CRM Members: Tags Management', () => {
     await createButton.click();
     await page.waitForTimeout(500);
 
-    // Remplir le nom
+    // Remplir le nom (controlled React input - use fill instead of pressSequentially)
     const tagName = `Custom Color Tag ${Date.now()}`;
-    const nameInput = page.locator('input[name="name"], input[placeholder*="nom" i]').first();
+    const nameInput = page.locator('#name');
+    await nameInput.fill('');
     await nameInput.fill(tagName);
+    await page.waitForTimeout(500);
 
     // Chercher le champ de saisie hex
     const hexInput = page.locator('input[type="text"][placeholder*="#"], input[value*="#"]').first();
@@ -253,15 +275,35 @@ test.describe('CRM Members: Tags Management', () => {
 
     await page.waitForTimeout(300);
 
-    // Soumettre
-    const submitButton = page.locator('button[type="submit"], button').filter({ hasText: /créer|enregistrer|save/i }).first();
+    // Soumettre - chercher le bouton dans le DialogFooter
+    const dialog = page.locator('[role="dialog"]').first();
+    const submitButton = dialog.locator('button').filter({ hasText: /créer|enregistrer|save/i }).last();
     await submitButton.click();
-    await page.waitForTimeout(2000);
 
-    // Vérifier création
-    const newTag = page.locator(`text="${tagName}"`);
-    await expect(newTag.first()).toBeVisible({ timeout: 5000 });
+    // Attendre que le modal se ferme
+    const modal = page.locator('[role="dialog"]').first();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
 
+    // Attendre que le loader disparaisse et les données rechargent
+    await page.waitForSelector('[class*="animate-spin"]', { state: 'detached', timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(2000); // Wait for refetch to complete
+
+    // Verify the tag appears in the table by scrolling through all rows
+    const allRows = page.locator('table tbody tr');
+    const rowCount = await allRows.count();
+
+    // Find the tag by scrolling through the table
+    let found = false;
+    for (let i = 0; i < rowCount; i++) {
+      const rowText = await allRows.nth(i).textContent();
+      if (rowText?.includes(tagName)) {
+        found = true;
+        await allRows.nth(i).scrollIntoViewIfNeeded();
+        break;
+      }
+    }
+
+    expect(found).toBe(true);
     console.log('[TEST 7] ✅ Tag avec couleur personnalisée créé');
   });
 
@@ -399,21 +441,21 @@ test.describe('CRM Members: Tags Management', () => {
     await createButton.click();
     await page.waitForTimeout(500);
 
-    // Ne pas remplir le nom
+    // Vérifier que le modal est ouvert
+    const modal = page.locator('[role="dialog"]').first();
+    await expect(modal).toBeVisible();
+
+    // Ne pas remplir le nom - le champ doit être vide
     const nameInput = page.locator('input[name="name"], input[placeholder*="nom" i]').first();
     await nameInput.fill('');
+    await page.waitForTimeout(300);
 
-    // Tenter de soumettre
-    const submitButton = page.locator('button[type="submit"], button').filter({ hasText: /créer|enregistrer/i }).first();
-    await submitButton.click();
-    await page.waitForTimeout(1000);
+    // Vérifier que le bouton de soumission est désactivé quand le nom est vide
+    const submitButton = modal.locator('button').filter({ hasText: /créer|enregistrer/i }).last();
+    const isDisabled = await submitButton.isDisabled();
+    expect(isDisabled).toBe(true);
 
-    // Vérifier qu'un message d'erreur apparaît ou que le modal reste ouvert
-    const modal = page.locator('[role="dialog"]').first();
-    const modalStillVisible = await modal.isVisible();
-    expect(modalStillVisible).toBe(true);
-
-    console.log('[TEST 11] ✅ Validation nom requis fonctionne (modal reste ouvert)');
+    console.log('[TEST 11] ✅ Validation nom requis fonctionne (bouton désactivé)');
   });
 
   test('12. Preview badge en temps réel', async ({ page }) => {
@@ -515,33 +557,108 @@ test.describe('CRM Members: Tags Management', () => {
     await createButton.click();
     await page.waitForTimeout(500);
 
-    const nameInput = page.locator('input[name="name"], input[placeholder*="nom" i]').first();
+    const nameInput = page.locator('#name');
+    await nameInput.fill('');
     await nameInput.fill(uniqueName);
+    await page.waitForTimeout(500);
 
     const firstColorButton = page.locator('button[style*="background-color"]').first();
     await firstColorButton.click();
     await page.waitForTimeout(300);
 
-    const submitButton = page.locator('button[type="submit"], button').filter({ hasText: /créer|enregistrer/i }).first();
+    // Soumettre - chercher le bouton dans le DialogFooter
+    const dialog = page.locator('[role="dialog"]').first();
+    const submitButton = dialog.locator('button').filter({ hasText: /créer|enregistrer/i }).last();
     await submitButton.click();
-    await page.waitForTimeout(2000);
 
-    const createdTag = page.locator(`text="${uniqueName}"`);
-    await expect(createdTag.first()).toBeVisible({ timeout: 5000 });
+    // Attendre fermeture modal
+    const modal = page.locator('[role="dialog"]').first();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
+
+    // Attendre rechargement
+    await page.waitForSelector('[class*="animate-spin"]', { state: 'detached', timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(2000); // Wait for refetch to complete
+
+    // Verify tag was created by checking it appears in the table
+    const allRows = page.locator('table tbody tr');
+    const rowCount = await allRows.count();
+    console.log('[TEST 15] Total rows in table:', rowCount);
+
+    // Find the tag by scrolling through the table
+    let found = false;
+    const allTagNames = [];
+    for (let i = 0; i < rowCount; i++) {
+      const rowText = await allRows.nth(i).textContent();
+      const firstCell = await allRows.nth(i).locator('td').first().textContent();
+      allTagNames.push(firstCell);
+      console.log(`[TEST 15] Row ${i}: ${firstCell}`);
+      if (rowText?.includes(uniqueName)) {
+        found = true;
+        await allRows.nth(i).scrollIntoViewIfNeeded();
+        break;
+      }
+    }
+
+    console.log('[TEST 15] Expected tag name:', uniqueName);
+    console.log('[TEST 15] All tag names in table:', allTagNames);
+    expect(found).toBe(true);
     console.log('[TEST 15] ✅ Tag créé');
 
     // 2. MODIFIER
     console.log('[TEST 15] Étape 2: Modification');
-    const tagRow = page.locator('tr, [data-testid*="tag"]').filter({ hasText: uniqueName });
-    const editButton = tagRow.locator('button').filter({ hasText: /modifier|edit/i }).first();
+    // Find the row by scrolling through
+    const rowsForModify = page.locator('table tbody tr');
+    let rowIndexToModify = -1;
+    for (let i = 0; i < await rowsForModify.count(); i++) {
+      const rowText = await rowsForModify.nth(i).textContent();
+      if (rowText?.includes(uniqueName)) {
+        rowIndexToModify = i;
+        console.log('[TEST 15] Trouvé la ligne du tag à index', i);
+        break;
+      }
+    }
+
+    if (rowIndexToModify === -1) {
+      throw new Error(`Tag with name "${uniqueName}" not found in table`);
+    }
+
+    // Get the specific row and scroll to it
+    const rowToModify = rowsForModify.nth(rowIndexToModify);
+    await rowToModify.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+
+    // Click the edit button within this row
+    const editButton = rowToModify.locator('button').nth(0); // First button is edit (pencil icon)
     await editButton.click();
     await page.waitForTimeout(500);
 
-    const nameInputEdit = page.locator('input[name="name"], input[placeholder*="nom" i]').first();
+    const editDialog = page.locator('[role="dialog"]').first();
+    await editDialog.waitFor({ state: 'visible', timeout: 5000 });
+
+    const nameInputEdit = editDialog.locator('input[name="name"], input[placeholder*="nom" i]').first();
     const modifiedName = uniqueName + ' (modifié)';
     await nameInputEdit.fill(modifiedName);
+    await page.waitForTimeout(300);
 
-    const saveButton = page.locator('button').filter({ hasText: /enregistrer|save|mettre à jour/i }).first();
+    // Find the save button - should be in the dialog footer
+    const allDialogButtons = editDialog.locator('button');
+    let saveButtonIndex = -1;
+    for (let i = 0; i < await allDialogButtons.count(); i++) {
+      const btnText = await allDialogButtons.nth(i).textContent();
+      if (btnText?.toLowerCase().includes('enregistrer') ||
+          btnText?.toLowerCase().includes('modifier') ||
+          btnText?.toLowerCase().includes('mettre à jour')) {
+        saveButtonIndex = i;
+        console.log('[TEST 15] Trouvé le bouton save à index', i, 'avec texte:', btnText);
+        break;
+      }
+    }
+
+    if (saveButtonIndex === -1) {
+      throw new Error('Save button not found in edit dialog');
+    }
+
+    const saveButton = allDialogButtons.nth(saveButtonIndex);
     await saveButton.click();
     await page.waitForTimeout(2000);
 
@@ -551,8 +668,29 @@ test.describe('CRM Members: Tags Management', () => {
 
     // 3. SUPPRIMER
     console.log('[TEST 15] Étape 3: Suppression');
-    const tagRowDelete = page.locator('tr, [data-testid*="tag"]').filter({ hasText: modifiedName });
-    const deleteButton = tagRowDelete.locator('button').filter({ hasText: /supprimer|delete/i }).first();
+    // Find the row by scrolling through
+    const rowsForDelete = page.locator('table tbody tr');
+    let rowIndexToDelete = -1;
+    for (let i = 0; i < await rowsForDelete.count(); i++) {
+      const rowText = await rowsForDelete.nth(i).textContent();
+      if (rowText?.includes(modifiedName)) {
+        rowIndexToDelete = i;
+        console.log('[TEST 15] Trouvé la ligne du tag modifié à index', i);
+        break;
+      }
+    }
+
+    if (rowIndexToDelete === -1) {
+      throw new Error(`Tag with name "${modifiedName}" not found in table`);
+    }
+
+    // Get the specific row and scroll to it
+    const rowToDelete = rowsForDelete.nth(rowIndexToDelete);
+    await rowToDelete.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+
+    // Click the delete button within this row (second button)
+    const deleteButton = rowToDelete.locator('button').nth(1); // Second button is delete (trash icon)
     await deleteButton.click();
     await page.waitForTimeout(500);
 

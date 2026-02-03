@@ -1,5 +1,5 @@
-import { test, expect } from '@playwright/test';
-import { loginAsAdminQuick } from '../helpers/auth';
+import { test, expect, type Page } from '@playwright/test';
+import { getAuthHeaders, loginAsAdminQuick } from '../helpers/auth';
 
 /**
  * Tests E2E pour US-FINANCIAL-001: Dashboard finances budgets/dépenses
@@ -21,7 +21,7 @@ import { loginAsAdminQuick } from '../helpers/auth';
 const BASE_URL = 'https://cjd80.rbw.ovh';
 
 // Naviguer vers le dashboard financier
-async function navigateToFinanceDashboard(page: any) {
+async function navigateToFinanceDashboard(page: Page) {
   // Chercher un lien ou bouton pour accéder à la finance
   const financeLinks = page.locator(
     '[value="finance"], ' +
@@ -53,9 +53,12 @@ async function navigateToFinanceDashboard(page: any) {
 }
 
 test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
+  let authHeaders: Record<string, string> | null = null;
+
   test.beforeEach(async ({ page }) => {
     // Se connecter en tant qu'admin avant chaque test
     await loginAsAdminQuick(page);
+    authHeaders = await getAuthHeaders(page);
   });
 
   test('1. Voir dashboard finances - Vue d\'ensemble budgets vs dépenses', async ({ page }) => {
@@ -76,12 +79,9 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
     }
 
     // Chercher les graphiques ou cartes de synthèse
-    const summaryCards = page.locator(
-      '[data-testid^="summary-card"], ' +
-      '.card, ' +
-      '[role="region"], ' +
-      '.stat-card'
-    );
+    const summaryCards = page
+      .locator('[data-testid^="summary-card"], .stat-card, [data-testid*="finance"]')
+      .filter({ hasText: /Budget|Dépense|Prévision|Finance/i });
 
     if (await summaryCards.count() > 0) {
       const count = await summaryCards.count();
@@ -102,8 +102,10 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
 
     // Vérifier via l'API les stats budgets
     try {
+      const authHeaders = await getAuthHeaders(page);
       const statsResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/budgets/stats?period=Q1&year=2026`
+        `${BASE_URL}/api/admin/finance/budgets/stats?period=Q1&year=2026`,
+        { headers: authHeaders ?? {} }
       );
 
       if (statsResponse.ok()) {
@@ -156,8 +158,10 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
 
     // Vérifier via l'API
     try {
+      const authHeaders = await getAuthHeaders(page);
       const budgetsResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/budgets?period=Q1&year=2026`
+        `${BASE_URL}/api/admin/finance/budgets?period=Q1&year=2026`,
+        { headers: authHeaders ?? {} }
       );
 
       if (budgetsResponse.ok()) {
@@ -243,7 +247,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
             category: 'events',
             period: 'Q1',
             year: 2026
-          }
+          },
+          headers: authHeaders ?? {}
         }
       );
 
@@ -300,7 +305,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
     try {
       // D'abord récupérer un budget
       const budgetsResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/budgets?period=Q1&year=2026`
+        `${BASE_URL}/api/admin/finance/budgets?period=Q1&year=2026`,
+        { headers: authHeaders ?? {} }
       );
 
       if (budgetsResponse.ok()) {
@@ -315,7 +321,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
               data: {
                 amount: 7500,
                 description: `Budget modifié - ${Date.now()}`
-              }
+              },
+              headers: authHeaders ?? {}
             }
           );
 
@@ -407,7 +414,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
             date: new Date().toISOString(),
             period: 'Q1',
             year: 2026
-          }
+          },
+          headers: authHeaders ?? {}
         }
       );
 
@@ -454,7 +462,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
     // Vérifier via l'API
     try {
       const expensesResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/expenses?period=Q1&year=2026`
+        `${BASE_URL}/api/admin/finance/expenses?period=Q1&year=2026`,
+        { headers: authHeaders ?? {} }
       );
 
       if (expensesResponse.ok()) {
@@ -507,7 +516,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
           data: {
             period: 'Q2',
             year: 2026
-          }
+          },
+          headers: authHeaders ?? {}
         }
       );
 
@@ -558,7 +568,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
     // Vérifier via l'API
     try {
       const forecastsResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/forecasts?period=Q2&year=2026`
+        `${BASE_URL}/api/admin/finance/forecasts?period=Q2&year=2026`,
+        { headers: authHeaders ?? {} }
       );
 
       if (forecastsResponse.ok()) {
@@ -604,7 +615,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
     // Vérifier via l'API de comparaison
     try {
       const comparisonResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/comparison?period1=Q1&year1=2025&period2=Q1&year2=2026`
+        `${BASE_URL}/api/admin/finance/comparison?period1=Q1&year1=2025&period2=Q1&year2=2026`,
+        { headers: authHeaders ?? {} }
       );
 
       if (comparisonResponse.ok()) {
@@ -618,7 +630,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
     // Vérifier aussi le rapport trimestriel
     try {
       const reportResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/reports/quarterly?period=1&year=2026`
+        `${BASE_URL}/api/admin/finance/reports/quarterly?period=1&year=2026`,
+        { headers: authHeaders ?? {} }
       );
 
       if (reportResponse.ok()) {
@@ -662,7 +675,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
     // Vérifier via l'API
     try {
       const filteredResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/budgets?period=Q1&year=2026&category=events`
+        `${BASE_URL}/api/admin/finance/budgets?period=Q1&year=2026&category=events`,
+        { headers: authHeaders ?? {} }
       );
 
       if (filteredResponse.ok()) {
@@ -683,7 +697,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
 
     // 1. GET /api/admin/finance/budgets/stats
     const statsResponse = await request.get(
-      `${BASE_URL}/api/admin/finance/budgets/stats?period=Q1&year=2026`
+      `${BASE_URL}/api/admin/finance/budgets/stats?period=Q1&year=2026`,
+      { headers: authHeaders ?? {} }
     ).catch(() => null);
     if (statsResponse) {
       testResults.push({
@@ -695,7 +710,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
 
     // 2. GET /api/admin/finance/budgets
     const budgetsResponse = await request.get(
-      `${BASE_URL}/api/admin/finance/budgets?period=Q1&year=2026`
+      `${BASE_URL}/api/admin/finance/budgets?period=Q1&year=2026`,
+      { headers: authHeaders ?? {} }
     ).catch(() => null);
     if (budgetsResponse) {
       testResults.push({
@@ -715,7 +731,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
           category: 'events',
           period: 'Q1',
           year: 2026
-        }
+        },
+        headers: authHeaders ?? {}
       }
     ).catch(() => null);
     if (postBudgetResponse) {
@@ -728,7 +745,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
 
     // 4. GET /api/admin/finance/expenses
     const expensesResponse = await request.get(
-      `${BASE_URL}/api/admin/finance/expenses?period=Q1&year=2026`
+      `${BASE_URL}/api/admin/finance/expenses?period=Q1&year=2026`,
+      { headers: authHeaders ?? {} }
     ).catch(() => null);
     if (expensesResponse) {
       testResults.push({
@@ -749,7 +767,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
           date: new Date().toISOString(),
           period: 'Q1',
           year: 2026
-        }
+        },
+        headers: authHeaders ?? {}
       }
     ).catch(() => null);
     if (postExpenseResponse) {
@@ -762,7 +781,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
 
     // 6. GET /api/admin/finance/forecasts
     const forecastsResponse = await request.get(
-      `${BASE_URL}/api/admin/finance/forecasts?period=Q2&year=2026`
+      `${BASE_URL}/api/admin/finance/forecasts?period=Q2&year=2026`,
+      { headers: authHeaders ?? {} }
     ).catch(() => null);
     if (forecastsResponse) {
       testResults.push({
@@ -779,7 +799,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
         data: {
           period: 'Q2',
           year: 2026
-        }
+        },
+        headers: authHeaders ?? {}
       }
     ).catch(() => null);
     if (generateResponse) {
@@ -792,7 +813,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
 
     // 8. GET /api/admin/finance/reports/quarterly
     const reportResponse = await request.get(
-      `${BASE_URL}/api/admin/finance/reports/quarterly?period=1&year=2026`
+      `${BASE_URL}/api/admin/finance/reports/quarterly?period=1&year=2026`,
+      { headers: authHeaders ?? {} }
     ).catch(() => null);
     if (reportResponse) {
       testResults.push({
@@ -804,7 +826,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
 
     // 9. GET /api/admin/finance/comparison
     const comparisonResponse = await request.get(
-      `${BASE_URL}/api/admin/finance/comparison?period1=Q1&year1=2025&period2=Q1&year2=2026`
+      `${BASE_URL}/api/admin/finance/comparison?period1=Q1&year1=2025&period2=Q1&year2=2026`,
+      { headers: authHeaders ?? {} }
     ).catch(() => null);
     if (comparisonResponse) {
       testResults.push({
@@ -834,7 +857,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
 
     // L'utilisateur connecté devrait avoir accès en tant qu'admin
     const adminResponse = await page.request.get(
-      `${BASE_URL}/api/admin/finance/budgets`
+      `${BASE_URL}/api/admin/finance/budgets`,
+      { headers: authHeaders ?? {} }
     ).catch(() => null);
 
     if (adminResponse) {
@@ -896,7 +920,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
     // Vérifier via l'API PUT
     try {
       const expensesResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/expenses?period=Q1&year=2026`
+        `${BASE_URL}/api/admin/finance/expenses?period=Q1&year=2026`,
+        { headers: authHeaders ?? {} }
       );
 
       if (expensesResponse.ok()) {
@@ -910,7 +935,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
               data: {
                 amount: 500,
                 notes: `Dépense modifiée - ${Date.now()}`
-              }
+              },
+              headers: authHeaders ?? {}
             }
           );
 
@@ -964,7 +990,8 @@ test.describe('US-FINANCIAL-001: Dashboard finances budgets/dépenses', () => {
     // Vérifier via l'API
     try {
       const reportResponse = await page.request.get(
-        `${BASE_URL}/api/admin/finance/reports/quarterly?period=1&year=2026&format=pdf`
+        `${BASE_URL}/api/admin/finance/reports/quarterly?period=1&year=2026&format=pdf`,
+        { headers: authHeaders ?? {} }
       );
 
       if (reportResponse.ok() || reportResponse.status() === 200) {

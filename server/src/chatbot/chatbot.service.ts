@@ -213,9 +213,17 @@ Réponds UNIQUEMENT avec la requête SQL, rien d'autre.`;
    */
   async query(question: string, context?: string): Promise<ChatbotResponse> {
     if (!this.openai) {
+      if (process.env.NODE_ENV !== 'production') {
+        return {
+          answer: 'Mode démo: configurez OPENAI_API_KEY pour activer l\'assistant.',
+          sql: 'SELECT 1;',
+          data: [],
+        };
+      }
+
       return {
         answer: 'Le service chatbot n\'est pas disponible. Veuillez configurer OPENAI_API_KEY.',
-        error: 'OpenAI client not initialized'
+        error: 'OpenAI client not initialized',
       };
     }
 

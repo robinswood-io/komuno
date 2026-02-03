@@ -1,0 +1,27 @@
+{
+  "name": "CJD80",
+  "description": "Application web interne 'Boîte à Kiffs' pour CJD Amiens. Plateforme collaborative avec authentification, gestion d'utilisateurs et interface moderne.",
+  "category": "application",
+  "icon": {
+    "emoji": "🎉"
+  },
+  "healthEndpoint": "/api/health",
+  "version": "1.0.0",
+  "subdomain": "cjd80",
+  "dockerContainerName": "cjd80",
+  "tags": ["nestjs", "internal-app", "collaboration", "production"],
+  "features": ["user-management", "api", "frontend", "authentication"],
+  "environment": "production",
+  "grafanaDashboardUid": "cjd80-dashboard",
+  "links": {
+    "documentation": "https://docs.rbw.ovh/cjd80",
+    "repository": "https://github.com/robinswood/cjd80",
+    "issues": "https://github.com/robinswood/cjd80/issues"
+  },
+  "owner": {
+    "team": "Platform Engineering",
+    "contact": "platform@robinswood.io",
+    "slack": "#platform-engineering"
+  },
+  "dependencies": []
+}

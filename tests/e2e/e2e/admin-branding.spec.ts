@@ -18,9 +18,9 @@ test.describe('Admin Branding Interface', () => {
     await page.waitForLoadState('networkidle');
     
     // Vérifier que les 5 sections Accordion sont présentes
-    await expect(page.locator('text=Application')).toBeVisible();
-    await expect(page.locator('text=Organisation')).toBeVisible();
-    await expect(page.locator('text=Apparence')).toBeVisible();
+    await expect(page.locator('[data-testid="accordion-trigger-app"]')).toBeVisible();
+    await expect(page.locator('[data-testid="accordion-trigger-organization"]')).toBeVisible();
+    await expect(page.locator('[data-testid="accordion-trigger-appearance"]')).toBeVisible();
     // PWA section is in the form
     await expect(page.locator('[data-testid="accordion-pwa"]')).toBeVisible();
     // Links section
@@ -64,14 +64,14 @@ test.describe('Admin Branding Interface', () => {
     await page.click('[data-testid="button-save-branding"]');
     
     // Vérifier succès (toast message)
-    await expect(page.locator('text=Branding sauvegardé avec succès')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('Branding sauvegardé avec succès').first()).toBeVisible({ timeout: 3000 });
   });
   
   test('should allow color picker for primary color', async ({ page }) => {
     await page.waitForLoadState('networkidle');
     
     // Ouvrir section Apparence
-    await page.click('text=Apparence');
+    await page.click('[data-testid="accordion-trigger-appearance"]');
     
     // Tester le color picker (input type color)
     const colorInput = page.locator('[data-testid="input-color-primary"]');
@@ -91,7 +91,7 @@ test.describe('Admin Branding Interface', () => {
     });
     
     await page.click('[data-testid="button-save-branding"]');
-    await expect(page.locator('text=Branding sauvegardé avec succès')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('Branding sauvegardé avec succès').first()).toBeVisible({ timeout: 3000 });
   });
   
   test('should reset to default configuration', async ({ page }) => {
@@ -113,10 +113,10 @@ test.describe('Admin Branding Interface', () => {
     await page.click('[data-testid="button-reset-branding"]');
     
     // Confirmer dans AlertDialog
-    await page.click('text=Confirmer');
+    await page.click('[data-testid="button-confirm-reset-branding"]');
     
     // Vérifier reset
-    await expect(page.locator('text=Configuration réinitialisée aux valeurs par défaut')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('Configuration réinitialisée aux valeurs par défaut').first()).toBeVisible({ timeout: 3000 });
   });
 
   test('should show all form fields in Application section', async ({ page }) => {
@@ -133,7 +133,7 @@ test.describe('Admin Branding Interface', () => {
     await page.waitForLoadState('networkidle');
     
     // Open Organisation section
-    await page.click('text=Organisation');
+    await page.click('[data-testid="accordion-trigger-organization"]');
     
     await expect(page.locator('[data-testid="input-org-name"]')).toBeVisible();
     await expect(page.locator('[data-testid="input-org-full-name"]')).toBeVisible();
@@ -146,7 +146,7 @@ test.describe('Admin Branding Interface', () => {
     await page.waitForLoadState('networkidle');
     
     // Open Apparence section
-    await page.click('text=Apparence');
+    await page.click('[data-testid="accordion-trigger-appearance"]');
     
     // Check for color inputs
     await expect(page.locator('[data-testid="input-color-primary"]')).toBeVisible();
@@ -175,7 +175,7 @@ test.describe('Admin Branding Interface', () => {
     await page.click('[data-testid="button-save-branding"]');
     
     // Should show error toast
-    await expect(page.locator('text=Erreur')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('Erreur').first()).toBeVisible({ timeout: 3000 });
   });
 });
 

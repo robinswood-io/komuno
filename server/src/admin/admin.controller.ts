@@ -8,8 +8,10 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { User } from '../auth/decorators/user.decorator';
 import { ZodValidationPipe } from '../common/pipes/validation.pipe';
 import { logger } from '../../lib/logger';
+import { resolveRequestBody } from '../common/utils/request-body';
 import { frontendErrorSchema } from '@shared/schema';
 import { z } from 'zod';
+import type { DevRequestStatus } from '../../utils/development-request-status';
 import {
   updateIdeaStatusDto,
   updateEventStatusDto,
@@ -20,9 +22,6 @@ import {
   updateAdministratorStatusDto,
   updateAdministratorInfoDto,
   approveAdministratorDto,
-  createDevelopmentRequestDto,
-  updateDevelopmentRequestDto,
-  updateDevelopmentRequestStatusDto,
   createVoteDto,
   updateUnsubscriptionDto,
   updateFeatureConfigDto,
@@ -678,13 +677,31 @@ export class AdminController {
   @ApiResponse({ status: 200, description: 'Liste des demandes de développement' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
-  async getDevelopmentRequests() {
-    return await this.adminService.getDevelopmentRequests();
+  async getDevelopmentRequests(
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+  ) {
+    const normalizedType = type === 'bug' || type === 'feature' ? type : undefined;
+    const isDevRequestStatus = (value: string): value is DevRequestStatus =>
+      value === 'pending' ||
+      value === 'in_progress' ||
+      value === 'done' ||
+      value === 'cancelled';
+
+    const normalizedStatus: DevRequestStatus | 'open' | 'closed' | undefined =
+      status && (isDevRequestStatus(status) || status === 'open' || status === 'closed')
+        ? status
+        : undefined;
+
+    const data = await this.adminService.getDevelopmentRequests({
+      type: normalizedType,
+      status: normalizedStatus,
+    });
+    return { success: true, data };
   }
 
   @Post('development-requests')
   @Permissions('admin.edit')
-  @UsePipes(new ZodValidationPipe(createDevelopmentRequestDto))
   @ApiOperation({ summary: 'Créer une demande de développement (bug/feature)' })
   @ApiBody({
     schema: {
@@ -704,14 +721,16 @@ export class AdminController {
   @ApiResponse({ status: 403, description: 'Permission refusée' })
   async createDevelopmentRequest(
     @Body() body: CreateDevelopmentRequestDto,
+    @Req() req: Request,
     @User() user: { email: string; firstName?: string; lastName?: string },
   ) {
-    return await this.adminService.createDevelopmentRequest(body, user);
+    const resolvedBody = resolveRequestBody(body, req);
+    const data = await this.adminService.createDevelopmentRequest(resolvedBody, user);
+    return { success: true, data };
   }
 
   @Put('development-requests/:id')
   @Permissions('admin.manage')
-  @UsePipes(new ZodValidationPipe(updateDevelopmentRequestDto))
   @ApiOperation({ summary: 'Mettre à jour une demande de développement' })
   @ApiParam({ name: 'id', description: 'ID de la demande', example: 'uuid-123' })
   @ApiBody({
@@ -734,8 +753,11 @@ export class AdminController {
   async updateDevelopmentRequest(
     @Param('id') id: string,
     @Body() body: UpdateDevelopmentRequestDto,
+    @Req() req: Request,
   ) {
-    return await this.adminService.updateDevelopmentRequest(id, body);
+    const resolvedBody = resolveRequestBody(body, req);
+    const data = await this.adminService.updateDevelopmentRequest(id, resolvedBody);
+    return { success: true, data };
   }
 
   @Post('development-requests/:id/sync')
@@ -747,19 +769,19 @@ export class AdminController {
   @ApiResponse({ status: 403, description: 'Permission refusée' })
   @ApiResponse({ status: 404, description: 'Demande non trouvée' })
   async syncDevelopmentRequestWithGitHub(@Param('id') id: string) {
-    return await this.adminService.syncDevelopmentRequestWithGitHub(id);
+    const data = await this.adminService.syncDevelopmentRequestWithGitHub(id);
+    return { success: true, data };
   }
 
   @Patch('development-requests/:id/status')
   @Permissions('admin.manage')
-  @UsePipes(new ZodValidationPipe(updateDevelopmentRequestStatusDto))
   @ApiOperation({ summary: 'Mettre à jour le statut d\'une demande de développement' })
   @ApiParam({ name: 'id', description: 'ID de la demande', example: 'uuid-123' })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        status: { type: 'string', enum: ['open', 'in_progress', 'closed', 'cancelled'], example: 'in_progress' }
+        status: { type: 'string', enum: ['pending', 'in_progress', 'done', 'cancelled'], example: 'in_progress' }
       },
       required: ['status']
     }
@@ -772,9 +794,12 @@ export class AdminController {
   async updateDevelopmentRequestStatus(
     @Param('id') id: string,
     @Body() body: UpdateDevelopmentRequestStatusDto,
+    @Req() req: Request,
     @User() user: { email: string },
   ) {
-    return await this.adminService.updateDevelopmentRequestStatus(id, body, user);
+    const resolvedBody = resolveRequestBody(body, req);
+    const data = await this.adminService.updateDevelopmentRequestStatus(id, resolvedBody, user);
+    return { success: true, data };
   }
 
   @Delete('development-requests/:id')
@@ -786,7 +811,8 @@ export class AdminController {
   @ApiResponse({ status: 403, description: 'Permission refusée' })
   @ApiResponse({ status: 404, description: 'Demande non trouvée' })
   async deleteDevelopmentRequest(@Param('id') id: string) {
-    return await this.adminService.deleteDevelopmentRequest(id);
+    await this.adminService.deleteDevelopmentRequest(id);
+    return { success: true };
   }
 
   // ===== Routes Admin Logs & Tests =====

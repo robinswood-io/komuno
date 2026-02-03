@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { getAuthHeaders, loginAsAdminQuick } from '../helpers/auth';
 
 /**
  * Tests E2E - US-EVENTS-003: Gestion des inscriptions (admin)
@@ -22,8 +23,6 @@ import { test, expect, Page } from '@playwright/test';
  */
 
 const BASE_URL = 'https://cjd80.rbw.ovh';
-const MANAGER_EMAIL = 'admin@test.local';
-const MANAGER_PASSWORD = 'devmode';
 
 interface TestContext {
   eventId: string;
@@ -40,29 +39,10 @@ interface TestContext {
   }>;
 }
 
-// Helper: Login as events_manager
-async function loginAsManager(page: Page) {
-  await page.goto(`${BASE_URL}/login`);
-  await page.fill('input[type="email"]', MANAGER_EMAIL);
-  await page.fill('input[type="password"]', MANAGER_PASSWORD);
-  await page.click('button[type="submit"]');
-  await page.waitForURL(/\/admin/, { timeout: 10000 });
-}
-
-// Helper: Get session cookie
-async function getSessionCookie(page: Page) {
-  const cookies = await page.context().cookies();
-  return cookies.find(c => c.name.includes('sid') || c.name.includes('session') || c.name.includes('auth'));
-}
-
 // Helper: Create test event via API
 async function createTestEvent(page: Page, eventName: string) {
-  await loginAsManager(page);
-  const sessionCookie = await getSessionCookie(page);
-
-  if (!sessionCookie) {
-    throw new Error('No session cookie found');
-  }
+  await loginAsAdminQuick(page, BASE_URL);
+  const authHeaders = await getAuthHeaders(page);
 
   const response = await page.request.post(`${BASE_URL}/api/admin/events`, {
     data: {
@@ -73,9 +53,7 @@ async function createTestEvent(page: Page, eventName: string) {
       location: 'Test Location',
       maxInscriptions: 100
     },
-    headers: {
-      'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-    }
+    headers: authHeaders
   });
 
   if (!response.ok()) {
@@ -117,13 +95,15 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should display event inscriptions list', async ({ page }) => {
       console.log('[TEST] Starting: Display event inscriptions list');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
 
       // Navigate to events management
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Verify page loaded
-      await expect(page.locator('h1, h2')).toContainText(/Événement|Event/i);
+      await expect(
+        page.getByRole('heading', { name: /Événement|Event/i }).first()
+      ).toBeVisible();
 
       // Wait for events list to load
       await page.waitForTimeout(1000);
@@ -163,19 +143,12 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('API GET /api/admin/events/:eventId/inscriptions should return inscriptions', async ({ request, page }) => {
       console.log('[TEST] Testing API: GET /api/admin/events/:eventId/inscriptions');
 
-      await loginAsManager(page);
-      const sessionCookie = await getSessionCookie(page);
-
-      if (!sessionCookie) {
-        console.log('[TEST] No session cookie found, skipping API test');
-        return;
-      }
+      await loginAsAdminQuick(page, BASE_URL);
+      const authHeaders = await getAuthHeaders(page);
 
       // Get first event ID from events list
       const eventsResponse = await request.get(`${BASE_URL}/api/admin/events`, {
-        headers: {
-          'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-        }
+        headers: authHeaders
       });
 
       if (!eventsResponse.ok()) {
@@ -198,11 +171,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
       // Test inscriptions endpoint
       const response = await request.get(
         `${BASE_URL}/api/admin/events/${eventId}/inscriptions`,
-        {
-          headers: {
-            'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-          }
-        }
+        { headers: authHeaders }
       );
 
       expect(response.ok()).toBeTruthy();
@@ -223,7 +192,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should open add inscription form', async ({ page }) => {
       console.log('[TEST] Starting: Open add inscription form');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Wait for page to load
@@ -251,10 +220,10 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('API POST /api/admin/inscriptions should create inscription', async ({ request, page }) => {
       console.log('[TEST] Testing API: POST /api/admin/inscriptions');
 
-      await loginAsManager(page);
-      const sessionCookie = await getSessionCookie(page);
+      await loginAsAdminQuick(page, BASE_URL);
+      const authHeaders = await getAuthHeaders(page);
 
-      if (!sessionCookie || !testContext.eventId) {
+      if (!testContext.eventId) {
         console.log('[TEST] Missing session or event ID, skipping test');
         return;
       }
@@ -271,9 +240,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
 
       const response = await request.post(`${BASE_URL}/api/admin/inscriptions`, {
         data: inscriptionData,
-        headers: {
-          'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-        }
+        headers: authHeaders
       });
 
       console.log(`[TEST] API Response Status: ${response.status()}`);
@@ -291,7 +258,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should fill and submit inscription form', async ({ page }) => {
       console.log('[TEST] Starting: Fill and submit inscription form');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Navigate to add inscription
@@ -339,7 +306,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should display bulk import button', async ({ page }) => {
       console.log('[TEST] Starting: Display bulk import button');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Look for bulk import button
@@ -358,7 +325,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should show file upload for bulk import', async ({ page }) => {
       console.log('[TEST] Starting: Show file upload for bulk import');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Click bulk import button if it exists
@@ -382,10 +349,10 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('API POST /api/admin/inscriptions/bulk should import multiple inscriptions', async ({ request, page }) => {
       console.log('[TEST] Testing API: POST /api/admin/inscriptions/bulk');
 
-      await loginAsManager(page);
-      const sessionCookie = await getSessionCookie(page);
+      await loginAsAdminQuick(page, BASE_URL);
+      const authHeaders = await getAuthHeaders(page);
 
-      if (!sessionCookie || !testContext.eventId) {
+      if (!testContext.eventId) {
         console.log('[TEST] Missing session or event ID, skipping test');
         return;
       }
@@ -405,9 +372,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
           inscriptions: bulkInscriptions,
           eventId: testContext.eventId
         },
-        headers: {
-          'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-        }
+        headers: authHeaders
       });
 
       console.log(`[TEST] API Response Status: ${response.status()}`);
@@ -427,13 +392,14 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should navigate to unsubscriptions page', async ({ page }) => {
       console.log('[TEST] Starting: Navigate to unsubscriptions page');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Look for unsubscriptions link
-      const unsubLink = page.locator(
-        'a[href*="unsubscription"], button:has-text("Désinscription"), text=/Désinscription|Unsubscribed/i'
-      ).first();
+      const unsubLink = page
+        .locator('a[href*="unsubscription"], button')
+        .filter({ hasText: /Désinscription|Unsubscribed/i })
+        .first();
 
       if (await unsubLink.count() > 0) {
         console.log('[TEST] Unsubscriptions link found');
@@ -451,21 +417,17 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('API GET /api/admin/events/:id/unsubscriptions should return unsubscriptions', async ({ request, page }) => {
       console.log('[TEST] Testing API: GET /api/admin/events/:id/unsubscriptions');
 
-      await loginAsManager(page);
-      const sessionCookie = await getSessionCookie(page);
+      await loginAsAdminQuick(page, BASE_URL);
+      const authHeaders = await getAuthHeaders(page);
 
-      if (!sessionCookie || !testContext.eventId) {
+      if (!testContext.eventId) {
         console.log('[TEST] Missing session or event ID, skipping test');
         return;
       }
 
       const response = await request.get(
         `${BASE_URL}/api/admin/events/${testContext.eventId}/unsubscriptions`,
-        {
-          headers: {
-            'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-          }
-        }
+        { headers: authHeaders }
       );
 
       console.log(`[TEST] API Response Status: ${response.status()}`);
@@ -492,13 +454,14 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should display unsubscriptions with reasons', async ({ page }) => {
       console.log('[TEST] Starting: Display unsubscriptions with reasons');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Navigate to unsubscriptions
-      const unsubLink = page.locator(
-        'a[href*="unsubscription"], button:has-text("Désinscription")'
-      ).first();
+      const unsubLink = page
+        .locator('a[href*="unsubscription"], button')
+        .filter({ hasText: /Désinscription|Unsubscribed/i })
+        .first();
 
       if (await unsubLink.count() > 0) {
         await unsubLink.click();
@@ -521,7 +484,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should display export button', async ({ page }) => {
       console.log('[TEST] Starting: Display export button');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Look for export button
@@ -540,7 +503,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should trigger CSV download on export', async ({ page }) => {
       console.log('[TEST] Starting: Trigger CSV download on export');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Look for export button
@@ -568,10 +531,10 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('API endpoint should support CSV export', async ({ request, page }) => {
       console.log('[TEST] Testing CSV export capability');
 
-      await loginAsManager(page);
-      const sessionCookie = await getSessionCookie(page);
+      await loginAsAdminQuick(page, BASE_URL);
+      const authHeaders = await getAuthHeaders(page);
 
-      if (!sessionCookie || !testContext.eventId) {
+      if (!testContext.eventId) {
         console.log('[TEST] Missing session or event ID, skipping test');
         return;
       }
@@ -581,7 +544,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
         `${BASE_URL}/api/admin/events/${testContext.eventId}/inscriptions?format=csv`,
         {
           headers: {
-            'Cookie': `${sessionCookie.name}=${sessionCookie.value}`,
+            ...authHeaders,
             'Accept': 'text/csv'
           }
         }
@@ -601,7 +564,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should display delete button on inscription', async ({ page }) => {
       console.log('[TEST] Starting: Display delete button on inscription');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Look for inscriptions list
@@ -638,10 +601,10 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('API DELETE /api/admin/inscriptions/:id should delete inscription', async ({ request, page }) => {
       console.log('[TEST] Testing API: DELETE /api/admin/inscriptions/:id');
 
-      await loginAsManager(page);
-      const sessionCookie = await getSessionCookie(page);
+      await loginAsAdminQuick(page, BASE_URL);
+      const authHeaders = await getAuthHeaders(page);
 
-      if (!sessionCookie || !testContext.eventId) {
+      if (!testContext.eventId) {
         console.log('[TEST] Missing session or event ID, skipping test');
         return;
       }
@@ -650,9 +613,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
       const listResponse = await request.get(
         `${BASE_URL}/api/admin/events/${testContext.eventId}/inscriptions`,
         {
-          headers: {
-            'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-          }
+          headers: authHeaders
         }
       );
 
@@ -675,9 +636,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
             firstName: 'Delete',
             lastName: 'Test'
           },
-          headers: {
-            'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-          }
+          headers: authHeaders
         });
 
         if (!createResponse.ok()) {
@@ -693,9 +652,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
           const deleteResponse = await request.delete(
             `${BASE_URL}/api/admin/inscriptions/${inscriptionId}`,
             {
-              headers: {
-                'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-              }
+              headers: authHeaders
             }
           );
 
@@ -710,9 +667,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
         const deleteResponse = await request.delete(
           `${BASE_URL}/api/admin/inscriptions/${inscriptionId}`,
           {
-            headers: {
-              'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-            }
+            headers: authHeaders
           }
         );
 
@@ -724,7 +679,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should delete inscription after confirmation', async ({ page }) => {
       console.log('[TEST] Starting: Delete inscription after confirmation');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
       await page.goto(`${BASE_URL}/admin/events`, { waitUntil: 'networkidle' });
 
       // Navigate to inscriptions
@@ -772,7 +727,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should complete full inscription management workflow', async ({ page }) => {
       console.log('[TEST] Starting: Complete inscription management workflow');
 
-      await loginAsManager(page);
+      await loginAsAdminQuick(page, BASE_URL);
 
       // Step 1: Navigate to admin
       console.log('[TEST] Step 1: Navigate to admin panel');
@@ -819,22 +774,15 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
     test('should have proper error handling for invalid operations', async ({ request, page }) => {
       console.log('[TEST] Starting: Error handling tests');
 
-      await loginAsManager(page);
-      const sessionCookie = await getSessionCookie(page);
-
-      if (!sessionCookie) {
-        console.log('[TEST] No session cookie found, skipping error handling tests');
-        return;
-      }
+      await loginAsAdminQuick(page, BASE_URL);
+      const authHeaders = await getAuthHeaders(page);
 
       // Test 1: Delete non-existent inscription
       console.log('[TEST] Test 1: Delete non-existent inscription');
       const deleteResponse = await request.delete(
         `${BASE_URL}/api/admin/inscriptions/non-existent-id`,
         {
-          headers: {
-            'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-          }
+          headers: authHeaders
         }
       );
 
@@ -848,9 +796,7 @@ test.describe('US-EVENTS-003: Gestion des inscriptions (admin)', () => {
           email: 'test@example.com'
           // Missing eventId, firstName, lastName
         },
-        headers: {
-          'Cookie': `${sessionCookie.name}=${sessionCookie.value}`
-        }
+        headers: authHeaders
       });
 
       console.log(`[TEST] Create with missing fields response: ${createResponse.status()}`);
