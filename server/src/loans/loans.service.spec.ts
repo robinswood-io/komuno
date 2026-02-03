@@ -206,8 +206,8 @@ describe('LoansService', () => {
       });
 
       it('should support search parameter', async () => {
-        const expectedResult = {
-          items: [mockLoanItem],
+        const mockData = {
+          data: [mockLoanItem],
           total: 1,
           page: 1,
           limit: 20,
@@ -215,11 +215,19 @@ describe('LoansService', () => {
 
         storageService.instance.getLoanItems.mockResolvedValue({
           success: true,
-          data: expectedResult,
+          data: mockData,
         });
 
-        await service.getLoanItems(1, 20, 'projecteur');
+        const result = await service.getLoanItems(1, 20, 'projecteur');
 
+        expect(result).toEqual({
+          success: true,
+          data: [mockLoanItem],
+          total: 1,
+          page: 1,
+          limit: 20,
+          totalPages: 1,
+        });
         expect(storageService.instance.getLoanItems).toHaveBeenCalledWith({
           page: 1,
           limit: 20,
@@ -738,8 +746,8 @@ describe('LoansService', () => {
   describe('Admin Operations', () => {
     describe('getAllLoanItems', () => {
       it('should return all loan items (admin)', async () => {
-        const expectedResult = {
-          items: [mockLoanItem],
+        const mockData = {
+          data: [mockLoanItem],
           total: 1,
           page: 1,
           limit: 20,
@@ -747,12 +755,19 @@ describe('LoansService', () => {
 
         storageService.instance.getAllLoanItems.mockResolvedValue({
           success: true,
-          data: expectedResult,
+          data: mockData,
         });
 
         const result = await service.getAllLoanItems(1, 20);
 
-        expect(result).toEqual(expectedResult);
+        expect(result).toEqual({
+          success: true,
+          data: [mockLoanItem],
+          total: 1,
+          page: 1,
+          limit: 20,
+          totalPages: 1,
+        });
         expect(storageService.instance.getAllLoanItems).toHaveBeenCalledWith({
           page: 1,
           limit: 20,
@@ -761,8 +776,8 @@ describe('LoansService', () => {
       });
 
       it('should support search for admin users', async () => {
-        const expectedResult = {
-          items: [mockLoanItem],
+        const mockData = {
+          data: [mockLoanItem],
           total: 1,
           page: 1,
           limit: 20,
@@ -770,11 +785,19 @@ describe('LoansService', () => {
 
         storageService.instance.getAllLoanItems.mockResolvedValue({
           success: true,
-          data: expectedResult,
+          data: mockData,
         });
 
-        await service.getAllLoanItems(1, 20, 'projecteur');
+        const result = await service.getAllLoanItems(1, 20, 'projecteur');
 
+        expect(result).toEqual({
+          success: true,
+          data: [mockLoanItem],
+          total: 1,
+          page: 1,
+          limit: 20,
+          totalPages: 1,
+        });
         expect(storageService.instance.getAllLoanItems).toHaveBeenCalledWith({
           page: 1,
           limit: 20,

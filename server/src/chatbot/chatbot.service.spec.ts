@@ -119,8 +119,7 @@ describe('ChatbotService', () => {
 
       const response = await service.query('Combien de membres ?');
 
-      expect(response.answer).toContain('service chatbot n\'est pas disponible');
-      expect(response.error).toBeTruthy();
+      expect(response.answer).toContain('Mode démo: configurez OPENAI_API_KEY');
     });
 
     it('devrait lancer une erreur si OpenAI échoue', async () => {
@@ -541,8 +540,7 @@ describe('ChatbotService', () => {
 
       const response = await service.query('Test question');
 
-      expect(response.answer).toContain('service chatbot n\'est pas disponible');
-      expect(response.error).toBe('OpenAI client not initialized');
+      expect(response.answer).toContain('Mode démo: configurez OPENAI_API_KEY');
     });
 
     it('devrait construire la réponse avec toutes les données', async () => {
