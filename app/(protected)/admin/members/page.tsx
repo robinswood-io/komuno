@@ -406,7 +406,14 @@ export default function AdminMembersPage() {
             <TableBody>
               {filteredMembers && filteredMembers.length > 0 ? (
                 filteredMembers.map((member: Member) => (
-                  <TableRow key={member.email}>
+                  <TableRow
+                    key={member.email}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      setDetailsEmail(member.email);
+                      setDetailsSheetOpen(true);
+                    }}
+                  >
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <span>{member.firstName} {member.lastName}</span>
@@ -415,7 +422,31 @@ export default function AdminMembersPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{member.email}</TableCell>
+                    <TableCell
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-pointer hover:text-primary transition-colors"
+                      title="Cliquer pour copier l'email"
+                    >
+                      <span
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(member.email);
+                            toast({
+                              title: 'Email copié',
+                              description: `${member.email} a été copié dans le presse-papier`,
+                            });
+                          } catch (error) {
+                            toast({
+                              title: 'Erreur',
+                              description: 'Impossible de copier l\'email',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
+                      >
+                        {member.email}
+                      </span>
+                    </TableCell>
                     <TableCell>{member.company || '-'}</TableCell>
                     <TableCell>
                       <Badge
@@ -447,64 +478,27 @@ export default function AdminMembersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setDetailsEmail(member.email);
-                            setDetailsSheetOpen(true);
-                          }}
-                          title="Voir les détails"
-                          aria-label={`Voir les détails du membre ${member.firstName} ${member.lastName}`}
-                          data-testid="member-details-button"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {member.status === 'proposed' ? (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => convertToActiveMutation.mutate(member.email)}
-                              disabled={convertToActiveMutation.isPending}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                            >
-                              {convertToActiveMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <UserCheck className="h-4 w-4 mr-1" />
-                                  Convertir
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenEditDialog(member)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenEditDialog(member)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </>
+                        {member.status === 'proposed' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              convertToActiveMutation.mutate(member.email);
+                            }}
+                            disabled={convertToActiveMutation.isPending}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          >
+                            {convertToActiveMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <UserCheck className="h-4 w-4 mr-1" />
+                                Convertir
+                              </>
+                            )}
+                          </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(member.email)}
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -702,6 +696,19 @@ export default function AdminMembersPage() {
           setDetailsSheetOpen(false);
           setDetailsEmail(null);
         }}
+        onEdit={(member: Member) => {
+          handleOpenEditDialog(member);
+          setDetailsSheetOpen(false);
+        }}
+        onDelete={(email: string) => {
+          handleDelete(email);
+          setDetailsSheetOpen(false);
+        }}
+        onConvertToActive={(email: string) => {
+          convertToActiveMutation.mutate(email);
+        }}
+        isConvertingToActive={convertToActiveMutation.isPending}
+        isDeletingMember={deleteMutation.isPending}
       />
     </div>
   );

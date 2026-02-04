@@ -12,8 +12,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Mail, Phone, Building2, Briefcase, UserCircle, Calendar, TrendingUp } from 'lucide-react';
+import { Loader2, Mail, Phone, Building2, Briefcase, UserCircle, Calendar, TrendingUp, Pencil, Trash2, UserCheck } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 
 interface Member {
   email: string;
@@ -70,9 +71,23 @@ interface MemberDetailsSheetProps {
   email: string | null;
   open: boolean;
   onClose: () => void;
+  onEdit?: (member: Member) => void;
+  onDelete?: (email: string) => void;
+  onConvertToActive?: (email: string) => void;
+  isConvertingToActive?: boolean;
+  isDeletingMember?: boolean;
 }
 
-export function MemberDetailsSheet({ email, open, onClose }: MemberDetailsSheetProps) {
+export function MemberDetailsSheet({
+  email,
+  open,
+  onClose,
+  onEdit,
+  onDelete,
+  onConvertToActive,
+  isConvertingToActive = false,
+  isDeletingMember = false,
+}: MemberDetailsSheetProps) {
   const detailsQuery = useQuery({
     queryKey: queryKeys.members.detail(email || ''),
     queryFn: async () => {
@@ -133,6 +148,49 @@ export function MemberDetailsSheet({ email, open, onClose }: MemberDetailsSheetP
                   </SheetDescription>
                 </div>
                 <div className="flex flex-col items-end gap-2">
+                  <div className="flex gap-2">
+                    {member.status === 'proposed' && onConvertToActive && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onConvertToActive(member.email)}
+                        disabled={isConvertingToActive}
+                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                      >
+                        {isConvertingToActive ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <UserCheck className="h-4 w-4 mr-1" />
+                            Convertir
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    {onEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onEdit(member)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          if (confirm('Êtes-vous sûr de vouloir supprimer ce membre ?')) {
+                            onDelete(member.email);
+                          }
+                        }}
+                        disabled={isDeletingMember}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
                   <span data-testid="member-status-badge">{getStatusBadge(member.status)}</span>
                   {member.engagementScore !== undefined && (
                     <Badge variant="outline" className="gap-1" data-testid="member-engagement-score-badge">

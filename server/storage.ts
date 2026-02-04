@@ -3029,6 +3029,9 @@ export class DatabaseStorage implements IStorage {
     member: Member;
     activities: MemberActivity[];
     subscriptions: MemberSubscription[];
+    tags: MemberTag[];
+    tasks: MemberTask[];
+    relations: MemberRelation[];
   }>> {
     try {
       // Récupérer le membre
@@ -3043,8 +3046,51 @@ export class DatabaseStorage implements IStorage {
         return { success: false, error: activitiesResult.error };
       }
 
-      // Récupérer les souscriptions
-      const subscriptions = await this.getSubscriptionsByMember(email);
+      // Récupérer les souscriptions avec gestion d'erreur
+      let subscriptions: MemberSubscription[] = [];
+      try {
+        subscriptions = await this.getSubscriptionsByMember(email);
+      } catch (subError) {
+        // Log error but don't fail the entire request
+        console.warn(`Failed to fetch subscriptions for ${email}:`, subError);
+        subscriptions = [];
+      }
+
+      // Récupérer les tags avec gestion d'erreur
+      let tags: MemberTag[] = [];
+      try {
+        const tagsResult = await this.getTagsByMember(email);
+        if (tagsResult.success) {
+          tags = tagsResult.data;
+        }
+      } catch (tagError) {
+        console.warn(`Failed to fetch tags for ${email}:`, tagError);
+        tags = [];
+      }
+
+      // Récupérer les tâches avec gestion d'erreur
+      let tasks: MemberTask[] = [];
+      try {
+        const tasksResult = await this.getTasksByMember(email);
+        if (tasksResult.success) {
+          tasks = tasksResult.data;
+        }
+      } catch (taskError) {
+        console.warn(`Failed to fetch tasks for ${email}:`, taskError);
+        tasks = [];
+      }
+
+      // Récupérer les relations avec gestion d'erreur
+      let relations: MemberRelation[] = [];
+      try {
+        const relationsResult = await this.getRelationsByMember(email);
+        if (relationsResult.success) {
+          relations = relationsResult.data;
+        }
+      } catch (relationError) {
+        console.warn(`Failed to fetch relations for ${email}:`, relationError);
+        relations = [];
+      }
 
       return {
         success: true,
@@ -3052,6 +3098,9 @@ export class DatabaseStorage implements IStorage {
           member: memberResult.data,
           activities: activitiesResult.data,
           subscriptions,
+          tags,
+          tasks,
+          relations,
         }
       };
     } catch (error) {
