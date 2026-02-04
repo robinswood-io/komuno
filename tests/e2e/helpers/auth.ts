@@ -333,10 +333,6 @@ export async function loginAsAdminQuick(
     }
   );
 
-  await page.evaluate((user: { email: string; role: string }) => {
-    window.localStorage.setItem('admin-user', JSON.stringify(user));
-  }, devUser);
-
   // CRITICAL: Wait for session cookie to be set and persisted
   // Use polling to ensure cookie is set, not just wait time
   if (verbose) {
