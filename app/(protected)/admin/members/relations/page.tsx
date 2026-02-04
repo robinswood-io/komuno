@@ -73,31 +73,24 @@ export default function AdminMembersRelationsPage() {
 
   if (error) {
     return (
-      <div className="container py-8">
-        <Card className="border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">Erreur</CardTitle>
-            <CardDescription>Impossible de charger les relations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">{(error as Error).message}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-destructive">
+        <CardHeader>
+          <CardTitle className="text-destructive">Erreur</CardTitle>
+          <CardDescription>Impossible de charger les relations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{(error as Error).message}</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="container py-8 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestion des Relations</h1>
-          <p className="text-muted-foreground">
-            Visualisez et gérez les relations entre les membres de l'association
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      {/* Description de la page */}
+      <p className="text-muted-foreground">
+        Visualisez et gérez les relations entre les membres de l'association
+      </p>
 
       {/* Onglets Graphe/Tableau */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'graph' | 'table')}>
@@ -114,62 +107,58 @@ export default function AdminMembersRelationsPage() {
 
         {/* Tab Graphe */}
         <TabsContent value="graph" className="space-y-4 mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Colonne gauche: Filtres */}
-            <div className="lg:col-span-1">
-              <RelationFilters
-                filters={filters}
-                onRelationTypeChange={updateRelationTypeFilter}
-                onStatusChange={updateMemberStatusFilter}
-                onSearchChange={updateSearchQuery}
-                onReset={resetAllFilters}
-              />
+          {/* Filtres en haut sur mobile, à gauche sur desktop */}
+          <div className="mb-4">
+            <RelationFilters
+              filters={filters}
+              onRelationTypeChange={updateRelationTypeFilter}
+              onStatusChange={updateMemberStatusFilter}
+              onSearchChange={updateSearchQuery}
+              onReset={resetAllFilters}
+            />
 
-              {filters.viewMode === 'ego-network' && (
-                <div className="mt-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={handleResetToNetwork}
-                  >
-                    Retour au réseau complet
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Colonne principale: Graphe */}
-            <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Réseau de relations</CardTitle>
-                  <CardDescription>
-                    {filteredNodes.length} membre(s) - {filteredEdges.length} relation(s)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <RelationGraphView
-                    nodes={filteredNodes}
-                    edges={filteredEdges}
-                    onNodeSelect={handleNodeSelect}
-                    selectedNode={selectedNode || undefined}
-                  />
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Colonne droite: Détails du membre sélectionné */}
-            <div className="lg:col-span-1">
-              <MemberDetailPanel
-                memberEmail={selectedNode}
-                members={members}
-                relations={relations}
-                onEgoNetworkClick={handleEgoNetworkClick}
-                onClose={() => setSelectedNode(null)}
-              />
-            </div>
+            {filters.viewMode === 'ego-network' && (
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={handleResetToNetwork}
+                >
+                  Retour au réseau complet
+                </Button>
+              </div>
+            )}
           </div>
+
+          {/* Graphe en pleine largeur */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Réseau de relations</CardTitle>
+              <CardDescription>
+                {filteredNodes.length} membre(s) - {filteredEdges.length} relation(s)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="min-h-[600px]">
+              <RelationGraphView
+                nodes={filteredNodes}
+                edges={filteredEdges}
+                onNodeSelect={handleNodeSelect}
+                selectedNode={selectedNode || undefined}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Panel de détails en dessous sur mobile, flottant sur desktop */}
+          {selectedNode && (
+            <MemberDetailPanel
+              memberEmail={selectedNode}
+              members={members}
+              relations={relations}
+              onEgoNetworkClick={handleEgoNetworkClick}
+              onClose={() => setSelectedNode(null)}
+            />
+          )}
         </TabsContent>
 
         {/* Tab Tableau */}
