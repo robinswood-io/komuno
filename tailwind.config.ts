@@ -1,12 +1,8 @@
 import type { Config } from "tailwindcss";
 
-// Hardcoded values from branding config to avoid build-time import issues
-// NOTE: These values should match brandingCore.colors in client/src/config/branding-core.ts
-// We can't import brandingCore here because Tailwind config runs at build time and may have module resolution issues
-const CJD_GREEN = "#00a844";      // brandingCore.colors.primary
-const CJD_GREEN_DARK = "#008835"; // brandingCore.colors.primaryDark
-const CJD_GREEN_LIGHT = "#e8f5e8"; // Derived from brandingCore.colors.primaryLight or successLight
-const PRIMARY_FONT = "Lato";       // brandingCore.fonts.primary
+// Toutes les couleurs sont maintenant dynamiques via CSS variables
+// Les valeurs sont définies dans app/globals.css et mises à jour par BrandingContext
+// Cela permet des changements de thème en temps réel sans rebuild
 
 export default {
   darkMode: ["class"],
@@ -28,91 +24,91 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
         card: {
-          DEFAULT: "var(--card)",
-          foreground: "var(--card-foreground)",
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
         },
         popover: {
-          DEFAULT: "var(--popover)",
-          foreground: "var(--popover-foreground)",
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
         },
         primary: {
-          DEFAULT: "var(--primary)",
-          foreground: "var(--primary-foreground)",
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
-          DEFAULT: "var(--secondary)",
-          foreground: "var(--secondary-foreground)",
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
         },
         muted: {
-          DEFAULT: "var(--muted)",
-          foreground: "var(--muted-foreground)",
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          DEFAULT: "var(--accent)",
-          foreground: "var(--accent-foreground)",
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
         destructive: {
-          DEFAULT: "var(--destructive)",
-          foreground: "var(--destructive-foreground)",
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
-        border: "var(--border)",
-        input: "var(--input)",
-        ring: "var(--ring)",
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
         chart: {
-          "1": "var(--chart-1)",
-          "2": "var(--chart-2)",
-          "3": "var(--chart-3)",
-          "4": "var(--chart-4)",
-          "5": "var(--chart-5)",
+          "1": "hsl(var(--chart-1))",
+          "2": "hsl(var(--chart-2))",
+          "3": "hsl(var(--chart-3))",
+          "4": "hsl(var(--chart-4))",
+          "5": "hsl(var(--chart-5))",
         },
         sidebar: {
-          DEFAULT: "var(--sidebar-background)",
-          foreground: "var(--sidebar-foreground)",
-          primary: "var(--sidebar-primary)",
-          "primary-foreground": "var(--sidebar-primary-foreground)",
-          accent: "var(--sidebar-accent)",
-          "accent-foreground": "var(--sidebar-accent-foreground)",
-          border: "var(--sidebar-border)",
-          ring: "var(--sidebar-ring)",
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
         },
         'cjd-green': {
-          DEFAULT: CJD_GREEN,
-          dark: CJD_GREEN_DARK,
-          light: CJD_GREEN_LIGHT,
+          DEFAULT: "hsl(var(--cjd-green))",
+          dark: "hsl(var(--cjd-green-dark))",
+          light: "hsl(var(--cjd-green-light))",
         },
         'success': {
-          DEFAULT: "var(--success)",
-          foreground: "var(--success-foreground)",
-          dark: "var(--success-dark)",
-          light: "var(--success-light)",
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+          dark: "hsl(var(--success-dark))",
+          light: "hsl(var(--success-light))",
         },
         'warning': {
-          DEFAULT: "var(--warning)",
-          foreground: "var(--warning-foreground)",
-          dark: "var(--warning-dark)",
-          light: "var(--warning-light)",
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+          dark: "hsl(var(--warning-dark))",
+          light: "hsl(var(--warning-light))",
         },
         'error': {
-          DEFAULT: "var(--error)",
-          foreground: "var(--error-foreground)",
-          dark: "var(--error-dark)",
-          light: "var(--error-light)",
+          DEFAULT: "hsl(var(--error))",
+          foreground: "hsl(var(--error-foreground))",
+          dark: "hsl(var(--error-dark))",
+          light: "hsl(var(--error-light))",
         },
         'info': {
-          DEFAULT: "var(--info)",
-          foreground: "var(--info-foreground)",
-          dark: "var(--info-dark)",
-          light: "var(--info-light)",
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+          dark: "hsl(var(--info-dark))",
+          light: "hsl(var(--info-light))",
         },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
-        lato: [PRIMARY_FONT, 'sans-serif'],
+        lato: ["Lato", 'sans-serif'],
       },
       keyframes: {
         "accordion-down": {

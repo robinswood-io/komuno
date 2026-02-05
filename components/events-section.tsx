@@ -56,7 +56,7 @@ function SponsorsPreview({ eventId }: { eventId: string }) {
   return (
     <div className="mb-5" data-testid={`sponsors-section-${eventId}`}>
       <div className="flex items-center gap-2 mb-3">
-        <Award className="w-5 h-5 text-cjd-green" />
+        <Award className="w-5 h-5 text-primary" />
         <h4 className="font-semibold text-gray-800">
           Sponsors {sponsors.length > 5 && <span className="text-sm text-gray-500 font-normal">({sponsors.length})</span>}
         </h4>
@@ -66,7 +66,7 @@ function SponsorsPreview({ eventId }: { eventId: string }) {
           <div
             key={sponsor.id}
             data-testid={`sponsor-item-${sponsor.id}`}
-            className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-cjd-green hover:shadow-md transition-all duration-200"
+            className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:border-primary hover:shadow-md transition-all duration-200"
           >
             {sponsor.logoUrl ? (
               <img
@@ -76,7 +76,7 @@ function SponsorsPreview({ eventId }: { eventId: string }) {
                 className="w-12 h-12 object-contain flex-shrink-0"
               />
             ) : (
-              <div className="w-12 h-12 bg-gradient-to-br from-cjd-green to-success-dark rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+              <div className="w-12 h-12 bg-gradient-to-br from-primary to-success-dark rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
                 {getSponsorshipLevelIcon(sponsor.level)}
               </div>
             )}
@@ -97,7 +97,7 @@ function SponsorsPreview({ eventId }: { eventId: string }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid={`sponsor-link-${sponsor.id}`}
-                className="flex-shrink-0 p-2 text-cjd-green hover:bg-cjd-green hover:text-white rounded-full transition-colors"
+                className="flex-shrink-0 p-2 text-primary hover:bg-primary hover:text-white rounded-full transition-colors"
                 title="Visiter le site web"
               >
                 <ExternalLink className="w-4 h-4" />
@@ -212,7 +212,7 @@ export default function EventsSection() {
   return (
     <section className="space-y-6 sm:space-y-8">
       {/* Welcome Message */}
-      <div className="bg-gradient-to-r from-cjd-green to-success-dark rounded-xl shadow-lg p-6 sm:p-8 text-white">
+      <div className="bg-gradient-to-r from-primary to-success-dark rounded-xl shadow-lg p-6 sm:p-8 text-white">
         <div className="flex items-center gap-3 mb-3">
           <div className="bg-white/20 rounded-full p-2">
             <Calendar className="w-6 h-6 text-white" />
@@ -227,7 +227,7 @@ export default function EventsSection() {
       {/* Events List */}
       {isLoading ? (
         <div className="flex justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-cjd-green" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : events && events.length > 0 ? (
         <div className="space-y-6 sm:space-y-8">
@@ -237,11 +237,11 @@ export default function EventsSection() {
             const isEventFull = Boolean(event.maxParticipants && event.inscriptionCount >= event.maxParticipants);
             
             return (
-              <Card key={event.id} className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-l-4 border-l-cjd-green overflow-hidden bg-gradient-to-br from-white to-gray-50">
+              <Card key={event.id} className="group hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-l-4 border-l-primary overflow-hidden bg-gradient-to-br from-white to-gray-50">
                 <CardContent className="p-0">
                   <div className="flex flex-col lg:flex-row">
                     {/* Date Badge */}
-                    <div className="lg:w-32 flex lg:flex-col items-center justify-center bg-gradient-to-br from-cjd-green to-success-dark text-white p-4 lg:p-6">
+                    <div className="lg:w-32 flex lg:flex-col items-center justify-center bg-gradient-to-br from-primary to-success-dark text-white p-4 lg:p-6">
                       <div className="text-center">
                         <div className="text-2xl lg:text-4xl font-bold leading-tight">{shortDate.day}</div>
                         <div className="text-sm lg:text-base font-medium uppercase tracking-wide opacity-90">{shortDate.month}</div>
@@ -265,7 +265,7 @@ export default function EventsSection() {
                         <div className="flex-1 min-w-0">
                           {/* Title with status indicator */}
                           <div className="flex items-start gap-3 mb-4">
-                            <h3 className="font-bold text-xl lg:text-2xl text-gray-800 leading-tight group-hover:text-cjd-green transition-colors">
+                            <h3 className="font-bold text-xl lg:text-2xl text-gray-800 leading-tight group-hover:text-primary transition-colors">
                               {event.title}
                             </h3>
                             {isEventFull && (
@@ -285,7 +285,7 @@ export default function EventsSection() {
                           {/* Event Info */}
                           <div className="space-y-3 mb-5">
                             <div className="flex items-start text-gray-600">
-                              <Calendar className="w-5 h-5 mr-3 mt-0.5 text-cjd-green flex-shrink-0" />
+                              <Calendar className="w-5 h-5 mr-3 mt-0.5 text-primary flex-shrink-0" />
                               <div>
                                 <span className="font-medium text-gray-800">{formatDate(event.date.toString())}</span>
                                 <div className="text-sm text-gray-500 mt-1">
@@ -296,7 +296,7 @@ export default function EventsSection() {
                             
                             {event.location && (
                               <div className="flex items-start text-gray-600">
-                                <MapPin className="w-5 h-5 mr-3 mt-0.5 text-cjd-green flex-shrink-0" />
+                                <MapPin className="w-5 h-5 mr-3 mt-0.5 text-primary flex-shrink-0" />
                                 <span className="text-base font-medium text-gray-800">{event.location}</span>
                               </div>
                             )}
@@ -318,7 +318,7 @@ export default function EventsSection() {
 
                           {/* Description */}
                           {event.description && (
-                            <div className="mb-5 p-4 bg-gray-50 rounded-lg border-l-2 border-l-cjd-green">
+                            <div className="mb-5 p-4 bg-gray-50 rounded-lg border-l-2 border-l-primary">
                               <p className="text-gray-700 text-base leading-relaxed whitespace-pre-line">{event.description}</p>
                             </div>
                           )}
@@ -375,7 +375,7 @@ export default function EventsSection() {
                                 className={`text-sm font-semibold px-6 py-3 transition-all duration-200 shadow-lg hover:shadow-xl ${
                                   isEventFull
                                     ? 'bg-muted cursor-not-allowed text-muted-foreground'
-                                    : 'bg-gradient-to-r from-cjd-green to-success-dark text-white hover:from-success-dark hover:to-success-dark transform hover:scale-105'
+                                    : 'bg-gradient-to-r from-primary to-success-dark text-white hover:from-success-dark hover:to-success-dark transform hover:scale-105'
                                 }`}
                                 data-testid="button-register-event"
                               >
@@ -420,7 +420,7 @@ export default function EventsSection() {
                               onClick={() => handleShare(event)}
                               variant="ghost"
                               size="sm"
-                              className="text-gray-600 hover:text-cjd-green"
+                              className="text-gray-600 hover:text-primary"
                               data-testid={`button-share-event-${event.id}`}
                               title="Partager cet événement"
                             >

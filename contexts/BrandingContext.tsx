@@ -104,6 +104,100 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     loadBranding();
   }, []);
 
+  // Appliquer les couleurs au CSS quand le branding change
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const root = document.documentElement;
+    const colors = brandingState.colors;
+
+    console.log('[BrandingContext] Application des couleurs:', colors);
+
+    // Fonction pour convertir hex en HSL
+    const hexToHSL = (hex: string): string => {
+      // Enlever le # si présent
+      hex = hex.replace(/^#/, '');
+
+      // Convertir en RGB
+      const r = parseInt(hex.substring(0, 2), 16) / 255;
+      const g = parseInt(hex.substring(2, 4), 16) / 255;
+      const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
+
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+        switch (max) {
+          case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+          case g: h = ((b - r) / d + 2) / 6; break;
+          case b: h = ((r - g) / d + 4) / 6; break;
+        }
+      }
+
+      h = Math.round(h * 360);
+      s = Math.round(s * 100);
+      l = Math.round(l * 100);
+
+      return `${h} ${s}% ${l}%`;
+    };
+
+    // Appliquer les couleurs aux variables CSS
+    if (colors.primary) {
+      try {
+        const primaryHSL = colors.primary.startsWith('#') ? hexToHSL(colors.primary) : colors.primary;
+        console.log('[BrandingContext] Application primary:', colors.primary, '->', primaryHSL);
+        root.style.setProperty('--primary', primaryHSL);
+        root.style.setProperty('--ring', primaryHSL);
+        root.style.setProperty('--sidebar-primary', primaryHSL);
+        root.style.setProperty('--chart-1', primaryHSL);
+        // Variables CJD custom
+        root.style.setProperty('--cjd-green', primaryHSL);
+      } catch (error) {
+        console.error('[BrandingContext] Erreur conversion primary:', error);
+      }
+    }
+
+    if (colors.primaryDark) {
+      try {
+        const darkHSL = colors.primaryDark.startsWith('#') ? hexToHSL(colors.primaryDark) : colors.primaryDark;
+        console.log('[BrandingContext] Application primaryDark:', colors.primaryDark, '->', darkHSL);
+        root.style.setProperty('--accent-foreground', darkHSL);
+        root.style.setProperty('--sidebar-accent-foreground', darkHSL);
+        // Variables CJD custom
+        root.style.setProperty('--cjd-green-dark', darkHSL);
+      } catch (error) {
+        console.error('[BrandingContext] Erreur conversion primaryDark:', error);
+      }
+    }
+
+    if (colors.primaryLight) {
+      try {
+        const lightHSL = colors.primaryLight.startsWith('#') ? hexToHSL(colors.primaryLight) : colors.primaryLight;
+        console.log('[BrandingContext] Application primaryLight:', colors.primaryLight, '->', lightHSL);
+        root.style.setProperty('--accent', lightHSL);
+        root.style.setProperty('--sidebar-accent', lightHSL);
+        // Variables CJD custom
+        root.style.setProperty('--cjd-green-light', lightHSL);
+      } catch (error) {
+        console.error('[BrandingContext] Erreur conversion primaryLight:', error);
+      }
+    }
+
+    if (colors.secondary) {
+      try {
+        const secondaryHSL = colors.secondary.startsWith('#') ? hexToHSL(colors.secondary) : colors.secondary;
+        console.log('[BrandingContext] Application secondary:', colors.secondary, '->', secondaryHSL);
+        root.style.setProperty('--secondary', secondaryHSL);
+      } catch (error) {
+        console.error('[BrandingContext] Erreur conversion secondary:', error);
+      }
+    }
+  }, [brandingState.colors]);
+
   return (
     <BrandingContext.Provider value={{ 
       branding: brandingState, 

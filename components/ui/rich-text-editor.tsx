@@ -104,7 +104,7 @@ export default function RichTextEditor({
   const isMaxLengthReached = maxLength ? currentLength >= maxLength : false;
 
   return (
-    <div className={`border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-cjd-green focus-within:border-cjd-green ${className}`} data-testid={testId}>
+    <div className={`border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-primary focus-within:border-primary ${className}`} data-testid={testId}>
       {/* Toolbar */}
       <div className="border-b border-gray-200 bg-gray-50 p-2 flex flex-wrap gap-1">
         <Button

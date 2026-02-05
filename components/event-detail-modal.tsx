@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, MapPin, Users, Edit, Trash2, Download, ExternalLink, Award } from "lucide-react";
+import { Calendar, MapPin, Users, Edit, Trash2, Download, ExternalLink, Award, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,13 @@ import {
   isPremiumSponsorship,
   type PublicSponsorship
 } from "@/lib/sponsorship-utils";
+import { exportInscriptions, exportUnsubscriptions } from "@/lib/export-utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface EventWithInscriptions extends Omit<Event, "inscriptionCount"> {
   inscriptionCount: number;
@@ -116,7 +123,7 @@ export default function EventDetailModal({
     }
   };
 
-  const exportInscriptions = () => {
+  const exportInscriptionsCSV = () => {
     if (!inscriptions) return;
 
     const csvContent = [
@@ -142,7 +149,7 @@ export default function EventDetailModal({
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Calendar className="w-5 h-5 text-cjd-green" />
+            <Calendar className="w-5 h-5 text-primary" />
             Détails de l'événement
           </DialogTitle>
         </DialogHeader>
@@ -205,7 +212,7 @@ export default function EventDetailModal({
                 href={event.helloAssoLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-cjd-green hover:text-cjd-green-dark transition-colors"
+                className="inline-flex items-center gap-2 text-primary hover:text-primary transition-colors"
               >
                 <ExternalLink className="w-4 h-4" />
                 Ouvrir HelloAsso
@@ -219,7 +226,7 @@ export default function EventDetailModal({
               <Separator />
               <div data-testid={`sponsors-section-${event.id}`}>
                 <div className="flex items-center gap-2 mb-4">
-                  <Award className="w-5 h-5 text-cjd-green" />
+                  <Award className="w-5 h-5 text-primary" />
                   <h4 className="font-semibold text-gray-800 text-lg">
                     Sponsors de l'événement ({sponsors.length})
                   </h4>
@@ -227,7 +234,7 @@ export default function EventDetailModal({
 
                 {sponsorsLoading ? (
                   <div className="flex justify-center py-8">
-                    <div className="animate-spin w-8 h-8 border-2 border-cjd-green border-t-transparent rounded-full"></div>
+                    <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full"></div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -237,8 +244,8 @@ export default function EventDetailModal({
                         data-testid={`sponsor-item-${sponsor.id}`}
                         className={`flex items-start gap-4 p-4 rounded-lg border-2 transition-all duration-200 ${
                           isPremiumSponsorship(sponsor.level)
-                            ? 'border-cjd-green bg-gradient-to-br from-green-50 to-white hover:shadow-lg'
-                            : 'border-gray-200 bg-white hover:border-cjd-green hover:shadow-md'
+                            ? 'border-primary bg-gradient-to-br from-green-50 to-white hover:shadow-lg'
+                            : 'border-gray-200 bg-white hover:border-primary hover:shadow-md'
                         }`}
                       >
                         {/* Logo */}
@@ -251,7 +258,7 @@ export default function EventDetailModal({
                               className="w-20 h-20 object-contain rounded-lg border border-gray-200 bg-white p-2"
                             />
                           ) : (
-                            <div className="w-20 h-20 bg-gradient-to-br from-cjd-green to-success-dark rounded-lg flex items-center justify-center text-white font-bold text-2xl">
+                            <div className="w-20 h-20 bg-gradient-to-br from-primary to-success-dark rounded-lg flex items-center justify-center text-white font-bold text-2xl">
                               {getSponsorshipLevelIcon(sponsor.level)}
                             </div>
                           )}
@@ -274,7 +281,7 @@ export default function EventDetailModal({
                               target="_blank"
                               rel="noopener noreferrer"
                               data-testid={`sponsor-link-${sponsor.id}`}
-                              className="inline-flex items-center gap-1 mt-3 text-sm text-cjd-green hover:text-cjd-green-dark font-medium transition-colors"
+                              className="inline-flex items-center gap-1 mt-3 text-sm text-primary hover:text-primary font-medium transition-colors"
                             >
                               <ExternalLink className="w-4 h-4" />
                               Visiter le site web
@@ -300,14 +307,46 @@ export default function EventDetailModal({
                 </h4>
               <div className="flex gap-2">
                 {inscriptions && inscriptions.length > 0 && (
-                  <Button
-                    onClick={exportInscriptions}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <Download className="w-4 h-4 mr-1" />
-                    Exporter CSV
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" data-testid="button-export-inscriptions-dropdown">
+                        <Download className="w-4 h-4 mr-1" />
+                        Exporter
+                        <ChevronDown className="w-4 h-4 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => exportInscriptions(
+                          event.title,
+                          inscriptions.map(i => ({ ...i, createdAt: i.createdAt.toString() })),
+                          'pdf'
+                        )}
+                        data-testid="button-export-inscriptions-pdf"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => exportInscriptions(
+                          event.title,
+                          inscriptions.map(i => ({ ...i, createdAt: i.createdAt.toString() })),
+                          'excel'
+                        )}
+                        data-testid="button-export-inscriptions-excel"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={exportInscriptionsCSV}
+                        data-testid="button-export-inscriptions-csv"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
                 <Button
                   onClick={() => setShowInscriptions(!showInscriptions)}
@@ -323,7 +362,7 @@ export default function EventDetailModal({
               <div className="border rounded-lg">
                 {inscriptionsLoading ? (
                   <div className="p-4 text-center">
-                    <div className="animate-spin w-6 h-6 border-2 border-cjd-green border-t-transparent rounded-full mx-auto"></div>
+                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
                   </div>
                 ) : inscriptions && inscriptions.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -378,6 +417,41 @@ export default function EventDetailModal({
                 Absences déclarées ({unsubscriptions?.length || 0})
               </h4>
               <div className="flex gap-2">
+                {unsubscriptions && unsubscriptions.length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" data-testid="button-export-unsubscriptions-dropdown">
+                        <Download className="w-4 h-4 mr-1" />
+                        Exporter
+                        <ChevronDown className="w-4 h-4 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => exportUnsubscriptions(
+                          event.title,
+                          unsubscriptions.map(u => ({ ...u, createdAt: u.createdAt.toString() })),
+                          'pdf'
+                        )}
+                        data-testid="button-export-unsubscriptions-pdf"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => exportUnsubscriptions(
+                          event.title,
+                          unsubscriptions.map(u => ({ ...u, createdAt: u.createdAt.toString() })),
+                          'excel'
+                        )}
+                        data-testid="button-export-unsubscriptions-excel"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Excel
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
                 <Button
                   onClick={() => setShowUnsubscriptions(!showUnsubscriptions)}
                   variant="outline"
@@ -392,7 +466,7 @@ export default function EventDetailModal({
               <div className="border rounded-lg">
                 {unsubscriptionsLoading ? (
                   <div className="p-4 text-center">
-                    <div className="animate-spin w-6 h-6 border-2 border-cjd-green border-t-transparent rounded-full mx-auto"></div>
+                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
                   </div>
                 ) : unsubscriptions && unsubscriptions.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -450,7 +524,7 @@ export default function EventDetailModal({
             <div className="flex flex-col sm:flex-row gap-3">
             <Button
               onClick={handleEdit}
-              className="bg-cjd-green hover:bg-cjd-green-dark text-white flex-1"
+              className="bg-primary hover:bg-primary text-white flex-1"
             >
               <Edit className="w-4 h-4 mr-2" />
               Modifier l'événement

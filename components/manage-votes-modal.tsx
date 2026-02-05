@@ -21,10 +21,17 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trash2, ThumbsUp, Mail, User, Plus, Loader2 } from "lucide-react";
+import { Trash2, ThumbsUp, Mail, User, Plus, Loader2, Download, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Idea } from "@/shared/schema";
+import { exportVoters } from "@/lib/export-utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface IdeaWithVotes extends Omit<Idea, "voteCount"> {
   voteCount: number;
@@ -160,13 +167,48 @@ export default function ManageVotesModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
         <DialogHeader className="text-left pb-4">
-          <DialogTitle className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
-            <ThumbsUp className="h-5 w-5 text-cjd-green" />
-            Gérer les votes
-          </DialogTitle>
-          <DialogDescription className="text-sm">
-            Idée: <span className="font-medium">{idea.title}</span>
-          </DialogDescription>
+          <div className="flex justify-between items-start gap-4">
+            <div className="flex-1">
+              <DialogTitle className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
+                <ThumbsUp className="h-5 w-5 text-primary" />
+                Gérer les votes
+              </DialogTitle>
+              <DialogDescription className="text-sm">
+                Idée: <span className="font-medium">{idea.title}</span>
+              </DialogDescription>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!votes || votes.length === 0}
+                  className="shrink-0"
+                  data-testid="button-export-dropdown"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exporter
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => votes && exportVoters(idea.title, votes.map(v => ({ ...v, createdAt: v.createdAt.toString() })), 'pdf')}
+                  data-testid="button-export-pdf"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => votes && exportVoters(idea.title, votes.map(v => ({ ...v, createdAt: v.createdAt.toString() })), 'excel')}
+                  data-testid="button-export-excel"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -234,7 +276,7 @@ export default function ManageVotesModal({
                   <Button
                     type="submit"
                     disabled={addVoteMutation.isPending}
-                    className="bg-cjd-green hover:bg-cjd-green-dark"
+                    className="bg-primary hover:bg-primary"
                     data-testid="button-submit-vote"
                   >
                     {addVoteMutation.isPending ? (
@@ -262,7 +304,7 @@ export default function ManageVotesModal({
             <CardContent>
               {isLoading ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-cjd-green" />
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : votes && votes.length > 0 ? (
                 <div className="overflow-x-auto">

@@ -24,84 +24,84 @@
 
 :root {
   /* Couleurs de base */
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(210 25% 7.8431%);
+  --background: 0 0% 100%;
+  --foreground: 210 25% 7.8431%;
 
   /* Cartes et conteneurs */
-  --card: hsl(180 6.6667% 97.0588%);
-  --card-foreground: hsl(210 25% 7.8431%);
+  --card: 180 6.6667% 97.0588%;
+  --card-foreground: 210 25% 7.8431%;
 
   /* Popovers */
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(210 25% 7.8431%);
+  --popover: 0 0% 100%;
+  --popover-foreground: 210 25% 7.8431%;
 
   /* Couleurs principales (CJD Green #00a844) */
-  --primary: hsl(140 69% 33%);
-  --primary-foreground: hsl(0 0% 100%);
+  --primary: 140 69% 33%;
+  --primary-foreground: 0 0% 100%;
 
   /* Couleurs secondaires */
-  --secondary: hsl(0 0% 10%);
-  --secondary-foreground: hsl(0 0% 100%);
+  --secondary: 0 0% 10%;
+  --secondary-foreground: 0 0% 100%;
 
   /* États discrets */
-  --muted: hsl(240 1.9608% 90%);
-  --muted-foreground: hsl(210 25% 7.8431%);
+  --muted: 240 1.9608% 90%;
+  --muted-foreground: 210 25% 7.8431%;
 
   /* Accents */
-  --accent: hsl(211.5789 51.3514% 92.7451%);
-  --accent-foreground: hsl(140 69% 33%);
+  --accent: 211.5789 51.3514% 92.7451%;
+  --accent-foreground: 140 69% 33%;
 
   /* Destructif */
-  --destructive: hsl(4 90% 58%);
-  --destructive-foreground: hsl(0 0% 100%);
+  --destructive: 4 90% 58%;
+  --destructive-foreground: 0 0% 100%;
 
   /* Bordures et inputs */
-  --border: hsl(201.4286 30.4348% 90.9804%);
-  --input: hsl(200 23.0769% 97.4510%);
-  --ring: hsl(140 69% 33%);
+  --border: 201.4286 30.4348% 90.9804%;
+  --input: 200 23.0769% 97.4510%;
+  --ring: 140 69% 33%;
 
   /* Charts */
-  --chart-1: hsl(140 69% 33%);
-  --chart-2: hsl(159 100% 37%);
-  --chart-3: hsl(42 93% 56%);
-  --chart-4: hsl(174 77% 45%);
-  --chart-5: hsl(342 75% 51%);
+  --chart-1: 140 69% 33%;
+  --chart-2: 159 100% 37%;
+  --chart-3: 42 93% 56%;
+  --chart-4: 174 77% 45%;
+  --chart-5: 342 75% 51%;
 
   /* Sidebar */
-  --sidebar-background: hsl(180 6.6667% 97.0588%);
-  --sidebar-foreground: hsl(210 25% 7.8431%);
-  --sidebar-primary: hsl(140 69% 33%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(211.5789 51.3514% 92.7451%);
-  --sidebar-accent-foreground: hsl(140 69% 33%);
-  --sidebar-border: hsl(205.0000 25.0000% 90.5882%);
-  --sidebar-ring: hsl(140 69% 33%);
+  --sidebar-background: 180 6.6667% 97.0588%;
+  --sidebar-foreground: 210 25% 7.8431%;
+  --sidebar-primary: 140 69% 33%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 211.5789 51.3514% 92.7451%;
+  --sidebar-accent-foreground: 140 69% 33%;
+  --sidebar-border: 205.0000 25.0000% 90.5882%;
+  --sidebar-ring: 140 69% 33%;
 
   /* Couleurs de statut */
-  --success: hsl(145 100% 39%);
-  --success-foreground: hsl(0 0% 100%);
-  --success-dark: hsl(140 69% 33%);
-  --success-light: hsl(120 51% 93%);
+  --success: 145 100% 39%;
+  --success-foreground: 0 0% 100%;
+  --success-dark: 140 69% 33%;
+  --success-light: 120 51% 93%;
 
-  --warning: hsl(32 99% 57%);
-  --warning-foreground: hsl(0 0% 0%);
-  --warning-dark: hsl(32 100% 48%);
-  --warning-light: hsl(36 100% 94%);
+  --warning: 32 99% 57%;
+  --warning-foreground: 0 0% 0%;
+  --warning-dark: 32 100% 48%;
+  --warning-light: 36 100% 94%;
 
-  --error: hsl(4 90% 58%);
-  --error-foreground: hsl(0 0% 100%);
-  --error-dark: hsl(0 69% 51%);
-  --error-light: hsl(0 100% 97%);
+  --error: 4 90% 58%;
+  --error-foreground: 0 0% 100%;
+  --error-dark: 0 69% 51%;
+  --error-light: 0 100% 97%;
 
-  --info: hsl(207 90% 54%);
-  --info-foreground: hsl(0 0% 100%);
-  --info-dark: hsl(207 77% 47%);
-  --info-light: hsl(207 89% 94%);
+  --info: 207 90% 54%;
+  --info-foreground: 0 0% 100%;
+  --info-dark: 207 77% 47%;
+  --info-light: 207 89% 94%;
 
   /* Alias de marque (compatibilité) */
-  --cjd-green: hsl(140 69% 33%);
-  --cjd-green-dark: hsl(140 69% 28%);
-  --cjd-green-light: hsl(140 71% 41%);
+  --cjd-green: 140 69% 33%;
+  --cjd-green-dark: 140 69% 28%;
+  --cjd-green-light: 140 71% 41%;
 
   /* Typographie */
   --font-sans: 'Lato', sans-serif;
@@ -136,57 +136,57 @@
 
 .dark {
   /* Couleurs de base inversées */
-  --background: hsl(0 0% 0%);
-  --foreground: hsl(200 6.6667% 91.1765%);
+  --background: 0 0% 0%;
+  --foreground: 200 6.6667% 91.1765%;
 
   /* Cartes et conteneurs */
-  --card: hsl(228 9.8039% 10%);
-  --card-foreground: hsl(0 0% 85.0980%);
+  --card: 228 9.8039% 10%;
+  --card-foreground: 0 0% 85.0980%;
 
   /* Popovers */
-  --popover: hsl(0 0% 0%);
-  --popover-foreground: hsl(200 6.6667% 91.1765%);
+  --popover: 0 0% 0%;
+  --popover-foreground: 200 6.6667% 91.1765%;
 
   /* Couleurs principales (restent identiques) */
-  --primary: hsl(140 69% 33%);
-  --primary-foreground: hsl(0 0% 100%);
+  --primary: 140 69% 33%;
+  --primary-foreground: 0 0% 100%;
 
   /* Couleurs secondaires */
-  --secondary: hsl(195 15.3846% 94.9020%);
-  --secondary-foreground: hsl(210 25% 7.8431%);
+  --secondary: 195 15.3846% 94.9020%;
+  --secondary-foreground: 210 25% 7.8431%;
 
   /* États discrets */
-  --muted: hsl(0 0% 9.4118%);
-  --muted-foreground: hsl(210 3.3898% 46.2745%);
+  --muted: 0 0% 9.4118%;
+  --muted-foreground: 210 3.3898% 46.2745%;
 
   /* Accents */
-  --accent: hsl(205.7143 70% 7.8431%);
-  --accent-foreground: hsl(140 69% 33%);
+  --accent: 205.7143 70% 7.8431%;
+  --accent-foreground: 140 69% 33%;
 
   /* Destructif */
-  --destructive: hsl(4 90% 58%);
-  --destructive-foreground: hsl(0 0% 100%);
+  --destructive: 4 90% 58%;
+  --destructive-foreground: 0 0% 100%;
 
   /* Bordures et inputs */
-  --border: hsl(210 5.2632% 14.9020%);
-  --input: hsl(207.6923 27.6596% 18.4314%);
-  --ring: hsl(140 69% 33%);
+  --border: 210 5.2632% 14.9020%;
+  --input: 207.6923 27.6596% 18.4314%;
+  --ring: 140 69% 33%;
 
   /* Sidebar */
-  --sidebar-background: hsl(228 9.8039% 10%);
-  --sidebar-foreground: hsl(0 0% 85.0980%);
-  --sidebar-primary: hsl(140 69% 33%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(205.7143 70% 7.8431%);
-  --sidebar-accent-foreground: hsl(140 69% 33%);
-  --sidebar-border: hsl(205.7143 15.7895% 26.0784%);
-  --sidebar-ring: hsl(140 69% 33%);
+  --sidebar-background: 228 9.8039% 10%;
+  --sidebar-foreground: 0 0% 85.0980%;
+  --sidebar-primary: 140 69% 33%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 205.7143 70% 7.8431%;
+  --sidebar-accent-foreground: 140 69% 33%;
+  --sidebar-border: 205.7143 15.7895% 26.0784%;
+  --sidebar-ring: 140 69% 33%;
 
   /* Couleurs de statut (adaptées pour dark mode) */
-  --success-light: hsl(120 30% 20%);
-  --warning-light: hsl(36 50% 25%);
-  --error-light: hsl(0 50% 20%);
-  --info-light: hsl(207 50% 25%);
+  --success-light: 120 30% 20%;
+  --warning-light: 36 50% 25%;
+  --error-light: 0 50% 20%;
+  --info-light: 207 50% 25%;
 }
 
 /* ============================================
@@ -241,136 +241,7 @@
     font-family: 'Lato', sans-serif;
   }
 
-  /* Couleurs de marque CJD */
-  .bg-cjd-green {
-    background-color: hsl(var(--cjd-green));
-  }
-
-  .bg-cjd-green-dark {
-    background-color: hsl(var(--cjd-green-dark));
-  }
-
-  .bg-cjd-green-light {
-    background-color: hsl(var(--cjd-green-light));
-  }
-
-  .text-cjd-green {
-    color: hsl(var(--cjd-green));
-  }
-
-  .text-cjd-green-dark {
-    color: hsl(var(--cjd-green-dark));
-  }
-
-  .border-cjd-green {
-    border-color: hsl(var(--cjd-green));
-  }
-
-  .hover\:bg-cjd-green-dark:hover {
-    background-color: hsl(var(--cjd-green-dark));
-  }
-
-  /* Couleurs de statut - Success */
-  .bg-success {
-    background-color: hsl(var(--success));
-  }
-
-  .bg-success-dark {
-    background-color: hsl(var(--success-dark));
-  }
-
-  .bg-success-light {
-    background-color: hsl(var(--success-light));
-  }
-
-  .text-success {
-    color: hsl(var(--success));
-  }
-
-  .text-success-dark {
-    color: hsl(var(--success-dark));
-  }
-
-  .border-success {
-    border-color: hsl(var(--success));
-  }
-
-  .hover\:bg-success-dark:hover {
-    background-color: hsl(var(--success-dark));
-  }
-
-  /* Couleurs de statut - Warning */
-  .bg-warning {
-    background-color: hsl(var(--warning));
-  }
-
-  .bg-warning-dark {
-    background-color: hsl(var(--warning-dark));
-  }
-
-  .bg-warning-light {
-    background-color: hsl(var(--warning-light));
-  }
-
-  .text-warning {
-    color: hsl(var(--warning));
-  }
-
-  .text-warning-dark {
-    color: hsl(var(--warning-dark));
-  }
-
-  .border-warning {
-    border-color: hsl(var(--warning));
-  }
-
-  /* Couleurs de statut - Error */
-  .bg-error {
-    background-color: hsl(var(--error));
-  }
-
-  .bg-error-dark {
-    background-color: hsl(var(--error-dark));
-  }
-
-  .bg-error-light {
-    background-color: hsl(var(--error-light));
-  }
-
-  .text-error {
-    color: hsl(var(--error));
-  }
-
-  .text-error-dark {
-    color: hsl(var(--error-dark));
-  }
-
-  .border-error {
-    border-color: hsl(var(--error));
-  }
-
-  /* Couleurs de statut - Info */
-  .bg-info {
-    background-color: hsl(var(--info));
-  }
-
-  .bg-info-dark {
-    background-color: hsl(var(--info-dark));
-  }
-
-  .bg-info-light {
-    background-color: hsl(var(--info-light));
-  }
-
-  .text-info {
-    color: hsl(var(--info));
-  }
-
-  .text-info-dark {
-    color: hsl(var(--info-dark));
-  }
-
-  .border-info {
-    border-color: hsl(var(--info));
-  }
+  /* Note: Toutes les classes de couleurs (bg-primary, text-primary, bg-success, etc.)
+     sont maintenant générées automatiquement par Tailwind via tailwind.config.ts
+     qui référence les CSS variables définies ci-dessus. */
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -14,7 +14,7 @@ import { branding, getShortAppName } from '@/lib/config/branding';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function LoginPage() {
-  const { user, isLoading, loginMutation, authMode } = useAuth();
+  const { user, isLoading, loginMutation } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -26,27 +26,24 @@ export default function LoginPage() {
   // Vérifier les paramètres d'erreur dans l'URL
   const error = searchParams.get('error');
 
-  // Redirect if already logged in
-  if (!isLoading && user) {
-    router.push(isAdmin ? "/admin" : "/");
-    return null;
-  }
+  // Redirect if already logged in (dans useEffect pour éviter setState pendant render)
+  useEffect(() => {
+    if (!isLoading && user) {
+      router.push(isAdmin ? "/admin" : "/");
+    }
+  }, [user, isLoading, isAdmin, router]);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-cjd-green" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (authMode === 'local') {
-      loginMutation.mutate({ email, password });
-    } else {
-      loginMutation.mutate(undefined);
-    }
+    loginMutation.mutate({ email, password });
   };
 
   return (
@@ -55,7 +52,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-cjd-green rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-white font-bold text-xl">CJD</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Administration {getShortAppName()}</h1>
@@ -66,10 +63,7 @@ export default function LoginPage() {
             <CardHeader>
               <CardTitle>Connexion</CardTitle>
               <CardDescription>
-                {authMode === 'local'
-                  ? "Entrez vos identifiants pour vous connecter"
-                  : "Utilisez Authentik pour vous connecter à l'administration"
-                }
+                Entrez vos identifiants pour vous connecter
               </CardDescription>
             </CardHeader>
             <form onSubmit={handleLogin}>
@@ -86,128 +80,95 @@ export default function LoginPage() {
                   </Alert>
                 )}
 
-                {authMode === 'local' ? (
-                  <>
-                    {/* Comptes de test en mode développement */}
-                    {process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true' && (
-                      <Alert className="bg-blue-50 border-blue-200">
-                        <Shield className="h-4 w-4 text-blue-600" />
-                        <AlertTitle className="text-blue-900">Mode Dev Login Actif</AlertTitle>
-                        <AlertDescription className="text-blue-800 text-xs space-y-1">
-                          <div>Comptes de test (mot de passe: n'importe quoi):</div>
-                          <div className="font-mono space-y-0.5 mt-1">
-                            <div className="cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setEmail('admin@test.local')}>
-                              • admin@test.local (super_admin)
-                            </div>
-                            <div className="cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setEmail('manager@test.local')}>
-                              • manager@test.local (events_manager)
-                            </div>
-                            <div className="cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setEmail('reader@test.local')}>
-                              • reader@test.local (events_reader)
-                            </div>
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="email"
-                          name="email"
-                          type="email"
-                          placeholder="votre@email.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="pl-10"
-                          required
-                        />
+                {/* Comptes de test en mode développement */}
+                {process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true' && (
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <Shield className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-900">Mode Dev Login Actif</AlertTitle>
+                    <AlertDescription className="text-blue-800 text-xs space-y-1">
+                      <div>Comptes de test (mot de passe: n'importe quoi):</div>
+                      <div className="font-mono space-y-0.5 mt-1">
+                        <div className="cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setEmail('admin@test.local')}>
+                          • admin@test.local (super_admin)
+                        </div>
+                        <div className="cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setEmail('manager@test.local')}>
+                          • manager@test.local (events_manager)
+                        </div>
+                        <div className="cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setEmail('reader@test.local')}>
+                          • reader@test.local (events_reader)
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Mot de passe</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="password"
-                          name="password"
-                          type="password"
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-cjd-green hover:bg-cjd-green-dark"
-                      disabled={loginMutation.isPending}
-                      size="lg"
-                    >
-                      {loginMutation.isPending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Connexion en cours...
-                        </>
-                      ) : (
-                        <>
-                          <Shield className="mr-2 h-4 w-4" />
-                          Se connecter
-                        </>
-                      )}
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    type="submit"
-                    className="w-full bg-cjd-green hover:bg-cjd-green-dark"
-                    disabled={loginMutation.isPending}
-                    size="lg"
-                  >
-                    {loginMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Redirection en cours...
-                      </>
-                    ) : (
-                      <>
-                        <Shield className="mr-2 h-4 w-4" />
-                        Se connecter avec Authentik
-                      </>
-                    )}
-                  </Button>
+                    </AlertDescription>
+                  </Alert>
                 )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="votre@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Mot de passe</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-primary hover:bg-primary"
+                  disabled={loginMutation.isPending}
+                  size="lg"
+                >
+                  {loginMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Connexion en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="mr-2 h-4 w-4" />
+                      Se connecter
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </form>
 
-            {authMode === 'local' && (
-              <CardFooter className="flex justify-center">
-                <Link href="/forgot-password" className="text-sm text-cjd-green hover:underline">
-                  Mot de passe oublié ?
-                </Link>
-              </CardFooter>
-            )}
-
-            {authMode === 'oauth' && (
-              <CardFooter>
-                <p className="text-sm text-gray-500 text-center w-full">
-                  Vous serez redirigé vers Authentik pour vous authentifier
-                </p>
-              </CardFooter>
-            )}
+            <CardFooter className="flex justify-center">
+              <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                Mot de passe oublié ?
+              </Link>
+            </CardFooter>
           </Card>
         </div>
       </div>
 
       {/* Right side - Hero section */}
-      <div className="flex-1 bg-cjd-green relative overflow-hidden hidden lg:block">
-        <div className="absolute inset-0 bg-gradient-to-br from-cjd-green to-cjd-green-dark"></div>
+      <div className="flex-1 bg-primary relative overflow-hidden hidden lg:block">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary"></div>
         <div className="relative z-10 flex flex-col justify-center items-center h-full text-white p-12">
           <h2 className="text-4xl font-bold mb-6">Boîte à Kiffs</h2>
           <p className="text-xl mb-8 text-center max-w-md">
@@ -222,10 +183,7 @@ export default function LoginPage() {
               <div>
                 <h3 className="font-semibold">Authentification sécurisée</h3>
                 <p className="text-sm opacity-90">
-                  {authMode === 'local'
-                    ? "Connexion par email et mot de passe sécurisé"
-                    : "Connexion via Authentik pour une sécurité renforcée"
-                  }
+                  Connexion par email et mot de passe sécurisé
                 </p>
               </div>
             </div>

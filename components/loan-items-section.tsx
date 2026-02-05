@@ -28,7 +28,7 @@ const LoanItemCard = React.memo(({
   getStatusBadge: (status: string) => string;
   getStatusLabel: (status: string) => string;
 }) => (
-  <Card className="bg-white border-2 border-gray-100 hover:border-cjd-green/30 hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] overflow-hidden">
+  <Card className="bg-white border-2 border-gray-100 hover:border-primary/30 hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] overflow-hidden">
     {/* Photo */}
     {item.photoUrl ? (
       <div className="w-full h-48 bg-gray-100 overflow-hidden">
@@ -191,7 +191,7 @@ export default function LoanItemsSection({ onNavigateToPropose: _onNavigateToPro
     <div className="space-y-6 sm:space-y-8">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl sm:text-4xl font-bold text-cjd-green mb-3" data-testid="loan-page-title">
+        <h1 className="text-3xl sm:text-4xl font-bold text-primary mb-3" data-testid="loan-page-title">
           📦 Prêts - Objets disponibles
         </h1>
         <p className="text-gray-600 text-base sm:text-lg">
@@ -218,7 +218,7 @@ export default function LoanItemsSection({ onNavigateToPropose: _onNavigateToPro
             className="pl-10"
           />
         </div>
-        <Button type="submit" className="bg-cjd-green hover:bg-success-dark">
+        <Button type="submit" className="bg-primary hover:bg-success-dark">
           Rechercher
         </Button>
       </form>
@@ -226,7 +226,7 @@ export default function LoanItemsSection({ onNavigateToPropose: _onNavigateToPro
       {/* Items Grid */}
       {isLoading ? (
         <div className="flex justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-cjd-green" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : loanItems && loanItems.length > 0 ? (
         <div className="grid gap-5 sm:gap-7 md:grid-cols-2 xl:grid-cols-3">
@@ -264,11 +264,11 @@ export default function LoanItemsSection({ onNavigateToPropose: _onNavigateToPro
       )}
 
       {/* Formulaire de proposition */}
-      <div className="mt-12 pt-8 border-t-4 border-cjd-green">
+      <div className="mt-12 pt-8 border-t-4 border-primary">
         <Card className="bg-gradient-to-br from-gray-50 to-white">
           <CardContent className="pt-6 pb-6 pl-6 pr-6 sm:pt-8 sm:pb-8 sm:pl-8 sm:pr-8">
             <div className="text-center mb-6">
-              <h2 className="text-2xl sm:text-3xl font-bold text-cjd-green mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-primary mb-2">
                 Proposer du matériel
               </h2>
               <p className="text-gray-600">
@@ -278,7 +278,7 @@ export default function LoanItemsSection({ onNavigateToPropose: _onNavigateToPro
 
             <Button
               onClick={() => setFormOpen(true)}
-              className="w-full bg-cjd-green hover:bg-success-dark text-white"
+              className="w-full bg-primary hover:bg-success-dark text-white"
               size="lg"
               data-testid="button-propose-loan-item"
             >
@@ -390,7 +390,7 @@ export default function LoanItemsSection({ onNavigateToPropose: _onNavigateToPro
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-cjd-green hover:bg-success-dark"
+                  className="bg-primary hover:bg-success-dark"
                   disabled={createMutation.isPending}
                   data-testid="button-submit-loan-proposal"
                 >

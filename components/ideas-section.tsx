@@ -126,7 +126,7 @@ export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps)
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-cjd-green flex items-center gap-2" data-testid="ideas-page-title">
+          <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center gap-2" data-testid="ideas-page-title">
             <Lightbulb className="w-6 h-6 sm:w-8 sm:h-8" />
             Idées - Boîte à Kiffs
           </h1>
@@ -135,7 +135,7 @@ export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps)
         {onNavigateToPropose && (
           <Button
             onClick={onNavigateToPropose}
-            className="bg-cjd-green hover:bg-cjd-green-dark text-white shadow-md"
+            className="bg-primary hover:bg-primary text-white shadow-md"
             data-testid="button-propose-idea"
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -147,7 +147,7 @@ export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps)
       {/* Loading State */}
       {isLoading && (
         <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-cjd-green" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       )}
 
@@ -198,7 +198,7 @@ export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps)
                   <CardContent className="p-4 sm:p-6">
                     <div className="space-y-4">
                       {/* Title */}
-                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 pr-24">
+                      <h3 className={`text-lg sm:text-xl font-semibold text-gray-900 pr-24 ${isNew ? 'pt-6' : ''}`}>
                         {idea.title}
                       </h3>
 
@@ -211,7 +211,7 @@ export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps)
                           {descriptionTooLong && (
                             <button
                               onClick={() => toggleDescription(idea.id)}
-                              className="text-cjd-green hover:text-cjd-green-dark text-sm font-medium mt-2 flex items-center gap-1"
+                              className="text-primary hover:text-primary text-sm font-medium mt-2 flex items-center gap-1"
                             >
                               {isExpanded ? (
                                 <>
@@ -251,7 +251,7 @@ export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps)
                               variant="ghost"
                               size="sm"
                               onClick={() => handleShare(idea)}
-                              className="text-gray-600 hover:text-cjd-green"
+                              className="text-gray-600 hover:text-primary"
                             >
                               <Share2 className="w-4 h-4" />
                             </Button>
@@ -265,7 +265,7 @@ export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps)
                                 setSelectedIdea(idea);
                                 setVoteModalOpen(true);
                               }}
-                              className="bg-cjd-green hover:bg-cjd-green-dark text-white"
+                              className="bg-primary hover:bg-primary text-white"
                               data-testid={`button-vote-${idea.id}`}
                             >
                               <Vote className="mr-1 h-4 w-4" />

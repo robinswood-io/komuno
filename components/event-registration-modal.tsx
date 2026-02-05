@@ -219,22 +219,22 @@ export default function EventRegistrationModal({
           <DialogDescription asChild>
             <div className="space-y-3 sm:space-y-4">
               {/* Event Info */}
-              <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border-l-4 border-cjd-green">
+              <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border-l-4 border-primary">
                 <h3 className="font-semibold text-base sm:text-lg text-gray-800 mb-2 line-clamp-2">{event.title}</h3>
                 <div className="space-y-2 text-xs sm:text-sm text-gray-600">
                   <div className="flex items-start sm:items-center">
-                    <Calendar className="w-4 h-4 mr-2 text-cjd-green flex-shrink-0 mt-0.5 sm:mt-0" />
+                    <Calendar className="w-4 h-4 mr-2 text-primary flex-shrink-0 mt-0.5 sm:mt-0" />
                     <span className="break-words">{formatEventDate(event.date.toString())}</span>
                   </div>
                   {event.location && (
                     <div className="flex items-start sm:items-center">
-                      <MapPin className="w-4 h-4 mr-2 text-cjd-green flex-shrink-0 mt-0.5 sm:mt-0" />
+                      <MapPin className="w-4 h-4 mr-2 text-primary flex-shrink-0 mt-0.5 sm:mt-0" />
                       <span className="break-words">{event.location}</span>
                     </div>
                   )}
                   {(event.showInscriptionsCount || event.showAvailableSeats) && (
                     <div className="flex items-start sm:items-center">
-                      <Users className="w-4 h-4 mr-2 text-cjd-green flex-shrink-0 mt-0.5 sm:mt-0" />
+                      <Users className="w-4 h-4 mr-2 text-primary flex-shrink-0 mt-0.5 sm:mt-0" />
                       <span className="break-words">
                         {event.showInscriptionsCount && `${event.inscriptionCount} personne(s) inscrite(s)`}
                         {event.showInscriptionsCount && event.maxParticipants && event.showAvailableSeats && " / "}
@@ -281,7 +281,7 @@ export default function EventRegistrationModal({
                   onChange={(e) => handleInputChange("name", e.target.value)}
                   placeholder="Ex: Jean Dupont"
                   required
-                  className="text-sm sm:text-base focus:ring-cjd-green focus:border-cjd-green h-10 sm:h-11"
+                  className="text-sm sm:text-base focus:ring-primary focus:border-primary h-10 sm:h-11"
                   maxLength={100}
                   data-testid="input-unsubscribe-name"
                 />
@@ -301,7 +301,7 @@ export default function EventRegistrationModal({
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   placeholder="votre.email@exemple.com"
                   required
-                  className="text-sm sm:text-base focus:ring-cjd-green focus:border-cjd-green h-10 sm:h-11"
+                  className="text-sm sm:text-base focus:ring-primary focus:border-primary h-10 sm:h-11"
                   data-testid="input-unsubscribe-email"
                 />
                 <p className="text-xs text-gray-500">
@@ -320,7 +320,7 @@ export default function EventRegistrationModal({
                   onChange={(e) => handleInputChange("comments", e.target.value)}
                   placeholder="Ex: empêchement de dernière minute, maladie, autre engagement..."
                   rows={3}
-                  className="text-sm sm:text-base focus:ring-cjd-green focus:border-cjd-green resize-none"
+                  className="text-sm sm:text-base focus:ring-primary focus:border-primary resize-none"
                   maxLength={500}
                 />
                 <p className="text-xs text-gray-500">
@@ -343,7 +343,7 @@ export default function EventRegistrationModal({
                   onChange={(e) => handleInputChange("name", e.target.value)}
                   placeholder="Ex: Jean Dupont"
                   required
-                  className="text-sm sm:text-base focus:ring-cjd-green focus:border-cjd-green h-10 sm:h-11"
+                  className="text-sm sm:text-base focus:ring-primary focus:border-primary h-10 sm:h-11"
                   maxLength={100}
                 />
                 <p className="text-xs text-gray-500">
@@ -363,7 +363,7 @@ export default function EventRegistrationModal({
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   placeholder="jean.dupont@exemple.com"
                   required
-                  className="text-sm sm:text-base focus:ring-cjd-green focus:border-cjd-green h-10 sm:h-11"
+                  className="text-sm sm:text-base focus:ring-primary focus:border-primary h-10 sm:h-11"
                   maxLength={100}
                   data-testid="input-participant-email"
                 />
@@ -383,7 +383,7 @@ export default function EventRegistrationModal({
                   value={formData.company}
                   onChange={(e) => handleInputChange("company", e.target.value)}
                   placeholder="Votre société"
-                  className="text-sm sm:text-base focus:ring-cjd-green focus:border-cjd-green h-10 sm:h-11"
+                  className="text-sm sm:text-base focus:ring-primary focus:border-primary h-10 sm:h-11"
                   maxLength={100}
                   data-testid="input-company-event"
                 />
@@ -400,7 +400,7 @@ export default function EventRegistrationModal({
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
                   placeholder="06 12 34 56 78"
-                  className="text-sm sm:text-base focus:ring-cjd-green focus:border-cjd-green h-10 sm:h-11"
+                  className="text-sm sm:text-base focus:ring-primary focus:border-primary h-10 sm:h-11"
                   maxLength={20}
                   data-testid="input-phone-event"
                 />
@@ -417,7 +417,7 @@ export default function EventRegistrationModal({
                   onChange={(e) => handleInputChange("comments", e.target.value)}
                   placeholder="Ex: régime alimentaire, nombre d'accompagnants, questions..."
                   rows={3}
-                  className="text-sm sm:text-base focus:ring-cjd-green focus:border-cjd-green resize-none"
+                  className="text-sm sm:text-base focus:ring-primary focus:border-primary resize-none"
                   maxLength={500}
                 />
                 <p className="text-xs text-gray-500">
@@ -492,7 +492,7 @@ export default function EventRegistrationModal({
               className={`flex-1 h-11 sm:h-12 text-sm sm:text-base ${
                 isUnsubscribeMode
                   ? 'bg-error hover:bg-error-dark text-white'
-                  : 'bg-cjd-green hover:bg-cjd-green-dark text-white'
+                  : 'bg-primary hover:bg-primary text-white'
               }`}
             >
               {isUnsubscribeMode ? (

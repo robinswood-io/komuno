@@ -144,7 +144,7 @@ export default function VoteModal({ open, onOpenChange, idea }: VoteModalProps) 
               onChange={(e) => handleInputChange("voterName", e.target.value)}
               placeholder="Prénom Nom"
               required
-              className="focus:ring-cjd-green focus:border-cjd-green"
+              className="focus:ring-primary focus:border-primary"
               data-testid="input-voter-name"
             />
           </div>
@@ -160,7 +160,7 @@ export default function VoteModal({ open, onOpenChange, idea }: VoteModalProps) 
               onChange={(e) => handleInputChange("voterEmail", e.target.value)}
               placeholder="email@exemple.com"
               required
-              className="focus:ring-cjd-green focus:border-cjd-green"
+              className="focus:ring-primary focus:border-primary"
               data-testid="input-voter-email"
             />
           </div>
@@ -210,7 +210,7 @@ export default function VoteModal({ open, onOpenChange, idea }: VoteModalProps) 
             <Button
               type="submit"
               disabled={voteMutation.isPending}
-              className="bg-cjd-green hover:bg-cjd-green-dark"
+              className="bg-primary hover:bg-primary"
               data-testid="button-submit-vote"
             >
               {voteMutation.isPending ? (

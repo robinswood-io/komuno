@@ -10,7 +10,7 @@ export default function ToolsPage() {
       {/* En-tête de la page */}
       <div className="text-center mb-8 sm:mb-12">
         <div className="flex justify-center mb-4">
-          <div className="bg-gradient-to-r from-cjd-green to-success-dark rounded-full p-4">
+          <div className="bg-gradient-to-r from-primary to-success-dark rounded-full p-4">
             <Wrench className="w-8 h-8 text-white" />
           </div>
         </div>
@@ -23,7 +23,7 @@ export default function ToolsPage() {
       </div>
 
       {/* Section "Coming Soon" */}
-      <div className="bg-gradient-to-r from-cjd-green to-success-dark rounded-xl shadow-lg p-8 sm:p-12 text-white text-center mb-8">
+      <div className="bg-gradient-to-r from-primary to-success-dark rounded-xl shadow-lg p-8 sm:p-12 text-white text-center mb-8">
         <h2 className="text-2xl sm:text-3xl font-bold mb-4">🚀 Bientôt disponible</h2>
         <p className="text-success-light text-lg mb-6">
           Nous préparons une suite d'outils innovants pour vous accompagner dans votre développement professionnel et celui de votre entreprise.
@@ -98,7 +98,7 @@ export default function ToolsPage() {
           </p>
           <button
             onClick={() => window.location.href = 'mailto:contact@cjd-amiens.fr?subject=Suggestions pour les outils du dirigeant'}
-            className="bg-cjd-green hover:bg-cjd-green-dark text-white font-medium px-6 py-3 rounded-lg transition-colors duration-200"
+            className="bg-primary hover:bg-primary text-white font-medium px-6 py-3 rounded-lg transition-colors duration-200"
             data-testid="button-contact-suggestions"
           >
             Nous faire part de vos idées

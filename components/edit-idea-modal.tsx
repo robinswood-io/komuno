@@ -120,7 +120,7 @@ export default function EditIdeaModal({ open, onOpenChange, idea }: EditIdeaModa
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Edit className="w-5 h-5 text-cjd-green" />
+            <Edit className="w-5 h-5 text-primary" />
             Modifier l'idée
           </DialogTitle>
           <DialogDescription>
@@ -234,7 +234,7 @@ export default function EditIdeaModal({ open, onOpenChange, idea }: EditIdeaModa
             <Button
               type="submit"
               disabled={updateIdeaMutation.isPending || !title.trim()}
-              className="bg-cjd-green hover:bg-cjd-green-dark px-6"
+              className="bg-primary hover:bg-primary px-6"
               data-testid="button-save-edit"
             >
               {updateIdeaMutation.isPending ? (

@@ -116,7 +116,7 @@ export default function ProposePage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-cjd-green rounded-full">
+              <div className="p-3 bg-primary rounded-full">
                 <Lightbulb className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -218,7 +218,7 @@ export default function ProposePage() {
 
               <Button
                 type="submit"
-                className="w-full bg-cjd-green hover:bg-cjd-green-dark"
+                className="w-full bg-primary hover:bg-primary"
                 disabled={createIdeaMutation.isPending}
               >
                 {createIdeaMutation.isPending ? 'Envoi en cours...' : 'Soumettre mon idée'}

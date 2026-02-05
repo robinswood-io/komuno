@@ -170,7 +170,7 @@ export default function IdeaDetailModal({ open, onOpenChange, idea }: IdeaDetail
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Lightbulb className="w-5 h-5 text-cjd-green" />
+            <Lightbulb className="w-5 h-5 text-primary" />
             Détails de l'idée
           </DialogTitle>
           <DialogDescription>
@@ -233,7 +233,7 @@ export default function IdeaDetailModal({ open, onOpenChange, idea }: IdeaDetail
             </h4>
             {votesLoading ? (
               <div className="flex justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-cjd-green" />
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             ) : votes.length > 0 ? (
               <div className="bg-gray-50 rounded-lg p-4 max-h-48 overflow-y-auto">

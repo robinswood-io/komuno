@@ -37,9 +37,9 @@ export default function HomePage() {
           )}
           {/* Séparateur visuel entre les sections */}
           {isFeatureEnabled('events') && (
-            <div className="mt-8 sm:mt-12 border-t-4 border-cjd-green pt-8">
+            <div className="mt-8 sm:mt-12 border-t-4 border-primary pt-8">
               <div className="text-center mb-6">
-                <h2 className="text-2xl sm:text-3xl font-bold text-cjd-green">📅 Événements à venir</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold text-primary">📅 Événements à venir</h2>
                 <p className="text-gray-600 mt-2">Inscrivez-vous aux prochains événements {getShortAppName()}</p>
               </div>
               <EventsSection />
@@ -51,7 +51,7 @@ export default function HomePage() {
           <div className="container mx-auto px-3 sm:px-4">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <div className="flex items-center space-x-3 sm:space-x-4 text-center sm:text-left">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-cjd-green rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-white font-bold text-sm sm:text-base">CJD</span>
                 </div>
                 <div>
@@ -62,20 +62,20 @@ export default function HomePage() {
               <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
                 <button
                   onClick={() => router.push("/admin")}
-                  className="text-xs sm:text-sm text-gray-400 hover:text-cjd-green transition-colors duration-200 underline"
+                  className="text-xs sm:text-sm text-gray-400 hover:text-primary transition-colors duration-200 underline"
                   data-testid="link-admin"
                 >
                   Administration
                 </button>
                 <div className="text-xs sm:text-sm text-gray-400 flex items-center gap-2 sm:gap-3">
-                  <span>Créé avec ❤️ par <a href="https://robinswood.io" target="_blank" rel="noopener noreferrer" className="text-cjd-green hover:text-success-light transition-colors duration-200">Thibault</a></span>
+                  <span>Créé avec ❤️ par <a href="https://robinswood.io" target="_blank" rel="noopener noreferrer" className="text-primary hover:text-success-light transition-colors duration-200">Thibault</a></span>
                   <span className="hidden sm:inline">•</span>
                   <div className="flex flex-col items-center gap-1">
                     <a
                       href="https://github.com/Aoleon/cjd80"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-gray-400 hover:text-cjd-green transition-colors duration-200"
+                      className="flex items-center gap-1 text-gray-400 hover:text-primary transition-colors duration-200"
                       data-testid="link-github"
                     >
                       <SiGithub className="w-4 h-4" />

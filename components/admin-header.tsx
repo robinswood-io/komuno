@@ -111,11 +111,11 @@ export default function AdminHeader() {
   };
 
   return (
-    <header className="bg-gray-800 dark:bg-gray-900 text-white shadow-lg border-b-4 border-cjd-green">
+    <header className="bg-gray-800 dark:bg-gray-900 text-white shadow-lg border-b-4 border-primary">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center space-x-4">
-            <Shield className="w-8 h-8 text-cjd-green" data-testid="icon-admin-shield" />
+            <Shield className="w-8 h-8 text-primary" data-testid="icon-admin-shield" />
             <div>
               <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-admin-title">
                 {getShortAppName()} - Administration
@@ -131,7 +131,7 @@ export default function AdminHeader() {
               variant={isActive("/admin/dashboard") ? "default" : "ghost"}
               size="sm"
               onClick={() => handleNavigation("/admin/dashboard")}
-              className="text-white hover:text-cjd-green hover:bg-gray-700"
+              className="text-white hover:text-primary hover:bg-gray-700"
             >
               <TrendingUp className="w-4 h-4 mr-2" />
               Dashboard
@@ -143,7 +143,7 @@ export default function AdminHeader() {
                 <Button
                   variant={activeModule === "crm" ? "default" : "ghost"}
                   size="sm"
-                  className="text-white hover:text-cjd-green hover:bg-gray-700"
+                  className="text-white hover:text-primary hover:bg-gray-700"
                 >
                   CRM
                   <ChevronDown className="w-4 h-4 ml-2" />
@@ -169,7 +169,7 @@ export default function AdminHeader() {
                 <Button
                   variant={activeModule === "content" ? "default" : "ghost"}
                   size="sm"
-                  className="text-white hover:text-cjd-green hover:bg-gray-700"
+                  className="text-white hover:text-primary hover:bg-gray-700"
                 >
                   Contenu
                   <ChevronDown className="w-4 h-4 ml-2" />
@@ -196,7 +196,7 @@ export default function AdminHeader() {
                   <Button
                     variant={activeModule === "finance" ? "default" : "ghost"}
                     size="sm"
-                    className="text-white hover:text-cjd-green hover:bg-gray-700"
+                    className="text-white hover:text-primary hover:bg-gray-700"
                   >
                     Finances
                     <ChevronDown className="w-4 h-4 ml-2" />
@@ -222,7 +222,7 @@ export default function AdminHeader() {
               variant={isActive("/admin/tracking") ? "default" : "ghost"}
               size="sm"
               onClick={() => handleNavigation("/admin/tracking")}
-              className="text-white hover:text-cjd-green hover:bg-gray-700"
+              className="text-white hover:text-primary hover:bg-gray-700"
             >
               <Activity className="w-4 h-4 mr-2" />
               Suivi
@@ -235,7 +235,7 @@ export default function AdminHeader() {
                   <Button
                     variant={activeModule === "settings" ? "default" : "ghost"}
                     size="sm"
-                    className="text-white hover:text-cjd-green hover:bg-gray-700"
+                    className="text-white hover:text-primary hover:bg-gray-700"
                   >
                     Paramètres
                     <ChevronDown className="w-4 h-4 ml-2" />
@@ -263,7 +263,7 @@ export default function AdminHeader() {
                 variant={isActive(item.path) ? "default" : "ghost"}
                 size="sm"
                 onClick={() => handleNavigation(item.path)}
-                className="text-white hover:text-cjd-green hover:bg-gray-700"
+                className="text-white hover:text-primary hover:bg-gray-700"
               >
                 <item.icon className="w-4 h-4 mr-2" />
                 {item.label}
@@ -278,7 +278,7 @@ export default function AdminHeader() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-white hover:text-cjd-green hover:bg-gray-700"
+                className="text-white hover:text-primary hover:bg-gray-700"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 data-testid="button-mobile-menu"
               >
@@ -290,7 +290,7 @@ export default function AdminHeader() {
             <div className="hidden sm:block text-right">
               <p className="text-gray-300 text-xs">Connecté en tant que</p>
               <p className="font-medium text-sm" data-testid="text-user-email">{user?.email}</p>
-              <p className="text-cjd-green text-xs capitalize" data-testid="text-user-role">
+              <p className="text-primary text-xs capitalize" data-testid="text-user-role">
                 {user?.role?.replace('_', ' ') ?? ''}
               </p>
             </div>
@@ -318,7 +318,7 @@ export default function AdminHeader() {
             <div className="sm:hidden pb-3 mb-3 border-b border-gray-600">
               <p className="text-gray-300 text-xs">Connecté en tant que</p>
               <p className="font-medium text-sm">{user?.email}</p>
-              <p className="text-cjd-green text-xs capitalize">{user?.role?.replace('_', ' ') ?? ''}</p>
+              <p className="text-primary text-xs capitalize">{user?.role?.replace('_', ' ') ?? ''}</p>
             </div>
 
             {/* Dashboard */}
