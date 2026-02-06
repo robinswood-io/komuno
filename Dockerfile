@@ -65,6 +65,10 @@ RUN mkdir -p /app/logs /app/node_modules && \
 # Charger le loader ESM pour la résolution des imports sans extension
 COPY --from=builder /app/server/esm-loader.js ./server/esm-loader.js
 
+# Copier le script de démarrage
+COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh && chown cjduser:cjd /app/docker-entrypoint.sh
+
 # Utiliser l'utilisateur non-root
 USER cjduser
 
@@ -83,5 +87,5 @@ ENV GIT_TAG=${GIT_TAG}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD node -e "require('http').get('http://localhost:5000/api/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => { process.exit(1); });"
 
-# Commande de démarrage (NextJS + NestJS via npm start)
-CMD ["npm", "start"]
+# Commande de démarrage (NextJS + NestJS via script shell)
+CMD ["./docker-entrypoint.sh"]
