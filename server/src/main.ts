@@ -166,14 +166,16 @@ async function bootstrap() {
   // 7. Setup Vite en développement (après le listen pour avoir le server)
   // Note: En production, les fichiers statiques sont servis par @nestjs/serve-static
   // configuré dans AppModule. Pas besoin de code Express ici.
-  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
-    try {
-      await setupVite(expressApp, httpServer);
-      logger.info('Vite middleware configured');
-    } catch (error) {
-      logger.error('Failed to setup Vite middleware', { error });
-    }
-  }
+  // DÉSACTIVÉ TEMPORAIREMENT : Application NextJS, pas Vite+React
+  // if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+  //   try {
+  //     await setupVite(expressApp, httpServer);
+  //     logger.info('Vite middleware configured');
+  //   } catch (error) {
+  //     logger.error('Failed to setup Vite middleware', { error });
+  //   }
+  // }
+  logger.info('[Frontend] Application NextJS, middleware Vite désactivé');
 
   // 8. Démarrer les services en arrière-plan
   logger.info('[Background Services] Démarrage des services en arrière-plan...');

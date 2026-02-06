@@ -114,7 +114,7 @@ export class AdminToolsController {
   async createCategory(@Body() body: unknown) {
     const parsed = insertToolCategorySchema.safeParse(body);
     if (!parsed.success) {
-      return { error: 'Données invalides', details: parsed.error.errors };
+      return { error: 'Données invalides', details: parsed.error.issues };
     }
     return this.toolsService.createCategory(parsed.data);
   }
@@ -126,7 +126,7 @@ export class AdminToolsController {
   async updateCategory(@Param('id') id: string, @Body() body: unknown) {
     const parsed = updateToolCategorySchema.safeParse(body);
     if (!parsed.success) {
-      return { error: 'Données invalides', details: parsed.error.errors };
+      return { error: 'Données invalides', details: parsed.error.issues };
     }
     return this.toolsService.updateCategory(id, parsed.data);
   }
@@ -177,7 +177,7 @@ export class AdminToolsController {
   async createTool(@Body() body: unknown) {
     const parsed = insertToolSchema.safeParse(body);
     if (!parsed.success) {
-      return { error: 'Données invalides', details: parsed.error.errors };
+      return { error: 'Données invalides', details: parsed.error.issues };
     }
     return this.toolsService.createTool(parsed.data);
   }
@@ -189,7 +189,7 @@ export class AdminToolsController {
   async updateTool(@Param('id') id: string, @Body() body: unknown) {
     const parsed = updateToolSchema.safeParse(body);
     if (!parsed.success) {
-      return { error: 'Données invalides', details: parsed.error.errors };
+      return { error: 'Données invalides', details: parsed.error.issues };
     }
     return this.toolsService.updateTool(id, parsed.data);
   }
