@@ -2272,6 +2272,112 @@ export type UpdateNotification = z.infer<typeof updateNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 
 // ===================================
+// Tool Categories - Catégories d'outils pour dirigeants
+// ===================================
+export const toolCategories = pgTable("tool_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  icon: text("icon"), // Nom de l'icône Lucide (ex: "Wrench", "Users")
+  color: text("color").default("#10b981"), // Couleur hex pour l'affichage
+  order: integer("order").default(0).notNull(), // Ordre d'affichage
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orderIdx: index("tool_categories_order_idx").on(table.order),
+  activeIdx: index("tool_categories_active_idx").on(table.isActive),
+}));
+
+// Relations pour toolCategories
+export const toolCategoriesRelations = relations(toolCategories, ({ many }) => ({
+  tools: many(tools),
+}));
+
+// ===================================
+// Tools - Outils du dirigeant
+// ===================================
+export const tools = pgTable("tools", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  categoryId: varchar("category_id").references(() => toolCategories.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  logoUrl: text("logo_url"), // URL du logo/image de l'outil
+  price: text("price"), // Prix (texte pour gérer "Gratuit", "À partir de 10€/mois", etc.)
+  link: text("link"), // Lien externe vers l'outil
+  tags: text("tags").array(), // Tags pour le filtrage
+  isFeatured: boolean("is_featured").default(false).notNull(), // Mise en avant
+  isActive: boolean("is_active").default(true).notNull(),
+  order: integer("order").default(0).notNull(), // Ordre d'affichage dans la catégorie
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdBy: text("created_by"), // Email de l'admin qui a créé
+}, (table) => ({
+  categoryIdx: index("tools_category_idx").on(table.categoryId),
+  featuredIdx: index("tools_featured_idx").on(table.isFeatured),
+  activeIdx: index("tools_active_idx").on(table.isActive),
+  orderIdx: index("tools_order_idx").on(table.order),
+}));
+
+// Relations pour tools
+export const toolsRelations = relations(tools, ({ one }) => ({
+  category: one(toolCategories, {
+    fields: [tools.categoryId],
+    references: [toolCategories.id],
+  }),
+}));
+
+// Schémas Zod pour validation
+export const insertToolCategorySchema = createInsertSchema(toolCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  name: z.string().min(2, "Le nom doit contenir au moins 2 caractères").max(100),
+  description: z.string().max(500).optional(),
+  icon: z.string().max(50).optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Couleur invalide").optional(),
+  order: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updateToolCategorySchema = insertToolCategorySchema.partial();
+
+export const insertToolSchema = createInsertSchema(tools).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  name: z.string().min(2, "Le nom doit contenir au moins 2 caractères").max(200),
+  description: z.string().max(1000).optional(),
+  categoryId: z.string().uuid().optional().nullable(),
+  logoUrl: z.string().url().optional().nullable(),
+  price: z.string().max(100).optional().nullable(),
+  link: z.string().url().optional().nullable(),
+  tags: z.array(z.string().max(50)).max(10).optional(),
+  isFeatured: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  order: z.number().int().min(0).optional(),
+  createdBy: z.string().email().optional(),
+});
+
+export const updateToolSchema = insertToolSchema.partial();
+
+// Types inférés
+export type ToolCategory = typeof toolCategories.$inferSelect;
+export type InsertToolCategory = z.infer<typeof insertToolCategorySchema>;
+export type UpdateToolCategory = z.infer<typeof updateToolCategorySchema>;
+
+export type Tool = typeof tools.$inferSelect;
+export type InsertTool = z.infer<typeof insertToolSchema>;
+export type UpdateTool = z.infer<typeof updateToolSchema>;
+
+// Type avec catégorie jointe
+export type ToolWithCategory = Tool & {
+  category: ToolCategory | null;
+};
+
+// ===================================
 // System Status / Health Check Types
 // ===================================
 // Note: These are runtime/operational types, not persistent database tables

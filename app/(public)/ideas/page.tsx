@@ -1,6 +1,5 @@
 'use client';
 
-import { MainLayout } from "@/components/layout";
 import IdeasSection from "@/components/ideas-section";
 import { useRouter } from "next/navigation";
 
@@ -19,10 +18,8 @@ export default function IdeasPage() {
   };
 
   return (
-    <MainLayout>
-      <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8">
-        <IdeasSection onNavigateToPropose={handleProposeIdea} />
-      </div>
-    </MainLayout>
+    <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8">
+      <IdeasSection onNavigateToPropose={handleProposeIdea} />
+    </div>
   );
 }

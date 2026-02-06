@@ -72,12 +72,6 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/login"
-              className="ml-4 px-4 py-2 bg-white text-primary rounded-lg hover:bg-gray-100 transition-colors duration-200 font-medium text-sm xl:text-base whitespace-nowrap"
-            >
-              Connexion
-            </Link>
           </nav>
 
           <div className="lg:hidden flex items-center space-x-2">
@@ -113,13 +107,6 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
-            <Link
-              href="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block w-full text-left py-3 px-2 rounded bg-white text-primary hover:bg-gray-100 transition-colors duration-200 font-medium"
-            >
-              Connexion
-            </Link>
           </div>
         </div>
       )}
