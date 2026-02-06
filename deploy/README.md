@@ -6,7 +6,7 @@
 GitHub Actions (Build)
         │
         ▼
-   ghcr.io/robinswood-io/cjd80:latest
+   ghcr.io/robinswood-io/komuno:latest
         │
         ├──────────────────┐
         ▼                  ▼
@@ -103,7 +103,7 @@ export APP_NAME=rep
 export GHCR_TOKEN=ghp_xxx
 export GHCR_USER=votre-username
 
-curl -sSL https://raw.githubusercontent.com/robinswood-io/cjd80/main/deploy/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/install.sh | bash
 ```
 
 ### Option 2: Installation manuelle
@@ -114,8 +114,8 @@ mkdir -p /srv/workspace/rep
 cd /srv/workspace/rep
 
 # Télécharger les fichiers
-curl -O https://raw.githubusercontent.com/robinswood-io/cjd80/main/deploy/docker-compose.prod.yml
-curl -O https://raw.githubusercontent.com/robinswood-io/cjd80/main/deploy/.env.example
+curl -O https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/docker-compose.prod.yml
+curl -O https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/.env.example
 
 # Configurer
 cp .env.example .env
@@ -134,7 +134,7 @@ docker compose -f docker-compose.prod.yml up -d
 cd /srv/workspace/rep  # ou /srv/workspace (CJD80)
 
 # Pull nouvelle image
-docker pull ghcr.io/robinswood-io/cjd80:latest
+docker pull ghcr.io/robinswood-io/komuno:latest
 
 # Redémarrer
 docker compose down

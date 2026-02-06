@@ -1,12 +1,12 @@
 #!/bin/bash
 # =============================================================================
 # Script d'installation pour nouveau serveur de production
-# Usage: curl -sSL https://raw.githubusercontent.com/robinswood-io/cjd80/main/deploy/install.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/install.sh | bash
 # =============================================================================
 
 set -e
 
-echo "🚀 Installation de l'application CJD80/REP..."
+echo "🚀 Installation de l'application Komuno..."
 
 # Variables
 APP_DIR="/srv/workspace/app"
@@ -58,10 +58,10 @@ download_files() {
     log_info "Téléchargement des fichiers de configuration..."
     
     # Docker Compose
-    curl -sSL https://raw.githubusercontent.com/robinswood-io/cjd80/main/deploy/docker-compose.prod.yml -o docker-compose.yml
+    curl -sSL https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/docker-compose.prod.yml -o docker-compose.yml
     
     # Env example
-    curl -sSL https://raw.githubusercontent.com/robinswood-io/cjd80/main/deploy/.env.example -o .env.example
+    curl -sSL https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/.env.example -o .env.example
     
     log_info "✅ Fichiers téléchargés"
 }
@@ -124,7 +124,7 @@ start_services() {
 # Main
 main() {
     echo "=================================================="
-    echo "   Installation Application CJD80/REP"
+    echo "   Installation Application Komuno"
     echo "=================================================="
     echo ""
     

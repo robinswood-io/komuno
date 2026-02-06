@@ -1,5 +1,5 @@
 {
-  "name": "rest-express",
+  "name": "komuno",
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
@@ -116,6 +116,7 @@
     "@tiptap/react": "^3.8.0",
     "@tiptap/starter-kit": "^3.8.0",
     "@types/bcrypt": "^6.0.0",
+    "@types/jspdf": "^1.3.3",
     "@types/multer": "^2.0.0",
     "@types/nodemailer": "^7.0.1",
     "@types/pg": "^8.15.6",
@@ -138,7 +139,7 @@
     "input-otp": "^1.4.2",
     "jsdom": "^26.1.0",
     "jspdf": "^3.0.4",
-    "jspdf-autotable": "^5.0.2",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.453.0",
     "memorystore": "^1.6.7",
     "minio": "^8.0.1",
@@ -161,7 +162,7 @@
     "react-icons": "^5.4.0",
     "react-resizable-panels": "^2.1.7",
     "reagraph": "^4.30.8",
-    "recharts": "^2.15.2",
+    "recharts": "^2.15.4",
     "reflect-metadata": "^0.1.14",
     "rxjs": "^7.8.2",
     "superjson": "^2.2.6",
