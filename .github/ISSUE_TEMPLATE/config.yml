@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "💬 Questions et Discussions"
+    url: https://github.com/robinswood-io/komuno/discussions
+    about: "Pour les questions générales, utilisez les Discussions GitHub"
+  - name: "🔒 Signaler une Vulnérabilité"
+    url: https://github.com/robinswood-io/komuno/security/policy
+    about: "Pour signaler une vulnérabilité de sécurité, consultez notre politique de sécurité"
+  - name: "📚 Documentation"
+    url: https://github.com/robinswood-io/komuno#readme
+    about: "Consultez la documentation avant de créer une issue"

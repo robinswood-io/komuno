@@ -1,6 +1,6 @@
 # Komuno
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
 [![NestJS](https://img.shields.io/badge/NestJS-11-red)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue)](https://www.typescriptlang.org/)
@@ -182,7 +182,25 @@ Configuration via `/admin/branding` (interface graphique) ou fichiers:
 
 ## 📄 Licence
 
-MIT License - Voir [LICENSE](LICENSE)
+**Komuno Non-Commercial License (KNCL) v1.0**
+
+Ce logiciel est sous licence non-commerciale. Vous pouvez librement :
+- Utiliser pour un usage personnel ou éducatif
+- Modifier et créer des œuvres dérivées
+- Distribuer sous les mêmes termes
+
+**Interdit** : Usage commercial sans accord préalable.
+
+Voir [LICENSE](LICENSE) pour les détails complets.
+
+Pour une licence commerciale : contact@robinswood.io
+
+## 🤝 Contribuer
+
+Les contributions sont les bienvenues ! Consultez :
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Guide de contribution
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - Code de conduite
+- [SECURITY.md](SECURITY.md) - Politique de sécurité
 
 ---
 
