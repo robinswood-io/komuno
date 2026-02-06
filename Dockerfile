@@ -39,13 +39,9 @@ RUN apk add --no-cache wget
 # Créer un utilisateur non-root pour la sécurité
 RUN addgroup -S cjd && adduser -S cjduser -G cjd
 
-# Copier package.json pour référence
+# Copier package.json et node_modules complets depuis le builder
 COPY --from=builder /app/package*.json ./
-
-# Installer les production dependencies + drizzle-kit pour les migrations
-# drizzle-kit est nécessaire pour exécuter les migrations en production
-RUN (npm ci --omit=dev --legacy-peer-deps || npm install --omit=dev --legacy-peer-deps) && \
-    npm install drizzle-kit --save-dev --no-audit --no-fund || true
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copier les fichiers nécessaires pour les migrations (drizzle-kit)
 COPY --from=builder /app/drizzle.config.ts ./
