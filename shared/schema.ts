@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, unique, index, serial, date, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, unique, index, serial, date, jsonb, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -27,7 +27,7 @@ export const admins = pgTable("admins", {
   email: text("email").primaryKey(),
   firstName: text("first_name").default("Admin").notNull(),
   lastName: text("last_name").default("User").notNull(),
-  password: text("password"), // Nullable car géré par Authentik pour les nouveaux utilisateurs
+  password: text("password"),
   addedBy: text("added_by"),
   role: text("role").default(ADMIN_ROLES.IDEAS_READER).notNull(), // Rôle par défaut : consultation des idées
   status: text("status").default(ADMIN_STATUS.PENDING).notNull(), // Statut par défaut : en attente
@@ -270,6 +270,10 @@ export const patrons = pgTable("patrons", {
   lastName: text("last_name").notNull(),
   role: text("role"), // Fonction du mécène
   company: text("company"), // Société
+  department: text("department"), // Département
+  city: text("city"), // Ville
+  postalCode: text("postal_code"), // Code postal
+  sector: text("sector"), // Secteur d'activité
   phone: text("phone"), // Téléphone
   email: text("email").notNull().unique(), // Email unique pour éviter les doublons
   notes: text("notes"), // Informations complémentaires
@@ -370,6 +374,10 @@ export const members = pgTable("members", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   company: text("company"),
+  department: text("department"), // Département
+  city: text("city"), // Ville
+  postalCode: text("postal_code"), // Code postal
+  sector: text("sector"), // Secteur d'activité
   phone: text("phone"),
   role: text("role"), // Rôle professionnel/métier
   cjdRole: text("cjd_role"), // Rôle organisationnel CJD (président, trésorier, etc.)
@@ -380,6 +388,7 @@ export const members = pgTable("members", {
   firstSeenAt: timestamp("first_seen_at").notNull(),
   lastActivityAt: timestamp("last_activity_at").notNull(),
   activityCount: integer("activity_count").default(0).notNull(),
+  subscriptionEndDate: timestamp("subscription_end_date"), // Date de fin de cotisation
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -437,13 +446,16 @@ export const memberSubscriptions = pgTable("member_subscriptions", {
   startDate: date("start_date").notNull(), // Format YYYY-MM-DD
   endDate: date("end_date").notNull(), // Format YYYY-MM-DD
   subscriptionType: text("subscription_type").notNull(), // "monthly", "quarterly", "yearly"
+  subscriptionTypeId: uuid("subscription_type_id").references(() => subscriptionTypes.id, { onDelete: "set null" }),
   status: text("status").default("active").notNull(), // "active", "expired", "cancelled"
   paymentMethod: text("payment_method"), // "cash", "check", "bank_transfer", "card" (optionnel)
+  assignedBy: varchar("assigned_by", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   memberEmailIdx: index("member_subscriptions_member_email_idx").on(table.memberEmail),
   startDateIdx: index("member_subscriptions_start_date_idx").on(table.startDate.desc()),
   statusIdx: index("member_subscriptions_status_idx").on(table.status),
+  subscriptionTypeIdIdx: index("member_subscriptions_subscription_type_id_idx").on(table.subscriptionTypeId),
 }));
 
 // Member tags table - Tags personnalisables pour les membres
@@ -730,12 +742,7 @@ export const memberActivitiesRelations = relations(memberActivities, ({ one }) =
   }),
 }));
 
-export const memberSubscriptionsRelations = relations(memberSubscriptions, ({ one }) => ({
-  member: one(members, {
-    fields: [memberSubscriptions.memberEmail],
-    references: [members.email],
-  }),
-}));
+// Old relations definition - will be replaced with new one below
 
 // Security helper functions - Plus permissif pour permettre plus de domaines
 const isValidDomain = (email: string) => {
@@ -774,7 +781,7 @@ export const insertAdminSchema = z.object({
     .max(128, "Le mot de passe ne peut pas dépasser 128 caractères")
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Le mot de passe doit contenir au moins : 1 majuscule (A-Z), 1 minuscule (a-z) et 1 chiffre (0-9)")
     .optional()
-    .nullable(), // Optionnel car géré par Authentik
+    .nullable(),
   addedBy: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
   role: z.enum([
     ADMIN_ROLES.SUPER_ADMIN,
@@ -1906,6 +1913,47 @@ export const financialForecasts = pgTable("financial_forecasts", {
   periodYearIdx: index("financial_forecasts_period_year_idx").on(table.period, table.year),
 }));
 
+// Financial revenues table - Revenus réels (donations, grants, sponsorships)
+export const financialRevenues = pgTable("financial_revenues", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // donation, grant, sponsorship, other
+  description: text("description").notNull(),
+  amountInCents: integer("amount_in_cents").notNull(), // Montant en centimes
+  revenueDate: date("revenue_date").notNull(), // Date du revenu (format YYYY-MM-DD)
+  memberEmail: text("member_email"), // Email du membre (si applicable)
+  patronId: varchar("patron_id"), // ID du mécène (si applicable)
+  paymentMethod: text("payment_method"), // cash, check, bank_transfer, card (optionnel)
+  status: text("status").default("confirmed").notNull(), // pending, confirmed, cancelled
+  receiptUrl: text("receipt_url"), // URL du justificatif (upload)
+  notes: text("notes"), // Notes supplémentaires
+  createdBy: text("created_by").notNull(), // Email admin
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  typeIdx: index("financial_revenues_type_idx").on(table.type),
+  revenueDateIdx: index("financial_revenues_revenue_date_idx").on(table.revenueDate.desc()),
+  memberEmailIdx: index("financial_revenues_member_email_idx").on(table.memberEmail),
+  patronIdIdx: index("financial_revenues_patron_id_idx").on(table.patronId),
+  statusIdx: index("financial_revenues_status_idx").on(table.status),
+  createdByIdx: index("financial_revenues_created_by_idx").on(table.createdBy),
+}));
+
+// Subscription types table - Types de cotisations (monthly, quarterly, yearly)
+export const subscriptionTypes = pgTable("subscription_types", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  amountInCents: integer("amount_in_cents").notNull(),
+  durationType: varchar("duration_type", { length: 20 }).notNull(), // 'monthly' | 'quarterly' | 'yearly'
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  nameIdx: index("subscription_types_name_idx").on(table.name),
+  durationTypeIdx: index("subscription_types_duration_type_idx").on(table.durationType),
+  isActiveIdx: index("subscription_types_is_active_idx").on(table.isActive),
+}));
+
 // Financial categories relations
 export const financialCategoriesRelations = relations(financialCategories, ({ one, many }) => ({
   parent: one(financialCategories, {
@@ -1947,6 +1995,35 @@ export const financialForecastsRelations = relations(financialForecasts, ({ one 
   category: one(financialCategories, {
     fields: [financialForecasts.category],
     references: [financialCategories.id],
+  }),
+}));
+
+// Financial revenues relations
+export const financialRevenuesRelations = relations(financialRevenues, ({ one }) => ({
+  member: one(members, {
+    fields: [financialRevenues.memberEmail],
+    references: [members.email],
+  }),
+  patron: one(patrons, {
+    fields: [financialRevenues.patronId],
+    references: [patrons.id],
+  }),
+}));
+
+// Subscription types relations
+export const subscriptionTypesRelations = relations(subscriptionTypes, ({ many }) => ({
+  subscriptions: many(memberSubscriptions),
+}));
+
+// Update member subscriptions relations to include subscription type
+export const memberSubscriptionsRelations = relations(memberSubscriptions, ({ one }) => ({
+  member: one(members, {
+    fields: [memberSubscriptions.memberEmail],
+    references: [members.email],
+  }),
+  subscriptionType: one(subscriptionTypes, {
+    fields: [memberSubscriptions.subscriptionTypeId],
+    references: [subscriptionTypes.id],
   }),
 }));
 
@@ -2065,6 +2142,85 @@ export const updateFinancialForecastSchema = insertFinancialForecastSchema.parti
 export type InsertFinancialForecast = z.infer<typeof insertFinancialForecastSchema>;
 export type UpdateFinancialForecast = z.infer<typeof updateFinancialForecastSchema>;
 export type FinancialForecast = typeof financialForecasts.$inferSelect;
+
+// Financial revenues schemas - Manual Zod v4 schemas
+export const insertFinancialRevenueSchema = z.object({
+  type: z.enum(["donation", "grant", "sponsorship", "other"], {
+    message: "Le type de revenu doit être donation, grant, sponsorship ou other",
+  }),
+  description: z.string().min(1, "La description est requise"),
+  amountInCents: z.number().int().min(0, "Le montant doit être positif"),
+  revenueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD"),
+  memberEmail: z.string().email("Email du membre invalide").optional().nullable(),
+  patronId: z.string().uuid().optional().nullable(),
+  paymentMethod: z.string().optional().nullable(),
+  status: z.enum(["pending", "confirmed", "cancelled"], {
+    message: "Le statut doit être pending, confirmed ou cancelled",
+  }).optional().default("confirmed"),
+  receiptUrl: z.string().url().optional().nullable(),
+  notes: z.string().optional().nullable(),
+  createdBy: z.string().email("Email de l'administrateur invalide"),
+});
+
+export const updateFinancialRevenueSchema = insertFinancialRevenueSchema.partial();
+
+export type InsertFinancialRevenue = z.infer<typeof insertFinancialRevenueSchema>;
+export type UpdateFinancialRevenue = z.infer<typeof updateFinancialRevenueSchema>;
+export type FinancialRevenue = typeof financialRevenues.$inferSelect;
+
+// Member subscriptions update schema
+export const updateMemberSubscriptionSchema = insertMemberSubscriptionSchema.partial();
+
+export type UpdateMemberSubscription = z.infer<typeof updateMemberSubscriptionSchema>;
+
+// Subscription Types schemas - Zod v4 validation
+export const insertSubscriptionTypeSchema = z.object({
+  name: z.string().min(1, "Le nom est requis").max(255, "Le nom ne peut pas dépasser 255 caractères"),
+  description: z.string().optional(),
+  amountInCents: z.number().int().min(0, "Le montant doit être positif ou zéro"),
+  durationType: z.enum(["monthly", "quarterly", "yearly"], {
+    message: "Le type de durée doit être monthly, quarterly ou yearly",
+  }),
+  isActive: z.boolean().optional().default(true),
+});
+
+export const updateSubscriptionTypeSchema = insertSubscriptionTypeSchema.partial();
+
+export const subscriptionTypeSchema = z.object({
+  id: z.string().uuid("ID invalide"),
+  name: z.string(),
+  description: z.string().nullable(),
+  amountInCents: z.number(),
+  durationType: z.enum(["monthly", "quarterly", "yearly"]),
+  isActive: z.boolean(),
+  createdAt: z.string().datetime("Date de création invalide"),
+  updatedAt: z.string().datetime("Date de mise à jour invalide"),
+});
+
+// Schema for assigning subscription to member
+export const assignSubscriptionSchema = z.object({
+  memberEmail: z.string().email("Format d'email invalide"),
+  memberName: z.string().min(1, "Le nom du membre est requis"),
+  subscriptionTypeId: z.string().uuid("ID de type de cotisation invalide"),
+  startDate: z.string().datetime("Date de début invalide"),
+  paymentMethod: z.string().optional(),
+  notes: z.string().optional(),
+  assignedBy: z.string().email("Email de l'administrateur invalide"),
+});
+
+// Schema for renewing subscription
+export const renewSubscriptionSchema = z.object({
+  subscriptionId: z.number().int().positive("ID de cotisation invalide"),
+  paymentMethod: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+// Type definitions for subscription types
+export type InsertSubscriptionType = z.infer<typeof insertSubscriptionTypeSchema>;
+export type UpdateSubscriptionType = z.infer<typeof updateSubscriptionTypeSchema>;
+export type SubscriptionType = z.infer<typeof subscriptionTypeSchema>;
+export type AssignSubscription = z.infer<typeof assignSubscriptionSchema>;
+export type RenewSubscription = z.infer<typeof renewSubscriptionSchema>;
 
 // Legacy compatibility
 export type AdminUser = Admin;

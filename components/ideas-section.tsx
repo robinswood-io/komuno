@@ -63,7 +63,7 @@ interface IdeasSectionProps {
 }
 
 export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps) {
-  useBranding(); // Load branding context
+  const { branding } = useBranding();
   const [selectedIdea, setSelectedIdea] = useState<IdeaWithVotes | null>(null);
   const [voteModalOpen, setVoteModalOpen] = useState(false);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
@@ -128,7 +128,7 @@ export default function IdeasSection({ onNavigateToPropose }: IdeasSectionProps)
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-primary flex items-center gap-2" data-testid="ideas-page-title">
             <Lightbulb className="w-6 h-6 sm:w-8 sm:h-8" />
-            Idées - Boîte à Kiffs
+            Idées - {branding?.app?.ideaBoxName || 'Boîte à Kiffs'}
           </h1>
           <p className="text-gray-600 mt-1">Proposez vos idées et votez pour vos préférées</p>
         </div>

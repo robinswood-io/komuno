@@ -2,11 +2,22 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Proxy Next.js 16 pour gérer l'authentification
- * (Anciennement middleware.ts - renommé pour Next.js 16)
+ * Proxy Next.js 16 pour gérer l'authentification et les requêtes HEAD
  * Vérifie les routes protégées et redirige vers /login si non authentifié
  */
 export function proxy(request: NextRequest) {
+  // Gestion des requêtes HEAD pour éviter les 502
+  // Next.js en mode dev peut avoir des problèmes avec HEAD requests
+  if (request.method === 'HEAD') {
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+    });
+  }
+
   const { pathname } = request.nextUrl;
 
   // Routes protégées (admin)

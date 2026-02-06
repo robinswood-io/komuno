@@ -866,7 +866,7 @@ export class AdminController {
   @Permissions('admin.manage')
   @UsePipes(new ZodValidationPipe(updateFeatureConfigDto))
   @ApiOperation({ summary: 'Activer/désactiver une fonctionnalité' })
-  @ApiParam({ name: 'featureKey', description: 'Clé de la fonctionnalité', example: 'chatbot' })
+  @ApiParam({ name: 'featureKey', description: 'Clé de la fonctionnalité', example: 'notifications' })
   @ApiBody({
     schema: {
       type: 'object',

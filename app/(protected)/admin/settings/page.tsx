@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api, queryKeys, type ApiResponse } from '@/lib/api/client';
 import { useToast } from '@/hooks/use-toast';
+import { useBranding } from '@/contexts/BrandingContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Save, Bell, Mail, Shield, Settings as SettingsIcon, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, Bell, Mail, Shield, Settings as SettingsIcon, AlertTriangle, Users } from 'lucide-react';
+import { AdministratorsTab } from './_components/administrators-tab';
 import {
   Select,
   SelectContent,
@@ -29,7 +33,19 @@ import {
  */
 export default function AdminSettingsPage() {
   const { toast } = useToast();
+  const { branding } = useBranding();
   const [isSaving, setIsSaving] = useState(false);
+
+  // Query - Utilisateur actuel pour vérifier le rôle
+  const { data: currentUser } = useQuery({
+    queryKey: queryKeys.auth.user(),
+    queryFn: async () => {
+      const response = await api.get<ApiResponse<{ email: string; role: string }>>('/api/auth/user');
+      return response.data;
+    },
+  });
+
+  const canManageAdmins = currentUser?.role === 'super_admin';
 
   // Configuration Email
   const [emailConfig, setEmailConfig] = useState({
@@ -68,8 +84,14 @@ export default function AdminSettingsPage() {
   });
 
   // Configuration Générale
-  const [generalConfig, setGeneralConfig] = useState({
-    appName: 'CJD Amiens - Boîte à Kiffs',
+  const [generalConfig, setGeneralConfig] = useState<{
+    appName: string;
+    supportEmail: string;
+    itemsPerPage: string;
+    defaultLanguage: string;
+    timezone: string;
+  }>({
+    appName: branding?.app?.name || 'CJD Amiens - Boîte à Kiffs',
     supportEmail: 'contact@cjd-amiens.fr',
     itemsPerPage: '20',
     defaultLanguage: 'fr',
@@ -201,6 +223,12 @@ export default function AdminSettingsPage() {
             <Shield className="h-4 w-4 mr-2" />
             Sécurité
           </TabsTrigger>
+          {canManageAdmins && (
+            <TabsTrigger value="administrators">
+              <Users className="h-4 w-4 mr-2" />
+              Administrateurs
+            </TabsTrigger>
+          )}
           <TabsTrigger value="maintenance">
             <AlertTriangle className="h-4 w-4 mr-2" />
             Maintenance
@@ -630,6 +658,13 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Configuration Administrateurs */}
+        {canManageAdmins && (
+          <TabsContent value="administrators">
+            <AdministratorsTab />
+          </TabsContent>
+        )}
 
         {/* Configuration Maintenance */}
         <TabsContent value="maintenance">

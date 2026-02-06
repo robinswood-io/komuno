@@ -26,6 +26,9 @@ const nextConfig = {
     // Turbopack-specific options if needed
   },
 
+  // Allow cross-origin requests in development
+  allowedDevOrigins: ['cjd80.rbw.ovh', 'https://cjd80.rbw.ovh'],
+
   // Experimental features (Next.js 16)
   experimental: {
     // typedRoutes is now stable in Next.js 16

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Test rapide - Page Relations', () => {
   test('devrait charger la page Relations sans erreur', async ({ page }) => {
     // Navigation vers la page
-    await page.goto('https://cjd80.rbw.ovh/admin/members/relations');
+    await page.goto('https://cjd80.rbw.ovh/admin/members/member-graph');
 
     // Attendre que la page soit chargée
     await page.waitForLoadState('networkidle');
@@ -19,7 +19,7 @@ test.describe('Test rapide - Page Relations', () => {
   });
 
   test('devrait afficher les onglets Graphe et Tableau', async ({ page }) => {
-    await page.goto('https://cjd80.rbw.ovh/admin/members/relations');
+    await page.goto('https://cjd80.rbw.ovh/admin/members/member-graph');
     await page.waitForLoadState('networkidle');
 
     // Chercher les onglets
@@ -34,7 +34,7 @@ test.describe('Test rapide - Page Relations', () => {
   });
 
   test('devrait permettre de basculer entre les onglets', async ({ page }) => {
-    await page.goto('https://cjd80.rbw.ovh/admin/members/relations');
+    await page.goto('https://cjd80.rbw.ovh/admin/members/member-graph');
     await page.waitForLoadState('networkidle');
 
     // Cliquer sur l'onglet Tableau
@@ -54,7 +54,7 @@ test.describe('Test rapide - Page Relations', () => {
   });
 
   test('devrait afficher le composant Reagraph dans l\'onglet Graphe', async ({ page }) => {
-    await page.goto('https://cjd80.rbw.ovh/admin/members/relations');
+    await page.goto('https://cjd80.rbw.ovh/admin/members/member-graph');
     await page.waitForLoadState('networkidle');
 
     // Attendre que le canvas WebGL soit présent

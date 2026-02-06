@@ -18,7 +18,8 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, Users, Calendar, MapPin } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Users, Calendar, MapPin, Eye } from 'lucide-react';
+import EventDetailModal from '@/components/event-detail-modal';
 import {
   Dialog,
   DialogContent,
@@ -47,8 +48,13 @@ interface Event {
   helloAssoLink?: string;
   status: EventStatus;
   inscriptionCount?: number;
+  unsubscriptionCount?: number;
   showInscriptionsCount?: boolean;
   showAvailableSeats?: boolean;
+  allowUnsubscribe?: boolean;
+  redUnsubscribeButton?: boolean;
+  buttonMode?: 'subscribe' | 'unsubscribe' | 'both' | 'custom';
+  customButtonText?: string;
 }
 
 interface Inscription {
@@ -71,6 +77,7 @@ export default function AdminEventsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showInscriptionsModal, setShowInscriptionsModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   // Form state
@@ -84,6 +91,10 @@ export default function AdminEventsPage() {
     status: 'published' as EventStatus,
     showInscriptionsCount: true,
     showAvailableSeats: true,
+    allowUnsubscribe: false,
+    redUnsubscribeButton: false,
+    buttonMode: 'subscribe' as 'subscribe' | 'unsubscribe' | 'both' | 'custom',
+    customButtonText: '',
   });
 
   // Query pour lister les événements
@@ -111,6 +122,10 @@ export default function AdminEventsPage() {
       status: EventStatus;
       showInscriptionsCount?: boolean;
       showAvailableSeats?: boolean;
+      allowUnsubscribe?: boolean;
+      redUnsubscribeButton?: boolean;
+      buttonMode?: 'subscribe' | 'unsubscribe' | 'both' | 'custom';
+      customButtonText?: string;
     }) => api.post('/api/events', data),
     onSuccess: () => {
       toast({
@@ -183,6 +198,10 @@ export default function AdminEventsPage() {
       status: 'published',
       showInscriptionsCount: true,
       showAvailableSeats: true,
+      allowUnsubscribe: false,
+      redUnsubscribeButton: false,
+      buttonMode: 'subscribe' as 'subscribe' | 'unsubscribe' | 'both' | 'custom',
+      customButtonText: '',
     });
   };
 
@@ -206,6 +225,10 @@ export default function AdminEventsPage() {
       status: formData.status,
       showInscriptionsCount: formData.showInscriptionsCount,
       showAvailableSeats: formData.showAvailableSeats,
+      allowUnsubscribe: formData.allowUnsubscribe,
+      redUnsubscribeButton: formData.redUnsubscribeButton,
+      buttonMode: formData.buttonMode,
+      customButtonText: formData.customButtonText || undefined,
     });
   };
 
@@ -224,6 +247,10 @@ export default function AdminEventsPage() {
         status: formData.status,
         showInscriptionsCount: formData.showInscriptionsCount,
         showAvailableSeats: formData.showAvailableSeats,
+        allowUnsubscribe: formData.allowUnsubscribe,
+        redUnsubscribeButton: formData.redUnsubscribeButton,
+        buttonMode: formData.buttonMode,
+        customButtonText: formData.customButtonText || undefined,
       },
     });
   };
@@ -246,6 +273,10 @@ export default function AdminEventsPage() {
       status: event.status,
       showInscriptionsCount: event.showInscriptionsCount ?? true,
       showAvailableSeats: event.showAvailableSeats ?? true,
+      allowUnsubscribe: (event as any).allowUnsubscribe ?? false,
+      redUnsubscribeButton: (event as any).redUnsubscribeButton ?? false,
+      buttonMode: ((event as any).buttonMode as 'subscribe' | 'unsubscribe' | 'both' | 'custom') ?? 'subscribe',
+      customButtonText: (event as any).customButtonText ?? '',
     });
     setShowEditModal(true);
   };
@@ -431,20 +462,36 @@ export default function AdminEventsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openInscriptionsModal(event)}
-                        className="flex items-center gap-2"
-                        title="Gérer les inscriptions"
-                        data-testid="event-inscriptions-button"
-                      >
-                        <Users className="h-4 w-4" />
-                        <span>{event.inscriptionCount || 0}</span>
-                        {event.maxParticipants && (
-                          <span className="text-muted-foreground">/ {event.maxParticipants}</span>
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedEvent(event);
+                            setShowDetailModal(true);
+                          }}
+                          className="flex items-center gap-2 h-auto py-1 justify-start"
+                          title="Voir détails, inscriptions et désinscriptions"
+                          data-testid="event-inscriptions-button"
+                        >
+                          <Users className="h-4 w-4 text-green-600" />
+                          <span className="font-medium">{event.inscriptionCount || 0}</span>
+                          <span className="text-xs text-muted-foreground">inscrits</span>
+                        </Button>
+                        {(event.unsubscriptionCount ?? 0) > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground pl-1">
+                            <span className="text-red-500">✗</span>
+                            <span>{event.unsubscriptionCount}</span>
+                            <span>absence{(event.unsubscriptionCount ?? 0) > 1 ? 's' : ''}</span>
+                          </div>
                         )}
-                      </Button>
+                        {event.maxParticipants && (
+                          <div className="text-xs text-muted-foreground pl-1">
+                            <span className="font-medium">{event.inscriptionCount || 0}</span>
+                            <span> / {event.maxParticipants} places</span>
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(event.status)}>
@@ -453,6 +500,17 @@ export default function AdminEventsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedEvent(event);
+                            setShowDetailModal(true);
+                          }}
+                          title="Voir détails et inscriptions"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -629,6 +687,65 @@ export default function AdminEventsPage() {
                 </label>
               </div>
             </div>
+
+            {/* Options d'inscription/désinscription */}
+            <div className="space-y-3 border-t pt-4">
+              <Label className="font-semibold">Options d'inscription</Label>
+
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="allowUnsubscribe"
+                  checked={formData.allowUnsubscribe ?? false}
+                  onChange={(e) => setFormData({ ...formData, allowUnsubscribe: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <label htmlFor="allowUnsubscribe" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Autoriser les désinscriptions
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="redUnsubscribeButton"
+                  checked={formData.redUnsubscribeButton ?? false}
+                  onChange={(e) => setFormData({ ...formData, redUnsubscribeButton: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300"
+                  disabled={!formData.allowUnsubscribe}
+                />
+                <label htmlFor="redUnsubscribeButton" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Bouton rouge pour désinscription
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="buttonMode">Mode d'affichage des boutons</Label>
+                <select
+                  id="buttonMode"
+                  value={formData.buttonMode}
+                  onChange={(e) => setFormData({ ...formData, buttonMode: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="subscribe">Inscription uniquement</option>
+                  <option value="unsubscribe">Désinscription uniquement</option>
+                  <option value="both">Les deux (inscription + désinscription)</option>
+                  <option value="custom">Personnalisé</option>
+                </select>
+              </div>
+
+              {formData.buttonMode === 'custom' && (
+                <div className="space-y-2">
+                  <Label htmlFor="customButtonText">Texte personnalisé du bouton</Label>
+                  <Input
+                    id="customButtonText"
+                    value={formData.customButtonText}
+                    onChange={(e) => setFormData({ ...formData, customButtonText: e.target.value })}
+                    placeholder="Ex: S'inscrire à l'événement"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>
@@ -757,6 +874,65 @@ export default function AdminEventsPage() {
                 </label>
               </div>
             </div>
+
+            {/* Options d'inscription/désinscription */}
+            <div className="space-y-3 border-t pt-4">
+              <Label className="font-semibold">Options d'inscription</Label>
+
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="edit-allowUnsubscribe"
+                  checked={formData.allowUnsubscribe ?? false}
+                  onChange={(e) => setFormData({ ...formData, allowUnsubscribe: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <label htmlFor="edit-allowUnsubscribe" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Autoriser les désinscriptions
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="edit-redUnsubscribeButton"
+                  checked={formData.redUnsubscribeButton ?? false}
+                  onChange={(e) => setFormData({ ...formData, redUnsubscribeButton: e.target.checked })}
+                  className="h-4 w-4 rounded border-gray-300"
+                  disabled={!formData.allowUnsubscribe}
+                />
+                <label htmlFor="edit-redUnsubscribeButton" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Bouton rouge pour désinscription
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-buttonMode">Mode d'affichage des boutons</Label>
+                <select
+                  id="edit-buttonMode"
+                  value={formData.buttonMode}
+                  onChange={(e) => setFormData({ ...formData, buttonMode: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                >
+                  <option value="subscribe">Inscription uniquement</option>
+                  <option value="unsubscribe">Désinscription uniquement</option>
+                  <option value="both">Les deux (inscription + désinscription)</option>
+                  <option value="custom">Personnalisé</option>
+                </select>
+              </div>
+
+              {formData.buttonMode === 'custom' && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-customButtonText">Texte personnalisé du bouton</Label>
+                  <Input
+                    id="edit-customButtonText"
+                    value={formData.customButtonText}
+                    onChange={(e) => setFormData({ ...formData, customButtonText: e.target.value })}
+                    placeholder="Ex: S'inscrire à l'événement"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditModal(false)}>
@@ -813,6 +989,17 @@ export default function AdminEventsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de détails avec inscriptions et désinscriptions */}
+      <EventDetailModal
+        open={showDetailModal}
+        onOpenChange={setShowDetailModal}
+        event={selectedEvent as any}
+        onEdit={(event) => {
+          setShowDetailModal(false);
+          openEditModal(event as unknown as Event);
+        }}
+      />
     </div>
   );
 }

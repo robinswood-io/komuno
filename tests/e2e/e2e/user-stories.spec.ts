@@ -16,7 +16,6 @@ import { test, expect } from '@playwright/test';
  * - US-PATRONS-001: Tests CRM mécènes (patron-related tests)
  * - US-LOANS-001: Tests gestion prêts (loans-related tests)
  * - US-TRACKING-001: Tests tracking métriques (tracking-related tests)
- * - US-CHATBOT-001: Chatbot analytics SQL naturel (admin-chatbot.spec.ts)
  *
  * URL de test: https://cjd80.rbw.ovh
  */

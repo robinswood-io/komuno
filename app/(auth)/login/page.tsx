@@ -10,11 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Loader2, Shield, AlertCircle, Mail, Lock } from "lucide-react";
 import { hasPermission } from "@/shared/schema";
-import { branding, getShortAppName } from '@/lib/config/branding';
+import { useBranding } from '@/contexts/BrandingContext';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function LoginPage() {
   const { user, isLoading, loginMutation } = useAuth();
+  const { branding } = useBranding();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -55,7 +56,7 @@ export default function LoginPage() {
             <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-white font-bold text-xl">CJD</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Administration {getShortAppName()}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Administration {branding?.app?.shortName || 'CJD Amiens'}</h1>
             <p className="text-gray-600">Connectez-vous pour accéder au back-office</p>
           </div>
 
@@ -170,9 +171,9 @@ export default function LoginPage() {
       <div className="flex-1 bg-primary relative overflow-hidden hidden lg:block">
         <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary"></div>
         <div className="relative z-10 flex flex-col justify-center items-center h-full text-white p-12">
-          <h2 className="text-4xl font-bold mb-6">Boîte à Kiffs</h2>
+          <h2 className="text-4xl font-bold mb-6">{branding?.app?.ideaBoxName || 'Boîte à Kiffs'}</h2>
           <p className="text-xl mb-8 text-center max-w-md">
-            La plateforme collaborative du {branding.organization.fullName}
+            La plateforme collaborative du {branding?.organization?.fullName || "Centre des Jeunes Dirigeants d'Amiens"}
           </p>
 
           <div className="space-y-6 max-w-sm">

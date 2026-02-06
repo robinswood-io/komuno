@@ -4,7 +4,7 @@ import { loginAsAdminQuick } from '../helpers/auth';
 /**
  * Tests E2E - CRM Members: Relations Management
  *
- * Page: /admin/members/relations
+ * Page: /admin/members/member-graph
  *
  * Fonctionnalités testées:
  * 1. Afficher page gestion des relations
@@ -69,7 +69,7 @@ const RELATION_TYPE_LABELS: Record<string, string> = {
 
 // Helper: Naviguer vers la page relations
 async function navigateToRelationsPage(page: Page) {
-  await page.goto(`${BASE_URL}/admin/members/relations`);
+  await page.goto(`${BASE_URL}/admin/members/member-graph`);
   await page.waitForLoadState('networkidle');
   await page.waitForTimeout(1000);
 }

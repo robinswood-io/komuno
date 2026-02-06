@@ -11,7 +11,7 @@ import type { Event } from "@/shared/schema";
 import { shareContent, isShareSupported } from "@/lib/share-utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { getShortAppName } from '@/lib/config/branding';
+import { useBranding } from '@/contexts/BrandingContext';
 import {
   getSponsorshipLevelLabel,
   getSponsorshipLevelBadgeClass,
@@ -118,6 +118,7 @@ export default function EventsSection() {
   const limit = 20;
   const { toast } = useToast();
   const { user } = useAuth();
+  const { branding } = useBranding();
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
@@ -220,7 +221,7 @@ export default function EventsSection() {
           <h2 className="text-2xl sm:text-3xl font-bold">Événements à venir</h2>
         </div>
         <p className="text-white text-base sm:text-lg opacity-90">
-          Découvrez les prochains événements de la section {getShortAppName()} et inscrivez-vous facilement
+          Découvrez les prochains événements de la section {branding?.app?.shortName || 'CJD Amiens'} et inscrivez-vous facilement
         </p>
       </div>
 

@@ -308,6 +308,7 @@ export class NotificationsService {
       projectId?: string;
       offerId?: string;
       entityType?: string;
+      entityId?: string;
       limit?: number;
       offset?: number;
     }
@@ -334,6 +335,10 @@ export class NotificationsService {
       conditions.push(eq(notifications.entityType, filters.entityType));
     }
 
+    if (filters.entityId) {
+      conditions.push(eq(notifications.entityId, filters.entityId));
+    }
+
     // Get total count
     const countResult = await this.db
       .select({ count: sql<number>`count(*)` })
@@ -352,5 +357,77 @@ export class NotificationsService {
       .offset(filters.offset || 0);
 
     return { notifications: notifs, total };
+  }
+
+  /**
+   * Get notification statistics
+   */
+  async getStatistics(): Promise<{
+    total: number;
+    unread: number;
+    read: number;
+    byType: Record<string, number>;
+    byDay: Record<string, number>;
+  }> {
+    try {
+      // Total notifications
+      const totalResult = await this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(notifications);
+      const total = totalResult[0]?.count || 0;
+
+      // Unread notifications
+      const unreadResult = await this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(notifications)
+        .where(eq(notifications.isRead, false));
+      const unread = unreadResult[0]?.count || 0;
+
+      // Read notifications
+      const read = total - unread;
+
+      // By type
+      const byTypeResult = await this.db
+        .select({
+          type: notifications.type,
+          count: sql<number>`count(*)`,
+        })
+        .from(notifications)
+        .groupBy(notifications.type);
+
+      const byType: Record<string, number> = {};
+      for (const row of byTypeResult) {
+        byType[row.type] = row.count;
+      }
+
+      // By day (last 30 days)
+      const byDayResult = await this.db
+        .select({
+          day: sql<string>`DATE(created_at)`,
+          count: sql<number>`count(*)`,
+        })
+        .from(notifications)
+        .where(
+          sql`created_at >= NOW() - INTERVAL '30 days'`
+        )
+        .groupBy(sql`DATE(created_at)`)
+        .orderBy(sql`DATE(created_at) DESC`);
+
+      const byDay: Record<string, number> = {};
+      for (const row of byDayResult) {
+        byDay[row.day] = row.count;
+      }
+
+      return {
+        total,
+        unread,
+        read,
+        byType,
+        byDay,
+      };
+    } catch (error) {
+      this.logger.error(`Erreur récupération statistiques: ${error}`);
+      throw error;
+    }
   }
 }

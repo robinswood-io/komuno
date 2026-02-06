@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
-import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from '../auth/guards/auth.guard';
 import {
   Notification,
   InsertNotification,
@@ -28,7 +28,7 @@ interface AuthRequest extends Request {
 @ApiTags('notifications')
 @ApiBearerAuth()
 @Controller('api/notifications')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 

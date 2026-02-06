@@ -94,7 +94,6 @@ async function bootstrap() {
     .addTag('tracking', 'Suivi et alertes')
     .addTag('admin', 'Administration')
     .addTag('branding', 'Configuration branding')
-    .addTag('chatbot', 'Chatbot IA')
     .addTag('features', 'Gestion des fonctionnalités')
     .addTag('health', 'Health check et monitoring')
     .addBearerAuth()

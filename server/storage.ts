@@ -32,6 +32,7 @@ import {
   financialBudgets,
   financialExpenses,
   financialForecasts,
+  financialRevenues,
   type Admin, 
   type InsertAdmin,
   type User,
@@ -86,6 +87,7 @@ import {
   type FinancialBudget,
   type FinancialExpense,
   type FinancialForecast,
+  type FinancialRevenue,
   type InsertFinancialCategory,
   type UpdateFinancialCategory,
   type InsertFinancialBudget,
@@ -94,6 +96,9 @@ import {
   type UpdateFinancialExpense,
   type InsertFinancialForecast,
   type UpdateFinancialForecast,
+  type InsertFinancialRevenue,
+  type UpdateFinancialRevenue,
+  type UpdateMemberSubscription,
   insertFinancialCategorySchema,
   updateFinancialCategorySchema,
   insertFinancialBudgetSchema,
@@ -102,6 +107,21 @@ import {
   updateFinancialExpenseSchema,
   insertFinancialForecastSchema,
   updateFinancialForecastSchema,
+  insertMemberSubscriptionSchema,
+  updateMemberSubscriptionSchema,
+  insertFinancialRevenueSchema,
+  updateFinancialRevenueSchema,
+  subscriptionTypeSchema,
+  insertSubscriptionTypeSchema,
+  updateSubscriptionTypeSchema,
+  assignSubscriptionSchema,
+  renewSubscriptionSchema,
+  subscriptionTypes,
+  type SubscriptionType,
+  type InsertSubscriptionType,
+  type UpdateSubscriptionType,
+  type AssignSubscription,
+  type RenewSubscription,
   type Result,
   ValidationError,
   DuplicateError,
@@ -468,6 +488,53 @@ export interface IStorage {
   getForecasts(options?: { period?: string; year?: number; category?: string }): Promise<Result<FinancialForecast[]>>;
   updateForecast(id: string, data: z.infer<typeof updateFinancialForecastSchema>): Promise<Result<FinancialForecast>>;
   generateForecasts(period: string, year: number): Promise<Result<FinancialForecast[]>>;
+
+  // Member subscriptions (cotisations)
+  getSubscriptions(options?: { year?: number; status?: string; memberEmail?: string }): Promise<Result<MemberSubscription[]>>;
+  getSubscriptionById(id: string): Promise<Result<MemberSubscription | null>>;
+  createSubscriptionRecord(subscription: z.infer<typeof insertMemberSubscriptionSchema>): Promise<Result<MemberSubscription>>;
+  updateSubscription(id: string, data: z.infer<typeof updateMemberSubscriptionSchema>): Promise<Result<MemberSubscription>>;
+  deleteSubscription(id: string): Promise<Result<void>>;
+  getSubscriptionStats(year?: number): Promise<Result<{
+    totalAmount: number;
+    activeMembers: number;
+    expiringMembersCount: number;
+    renewalRate: number;
+    byType: Array<{ type: string; count: number; total: number }>;
+  }>>;
+
+  // Subscription Types - Gestion des types de cotisations
+  getSubscriptionTypes(includeInactive: boolean): Promise<Result<z.infer<typeof subscriptionTypeSchema>[]>>;
+  getSubscriptionTypeById(id: string): Promise<Result<z.infer<typeof subscriptionTypeSchema> | null>>;
+  createSubscriptionType(data: unknown): Promise<Result<z.infer<typeof subscriptionTypeSchema>>>;
+  updateSubscriptionType(id: string, data: unknown): Promise<Result<z.infer<typeof subscriptionTypeSchema>>>;
+  deleteSubscriptionType(id: string): Promise<Result<void>>;
+  getMembersBySubscriptionType(typeId: string): Promise<Result<MemberSubscription[]>>;
+
+  // Subscription Assignment - Attribution et gestion des cotisations
+  assignSubscriptionToMember(data: unknown): Promise<Result<MemberSubscription>>;
+  revokeSubscription(id: string): Promise<Result<void>>;
+  renewSubscription(data: unknown): Promise<Result<MemberSubscription>>;
+
+  // Financial revenues (dons, subventions, parrainages)
+  getRevenues(options?: { year?: number; type?: string; categoryId?: string }): Promise<Result<FinancialRevenue[]>>;
+  getRevenueById(id: string): Promise<Result<FinancialRevenue | null>>;
+  createRevenue(revenue: z.infer<typeof insertFinancialRevenueSchema>): Promise<Result<FinancialRevenue>>;
+  updateRevenue(id: string, data: z.infer<typeof updateFinancialRevenueSchema>): Promise<Result<FinancialRevenue>>;
+  deleteRevenue(id: string): Promise<Result<void>>;
+  getRevenueStats(year?: number): Promise<Result<{
+    totalAmount: number;
+    countByType: Array<{ type: string; count: number; total: number }>;
+    topDonors: Array<{ name: string; total: number }>;
+  }>>;
+
+  // Financial dashboard
+  getDashboardOverview(year?: number): Promise<Result<{
+    subscriptions: { total: number; activeMembers: number };
+    revenues: { total: number; byType: { donations: number; grants: number; sponsorships: number } };
+    expenses: { total: number; count: number };
+    treasury: { balance: number; trend: 'up' | 'down' | 'stable' };
+  }>>;
 
   // Extended KPIs and Reports
   getFinancialKPIsExtended(period?: string, year?: number): Promise<Result<{
@@ -5244,13 +5311,13 @@ export class DatabaseStorage implements IStorage {
       // Calculer les moyennes historiques par catégorie
       const incomeCategories = await db.select().from(financialCategories)
         .where(sql`${financialCategories.type} = 'income'`);
-      
+
       const generatedForecasts: FinancialForecast[] = [];
-      
+
       for (const category of incomeCategories) {
         let historicalAmount = 0;
         let historicalCount = 0;
-        
+
         // Calculer moyenne historique pour cette catégorie
         if (category.name.includes('Souscriptions') || category.name.includes('souscriptions')) {
           // Moyenne des souscriptions
@@ -5258,7 +5325,7 @@ export class DatabaseStorage implements IStorage {
             const subDate = new Date(s.createdAt);
             return subDate.getFullYear() < year; // Données historiques
           });
-          
+
           if (relevantSubs.length > 0) {
             historicalAmount = relevantSubs.reduce((sum, s) => sum + s.amountInCents, 0);
             historicalCount = relevantSubs.length;
@@ -5269,17 +5336,17 @@ export class DatabaseStorage implements IStorage {
             const spDate = new Date(s.createdAt);
             return spDate.getFullYear() < year; // Données historiques
           });
-          
+
           if (relevantSponsorships.length > 0) {
             historicalAmount = relevantSponsorships.reduce((sum, s) => sum + s.amount, 0);
             historicalCount = relevantSponsorships.length;
           }
         }
-        
+
         // Calculer la prévision (moyenne historique ajustée)
         const averageAmount = historicalCount > 0 ? Math.round(historicalAmount / historicalCount) : 0;
         const forecastedAmount = averageAmount; // Peut être ajusté avec facteur de croissance
-        
+
         // Déterminer le niveau de confiance
         let confidence: 'high' | 'medium' | 'low' = 'medium';
         if (historicalCount >= 12) {
@@ -5287,7 +5354,7 @@ export class DatabaseStorage implements IStorage {
         } else if (historicalCount < 3) {
           confidence = 'low';
         }
-        
+
         // Créer la prévision
         const forecast: z.infer<typeof insertFinancialForecastSchema> = {
           category: category.id,
@@ -5301,18 +5368,651 @@ export class DatabaseStorage implements IStorage {
           notes: `Généré automatiquement basé sur ${historicalCount} données historiques`,
           createdBy: 'system',
         };
-        
+
         const [newForecast] = await db.insert(financialForecasts).values({
           ...forecast,
           updatedAt: new Date(),
         }).returning();
-        
+
         generatedForecasts.push(newForecast);
       }
-      
+
       return { success: true, data: generatedForecasts };
     } catch (error) {
       return { success: false, error: new DatabaseError(`Erreur lors de la génération des prévisions: ${error}`) };
+    }
+  }
+
+  // ===== Member Subscriptions (Cotisations) =====
+
+  async getSubscriptions(options?: { year?: number; status?: string; memberEmail?: string }): Promise<Result<MemberSubscription[]>> {
+    try {
+      const allSubscriptions = await db.select().from(memberSubscriptions);
+
+      let filtered = allSubscriptions;
+
+      if (options?.year) {
+        filtered = filtered.filter(s => {
+          const startYear = new Date(s.startDate).getFullYear();
+          const endYear = new Date(s.endDate).getFullYear();
+          return startYear === options.year || endYear === options.year;
+        });
+      }
+
+      if (options?.status) {
+        filtered = filtered.filter(s => s.status === options.status);
+      }
+
+      if (options?.memberEmail) {
+        filtered = filtered.filter(s => s.memberEmail === options.memberEmail);
+      }
+
+      return { success: true, data: filtered };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération des cotisations: ${error}`) };
+    }
+  }
+
+  async getSubscriptionById(id: string): Promise<Result<MemberSubscription | null>> {
+    try {
+      const subscriptions = await db.select().from(memberSubscriptions);
+      const subscription = subscriptions.find(s => s.id === parseInt(id, 10));
+      return { success: true, data: subscription || null };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération de la cotisation: ${error}`) };
+    }
+  }
+
+  async createSubscriptionRecord(subscription: z.infer<typeof insertMemberSubscriptionSchema>): Promise<Result<MemberSubscription>> {
+    try {
+      const [newSubscription] = await db.insert(memberSubscriptions).values(subscription).returning();
+      return { success: true, data: newSubscription };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la création de la cotisation: ${error}`) };
+    }
+  }
+
+  async updateSubscription(id: string, data: z.infer<typeof updateMemberSubscriptionSchema>): Promise<Result<MemberSubscription>> {
+    try {
+      const [updated] = await db.update(memberSubscriptions)
+        .set(data)
+        .where(eq(memberSubscriptions.id, parseInt(id, 10)))
+        .returning();
+
+      if (!updated) {
+        return { success: false, error: new NotFoundError('Cotisation non trouvée') };
+      }
+
+      return { success: true, data: updated };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la mise à jour de la cotisation: ${error}`) };
+    }
+  }
+
+  async deleteSubscription(id: string): Promise<Result<void>> {
+    try {
+      await db.delete(memberSubscriptions).where(eq(memberSubscriptions.id, parseInt(id, 10)));
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la suppression de la cotisation: ${error}`) };
+    }
+  }
+
+  async getSubscriptionStats(year?: number): Promise<Result<{
+    totalAmount: number;
+    activeMembers: number;
+    expiringMembersCount: number;
+    renewalRate: number;
+    byType: Array<{ type: string; count: number; total: number }>;
+  }>> {
+    try {
+      const currentYear = year || new Date().getFullYear();
+      const allSubscriptions = await db.select().from(memberSubscriptions);
+
+      const yearSubscriptions = allSubscriptions.filter(s => {
+        const startYear = new Date(s.startDate).getFullYear();
+        const endYear = new Date(s.endDate).getFullYear();
+        return startYear === currentYear || endYear === currentYear;
+      });
+
+      const now = new Date();
+      const activeSubscriptions = yearSubscriptions.filter(s => {
+        const start = new Date(s.startDate);
+        const end = new Date(s.endDate);
+        return start <= now && end >= now && s.status === 'active';
+      });
+
+      const threeMonthsFromNow = new Date(now);
+      threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+      const expiringSubscriptions = activeSubscriptions.filter(s => {
+        const end = new Date(s.endDate);
+        return end <= threeMonthsFromNow && end > now;
+      });
+
+      const totalAmount = yearSubscriptions.reduce((sum, s) => sum + s.amountInCents, 0);
+      const uniqueMembers = new Set(activeSubscriptions.map(s => s.memberEmail));
+
+      const byType = Object.entries(
+        yearSubscriptions.reduce((acc, s) => {
+          acc[s.subscriptionType] = acc[s.subscriptionType] || { count: 0, total: 0 };
+          acc[s.subscriptionType].count++;
+          acc[s.subscriptionType].total += s.amountInCents;
+          return acc;
+        }, {} as Record<string, { count: number; total: number }>)
+      ).map(([type, data]) => ({ type, count: data.count, total: data.total }));
+
+      const previousYearSubs = allSubscriptions.filter(s => {
+        const endYear = new Date(s.endDate).getFullYear();
+        return endYear === currentYear - 1;
+      });
+      const renewedMembers = yearSubscriptions.filter(s => {
+        return previousYearSubs.some(prev => prev.memberEmail === s.memberEmail);
+      });
+      const renewalRate = previousYearSubs.length > 0
+        ? (renewedMembers.length / previousYearSubs.length) * 100
+        : 0;
+
+      return {
+        success: true,
+        data: {
+          totalAmount,
+          activeMembers: uniqueMembers.size,
+          expiringMembersCount: expiringSubscriptions.length,
+          renewalRate: Math.round(renewalRate * 100) / 100,
+          byType,
+        },
+      };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors du calcul des statistiques des cotisations: ${error}`) };
+    }
+  }
+
+  // ===== Subscription Types - Gestion des types de cotisations =====
+
+  async getSubscriptionTypes(includeInactive: boolean): Promise<Result<SubscriptionType[]>> {
+    try {
+      let query = db.select().from(subscriptionTypes);
+
+      if (!includeInactive) {
+        query = query.where(eq(subscriptionTypes.isActive, true));
+      }
+
+      const types = await query.orderBy(asc(subscriptionTypes.name));
+
+      // Transform dates to ISO strings
+      const formattedTypes = types.map(type => ({
+        ...type,
+        createdAt: type.createdAt.toISOString(),
+        updatedAt: type.updatedAt.toISOString(),
+      }));
+
+      return { success: true, data: formattedTypes };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération des types de cotisations: ${error}`) };
+    }
+  }
+
+  async getSubscriptionTypeById(id: string): Promise<Result<SubscriptionType | null>> {
+    try {
+      const [type] = await db
+        .select()
+        .from(subscriptionTypes)
+        .where(eq(subscriptionTypes.id, id));
+
+      if (!type) {
+        return { success: false, error: new NotFoundError('Type de cotisation non trouvé') };
+      }
+
+      // Transform dates to ISO strings
+      const formattedType = {
+        ...type,
+        createdAt: type.createdAt.toISOString(),
+        updatedAt: type.updatedAt.toISOString(),
+      };
+
+      return { success: true, data: formattedType };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération du type de cotisation: ${error}`) };
+    }
+  }
+
+  async createSubscriptionType(data: unknown): Promise<Result<SubscriptionType>> {
+    try {
+      // Validate with Zod
+      const validation = insertSubscriptionTypeSchema.safeParse(data);
+      if (!validation.success) {
+        return { success: false, error: new ValidationError(`Validation échouée: ${validation.error.message}`) };
+      }
+
+      const [type] = await db
+        .insert(subscriptionTypes)
+        .values(validation.data)
+        .returning();
+
+      // Transform dates to ISO strings
+      const formattedType = {
+        ...type,
+        createdAt: type.createdAt.toISOString(),
+        updatedAt: type.updatedAt.toISOString(),
+      };
+
+      return { success: true, data: formattedType };
+    } catch (error: any) {
+      if (error.message?.includes('unique') || error.code === '23505') {
+        return { success: false, error: new DuplicateError('Un type de cotisation avec ce nom existe déjà') };
+      }
+      return { success: false, error: new DatabaseError(`Erreur lors de la création du type de cotisation: ${error}`) };
+    }
+  }
+
+  async updateSubscriptionType(id: string, data: unknown): Promise<Result<SubscriptionType>> {
+    try {
+      // Validate with Zod
+      const validation = updateSubscriptionTypeSchema.safeParse(data);
+      if (!validation.success) {
+        return { success: false, error: new ValidationError(`Validation échouée: ${validation.error.message}`) };
+      }
+
+      const [updated] = await db
+        .update(subscriptionTypes)
+        .set({ ...validation.data, updatedAt: new Date() })
+        .where(eq(subscriptionTypes.id, id))
+        .returning();
+
+      if (!updated) {
+        return { success: false, error: new NotFoundError('Type de cotisation non trouvé') };
+      }
+
+      // Transform dates to ISO strings
+      const formattedType = {
+        ...updated,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      };
+
+      return { success: true, data: formattedType };
+    } catch (error: any) {
+      if (error.message?.includes('unique') || error.code === '23505') {
+        return { success: false, error: new DuplicateError('Un type de cotisation avec ce nom existe déjà') };
+      }
+      return { success: false, error: new DatabaseError(`Erreur lors de la mise à jour du type de cotisation: ${error}`) };
+    }
+  }
+
+  async deleteSubscriptionType(id: string): Promise<Result<void>> {
+    try {
+      // Check if type is used by active subscriptions
+      const activeCount = await db
+        .select({ count: count() })
+        .from(memberSubscriptions)
+        .where(
+          and(
+            eq(memberSubscriptions.subscriptionTypeId, id),
+            eq(memberSubscriptions.status, 'active')
+          )
+        );
+
+      const activeSubsCount = activeCount[0]?.count || 0;
+      if (activeSubsCount > 0) {
+        return {
+          success: false,
+          error: new ValidationError(
+            `Impossible de supprimer: ${activeSubsCount} cotisation(s) active(s) utilisent ce type. Désactivez-le plutôt.`
+          )
+        };
+      }
+
+      const result = await db
+        .delete(subscriptionTypes)
+        .where(eq(subscriptionTypes.id, id));
+
+      if (result.rowCount === 0) {
+        return { success: false, error: new NotFoundError('Type de cotisation non trouvé') };
+      }
+
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la suppression du type de cotisation: ${error}`) };
+    }
+  }
+
+  async getMembersBySubscriptionType(typeId: string): Promise<Result<MemberSubscription[]>> {
+    try {
+      const subscriptions = await db
+        .select()
+        .from(memberSubscriptions)
+        .where(eq(memberSubscriptions.subscriptionTypeId, typeId))
+        .orderBy(desc(memberSubscriptions.createdAt));
+
+      return { success: true, data: subscriptions };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération des cotisations: ${error}`) };
+    }
+  }
+
+  // ===== Subscription Assignment - Attribution et gestion des cotisations =====
+
+  async assignSubscriptionToMember(data: unknown): Promise<Result<MemberSubscription>> {
+    try {
+      // Validate with Zod
+      const validation = assignSubscriptionSchema.safeParse(data);
+      if (!validation.success) {
+        return { success: false, error: new ValidationError(`Validation échouée: ${validation.error.message}`) };
+      }
+
+      // Get subscription type details
+      const typeResult = await this.getSubscriptionTypeById(validation.data.subscriptionTypeId);
+      if (!typeResult.success) {
+        return { success: false, error: new ValidationError('Type de cotisation invalide') };
+      }
+      const type = typeResult.data;
+
+      // Calculate end date based on duration
+      const startDate = new Date(validation.data.startDate);
+      const endDate = new Date(startDate);
+      switch (type.durationType) {
+        case 'monthly':
+          endDate.setMonth(endDate.getMonth() + 1);
+          break;
+        case 'quarterly':
+          endDate.setMonth(endDate.getMonth() + 3);
+          break;
+        case 'yearly':
+          endDate.setFullYear(endDate.getFullYear() + 1);
+          break;
+      }
+
+      // Create subscription
+      const subscriptionData = {
+        memberName: validation.data.memberName,
+        memberEmail: validation.data.memberEmail,
+        subscriptionType: type.name, // Keep for compatibility
+        subscriptionTypeId: type.id,
+        amountInCents: type.amountInCents, // Copy from type
+        durationType: type.durationType, // Copy from type
+        paymentDate: validation.data.startDate,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        status: 'active',
+        paymentMethod: validation.data.paymentMethod || 'bank_transfer',
+        notes: validation.data.notes,
+        createdBy: validation.data.assignedBy,
+      };
+
+      const [subscription] = await db
+        .insert(memberSubscriptions)
+        .values(subscriptionData)
+        .returning();
+
+      return { success: true, data: subscription };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de l'attribution de la cotisation: ${error}`) };
+    }
+  }
+
+  async revokeSubscription(id: string): Promise<Result<void>> {
+    try {
+      const [updated] = await db
+        .update(memberSubscriptions)
+        .set({
+          status: 'revoked',
+          notes: `Révoquée le ${new Date().toISOString()}`,
+        })
+        .where(eq(memberSubscriptions.id, parseInt(id, 10)))
+        .returning();
+
+      if (!updated) {
+        return { success: false, error: new NotFoundError('Cotisation non trouvée') };
+      }
+
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la révocation de la cotisation: ${error}`) };
+    }
+  }
+
+  async renewSubscription(data: unknown): Promise<Result<MemberSubscription>> {
+    try {
+      // Validate with Zod
+      const validation = renewSubscriptionSchema.safeParse(data);
+      if (!validation.success) {
+        return { success: false, error: new ValidationError(`Validation échouée: ${validation.error.message}`) };
+      }
+
+      // Get existing subscription
+      const [subscription] = await db
+        .select()
+        .from(memberSubscriptions)
+        .where(eq(memberSubscriptions.id, validation.data.subscriptionId));
+
+      if (!subscription) {
+        return { success: false, error: new NotFoundError('Cotisation non trouvée') };
+      }
+
+      // Calculate new end date
+      const currentEnd = new Date(subscription.endDate);
+      const newEnd = new Date(currentEnd);
+      switch (subscription.durationType) {
+        case 'monthly':
+          newEnd.setMonth(newEnd.getMonth() + 1);
+          break;
+        case 'quarterly':
+          newEnd.setMonth(newEnd.getMonth() + 3);
+          break;
+        case 'yearly':
+          newEnd.setFullYear(newEnd.getFullYear() + 1);
+          break;
+      }
+
+      // Update subscription
+      const [updated] = await db
+        .update(memberSubscriptions)
+        .set({
+          endDate: newEnd.toISOString(),
+          status: 'active',
+          paymentMethod: validation.data.paymentMethod || subscription.paymentMethod,
+          notes: `Renouvelée le ${new Date().toISOString()}. ${validation.data.notes || ''}`,
+        })
+        .where(eq(memberSubscriptions.id, validation.data.subscriptionId))
+        .returning();
+
+      return { success: true, data: updated! };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors du renouvellement de la cotisation: ${error}`) };
+    }
+  }
+
+  // ===== Financial Revenues (Dons, Subventions, Parrainages) =====
+
+  async getRevenues(options?: { year?: number; type?: string; categoryId?: string }): Promise<Result<FinancialRevenue[]>> {
+    try {
+      const allRevenues = await db.select().from(financialRevenues);
+
+      let filtered = allRevenues;
+
+      if (options?.year) {
+        filtered = filtered.filter(r => {
+          const revenueYear = new Date(r.revenueDate).getFullYear();
+          return revenueYear === options.year;
+        });
+      }
+
+      if (options?.type) {
+        filtered = filtered.filter(r => r.type === options.type);
+      }
+
+      return { success: true, data: filtered };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération des revenus: ${error}`) };
+    }
+  }
+
+  async getRevenueById(id: string): Promise<Result<FinancialRevenue | null>> {
+    try {
+      const revenues = await db.select().from(financialRevenues);
+      const revenue = revenues.find(r => r.id === id);
+      return { success: true, data: revenue || null };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération du revenu: ${error}`) };
+    }
+  }
+
+  async createRevenue(revenue: z.infer<typeof insertFinancialRevenueSchema>): Promise<Result<FinancialRevenue>> {
+    try {
+      const [newRevenue] = await db.insert(financialRevenues).values({
+        ...revenue,
+        updatedAt: new Date(),
+      }).returning();
+      return { success: true, data: newRevenue };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la création du revenu: ${error}`) };
+    }
+  }
+
+  async updateRevenue(id: string, data: z.infer<typeof updateFinancialRevenueSchema>): Promise<Result<FinancialRevenue>> {
+    try {
+      const [updated] = await db.update(financialRevenues)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(financialRevenues.id, id))
+        .returning();
+
+      if (!updated) {
+        return { success: false, error: new NotFoundError('Revenu non trouvé') };
+      }
+
+      return { success: true, data: updated };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la mise à jour du revenu: ${error}`) };
+    }
+  }
+
+  async deleteRevenue(id: string): Promise<Result<void>> {
+    try {
+      await db.delete(financialRevenues).where(eq(financialRevenues.id, id));
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la suppression du revenu: ${error}`) };
+    }
+  }
+
+  async getRevenueStats(year?: number): Promise<Result<{
+    totalAmount: number;
+    countByType: Array<{ type: string; count: number; total: number }>;
+    topDonors: Array<{ name: string; total: number }>;
+  }>> {
+    try {
+      const currentYear = year || new Date().getFullYear();
+      const allRevenues = await db.select().from(financialRevenues);
+
+      const yearRevenues = allRevenues.filter(r => {
+        const revenueYear = new Date(r.revenueDate).getFullYear();
+        return revenueYear === currentYear && r.status === 'confirmed';
+      });
+
+      const totalAmount = yearRevenues.reduce((sum, r) => sum + r.amountInCents, 0);
+
+      const countByType = Object.entries(
+        yearRevenues.reduce((acc, r) => {
+          acc[r.type] = acc[r.type] || { count: 0, total: 0 };
+          acc[r.type].count++;
+          acc[r.type].total += r.amountInCents;
+          return acc;
+        }, {} as Record<string, { count: number; total: number }>)
+      ).map(([type, data]) => ({ type, count: data.count, total: data.total }));
+
+      const donorTotals = yearRevenues
+        .filter(r => r.memberEmail)
+        .reduce((acc, r) => {
+          if (r.memberEmail) {
+            acc[r.memberEmail] = (acc[r.memberEmail] || 0) + r.amountInCents;
+          }
+          return acc;
+        }, {} as Record<string, number>);
+
+      const topDonors = Object.entries(donorTotals)
+        .map(([name, total]) => ({ name, total }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10);
+
+      return {
+        success: true,
+        data: {
+          totalAmount,
+          countByType,
+          topDonors,
+        },
+      };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors du calcul des statistiques des revenus: ${error}`) };
+    }
+  }
+
+  // ===== Financial Dashboard =====
+
+  async getDashboardOverview(year?: number): Promise<Result<{
+    subscriptions: { total: number; activeMembers: number };
+    revenues: { total: number; byType: { donations: number; grants: number; sponsorships: number } };
+    expenses: { total: number; count: number };
+    treasury: { balance: number; trend: 'up' | 'down' | 'stable' };
+  }>> {
+    try {
+      const currentYear = year || new Date().getFullYear();
+
+      const subscriptionStats = await this.getSubscriptionStats(currentYear);
+      const revenueStats = await this.getRevenueStats(currentYear);
+      const expenseStats = await this.getExpenseStats(undefined, currentYear);
+
+      if (!subscriptionStats.success || !revenueStats.success || !expenseStats.success) {
+        return { success: false, error: new DatabaseError('Erreur lors de la récupération des statistiques') };
+      }
+
+      const revenuesByType = revenueStats.data.countByType.reduce((acc, item) => {
+        if (item.type === 'donation') acc.donations = item.total;
+        if (item.type === 'grant') acc.grants = item.total;
+        if (item.type === 'sponsorship') acc.sponsorships = item.total;
+        return acc;
+      }, { donations: 0, grants: 0, sponsorships: 0 });
+
+      const totalRevenues = subscriptionStats.data.totalAmount + revenueStats.data.totalAmount;
+      const totalExpenses = expenseStats.data.totalAmount;
+      const balance = totalRevenues - totalExpenses;
+
+      const previousYearStats = await this.getExpenseStats(undefined, currentYear - 1);
+      const previousYearRevenueStats = await this.getRevenueStats(currentYear - 1);
+      const previousYearSubStats = await this.getSubscriptionStats(currentYear - 1);
+
+      let trend: 'up' | 'down' | 'stable' = 'stable';
+      if (previousYearStats.success && previousYearRevenueStats.success && previousYearSubStats.success) {
+        const previousBalance =
+          (previousYearSubStats.data.totalAmount + previousYearRevenueStats.data.totalAmount) -
+          previousYearStats.data.totalAmount;
+        if (balance > previousBalance * 1.05) trend = 'up';
+        else if (balance < previousBalance * 0.95) trend = 'down';
+      }
+
+      return {
+        success: true,
+        data: {
+          subscriptions: {
+            total: subscriptionStats.data.totalAmount,
+            activeMembers: subscriptionStats.data.activeMembers,
+          },
+          revenues: {
+            total: revenueStats.data.totalAmount,
+            byType: revenuesByType,
+          },
+          expenses: {
+            total: expenseStats.data.totalAmount,
+            count: expenseStats.data.totalExpenses,
+          },
+          treasury: {
+            balance,
+            trend,
+          },
+        },
+      };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la génération du tableau de bord: ${error}`) };
     }
   }
 

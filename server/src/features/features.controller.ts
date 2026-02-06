@@ -58,7 +58,7 @@ export class FeaturesController {
   @Get(':featureKey')
   @SkipThrottle()
   @ApiOperation({ summary: 'Obtenir une fonctionnalité par clé (publique)' })
-  @ApiParam({ name: 'featureKey', description: 'Clé de la fonctionnalité', example: 'chatbot' })
+  @ApiParam({ name: 'featureKey', description: 'Clé de la fonctionnalité', example: 'notifications' })
   @ApiResponse({ status: 200, description: 'Détails de la fonctionnalité' })
   @ApiResponse({ status: 404, description: 'Fonctionnalité non trouvée' })
   async getFeature(@Param('featureKey') featureKey: string) {
@@ -88,7 +88,7 @@ export class FeaturesController {
   @Permissions('admin.manage')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Activer/désactiver une fonctionnalité (admin)' })
-  @ApiParam({ name: 'featureKey', description: 'Clé de la fonctionnalité', example: 'chatbot' })
+  @ApiParam({ name: 'featureKey', description: 'Clé de la fonctionnalité', example: 'notifications' })
   @ApiBody({
     schema: {
       type: 'object',

@@ -40,32 +40,28 @@ export function RelationGraphView({
   const graphTheme = theme === 'dark' ? darkTheme : lightTheme;
 
   return (
-    <div className="w-full h-[600px] rounded-lg border border-input overflow-hidden bg-background">
+    <div className="w-full h-[600px] rounded-lg border border-input overflow-hidden bg-background relative">
       {nodes.length > 0 ? (
-        <GraphCanvas
-          nodes={nodes}
-          edges={edges}
-          layoutType="forceDirected2d"
-          theme={graphTheme}
-          onNodeClick={handleNodeClick}
-          onNodePointerOver={handleNodePointerOver}
-          onNodePointerOut={handleNodePointerOut}
-          cameraMode="pan"
-          // Configuration de la simulation force-directed
-          // @ts-expect-error - Reagraph types may be incomplete
-          springConfig={{
-            strength: 0.1,
-            distance: 120,
-            friction: 0.85,
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            position: 'absolute',
+            top: 0,
+            left: 0
           }}
-          // Activer les labels
-          labelType="all"
-          // Zoom et pan
-          minDistance={5}
-          maxDistance={500}
-          // Drag nodes
-          draggable
-        />
+          className="[&>canvas]:!max-w-full [&>canvas]:!max-h-full [&>canvas]:!w-full [&>canvas]:!h-full"
+        >
+          <GraphCanvas
+            nodes={nodes}
+            edges={edges}
+            layoutType="forceDirected2d"
+            theme={graphTheme}
+            onNodeClick={handleNodeClick}
+            onNodePointerOver={handleNodePointerOver}
+            onNodePointerOut={handleNodePointerOut}
+          />
+        </div>
       ) : (
         <div className="flex items-center justify-center h-full text-muted-foreground">
           <div className="text-center">

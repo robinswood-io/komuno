@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { brandingCore } from '@/lib/config/branding-core';
+import { DynamicTitle } from '@/components/dynamic-title';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -14,9 +15,10 @@ export const viewport: Viewport = {
   themeColor: brandingCore.colors.primary,
 };
 
+// Métadonnées par défaut - seront mises à jour dynamiquement par DynamicTitle
 export const metadata: Metadata = {
-  title: 'CJD Amiens - Boîte à Kiffs',
-  description: 'Application collaborative pour le CJD Amiens',
+  title: brandingCore.app.name,
+  description: brandingCore.app.description,
   manifest: '/manifest.json',
   icons: {
     icon: '/logo-cjd.png',
@@ -32,7 +34,10 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>{children}</Providers>
+        <Providers>
+          <DynamicTitle />
+          {children}
+        </Providers>
       </body>
     </html>
   );

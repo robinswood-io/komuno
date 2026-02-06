@@ -50,7 +50,7 @@ export default registerAs('app', () => ({
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',
   vapidSubject: process.env.VAPID_SUBJECT || 'mailto:admin@cjd-amiens.fr',
 
-  // OpenAI (Chatbot)
+  // OpenAI
   openaiApiKey: process.env.OPENAI_API_KEY || '',
 
   // Tracking

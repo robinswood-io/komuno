@@ -9,7 +9,7 @@ test.describe('Test Page Relations (Authentifié)', () => {
     await loginAsAdminQuick(page, BASE_URL);
 
     // Navigation vers la page Relations
-    await page.goto(`${BASE_URL}/admin/members/relations`);
+    await page.goto(`${BASE_URL}/admin/members/member-graph`);
 
     // Attendre que la page soit chargée
     await page.waitForLoadState('domcontentloaded');
@@ -22,7 +22,7 @@ test.describe('Test Page Relations (Authentifié)', () => {
 
   test('devrait afficher les onglets Graphe et Tableau', async ({ page }) => {
     await loginAsAdminQuick(page, BASE_URL);
-    await page.goto(`${BASE_URL}/admin/members/relations`);
+    await page.goto(`${BASE_URL}/admin/members/member-graph`);
     await page.waitForLoadState('domcontentloaded');
 
     // Attendre un peu pour le rendu
@@ -37,7 +37,7 @@ test.describe('Test Page Relations (Authentifié)', () => {
 
   test('devrait afficher du contenu dans l\'onglet Graphe', async ({ page }) => {
     await loginAsAdminQuick(page, BASE_URL);
-    await page.goto(`${BASE_URL}/admin/members/relations`);
+    await page.goto(`${BASE_URL}/admin/members/member-graph`);
     await page.waitForLoadState('domcontentloaded');
 
     // Attendre que le contenu charge
@@ -63,7 +63,7 @@ test.describe('Test Page Relations (Authentifié)', () => {
     });
 
     await loginAsAdminQuick(page, BASE_URL);
-    await page.goto(`${BASE_URL}/admin/members/relations`);
+    await page.goto(`${BASE_URL}/admin/members/member-graph`);
     await page.waitForLoadState('domcontentloaded');
 
     // Attendre un peu pour voir si des erreurs apparaissent

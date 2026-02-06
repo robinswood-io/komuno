@@ -20,14 +20,15 @@ import {
   CheckSquare,
   Link2,
   BarChart3,
-  Bot,
   Activity,
   ClipboardList,
   Palette,
+  Bell,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState } from 'react';
+import { NotificationBell } from './notification-bell';
 
 interface NavItem {
   title: string;
@@ -55,18 +56,13 @@ const navItems: (NavItem | NavSection)[] = [
         icon: Users,
       },
       {
-        title: 'Tags',
-        href: '/admin/members/tags',
-        icon: Tag,
-      },
-      {
         title: 'Tâches',
         href: '/admin/members/tasks',
         icon: CheckSquare,
       },
       {
         title: 'Relations',
-        href: '/admin/members/relations',
+        href: '/admin/members/member-graph',
         icon: Link2,
       },
       {
@@ -105,14 +101,14 @@ const navItems: (NavItem | NavSection)[] = [
     title: 'Outils',
     items: [
       {
+        title: 'Notifications',
+        href: '/admin/notifications',
+        icon: Bell,
+      },
+      {
         title: 'Tracking',
         href: '/admin/tracking',
         icon: Activity,
-      },
-      {
-        title: 'Chatbot',
-        href: '/admin/chatbot',
-        icon: Bot,
       },
       {
         title: 'Demandes dev',
@@ -169,18 +165,21 @@ export function AdminSidebar() {
               <span className="font-bold text-sidebar-foreground">Admin</span>
             </div>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn('h-8 w-8', isCollapsed && 'mx-auto')}
-            onClick={() => setIsCollapsed(!isCollapsed)}
-          >
-            {isCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
         {!isCollapsed && user && (

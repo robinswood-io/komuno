@@ -9,6 +9,10 @@ import {
   updateFinancialCategorySchema,
   insertFinancialForecastSchema,
   updateFinancialForecastSchema,
+  insertMemberSubscriptionSchema,
+  updateMemberSubscriptionSchema,
+  insertFinancialRevenueSchema,
+  updateFinancialRevenueSchema,
 } from '../../../shared/schema';
 import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
@@ -287,6 +291,224 @@ export class FinancialService {
 
   async getFinancialReport(type: 'monthly' | 'quarterly' | 'yearly', period: number, year: number) {
     const result = await this.storageService.instance.getFinancialReport(type, period, year);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  // ===== Routes Subscriptions =====
+
+  async getSubscriptions(options?: { year?: number; status?: string; memberEmail?: string }) {
+    const result = await this.storageService.instance.getSubscriptions(options);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async getSubscriptionById(id: string) {
+    const result = await this.storageService.instance.getSubscriptionById(id);
+    if (!result.success) {
+      throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async createSubscription(data: unknown) {
+    try {
+      const validated = insertMemberSubscriptionSchema.parse(data);
+      const result = await this.storageService.instance.createSubscriptionRecord(validated);
+      if (!result.success) {
+        throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException(fromZodError(error).toString());
+      }
+      throw error;
+    }
+  }
+
+  async updateSubscription(id: string, data: unknown) {
+    try {
+      const validated = updateMemberSubscriptionSchema.parse(data);
+      const result = await this.storageService.instance.updateSubscription(id, validated);
+      if (!result.success) {
+        throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException(fromZodError(error).toString());
+      }
+      throw error;
+    }
+  }
+
+  async deleteSubscription(id: string) {
+    const result = await this.storageService.instance.deleteSubscription(id);
+    if (!result.success) {
+      throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true };
+  }
+
+  async getSubscriptionStats(year?: number) {
+    const result = await this.storageService.instance.getSubscriptionStats(year);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  // ===== Routes Revenues =====
+
+  async getRevenues(options?: { year?: number; type?: string; categoryId?: string }) {
+    const result = await this.storageService.instance.getRevenues(options);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async getRevenueById(id: string) {
+    const result = await this.storageService.instance.getRevenueById(id);
+    if (!result.success) {
+      throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async createRevenue(data: unknown) {
+    try {
+      const validated = insertFinancialRevenueSchema.parse(data);
+      const result = await this.storageService.instance.createRevenue(validated);
+      if (!result.success) {
+        throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException(fromZodError(error).toString());
+      }
+      throw error;
+    }
+  }
+
+  async updateRevenue(id: string, data: unknown) {
+    try {
+      const validated = updateFinancialRevenueSchema.parse(data);
+      const result = await this.storageService.instance.updateRevenue(id, validated);
+      if (!result.success) {
+        throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException(fromZodError(error).toString());
+      }
+      throw error;
+    }
+  }
+
+  async deleteRevenue(id: string) {
+    const result = await this.storageService.instance.deleteRevenue(id);
+    if (!result.success) {
+      throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true };
+  }
+
+  async getRevenueStats(year?: number) {
+    const result = await this.storageService.instance.getRevenueStats(year);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  // ===== Routes Dashboard =====
+
+  async getDashboardOverview(year?: number) {
+    const result = await this.storageService.instance.getDashboardOverview(year);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  // ===== Routes Subscription Types =====
+
+  async getSubscriptionTypes(includeInactive = false) {
+    const result = await this.storageService.instance.getSubscriptionTypes(includeInactive);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async getSubscriptionTypeById(id: string) {
+    const result = await this.storageService.instance.getSubscriptionTypeById(id);
+    if (!result.success) {
+      throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async createSubscriptionType(data: unknown) {
+    const result = await this.storageService.instance.createSubscriptionType(data);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async updateSubscriptionType(id: string, data: unknown) {
+    const result = await this.storageService.instance.updateSubscriptionType(id, data);
+    if (!result.success) {
+      throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async deleteSubscriptionType(id: string) {
+    const result = await this.storageService.instance.deleteSubscriptionType(id);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true };
+  }
+
+  async getMembersBySubscriptionType(typeId: string) {
+    const result = await this.storageService.instance.getMembersBySubscriptionType(typeId);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  // ===== Routes Subscription Assignment =====
+
+  async assignSubscriptionToMember(data: unknown) {
+    const result = await this.storageService.instance.assignSubscriptionToMember(data);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async revokeSubscription(id: string) {
+    const result = await this.storageService.instance.revokeSubscription(id);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true };
+  }
+
+  async renewSubscription(data: unknown) {
+    const result = await this.storageService.instance.renewSubscription(data);
     if (!result.success) {
       throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
     }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys, type PaginatedResponse } from '@/lib/api/client';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +16,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, UserPlus, Eye, Download, BarChart3 } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, UserPlus, Eye, Download, BarChart3, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import {
@@ -26,6 +27,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { AddMemberDialog } from './add-member-dialog';
 import { MemberDetailsSheet } from './member-details-sheet';
@@ -53,6 +64,34 @@ interface EditMemberFormData {
   cjdRole?: string;
   notes?: string;
 }
+
+interface MemberTag {
+  id: string;
+  name: string;
+  color: string;
+  description?: string;
+  createdAt: string;
+  _count?: {
+    assignments: number;
+  };
+}
+
+interface TagFormData {
+  name: string;
+  color: string;
+  description?: string;
+}
+
+const DEFAULT_COLORS = [
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#10b981', // green
+  '#f59e0b', // amber
+  '#8b5cf6', // purple
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#f97316', // orange
+];
 
 /**
  * Fonction helper pour exporter les membres en CSV
@@ -133,6 +172,7 @@ function exportToCSV(members: Member[]): void {
 export default function AdminMembersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'proposed'>('all');
@@ -150,6 +190,19 @@ export default function AdminMembersPage() {
     cjdRole: '',
     notes: '',
   });
+
+  // Tags management states
+  const [tagsDialogOpen, setTagsDialogOpen] = useState(false);
+  const [tagFormDialogOpen, setTagFormDialogOpen] = useState(false);
+  const [tagAlertOpen, setTagAlertOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<MemberTag | null>(null);
+  const [tagToDelete, setTagToDelete] = useState<MemberTag | null>(null);
+  const [tagFormData, setTagFormData] = useState<TagFormData>({
+    name: '',
+    color: '#3b82f6',
+    description: '',
+  });
+  const [tagFormErrors, setTagFormErrors] = useState<Partial<TagFormData>>({});
 
   // Query pour lister les membres
   const { data, isLoading, error } = useQuery({
@@ -286,6 +339,180 @@ export default function AdminMembersPage() {
     },
   });
 
+  // Query pour lister tous les tags
+  const { data: tags = [], isLoading: isLoadingTags } = useQuery({
+    queryKey: queryKeys.members.tags.all,
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: MemberTag[] }>('/api/admin/tags');
+      return response.data;
+    },
+    enabled: tagsDialogOpen,
+  });
+
+  // Mutation pour créer un tag
+  const createTagMutation = useMutation({
+    mutationFn: (data: TagFormData) =>
+      api.post('/api/admin/tags', {
+        name: data.name.trim(),
+        color: data.color,
+        description: data.description?.trim() || undefined,
+      }),
+    onSuccess: () => {
+      toast({
+        title: 'Tag créé',
+        description: 'Le tag a été créé avec succès',
+      });
+      queryClient.refetchQueries({ queryKey: queryKeys.members.tags.all });
+      resetTagForm();
+      setTagFormDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erreur',
+        description: error.message || 'Erreur lors de la création du tag',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Mutation pour mettre à jour un tag
+  const updateTagMutation = useMutation({
+    mutationFn: (data: { id: string; updates: Partial<TagFormData> }) =>
+      api.patch(`/api/admin/tags/${data.id}`, {
+        name: data.updates.name?.trim(),
+        color: data.updates.color,
+        description: data.updates.description?.trim() || undefined,
+      }),
+    onSuccess: () => {
+      toast({
+        title: 'Tag modifié',
+        description: 'Le tag a été modifié avec succès',
+      });
+      queryClient.refetchQueries({ queryKey: queryKeys.members.tags.all });
+      resetTagForm();
+      setEditingTag(null);
+      setTagFormDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erreur',
+        description: error.message || 'Erreur lors de la modification du tag',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Mutation pour supprimer un tag
+  const deleteTagMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/admin/tags/${id}`),
+    onSuccess: () => {
+      toast({
+        title: 'Tag supprimé',
+        description: 'Le tag a été supprimé avec succès',
+      });
+      queryClient.refetchQueries({ queryKey: queryKeys.members.tags.all });
+      setTagToDelete(null);
+      setTagAlertOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Erreur',
+        description: error.message || 'Erreur lors de la suppression du tag',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Tag management functions
+  const resetTagForm = () => {
+    setTagFormData({
+      name: '',
+      color: '#3b82f6',
+      description: '',
+    });
+    setTagFormErrors({});
+  };
+
+  const validateTagForm = (): boolean => {
+    const newErrors: Partial<TagFormData> = {};
+
+    if (!tagFormData.name.trim()) {
+      newErrors.name = 'Le nom du tag est requis';
+    } else if (tagFormData.name.trim().length < 2) {
+      newErrors.name = 'Le nom doit contenir au moins 2 caractères';
+    } else if (tagFormData.name.trim().length > 50) {
+      newErrors.name = 'Le nom ne peut pas dépasser 50 caractères';
+    }
+
+    const tagWithSameName = tags.some(
+      tag => tag.name.toLowerCase() === tagFormData.name.trim().toLowerCase() &&
+             (!editingTag || tag.id !== editingTag.id)
+    );
+    if (tagWithSameName) {
+      newErrors.name = 'Un tag avec ce nom existe déjà';
+    }
+
+    if (!tagFormData.color) {
+      newErrors.color = 'La couleur est requise';
+    }
+
+    setTagFormErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleTagInputChange = (field: keyof TagFormData, value: string) => {
+    setTagFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+    if (tagFormErrors[field]) {
+      setTagFormErrors((prev) => ({
+        ...prev,
+        [field]: undefined,
+      }));
+    }
+  };
+
+  const handleTagSubmit = () => {
+    if (validateTagForm()) {
+      if (editingTag) {
+        updateTagMutation.mutate({
+          id: editingTag.id,
+          updates: tagFormData,
+        });
+      } else {
+        createTagMutation.mutate(tagFormData);
+      }
+    }
+  };
+
+  const openCreateTagDialog = () => {
+    setEditingTag(null);
+    resetTagForm();
+    setTagFormDialogOpen(true);
+  };
+
+  const openEditTagDialog = (tag: MemberTag) => {
+    setEditingTag(tag);
+    setTagFormData({
+      name: tag.name,
+      color: tag.color,
+      description: tag.description || '',
+    });
+    setTagFormDialogOpen(true);
+  };
+
+  const openDeleteTagConfirm = (tag: MemberTag) => {
+    setTagToDelete(tag);
+    setTagAlertOpen(true);
+  };
+
+  const handleDeleteTag = () => {
+    if (tagToDelete) {
+      deleteTagMutation.mutate(tagToDelete.id);
+    }
+  };
+
   // Filtrés les membres selon le statut sélectionné
   const filteredMembers = data?.data?.filter(member => {
     if (statusFilter === 'all') return true;
@@ -332,6 +559,10 @@ export default function AdminMembersPage() {
               Statistiques
             </Button>
           </Link>
+          <Button variant="outline" onClick={() => setTagsDialogOpen(true)}>
+            <Tag className="h-4 w-4 mr-2" />
+            Gérer les tags
+          </Button>
           <Button variant="outline" onClick={handleExportCSV}>
             <Download className="h-4 w-4 mr-2" />
             Exporter CSV
@@ -410,8 +641,7 @@ export default function AdminMembersPage() {
                     key={member.email}
                     className="cursor-pointer hover:bg-muted/50 transition-colors"
                     onClick={() => {
-                      setDetailsEmail(member.email);
-                      setDetailsSheetOpen(true);
+                      router.push(`/admin/members/${encodeURIComponent(member.email)}`);
                     }}
                   >
                     <TableCell className="font-medium">
@@ -710,6 +940,298 @@ export default function AdminMembersPage() {
         isConvertingToActive={convertToActiveMutation.isPending}
         isDeletingMember={deleteMutation.isPending}
       />
+
+      {/* Dialog Gestion des Tags */}
+      <Dialog open={tagsDialogOpen} onOpenChange={setTagsDialogOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5" />
+              Gestion des Tags
+            </DialogTitle>
+            <DialogDescription>
+              Créez et gérez les tags personnalisés pour les membres
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-muted-foreground">
+                {tags.length} tag{tags.length !== 1 ? 's' : ''} disponible{tags.length !== 1 ? 's' : ''}
+              </p>
+              <Button size="sm" onClick={openCreateTagDialog}>
+                <Plus className="h-4 w-4 mr-2" />
+                Créer un tag
+              </Button>
+            </div>
+
+            {isLoadingTags && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {!isLoadingTags && tags.length === 0 && (
+              <div className="text-center py-12">
+                <Tag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground mb-4">Aucun tag créé pour le moment</p>
+                <Button onClick={openCreateTagDialog} variant="outline">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Créer le premier tag
+                </Button>
+              </div>
+            )}
+
+            {!isLoadingTags && tags.length > 0 && (
+              <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-1/3">Nom</TableHead>
+                      <TableHead className="w-1/3">Couleur</TableHead>
+                      <TableHead className="w-1/6">Utilisations</TableHead>
+                      <TableHead className="w-1/6 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tags.map((tag) => (
+                      <TableRow key={tag.id}>
+                        <TableCell className="font-medium">{tag.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-6 h-6 rounded-md border"
+                              style={{ backgroundColor: tag.color }}
+                              title={tag.color}
+                            />
+                            <span className="text-sm text-muted-foreground font-mono">
+                              {tag.color}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {tag._count?.assignments ?? 0}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEditTagDialog(tag)}
+                            title="Modifier le tag"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openDeleteTagConfirm(tag)}
+                            title="Supprimer le tag"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTagsDialogOpen(false)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Création/Édition Tag */}
+      <Dialog open={tagFormDialogOpen} onOpenChange={setTagFormDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTag ? 'Modifier le tag' : 'Créer un nouveau tag'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingTag
+                ? 'Modifiez les informations du tag'
+                : 'Créez un nouveau tag personnalisé pour les membres'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            {/* Nom */}
+            <div className="grid gap-2">
+              <Label htmlFor="tag-name" className="flex items-center gap-1">
+                Nom du tag <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="tag-name"
+                name="tag-name"
+                placeholder="ex: VIP, Ambassadeur, Contributeur"
+                value={tagFormData.name}
+                onChange={(e) => handleTagInputChange('name', e.target.value)}
+                disabled={createTagMutation.isPending || updateTagMutation.isPending}
+                maxLength={50}
+              />
+              {tagFormErrors.name && (
+                <p className="text-xs text-destructive">{tagFormErrors.name}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {tagFormData.name.length}/50 caractères
+              </p>
+            </div>
+
+            {/* Couleur */}
+            <div className="grid gap-2">
+              <Label className="flex items-center gap-1">
+                Couleur du tag <span className="text-destructive">*</span>
+              </Label>
+
+              {/* Color Picker - Grid de couleurs */}
+              <div className="grid grid-cols-4 gap-3">
+                {DEFAULT_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`w-12 h-12 rounded-lg border-2 transition-all ${
+                      tagFormData.color === color
+                        ? 'border-foreground ring-2 ring-ring'
+                        : 'border-transparent hover:border-muted-foreground'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => handleTagInputChange('color', color)}
+                    title={color}
+                    disabled={createTagMutation.isPending || updateTagMutation.isPending}
+                  />
+                ))}
+              </div>
+
+              {/* Custom Color Input */}
+              <div className="flex items-center gap-2">
+                <Label htmlFor="customColor" className="text-xs">
+                  Hex personnalisé:
+                </Label>
+                <Input
+                  id="customColor"
+                  type="text"
+                  placeholder="#000000"
+                  value={tagFormData.color}
+                  onChange={(e) => handleTagInputChange('color', e.target.value)}
+                  disabled={createTagMutation.isPending || updateTagMutation.isPending}
+                  className="font-mono flex-1"
+                  pattern="^#[0-9A-Fa-f]{6}$"
+                  maxLength={7}
+                />
+              </div>
+
+              {tagFormErrors.color && (
+                <p className="text-xs text-destructive">{tagFormErrors.color}</p>
+              )}
+            </div>
+
+            {/* Description (Optionnel) */}
+            <div className="grid gap-2">
+              <Label htmlFor="tag-description">Description (optionnel)</Label>
+              <Input
+                id="tag-description"
+                placeholder="ex: Clients très importants"
+                value={tagFormData.description}
+                onChange={(e) => handleTagInputChange('description', e.target.value)}
+                disabled={createTagMutation.isPending || updateTagMutation.isPending}
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground">
+                {tagFormData.description?.length ?? 0}/500 caractères
+              </p>
+            </div>
+
+            {/* Prévisualisation */}
+            <div className="grid gap-2">
+              <Label>Prévisualisation</Label>
+              <div className="p-4 bg-muted rounded-lg flex items-center gap-2">
+                <Badge style={{ backgroundColor: tagFormData.color }} className="text-white">
+                  {tagFormData.name || 'Tag name'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                resetTagForm();
+                setEditingTag(null);
+                setTagFormDialogOpen(false);
+              }}
+              disabled={createTagMutation.isPending || updateTagMutation.isPending}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              onClick={handleTagSubmit}
+              disabled={
+                createTagMutation.isPending || updateTagMutation.isPending ||
+                !tagFormData.name.trim()
+              }
+            >
+              {(createTagMutation.isPending || updateTagMutation.isPending) && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {createTagMutation.isPending || updateTagMutation.isPending
+                ? 'Traitement en cours...'
+                : editingTag
+                ? 'Modifier le tag'
+                : 'Créer le tag'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Dialog Suppression Tag */}
+      <AlertDialog open={tagAlertOpen} onOpenChange={setTagAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le tag ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer le tag{' '}
+              <span className="font-semibold">"{tagToDelete?.name}"</span> ?
+              {tagToDelete?._count?.assignments ? (
+                <>
+                  <br />
+                  <span className="text-amber-600">
+                    Attention: Ce tag est actuellement assigné à{' '}
+                    <span className="font-semibold">{tagToDelete._count.assignments}</span> membre
+                    {tagToDelete._count.assignments > 1 ? 's' : ''}.
+                  </span>
+                </>
+              ) : null}
+              Cette action ne peut pas être annulée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteTagMutation.isPending}>
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTag}
+              disabled={deleteTagMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteTagMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              {deleteTagMutation.isPending ? 'Suppression...' : 'Supprimer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

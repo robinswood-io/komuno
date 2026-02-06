@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useBranding } from '@/contexts/BrandingContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,13 +34,14 @@ interface Feature {
  */
 export default function AdminFeaturesPage() {
   const { toast } = useToast();
+  const { branding } = useBranding();
   const [isSaving, setIsSaving] = useState(false);
 
   // Features de l'application (mock pour démonstration)
   const [features, setFeatures] = useState<Feature[]>([
     {
       id: 'ideas',
-      name: 'Boîte à Kiffs',
+      name: branding?.app?.ideaBoxName || 'Boîte à Kiffs',
       description: 'Système de proposition et vote d\'idées',
       icon: Lightbulb,
       enabled: true,
@@ -78,28 +80,12 @@ export default function AdminFeaturesPage() {
       category: 'engagement',
     },
     {
-      id: 'auth_oauth',
-      name: 'Authentification OAuth',
-      description: 'Connexion via Authentik (OAuth2/OIDC)',
-      icon: Shield,
-      enabled: true,
-      category: 'security',
-    },
-    {
       id: 'branding',
       name: 'Personnalisation',
       description: 'Configuration du branding et des couleurs',
       icon: Palette,
       enabled: true,
       category: 'customization',
-    },
-    {
-      id: 'ai_chatbot',
-      name: 'Chatbot IA',
-      description: 'Assistant virtuel pour les utilisateurs',
-      icon: Sparkles,
-      enabled: false,
-      category: 'ai',
     },
   ]);
 

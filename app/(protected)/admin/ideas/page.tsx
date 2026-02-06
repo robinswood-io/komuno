@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys, type PaginatedResponse } from '@/lib/api/client';
 import { useToast } from '@/hooks/use-toast';
+import { useBranding } from '@/contexts/BrandingContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,6 +54,7 @@ interface Idea {
  */
 export default function AdminIdeasPage() {
   const { toast } = useToast();
+  const { branding } = useBranding();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<IdeaStatus | 'all'>('all');
@@ -510,7 +512,7 @@ export default function AdminIdeasPage() {
           <DialogHeader>
             <DialogTitle>Créer une nouvelle idée</DialogTitle>
             <DialogDescription>
-              Ajoutez une nouvelle idée à la boîte à kiffs
+              Ajoutez une nouvelle idée à {branding?.app?.ideaBoxName?.toLowerCase() || 'la boîte à kiffs'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

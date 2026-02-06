@@ -1,0 +1,26 @@
+{
+  "name": "CJD Amiens - Boîte à Kiffs",
+  "short_name": "CJD Amiens",
+  "description": "Application collaborative pour le partage d'idées et la gestion d'événements",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#00a844",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "social"],
+  "lang": "fr-FR"
+}

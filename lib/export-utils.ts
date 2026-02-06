@@ -142,3 +142,128 @@ export function formatExportBoolean(value: boolean | null | undefined): string {
   if (value == null) return '';
   return value ? 'Oui' : 'Non';
 }
+
+// ============================================
+// Fonctions spécifiques pour CJD80
+// ============================================
+
+export interface Vote {
+  id: string;
+  voterName: string;
+  voterEmail: string;
+  createdAt: string;
+}
+
+export interface Inscription {
+  id: string;
+  name: string;
+  email: string;
+  company?: string | null;
+  phone?: string | null;
+  comments?: string | null;
+  createdAt: string;
+}
+
+export interface Unsubscription {
+  id: string;
+  name: string;
+  email: string;
+  comments?: string | null;
+  createdAt: string;
+}
+
+/**
+ * Export des votants (PDF ou Excel)
+ */
+export function exportVoters(
+  ideaTitle: string,
+  votes: Vote[],
+  format: 'pdf' | 'excel'
+) {
+  const filename = `votants-${ideaTitle.slice(0, 30).replace(/[^a-z0-9]/gi, '-')}-${Date.now()}`;
+  const exportOptions: ExportOptions = {
+    filename,
+    title: `Liste des Votants - ${ideaTitle}`,
+    columns: [
+      { header: 'N°', accessor: 'index' },
+      { header: 'Nom', accessor: 'voterName' },
+      { header: 'Email', accessor: 'voterEmail' },
+      { header: 'Date de vote', accessor: 'createdAt', format: (value) =>
+        new Date(value).toLocaleDateString('fr-FR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      },
+    ],
+    data: votes.map((vote, index) => ({ ...vote, index: index + 1 })),
+  };
+
+  if (format === 'pdf') {
+    exportToPDF(exportOptions);
+  } else {
+    exportToExcel(exportOptions);
+  }
+}
+
+/**
+ * Export des inscriptions (PDF ou Excel)
+ */
+export function exportInscriptions(
+  eventTitle: string,
+  inscriptions: Inscription[],
+  format: 'pdf' | 'excel'
+) {
+  const filename = `inscrits-${eventTitle.slice(0, 30).replace(/[^a-z0-9]/gi, '-')}-${Date.now()}`;
+  const exportOptions: ExportOptions = {
+    filename,
+    title: `Liste des Inscrits - ${eventTitle}`,
+    columns: [
+      { header: 'N°', accessor: 'index' },
+      { header: 'Nom', accessor: 'name' },
+      { header: 'Email', accessor: 'email' },
+      { header: 'Entreprise', accessor: 'company', format: (value) => value || '-' },
+      { header: 'Téléphone', accessor: 'phone', format: (value) => value || '-' },
+      { header: 'Commentaires', accessor: 'comments', format: (value) => value || '-' },
+      { header: 'Date d\'inscription', accessor: 'createdAt', format: formatExportDate },
+    ],
+    data: inscriptions.map((inscription, index) => ({ ...inscription, index: index + 1 })),
+  };
+
+  if (format === 'pdf') {
+    exportToPDF(exportOptions);
+  } else {
+    exportToExcel(exportOptions);
+  }
+}
+
+/**
+ * Export des désinscriptions (PDF ou Excel)
+ */
+export function exportUnsubscriptions(
+  eventTitle: string,
+  unsubscriptions: Unsubscription[],
+  format: 'pdf' | 'excel'
+) {
+  const filename = `absences-${eventTitle.slice(0, 30).replace(/[^a-z0-9]/gi, '-')}-${Date.now()}`;
+  const exportOptions: ExportOptions = {
+    filename,
+    title: `Liste des Absences - ${eventTitle}`,
+    columns: [
+      { header: 'N°', accessor: 'index' },
+      { header: 'Nom', accessor: 'name' },
+      { header: 'Email', accessor: 'email' },
+      { header: 'Raison de l\'absence', accessor: 'comments', format: (value) => value || '-' },
+      { header: 'Date de déclaration', accessor: 'createdAt', format: formatExportDate },
+    ],
+    data: unsubscriptions.map((unsub, index) => ({ ...unsub, index: index + 1 })),
+  };
+
+  if (format === 'pdf') {
+    exportToPDF(exportOptions);
+  } else {
+    exportToExcel(exportOptions);
+  }
+}

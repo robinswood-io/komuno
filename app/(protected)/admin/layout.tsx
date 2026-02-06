@@ -39,7 +39,6 @@ export default function AdminLayout({
       content: 'Contenu',
       finance: 'Finance',
       tracking: 'Tracking',
-      chatbot: 'Chatbot',
       'development-requests': 'Demandes dev',
       branding: 'Branding',
     };

@@ -11,7 +11,6 @@ import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { IdeasModule } from './ideas/ideas.module';
 import { EventsModule } from './events/events.module';
-import { ChatbotModule } from './chatbot/chatbot.module';
 import { SetupModule } from './setup/setup.module';
 import { BrandingModule } from './branding/branding.module';
 import { AdminModule } from './admin/admin.module';
@@ -58,7 +57,6 @@ const throttlerLimit = isDevelopment ? 10000 : 100;
     HealthModule,
     IdeasModule,
     EventsModule,
-    ChatbotModule,
     SetupModule,
     BrandingModule,
     AdminModule,

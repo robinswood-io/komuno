@@ -194,3 +194,7 @@ deploy.sh.local
 local-*.sh
 # Claude Code local settings
 .claude/settings.json
+
+# Archives de documentation (rapports temporaires)
+docs/archives/
+

@@ -170,6 +170,10 @@ export const queryKeys = {
     all: ['admin'] as const,
     stats: () => ['admin', 'stats'] as const,
     users: () => ['admin', 'users'] as const,
+    administrators: {
+      all: ['admin', 'administrators'] as const,
+      list: () => ['admin', 'administrators', 'list'] as const,
+    },
   },
 
   // Auth
@@ -200,4 +204,29 @@ export interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+}
+
+// Administrator types
+export interface Administrator {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: 'super_admin' | 'ideas_reader' | 'ideas_manager' | 'events_reader' | 'events_manager';
+  status: 'pending' | 'active' | 'inactive';
+  isActive: boolean;
+  addedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAdminFormData {
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+}
+
+export interface EditAdminFormData {
+  firstName: string;
+  lastName: string;
 }

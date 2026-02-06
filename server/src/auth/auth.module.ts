@@ -6,6 +6,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { DevLoginStrategy } from './strategies/dev-login.strategy';
 import { PasswordService } from './password.service';
 import { PasswordResetService } from './password-reset.service';
+import { JwtAuthGuard } from './guards/auth.guard';
 import { StorageModule } from '../common/storage/storage.module';
 import session from 'express-session';
 import { StorageService } from '../common/storage/storage.service';
@@ -32,6 +33,7 @@ if (devLoginEnabled) {
     AuthService,
     PasswordService,
     PasswordResetService,
+    JwtAuthGuard,
     LocalStrategy,
     // Charger DevLoginStrategy si activé (dev uniquement)
     ...(devLoginEnabled ? [DevLoginStrategy] : []),
@@ -66,6 +68,6 @@ if (devLoginEnabled) {
       useValue: 'local',
     },
   ],
-  exports: [AuthService, PasswordService, PasswordResetService, PassportModule, 'SESSION_CONFIG', 'AUTH_MODE'],
+  exports: [AuthService, PasswordService, PasswordResetService, JwtAuthGuard, PassportModule, 'SESSION_CONFIG', 'AUTH_MODE'],
 })
 export class AuthModule {}

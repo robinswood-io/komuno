@@ -8,6 +8,27 @@
       "when": 1769443634525,
       "tag": "0000_fearless_stepford_cuckoos",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770215914346,
+      "tag": "0001_melted_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770305259862,
+      "tag": "0002_add_location_and_sector_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770305259863,
+      "tag": "0003_subscription_types",
+      "breakpoints": true
     }
   ]
 }

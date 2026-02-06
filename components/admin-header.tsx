@@ -27,7 +27,7 @@ import {
   TrendingDown,
   FileText,
 } from "lucide-react";
-import { getShortAppName } from '@/lib/config/branding';
+import { useBranding } from '@/contexts/BrandingContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +46,7 @@ interface MenuItem {
 
 export default function AdminHeader() {
   const { user, logoutMutation } = useAuth();
+  const { branding } = useBranding();
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -118,7 +119,7 @@ export default function AdminHeader() {
             <Shield className="w-8 h-8 text-primary" data-testid="icon-admin-shield" />
             <div>
               <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-admin-title">
-                {getShortAppName()} - Administration
+                {branding?.app?.shortName || 'CJD Amiens'} - Administration
               </h1>
               <p className="text-gray-300 text-sm" data-testid="text-admin-subtitle">Espace de gestion</p>
             </div>
