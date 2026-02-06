@@ -115,17 +115,17 @@ jobs:
       - name: Deploy to REP server
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.REP_HOST }}
-          username: ${{ secrets.REP_SSH_USER }}
-          key: ${{ secrets.REP_SSH_KEY }}
-          port: 22
+          host: ${{ secrets.REP_HOST || secrets.VPS_HOST }}
+          username: ${{ secrets.REP_SSH_USER || secrets.VPS_USER }}
+          key: ${{ secrets.REP_SSH_KEY || secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.REP_PORT || secrets.VPS_PORT }}
           script: |
             set -e
-            mkdir -p /srv/workspace/rep
-            cd /srv/workspace/rep
+            cd /home/thibault
             echo "${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${{ github.repository }}:latest
-            docker compose down || true
-            docker compose up -d
+            docker compose -f docker-compose.apps.yml stop rep || true
+            docker compose -f docker-compose.apps.yml rm -f rep || true
+            docker compose -f docker-compose.apps.yml up -d rep
             sleep 15
             docker ps | grep rep
