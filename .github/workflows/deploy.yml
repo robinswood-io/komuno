@@ -1,737 +1,131 @@
-name: 🚀 Deploy Multi-Servers
+name: Build and Deploy
 
 on:
   push:
     branches:
       - main
-    tags:
-      - 'v*.*.*'  # Tags sémantiques (v1.0.0, v1.2.3, etc.)
+      - production
   workflow_dispatch:
     inputs:
-      server:
-        description: 'Serveur spécifique à déployer (laisser vide pour tous)'
-        required: false
+      environment:
+        description: 'Environment to deploy'
+        required: true
         type: choice
         options:
-          - all
-          - server1
-          - server2
-        default: all
+          - cjd80
+          - rep
+          - both
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # ============================================================================
-  # Job 1: Build & Push Docker Image (une seule fois)
-  # ============================================================================
-  build-and-push:
-    name: 🏗️ Build & Push Docker Image
+  build:
+    name: Build Docker Image
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
-    
+
     outputs:
-      image_tag: ${{ steps.image-tag.outputs.tag }}
-      image_digest: ${{ steps.build.outputs.digest }}
-      image_latest: ${{ steps.image-tag.outputs.latest }}
-    
+      image-tag: ${{ steps.meta.outputs.tags }}
+
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: 🔧 Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      
-      - name: 📦 Install dependencies
-        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
-      
-      - name: ✅ Run type checks
-        run: npm run check
-      
-      - name: 🏗️ Run production build
-        run: npm run build
-      
-      - name: 🐳 Set up Docker Buildx
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-      
-      - name: 🔐 Log in to GitHub Container Registry
+
+      - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: 🏷️ Generate image tags
-        id: image-tag
-        run: |
-          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          
-          # Détecter si c'est un push sur tag ou sur branche
-          if [ "${{ github.event_name }}" = "push" ] && [ -n "${{ github.ref }}" ] && echo "${{ github.ref }}" | grep -q "refs/tags/"; then
-            # C'est un tag Git - utiliser le nom du tag
-            GIT_TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\///')
-            # Nettoyer le tag (enlever le préfixe 'v' si présent pour le tag Docker)
-            DOCKER_TAG=$(echo "$GIT_TAG" | sed 's/^v//')
-            TAG="${{ env.REGISTRY }}/${REPO_LOWER}:${DOCKER_TAG}"
-            # Garder aussi le tag avec 'v' pour compatibilité
-            TAG_WITH_V="${{ env.REGISTRY }}/${REPO_LOWER}:${GIT_TAG}"
-            LATEST_TAG="${{ env.REGISTRY }}/${REPO_LOWER}:latest"
-            echo "tag=${TAG}" >> $GITHUB_OUTPUT
-            echo "tag_with_v=${TAG_WITH_V}" >> $GITHUB_OUTPUT
-            echo "git_tag=${GIT_TAG}" >> $GITHUB_OUTPUT
-            echo "latest=${LATEST_TAG}" >> $GITHUB_OUTPUT
-            echo "🏷️ Git tag détecté: ${GIT_TAG}"
-            echo "🏷️ Image tag: ${TAG}"
-            echo "🏷️ Image tag (avec v): ${TAG_WITH_V}"
-            echo "🏷️ Latest tag: ${LATEST_TAG}"
-          else
-            # C'est un push sur branche - utiliser le SHA
-            SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-            TAG="${{ env.REGISTRY }}/${REPO_LOWER}:main-${SHORT_SHA}"
-            LATEST_TAG="${{ env.REGISTRY }}/${REPO_LOWER}:latest"
-            echo "tag=${TAG}" >> $GITHUB_OUTPUT
-            echo "tag_with_v=${TAG}" >> $GITHUB_OUTPUT
-            echo "git_tag=main-${SHORT_SHA}" >> $GITHUB_OUTPUT
-            echo "latest=${LATEST_TAG}" >> $GITHUB_OUTPUT
-            echo "🏷️ Push sur branche détecté (SHA: ${SHORT_SHA})"
-            echo "🏷️ Image tag: ${TAG}"
-            echo "🏷️ Latest tag: ${LATEST_TAG}"
-          fi
-      
-      - name: 🐳 Build and push Docker image
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: |
-            ${{ steps.image-tag.outputs.tag }}
-            ${{ steps.image-tag.outputs.tag_with_v }}
-            ${{ steps.image-tag.outputs.latest }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-            GIT_TAG=${{ steps.image-tag.outputs.git_tag }}
-            GIT_TAG=${{ steps.image-tag.outputs.git_tag }}
 
-  # ============================================================================
-  # Job 2: Deploy to Multiple Servers (Matrix Strategy)
-  # ============================================================================
-  deploy:
-    name: 🚀 Deploy to ${{ matrix.server_name }}
-    needs: build-and-push
+  deploy-cjd80:
+    name: Deploy to CJD80
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
-    # Stratégie matrix pour déployer sur plusieurs serveurs
-    strategy:
-      fail-fast: false  # Continuer même si un serveur échoue
-      matrix:
-        server_name: [server1, server2]
-          # Ajoutez d'autres serveurs ici : [server1, server2, server3]
-    
-    # Filtrer les serveurs si un serveur spécifique est demandé
-    # Déclencher sur push main, tags, ou workflow_dispatch
-    # Note: La condition if avec matrix n'est pas supportée directement, on filtre dans le job
-    if: github.event.inputs.server == 'all' || github.event.inputs.server == '' || github.event_name == 'workflow_dispatch'
-    
-    # Utiliser l'environnement GitHub pour chaque serveur
+    needs: build
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.environment == 'cjd80' || github.event.inputs.environment == 'both'))
+
     environment:
-      name: ${{ matrix.server_name == 'server1' && 'production-cjd80' || (matrix.server_name == 'server2' && 'production-rep' || format('production-{0}', matrix.server_name)) }}
-    
-    # Concurrence pour éviter les déploiements simultanés sur le même serveur
-    concurrency:
-      group: deploy-${{ matrix.server_name }}
-      cancel-in-progress: false
-    
-    steps:
-      - name: 🔍 Precheck secrets
-        id: secrets-check
-        env:
-          SERVER_NAME: ${{ matrix.server_name }}
-          # Secrets pour server1 (cjd80) - utilisent les secrets existants VPS_*
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          # Secrets pour server2 (réseau entreprendre picardie)
-          SERVER2_HOST: ${{ secrets.SERVER2_HOST }}
-          SERVER2_PORT: ${{ secrets.SERVER2_PORT }}
-          SERVER2_USER: ${{ secrets.SERVER2_USER }}
-          SERVER2_SSH_KEY: ${{ secrets.SERVER2_SSH_KEY }}
-          # Secrets pour server3 (si nécessaire plus tard)
-          SERVER3_HOST: ${{ secrets.SERVER3_HOST }}
-          SERVER3_PORT: ${{ secrets.SERVER3_PORT }}
-          SERVER3_USER: ${{ secrets.SERVER3_USER }}
-          SERVER3_SSH_KEY: ${{ secrets.SERVER3_SSH_KEY }}
-        run: |
-          set -e
-          echo "🔍 Vérification des secrets pour ${SERVER_NAME}..."
-          
-          # Déterminer les noms des secrets selon le serveur
-          # server1 = cjd80 (utilise les secrets existants VPS_*)
-          if [ "$SERVER_NAME" = "server1" ]; then
-            SERVER_HOST="$VPS_HOST"
-            SERVER_PORT="${VPS_PORT:-22}"
-            SERVER_USER="$VPS_USER"
-            SERVER_SSH_KEY="$VPS_SSH_KEY"
-            SERVER_DISPLAY_NAME="CJD Amiens (cjd80.fr)"
-          elif [ "$SERVER_NAME" = "server2" ]; then
-            SERVER_HOST="$SERVER2_HOST"
-            SERVER_PORT="${SERVER2_PORT:-22}"
-            SERVER_USER="$SERVER2_USER"
-            SERVER_SSH_KEY="$SERVER2_SSH_KEY"
-            SERVER_DISPLAY_NAME="Réseau Entreprendre Picardie"
-          elif [ "$SERVER_NAME" = "server3" ]; then
-            SERVER_HOST="$SERVER3_HOST"
-            SERVER_PORT="${SERVER3_PORT:-22}"
-            SERVER_USER="$SERVER3_USER"
-            SERVER_SSH_KEY="$SERVER3_SSH_KEY"
-            SERVER_DISPLAY_NAME="Server 3"
-          else
-            echo "::error::❌ Serveur inconnu: ${SERVER_NAME}"
-            exit 1
-          fi
-          
-          if [ -z "$SERVER_HOST" ]; then 
-            if [ "$SERVER_NAME" = "server1" ]; then
-              echo "::error::❌ Secret manquant: VPS_HOST pour ${SERVER_NAME} (CJD Amiens)"
-            else
-              echo "::error::❌ Secret manquant: SERVER${SERVER_NAME#server}_HOST pour ${SERVER_NAME}"
-            fi
-            exit 1
-          fi
-          
-          if [ -z "$SERVER_USER" ]; then 
-            if [ "$SERVER_NAME" = "server1" ]; then
-              echo "::error::❌ Secret manquant: VPS_USER pour ${SERVER_NAME} (CJD Amiens)"
-            else
-              echo "::error::❌ Secret manquant: SERVER${SERVER_NAME#server}_USER pour ${SERVER_NAME}"
-            fi
-            exit 1
-          fi
-          
-          if [ -z "$SERVER_SSH_KEY" ]; then 
-            if [ "$SERVER_NAME" = "server1" ]; then
-              echo "::error::❌ Secret manquant: VPS_SSH_KEY pour ${SERVER_NAME} (CJD Amiens)"
-            else
-              echo "::error::❌ Secret manquant: SERVER${SERVER_NAME#server}_SSH_KEY pour ${SERVER_NAME}"
-            fi
-            exit 1
-          fi
-          
-          echo "✅ Tous les secrets requis sont configurés pour ${SERVER_NAME} (${SERVER_DISPLAY_NAME})"
-          echo "   Host: $SERVER_HOST"
-          echo "   Port: ${SERVER_PORT:-22}"
-          echo "   User: $SERVER_USER"
-          
-          # Déterminer le dossier de déploiement selon le serveur
-          if [ "$SERVER_NAME" = "server1" ]; then
-            DEPLOY_DIR="/docker/cjd80"
-          elif [ "$SERVER_NAME" = "server2" ]; then
-            DEPLOY_DIR="/home/debian/docker/apps/rep"
-          else
-            DEPLOY_DIR="/docker/cjd80"  # Par défaut
-          fi
-          
-          # Sauvegarder les valeurs pour les étapes suivantes (sans les secrets)
-          echo "host=$SERVER_HOST" >> $GITHUB_OUTPUT
-          echo "port=${SERVER_PORT:-22}" >> $GITHUB_OUTPUT
-          echo "user=$SERVER_USER" >> $GITHUB_OUTPUT
-          echo "deploy_dir=$DEPLOY_DIR" >> $GITHUB_OUTPUT
-          echo "display_name=$SERVER_DISPLAY_NAME" >> $GITHUB_OUTPUT
-          
-          # Les secrets seront utilisés directement via les variables d'environnement dans les étapes suivantes
-      
-      - name: 📥 Checkout code
-        if: steps.server-check.outputs.skip != 'true'
-        uses: actions/checkout@v4
-      
-      - name: 🔐 Setup SSH
-        if: steps.server-check.outputs.skip != 'true'
-        env:
-          SERVER_NAME: ${{ matrix.server_name }}
-          # Secrets pour server1
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          # Secrets pour server2
-          SERVER2_HOST: ${{ secrets.SERVER2_HOST }}
-          SERVER2_PORT: ${{ secrets.SERVER2_PORT }}
-          SERVER2_USER: ${{ secrets.SERVER2_USER }}
-          SERVER2_SSH_KEY: ${{ secrets.SERVER2_SSH_KEY }}
-          # Secrets pour server3
-          SERVER3_HOST: ${{ secrets.SERVER3_HOST }}
-          SERVER3_PORT: ${{ secrets.SERVER3_PORT }}
-          SERVER3_USER: ${{ secrets.SERVER3_USER }}
-          SERVER3_SSH_KEY: ${{ secrets.SERVER3_SSH_KEY }}
-          # Outputs de l'étape précédente
-          SERVER_HOST: ${{ steps.secrets-check.outputs.host }}
-          SERVER_PORT: ${{ steps.secrets-check.outputs.port }}
-          SERVER_USER: ${{ steps.secrets-check.outputs.user }}
-        run: |
-          # Déterminer les secrets selon le serveur
-          if [ "$SERVER_NAME" = "server1" ]; then
-            SERVER_SSH_KEY="$VPS_SSH_KEY"
-          elif [ "$SERVER_NAME" = "server2" ]; then
-            SERVER_SSH_KEY="$SERVER2_SSH_KEY"
-          elif [ "$SERVER_NAME" = "server3" ]; then
-            SERVER_SSH_KEY="$SERVER3_SSH_KEY"
-          else
-            echo "::error::❌ Serveur inconnu: ${SERVER_NAME}"
-            exit 1
-          fi
-          
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "$SERVER_SSH_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          
-          # Ajouter le host à known_hosts pour éviter les prompts
-          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          chmod 600 ~/.ssh/known_hosts
-          
-          # Test de connexion SSH
-          echo "🔍 Test de connexion SSH..."
-          if ssh -p "$SERVER_PORT" \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            -i ~/.ssh/id_rsa \
-            "$SERVER_USER@$SERVER_HOST" \
-            "echo 'SSH connection successful'" 2>&1; then
-            echo "✅ Connexion SSH réussie"
-          else
-            echo "❌ ERREUR: Impossible de se connecter au serveur via SSH"
-            exit 1
-          fi
-      
-      - name: 🔐 Authenticate server to GHCR
-        env:
-          SERVER_HOST: ${{ steps.secrets-check.outputs.host }}
-          SERVER_PORT: ${{ steps.secrets-check.outputs.port }}
-          SERVER_USER: ${{ steps.secrets-check.outputs.user }}
-        run: |
-          echo "🔐 Authentification de ${{ matrix.server_name }} à GHCR..."
-          MAX_RETRIES=3
-          RETRY=0
-          AUTH_SUCCESS=false
-          
-          while [ $RETRY -lt $MAX_RETRIES ]; do
-            if ssh -p "$SERVER_PORT" \
-              -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              -o ConnectTimeout=10 \
-              -i ~/.ssh/id_rsa \
-              "$SERVER_USER@$SERVER_HOST" \
-              "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin" 2>&1; then
-              echo "✅ Authentification GHCR réussie"
-              AUTH_SUCCESS=true
-              break
-            else
-              RETRY=$((RETRY + 1))
-              if [ $RETRY -lt $MAX_RETRIES ]; then
-                echo "⚠️  Échec de l'authentification (tentative $RETRY/$MAX_RETRIES), nouvelle tentative dans 2s..."
-                sleep 2
-              fi
-            fi
-          done
-          
-          if [ "$AUTH_SUCCESS" = false ]; then
-            echo "⚠️  Authentification GHCR échouée après $MAX_RETRIES tentatives, mais on continue..."
-            echo "   L'image peut déjà être en cache ou accessible publiquement"
-          fi
-      
-      - name: 🧹 Cleanup server (free disk space)
-        env:
-          SERVER_HOST: ${{ steps.secrets-check.outputs.host }}
-          SERVER_PORT: ${{ steps.secrets-check.outputs.port }}
-          SERVER_USER: ${{ steps.secrets-check.outputs.user }}
-        run: |
-          echo "🧹 Nettoyage du serveur pour libérer de l'espace disque..."
-          ssh -p "$SERVER_PORT" \
-            -i ~/.ssh/id_rsa \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            "$SERVER_USER@$SERVER_HOST" \
-            'bash -s' << 'ENDSSH'
-          set -e
-          
-          echo "📊 Espace disque avant nettoyage:"
-          df -h / | tail -1
-          
-          echo ""
-          echo "🐳 Nettoyage des images Docker non utilisées..."
-          docker image prune -a -f --filter "until=168h" || true
-          
-          echo ""
-          echo "📦 Nettoyage des conteneurs arrêtés..."
-          docker container prune -f || true
-          
-          echo ""
-          echo "💾 Nettoyage des volumes non utilisés..."
-          docker volume prune -f || true
-          
-          echo ""
-          echo "🌐 Nettoyage des réseaux non utilisés..."
-          docker network prune -f || true
-          
-          echo ""
-          echo "🧼 Nettoyage complet du système Docker..."
-          docker system prune -a -f --volumes --filter "until=168h" || true
-          
-          echo ""
-          echo "🗑️  Nettoyage des anciennes images de l'application (garder les 3 dernières)..."
-          if [ -d "/docker/cjd80" ]; then
-            cd /docker/cjd80
-            docker images ghcr.io/aoleon/cjd80 --format "{{.Tag}}" | grep -v "latest" | sort -V | head -n -2 | while read tag; do
-              echo "  Suppression de l'image: ghcr.io/aoleon/cjd80:$tag"
-              docker rmi "ghcr.io/aoleon/cjd80:$tag" || true
-            done
-          fi
-          
-          echo ""
-          echo "📝 Nettoyage des logs Docker..."
-          if [ -d "/var/lib/docker/containers" ]; then
-            find /var/lib/docker/containers -name "*.log" -type f -size +100M -delete || true
-          fi
-          
-          echo ""
-          echo "📋 Nettoyage des logs système..."
-          journalctl --vacuum-time=7d || true
-          
-          echo ""
-          echo "🗂️  Nettoyage des fichiers temporaires..."
-          rm -rf /tmp/* 2>/dev/null || true
-          rm -rf /var/tmp/* 2>/dev/null || true
-          
-          if command -v apt-get &> /dev/null; then
-            echo ""
-            echo "📦 Nettoyage des packages APT..."
-            apt-get clean || true
-            apt-get autoremove -y || true
-          fi
-          
-          echo ""
-          echo "📊 Espace disque après nettoyage:"
-          df -h / | tail -1
-          
-          echo ""
-          echo "🐳 Espace utilisé par Docker:"
-          docker system df
-          
-          echo ""
-          echo "✅ Nettoyage terminé!"
-          ENDSSH
-      
-      - name: 📦 Prepare server directories
-        env:
-          SERVER_HOST: ${{ steps.secrets-check.outputs.host }}
-          SERVER_PORT: ${{ steps.secrets-check.outputs.port }}
-          SERVER_USER: ${{ steps.secrets-check.outputs.user }}
-          DEPLOY_DIR: ${{ steps.secrets-check.outputs.deploy_dir }}
-        run: |
-          ssh -p "$SERVER_PORT" \
-            -i ~/.ssh/id_rsa \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            "$SERVER_USER@$SERVER_HOST" \
-            'bash -s' << ENDSSH
-          set -e
-          
-          mkdir -p "$DEPLOY_DIR/scripts"
-          
-          # Cloner ou mettre à jour le repository
-          if [ ! -d "$DEPLOY_DIR/.git" ]; then
-            echo "📦 Clonage initial du repository..."
-            cd "$DEPLOY_DIR"
-            git init
-            git remote add origin https://github.com/${{ github.repository }}.git || true
-            git fetch origin main
-            git reset --hard origin/main
-          else
-            echo "🔄 Mise à jour du repository..."
-            cd "$DEPLOY_DIR"
-            git fetch origin main
-            git reset --hard origin/main
-          fi
-          
-          # Vérifier que .env existe
-          if [ ! -f "$DEPLOY_DIR/.env" ]; then
-            echo "⚠️  ATTENTION: Le fichier .env n'existe pas encore!"
-            echo "   Vous devez le créer à partir de .env.example"
-          fi
-          
-          # Rendre les scripts exécutables
-          chmod +x "$DEPLOY_DIR/scripts/"*.sh 2>/dev/null || true
-          
-          echo "✅ Préparation du serveur terminée"
-          ENDSSH
-      
-      - name: 🚀 Deploy to server
-        env:
-          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
-          IMAGE_LATEST: ${{ needs.build-and-push.outputs.image_latest }}
-          SERVER_HOST: ${{ steps.secrets-check.outputs.host }}
-          SERVER_PORT: ${{ steps.secrets-check.outputs.port }}
-          SERVER_USER: ${{ steps.secrets-check.outputs.user }}
-          DEPLOY_DIR: ${{ steps.secrets-check.outputs.deploy_dir }}
-        run: |
-          ssh -p "$SERVER_PORT" \
-            -i ~/.ssh/id_rsa \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            "$SERVER_USER@$SERVER_HOST" \
-            'bash -s' << ENDSSH
-          set -e
-          
-          echo "🚀 Déploiement de l'image: ${IMAGE_TAG}"
-          
-          cd "$DEPLOY_DIR"
-          
-          # Vérifier que le dossier existe
-          if [ ! -d "$DEPLOY_DIR" ]; then
-            echo "❌ ERREUR: Le dossier de déploiement n'existe pas: $DEPLOY_DIR"
-            exit 1
-          fi
-          
-          # Mise à jour du repository avec retry
-          echo "🔄 Mise à jour du repository..."
-          MAX_RETRIES=3
-          RETRY=0
-          while [ $RETRY -lt $MAX_RETRIES ]; do
-            if git fetch origin main && git pull --ff-only origin main; then
-              echo "✅ Repository mis à jour avec succès"
-              break
-            else
-              RETRY=$((RETRY + 1))
-              if [ $RETRY -lt $MAX_RETRIES ]; then
-                echo "⚠️  Échec de la mise à jour (tentative $RETRY/$MAX_RETRIES), nouvelle tentative dans 2s..."
-                sleep 2
-              else
-                echo "⚠️  Fast-forward impossible après $MAX_RETRIES tentatives, utilisation de la version préparée"
-              fi
-            fi
-          done
-          
-          # Vérifier que les scripts existent
-          if [ ! -f "scripts/vps-deploy.sh" ]; then
-            echo "❌ ERREUR: Le script scripts/vps-deploy.sh n'existe pas"
-            exit 1
-          fi
-          
-          # Rendre les scripts exécutables
-          chmod +x scripts/*.sh 2>/dev/null || true
-          
-          # Pull de l'image depuis GHCR avec retry
-          echo "⬇️  Téléchargement de l'image depuis GHCR..."
-          MAX_RETRIES=3
-          RETRY=0
-          while [ $RETRY -lt $MAX_RETRIES ]; do
-            if docker pull "${IMAGE_TAG}"; then
-              echo "✅ Image téléchargée avec succès"
-              break
-            else
-              RETRY=$((RETRY + 1))
-              if [ $RETRY -lt $MAX_RETRIES ]; then
-                echo "⚠️  Échec du téléchargement (tentative $RETRY/$MAX_RETRIES), nouvelle tentative dans 5s..."
-                sleep 5
-              else
-                echo "❌ ERREUR: Impossible de télécharger l'image ${IMAGE_TAG} après $MAX_RETRIES tentatives"
-                exit 1
-              fi
-            fi
-          done
-          
-          # Tag comme latest localement (extraire le repository sans le tag)
-          REPO_NAME=$(echo "${IMAGE_TAG}" | cut -d: -f1)
-          docker tag "${IMAGE_TAG}" "${REPO_NAME}:latest" || true
-          
-          # Exporter l'image tag pour docker-compose
-          export DOCKER_IMAGE="${IMAGE_TAG}"
-          
-          # Exécuter le script de déploiement
-          echo "🔄 Exécution du script de déploiement..."
-          if ! bash scripts/vps-deploy.sh; then
-            echo "❌ ERREUR: Le script de déploiement a échoué"
-            echo "📋 Logs du script:"
-            exit 1
-          fi
-          ENDSSH
-      
-      - name: 🔍 Verify deployment health
-        env:
-          SERVER_HOST: ${{ steps.secrets-check.outputs.host }}
-          SERVER_PORT: ${{ steps.secrets-check.outputs.port }}
-          SERVER_USER: ${{ steps.secrets-check.outputs.user }}
-          DEPLOY_DIR: ${{ steps.secrets-check.outputs.deploy_dir }}
-          SERVER_NAME: ${{ matrix.server_name }}
-          DISPLAY_NAME: ${{ steps.secrets-check.outputs.display_name }}
-        run: |
-          ssh -p "$SERVER_PORT" \
-            -i ~/.ssh/id_rsa \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            "$SERVER_USER@$SERVER_HOST" \
-            'bash -s' << ENDSSH
-          set -e
-          
-          cd "$DEPLOY_DIR"
-          echo "🔍 Vérification du déploiement sur ${SERVER_NAME} (${DISPLAY_NAME})..."
-          
-          MAX_ATTEMPTS=30
-          ATTEMPT=0
-          HEALTH_CHECK_PASSED=false
-          
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            ATTEMPT=$((ATTEMPT + 1))
-            
-            # Vérifier que le conteneur est en cours d'exécution
-            if ! docker compose ps | grep -q "cjd-app.*Up"; then
-              echo "⚠️  Le conteneur n'est pas en cours d'exécution"
-              docker compose ps
-              sleep 2
-              continue
-            fi
-            
-            # Vérifier le health check depuis le conteneur
-            if docker compose exec -T cjd-app wget --spider -q http://localhost:5000/api/health 2>/dev/null; then
-              echo "✅ Health check réussi depuis le conteneur!"
-              HEALTH_CHECK_PASSED=true
-              break
-            fi
-            
-            # Alternative: vérifier via curl depuis le serveur
-            if command -v curl >/dev/null 2>&1 && curl -f -s -o /dev/null http://localhost:5000/api/health 2>/dev/null; then
-              echo "✅ Health check réussi via curl!"
-              HEALTH_CHECK_PASSED=true
-              break
-            fi
-            
-            # Calculer le délai avec backoff exponentiel (min 2s, max 10s)
-            DELAY=$((2 * ATTEMPT))
-            if [ $DELAY -gt 10 ]; then
-              DELAY=10
-            fi
-            
-            echo "⏳ Tentative $ATTEMPT/$MAX_ATTEMPTS: En attente de la réponse (${DELAY}s)..."
-            sleep $DELAY
-          done
-          
-          if [ "$HEALTH_CHECK_PASSED" = true ]; then
-            echo "✅ Déploiement réussi sur ${SERVER_NAME}!"
-            echo "📊 Statut du conteneur:"
-            docker compose ps
-            echo ""
-            echo "📋 Réponse du health check:"
-            docker compose exec -T cjd-app wget -q -O- http://localhost:5000/api/health || curl -s http://localhost:5000/api/health
-            exit 0
-          else
-            echo "❌ Le health check a échoué après $((MAX_ATTEMPTS * 2)) secondes"
-            echo "📋 Logs du conteneur (dernières 50 lignes):"
-            docker compose logs --tail=50 cjd-app
-            echo ""
-            echo "📊 Statut du conteneur:"
-            docker compose ps
-            exit 1
-          fi
-          ENDSSH
-      
-      - name: 🧹 Cleanup old images
-        if: success()
-        env:
-          SERVER_HOST: ${{ steps.secrets-check.outputs.host }}
-          SERVER_PORT: ${{ steps.secrets-check.outputs.port }}
-          SERVER_USER: ${{ steps.secrets-check.outputs.user }}
-          DEPLOY_DIR: ${{ steps.secrets-check.outputs.deploy_dir }}
-          SERVER_NAME: ${{ matrix.server_name }}
-          DISPLAY_NAME: ${{ steps.secrets-check.outputs.display_name }}
-        run: |
-          ssh -p "$SERVER_PORT" \
-            -i ~/.ssh/id_rsa \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o ConnectTimeout=10 \
-            "$SERVER_USER@$SERVER_HOST" \
-            'bash -s' << ENDSSH
-          echo "🧹 Nettoyage des anciennes images Docker sur ${SERVER_NAME} (${DISPLAY_NAME})..."
-          
-          # Nettoyer les images non utilisées (plus de 24h)
-          docker image prune -f --filter "until=24h" || true
-          
-          # Nettoyer les conteneurs arrêtés
-          docker container prune -f || true
-          
-          # Afficher l'espace libéré
-          echo "📊 Espace disque après nettoyage:"
-          df -h "$DEPLOY_DIR" | tail -1 || true
-          
-          echo '✅ Nettoyage terminé'
-          ENDSSH
-      
-      - name: 📊 Deployment summary
-        if: always()
-        run: |
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "🎉 ✅ Déploiement réussi sur ${{ matrix.server_name }}"
-            echo "📦 Image: ${{ needs.build-and-push.outputs.image_tag }}"
-          else
-            echo "❌ Échec du déploiement sur ${{ matrix.server_name }}"
-            echo "📋 Vérifiez les logs ci-dessus pour plus de détails"
-          fi
+      name: production-cjd80
+      url: https://cjd80.fr
 
-  # ============================================================================
-  # Job 3: Deployment Summary (optionnel)
-  # ============================================================================
-  deployment-summary:
-    name: 📊 Deployment Summary
-    needs: [build-and-push, deploy]
+    steps:
+      - name: Deploy to CJD80 server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.CJD80_HOST }}
+          username: ${{ secrets.CJD80_SSH_USER }}
+          key: ${{ secrets.CJD80_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /srv/workspace
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ github.repository }}:latest
+            docker compose -f docker-compose.apps.yml stop cjd80 || true
+            docker compose -f docker-compose.apps.yml rm -f cjd80 || true
+            docker compose -f docker-compose.apps.yml up -d cjd80
+            sleep 15
+            docker ps | grep cjd80
+
+  deploy-rep:
+    name: Deploy to REP
     runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-      - name: 📊 Summary
-        run: |
-          echo "## 🚀 Résumé du déploiement" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image Docker:** \`${{ needs.build-and-push.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Digest:** \`${{ needs.build-and-push.outputs.image_digest }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Serveurs déployés" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ needs.deploy.result }}" == "success" ]; then
-            echo "✅ Tous les serveurs ont été déployés avec succès" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Certains serveurs ont échoué. Vérifiez les logs ci-dessus." >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Auteur:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          if [ -n "${{ github.ref }}" ] && echo "${{ github.ref }}" | grep -q "refs/tags/"; then
-            GIT_TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\///')
-            echo "**Tag:** \`${GIT_TAG}\`" >> $GITHUB_STEP_SUMMARY
-          fi
-          if [ -n "${{ github.event.head_commit.message }}" ]; then
-            echo "**Message:** ${{ github.event.head_commit.message }}" >> $GITHUB_STEP_SUMMARY
-          fi
+    needs: build
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.environment == 'rep' || github.event.inputs.environment == 'both')
 
+    environment:
+      name: production-rep
+      url: https://repicardie.fr
+
+    steps:
+      - name: Deploy to REP server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REP_HOST }}
+          username: ${{ secrets.REP_SSH_USER }}
+          key: ${{ secrets.REP_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            mkdir -p /srv/workspace/rep
+            cd /srv/workspace/rep
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ github.repository }}:latest
+            docker compose down || true
+            docker compose up -d
+            sleep 15
+            docker ps | grep rep

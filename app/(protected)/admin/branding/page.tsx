@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
+import { useBranding } from '@/contexts/BrandingContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   AlertDialog,
@@ -19,24 +23,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Palette, RotateCcw, Save } from 'lucide-react';
+import { Loader2, Palette, RotateCcw, Save, Upload, Image as ImageIcon } from 'lucide-react';
 import { brandingCore, type BrandingCore } from '@/lib/config/branding-core';
 import { api, type ApiResponse } from '@/lib/api/client';
+import Image from 'next/image';
 
 export const dynamic = 'force-dynamic';
-
-interface AdminUser {
-  id: string;
-  email: string;
-  role: string;
-}
 
 interface BrandingApiData {
   config?: string;
   isDefault?: boolean;
 }
 
-const appKeys: Array<keyof BrandingCore['app']> = ['name', 'shortName', 'description', 'ideaBoxName'];
+const appKeys: Array<keyof BrandingCore['app']> = ['name', 'shortName', 'description', 'ideaBoxName', 'showLogo'];
 const orgKeys: Array<keyof BrandingCore['organization']> = ['name', 'fullName', 'tagline', 'url', 'email'];
 const colorKeys: Array<keyof BrandingCore['colors']> = [
   'primary',
@@ -138,36 +137,20 @@ function isDefaultBranding(config: BrandingCore): boolean {
 
 export default function AdminBrandingPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { branding, reloadBranding } = useBranding();
   const [config, setConfig] = useState<BrandingCore>(createDefaultConfig());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDefault, setIsDefault] = useState(true);
-  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
-  const hasAccess = adminUser?.role === 'super_admin';
+  // Tous les utilisateurs connectés ont accès au branding
+  const hasAccess = user !== null;
 
   const badgeLabel = useMemo(() => (isDefault ? 'Par défaut' : 'Personnalisé'), [isDefault]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem('admin-user');
-    if (!stored) {
-      setAdminUser(null);
-      return;
-    }
-    try {
-      const parsed = JSON.parse(stored) as unknown;
-      if (isRecord(parsed) && typeof parsed.role === 'string' && typeof parsed.email === 'string') {
-        setAdminUser({
-          id: String(parsed.id ?? ''),
-          email: parsed.email,
-          role: parsed.role,
-        });
-      }
-    } catch {
-      setAdminUser(null);
-    }
-  }, []);
 
   const fetchBranding = useCallback(async () => {
     setIsLoading(true);
@@ -205,9 +188,11 @@ export default function AdminBrandingPage() {
         config: JSON.stringify(config),
       });
       if (response.success) {
+        // Recharger le branding pour appliquer les nouvelles couleurs
+        await reloadBranding();
         toast({
           title: 'Branding sauvegardé avec succès',
-          description: 'Les modifications ont été enregistrées.',
+          description: 'Les modifications ont été enregistrées et appliquées.',
         });
         setIsDefault(isDefaultBranding(config));
       }
@@ -229,8 +214,11 @@ export default function AdminBrandingPage() {
       const defaults = createDefaultConfig();
       setConfig(defaults);
       setIsDefault(true);
+      // Recharger le branding pour appliquer les couleurs par défaut
+      await reloadBranding();
       toast({
         title: 'Configuration réinitialisée aux valeurs par défaut',
+        description: 'Les couleurs par défaut ont été appliquées.',
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Impossible de réinitialiser';
@@ -242,6 +230,90 @@ export default function AdminBrandingPage() {
     }
   };
 
+  const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Valider le type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: 'Type de fichier non valide',
+        description: 'Formats acceptés: PNG, JPG, SVG, WebP',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Valider la taille (max 5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'Fichier trop volumineux',
+        description: 'Taille maximale: 5MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLogoFile(file);
+
+    // Créer preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLogoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleLogoUpload = async () => {
+    if (!logoFile) return;
+
+    setIsUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('logo', logoFile);
+
+      const response = await fetch('/api/admin/branding/logo', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          // API client ajoute automatiquement auth headers
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Échec de l\'upload');
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: 'Logo uploadé avec succès',
+          description: `Le logo a été enregistré: ${result.data.filename}`,
+        });
+
+        // Recharger le branding
+        await reloadBranding();
+
+        // Réinitialiser le formulaire
+        setLogoFile(null);
+        setLogoPreview(null);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Impossible d\'uploader le logo';
+      toast({
+        title: 'Erreur',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   if (!hasAccess && !isLoading) {
     return (
       <div className="container py-8">
@@ -249,7 +321,7 @@ export default function AdminBrandingPage() {
           <CardHeader>
             <CardTitle className="text-destructive">Accès refusé</CardTitle>
             <CardDescription>
-              Cette page est réservée aux super-administrateurs uniquement.
+              Cette page est réservée aux administrateurs. Veuillez vous connecter.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -455,7 +527,101 @@ export default function AdminBrandingPage() {
 
             <AccordionItem value="appearance">
               <AccordionTrigger data-testid="accordion-trigger-appearance">Apparence</AccordionTrigger>
-              <AccordionContent className="space-y-4">
+              <AccordionContent className="space-y-6">
+                {/* Logo Section */}
+                <div className="space-y-3 pb-4 border-b">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    Logo de l'application
+                  </label>
+
+                  {/* Current Logo */}
+                  {branding.assets?.logo && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Logo actuel:</p>
+                      <div className="flex items-center gap-4 p-3 border rounded-lg bg-muted/50">
+                        <Image
+                          src={branding.assets.logo}
+                          alt="Logo actuel"
+                          width={80}
+                          height={80}
+                          className="object-contain"
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          {branding.assets.logo}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Logo Preview */}
+                  {logoPreview && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Prévisualisation:</p>
+                      <div className="flex items-center gap-4 p-3 border rounded-lg bg-primary/5">
+                        <Image
+                          src={logoPreview}
+                          alt="Prévisualisation"
+                          width={80}
+                          height={80}
+                          className="object-contain"
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          {logoFile?.name}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upload Controls */}
+                  <div className="flex gap-2">
+                    <Input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                      onChange={handleLogoFileChange}
+                      className="flex-1"
+                      data-testid="input-logo-file"
+                    />
+                    <Button
+                      onClick={handleLogoUpload}
+                      disabled={!logoFile || isUploadingLogo}
+                      data-testid="button-upload-logo"
+                    >
+                      {isUploadingLogo ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Formats acceptés: PNG, JPG, SVG, WebP. Taille max: 5MB
+                  </p>
+                </div>
+
+                {/* Show Logo Toggle */}
+                <div className="flex items-center justify-between space-x-4 pb-4 border-b">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="show-logo" className="text-sm font-medium">
+                      Afficher le logo
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Afficher ou masquer le logo dans l'en-tête de l'application
+                    </p>
+                  </div>
+                  <Switch
+                    id="show-logo"
+                    checked={config.app.showLogo ?? true}
+                    onCheckedChange={(checked) =>
+                      setConfig((prev) => ({
+                        ...prev,
+                        app: { ...prev.app, showLogo: checked },
+                      } as BrandingCore))
+                    }
+                    data-testid="switch-show-logo"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Couleur primaire</label>
                   <div className="flex items-center gap-3">
@@ -486,42 +652,87 @@ export default function AdminBrandingPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Primaire sombre</label>
-                  <Input
-                    data-testid="input-color-primary-dark"
-                    value={config.colors.primaryDark}
-                    onChange={(event) =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        colors: { ...prev.colors, primaryDark: event.target.value },
-                      } as BrandingCore))
-                    }
-                  />
+                  <div className="flex items-center gap-3">
+                    <Input
+                      data-testid="input-color-primary-dark"
+                      value={config.colors.primaryDark}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          colors: { ...prev.colors, primaryDark: event.target.value },
+                        } as BrandingCore))
+                      }
+                    />
+                    <Input
+                      type="color"
+                      aria-label="Primaire sombre"
+                      data-testid="input-color-primary-dark-picker"
+                      value={config.colors.primaryDark}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          colors: { ...prev.colors, primaryDark: event.target.value },
+                        } as BrandingCore))
+                      }
+                      className="w-14 h-10 p-1"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Primaire claire</label>
-                  <Input
-                    data-testid="input-color-primary-light"
-                    value={config.colors.primaryLight}
-                    onChange={(event) =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        colors: { ...prev.colors, primaryLight: event.target.value },
-                      } as BrandingCore))
-                    }
-                  />
+                  <div className="flex items-center gap-3">
+                    <Input
+                      data-testid="input-color-primary-light"
+                      value={config.colors.primaryLight}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          colors: { ...prev.colors, primaryLight: event.target.value },
+                        } as BrandingCore))
+                      }
+                    />
+                    <Input
+                      type="color"
+                      aria-label="Primaire claire"
+                      data-testid="input-color-primary-light-picker"
+                      value={config.colors.primaryLight}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          colors: { ...prev.colors, primaryLight: event.target.value },
+                        } as BrandingCore))
+                      }
+                      className="w-14 h-10 p-1"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Couleur secondaire</label>
-                  <Input
-                    data-testid="input-color-secondary"
-                    value={config.colors.secondary}
-                    onChange={(event) =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        colors: { ...prev.colors, secondary: event.target.value },
-                      } as BrandingCore))
-                    }
-                  />
+                  <div className="flex items-center gap-3">
+                    <Input
+                      data-testid="input-color-secondary"
+                      value={config.colors.secondary}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          colors: { ...prev.colors, secondary: event.target.value },
+                        } as BrandingCore))
+                      }
+                    />
+                    <Input
+                      type="color"
+                      aria-label="Couleur secondaire"
+                      data-testid="input-color-secondary-picker"
+                      value={config.colors.secondary}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          colors: { ...prev.colors, secondary: event.target.value },
+                        } as BrandingCore))
+                      }
+                      className="w-14 h-10 p-1"
+                    />
+                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -530,28 +741,60 @@ export default function AdminBrandingPage() {
               <AccordionTrigger data-testid="accordion-trigger-pwa">PWA</AccordionTrigger>
               <AccordionContent className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Thème</label>
-                  <Input
-                    value={config.pwa.themeColor}
-                    onChange={(event) =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        pwa: { ...prev.pwa, themeColor: event.target.value },
-                      } as BrandingCore))
-                    }
-                  />
+                  <label className="text-sm font-medium">Couleur du thème</label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      data-testid="input-pwa-theme-color"
+                      value={config.pwa.themeColor}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          pwa: { ...prev.pwa, themeColor: event.target.value },
+                        } as BrandingCore))
+                      }
+                    />
+                    <Input
+                      type="color"
+                      aria-label="Couleur du thème"
+                      data-testid="input-pwa-theme-color-picker"
+                      value={config.pwa.themeColor}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          pwa: { ...prev.pwa, themeColor: event.target.value },
+                        } as BrandingCore))
+                      }
+                      className="w-14 h-10 p-1"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Couleur de fond</label>
-                  <Input
-                    value={config.pwa.backgroundColor}
-                    onChange={(event) =>
-                      setConfig((prev) => ({
-                        ...prev,
-                        pwa: { ...prev.pwa, backgroundColor: event.target.value },
-                      } as BrandingCore))
-                    }
-                  />
+                  <div className="flex items-center gap-3">
+                    <Input
+                      data-testid="input-pwa-bg-color"
+                      value={config.pwa.backgroundColor}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          pwa: { ...prev.pwa, backgroundColor: event.target.value },
+                        } as BrandingCore))
+                      }
+                    />
+                    <Input
+                      type="color"
+                      aria-label="Couleur de fond"
+                      data-testid="input-pwa-bg-color-picker"
+                      value={config.pwa.backgroundColor}
+                      onChange={(event) =>
+                        setConfig((prev) => ({
+                          ...prev,
+                          pwa: { ...prev.pwa, backgroundColor: event.target.value },
+                        } as BrandingCore))
+                      }
+                      className="w-14 h-10 p-1"
+                    />
+                  </div>
                 </div>
               </AccordionContent>
             </AccordionItem>

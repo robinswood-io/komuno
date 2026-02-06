@@ -18,6 +18,7 @@ export const brandingCore = {
     shortName: "CJD Amiens",
     description: "Application interne du Centre des Jeunes Dirigeants d'Amiens pour la gestion collaborative d'idées et d'événements",
     ideaBoxName: "Boîte à Kiffs", // Nom de la fonctionnalité de partage d'idées
+    showLogo: true, // Afficher ou masquer le logo dans le header
   },
 
   // Couleurs du thème (format hexadécimal)

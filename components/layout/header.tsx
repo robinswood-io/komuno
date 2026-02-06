@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useBranding } from '@/contexts/BrandingContext';
 
 /**
  * Header principal de l'application Next.js
@@ -14,13 +15,8 @@ import { Button } from '@/components/ui/button';
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { branding } = useBranding();
   // const router = useRouter(); // For future navigation
-
-  // TODO: Récupérer branding depuis contexte ou API
-  // TODO: Récupérer feature config depuis contexte ou API
-  const branding = {
-    assets: { logo: '/icon-192.jpg' },
-  };
 
   // Map routes to section names
   const getActiveSection = (): 'ideas' | 'propose' | 'events' | 'tools' | 'loan' => {
@@ -51,13 +47,15 @@ export default function Header() {
               className="hover:opacity-80 transition-opacity duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 rounded flex items-center space-x-3"
               aria-label="Retour à la page d'accueil - Voter pour des idées"
             >
-              <img
-                src={branding.assets?.logo || '/icon-192.jpg'}
-                alt="Logo CJD Amiens"
-                className="h-8 sm:h-10 lg:h-12 w-auto rounded-[60px]"
-              />
+              {(branding?.app?.showLogo ?? true) && (
+                <img
+                  src={branding.assets?.logo || '/icon-192.jpg'}
+                  alt="Logo CJD Amiens"
+                  className="h-8 sm:h-10 lg:h-12 w-auto rounded-[60px]"
+                />
+              )}
               <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
-                Boîte à Kiffs
+                {branding?.app?.ideaBoxName || 'Boîte à Kiffs'}
               </h1>
             </Link>
           </div>
