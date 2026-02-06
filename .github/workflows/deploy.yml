@@ -93,11 +93,11 @@ jobs:
             cd /docker/cjd80
             echo "${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${{ github.repository }}:latest
-            docker compose stop cjd80 || true
-            docker compose rm -f cjd80 || true
-            docker compose up -d cjd80
+            docker compose stop cjd-app || true
+            docker compose rm -f cjd-app || true
+            docker compose up -d cjd-app
             sleep 15
-            docker ps | grep cjd80
+            docker ps | grep cjd
 
   deploy-rep:
     name: Deploy to REP
