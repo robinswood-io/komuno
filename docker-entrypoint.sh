@@ -3,6 +3,12 @@ set -e
 
 echo "🚀 Starting application..."
 
+# Exécuter les migrations de base de données
+echo "🔄 Running database migrations..."
+npx drizzle-kit push --config=drizzle.config.ts || {
+  echo "⚠️  Migrations failed or already applied, continuing startup..."
+}
+
 # Démarrer NestJS en background
 echo "📡 Starting NestJS backend on port 5000..."
 node --experimental-specifier-resolution=node --experimental-loader=./server/esm-loader.js dist/server/src/main.js &

@@ -46,6 +46,8 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copier les fichiers nécessaires pour les migrations (drizzle-kit)
 COPY --from=builder /app/drizzle.config.ts ./
 COPY --from=builder /app/shared ./shared
+COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/scripts/run-migrations.ts ./scripts/run-migrations.ts
 
 # Copier les fichiers buildés depuis le stage builder
 COPY --from=builder /app/dist ./dist
