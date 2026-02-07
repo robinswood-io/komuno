@@ -24,16 +24,10 @@ import { TrackingModule } from './tracking/tracking.module';
 import { FeaturesModule } from './features/features.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MinIOModule } from './integrations/minio/minio.module';
-import { ViteModule } from './integrations/vite/vite.module';
 import { DbMonitoringInterceptor } from './common/interceptors/db-monitoring.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-
-// Note: ServeStaticModule n'est plus utilisé
-// Le fallback SPA et le service des fichiers statiques sont maintenant gérés
-// entièrement par ViteModule/SpaFallbackController qui utilise un Controller NestJS
-// avec @Get('*') et res.sendFile() au lieu du middleware Express ServeStaticModule
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 // Limite augmentée en prod: 1000 req/min au lieu de 100 (trop restrictif)
@@ -105,7 +99,7 @@ const throttlerLimit = isDevelopment ? 10000 : 1000;
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // SPA fallback is now handled by ViteModule/SpaFallbackController
-    // No middleware needed here
+    // NextJS gère le routing et les fichiers statiques
+    // NestJS gère uniquement les routes /api/*
   }
 }

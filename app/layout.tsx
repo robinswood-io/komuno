@@ -4,6 +4,7 @@ import './globals.css';
 import { Providers } from './providers';
 import { brandingCore } from '@/lib/config/branding-core';
 import { DynamicTitle } from '@/components/dynamic-title';
+import { ThemeScript } from '@/components/theme-script';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -34,6 +35,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <body className={inter.className}>
+        <ThemeScript />
         <Providers>
           <DynamicTitle />
           {children}

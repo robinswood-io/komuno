@@ -47,10 +47,6 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/drizzle.config.ts ./
 COPY --from=builder /app/shared ./shared
 
-# Créer vite.config.js (nécessaire pour les imports dynamiques, même si non utilisé en production)
-# En production, setupVite n'est pas appelé, mais le module peut être importé
-RUN echo 'export default {};' > vite.config.js
-
 # Copier les fichiers buildés depuis le stage builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/.next ./.next

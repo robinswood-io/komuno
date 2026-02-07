@@ -8,7 +8,6 @@ import { MinIOService } from './integrations/minio/minio.service';
 import { startPoolMonitoring } from '../utils/db-health';
 import { startAutoSync } from '../utils/auto-sync';
 import { startTrackingAlertsGeneration } from '../utils/tracking-scheduler';
-import { setupVite } from '../vite';
 import { AuthService } from './auth/auth.service';
 import { validateEnvironment, checkExternalDependencies } from './config/env-validation';
 import { setupGracefulShutdown, rejectDuringShutdown } from './config/graceful-shutdown';
@@ -163,19 +162,9 @@ async function bootstrap() {
   logger.info(`📦 Environnement: ${process.env.NODE_ENV || 'development'}`);
   logger.info('======================================');
 
-  // 7. Setup Vite en développement (après le listen pour avoir le server)
-  // Note: En production, les fichiers statiques sont servis par @nestjs/serve-static
-  // configuré dans AppModule. Pas besoin de code Express ici.
-  // DÉSACTIVÉ TEMPORAIREMENT : Application NextJS, pas Vite+React
-  // if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
-  //   try {
-  //     await setupVite(expressApp, httpServer);
-  //     logger.info('Vite middleware configured');
-  //   } catch (error) {
-  //     logger.error('Failed to setup Vite middleware', { error });
-  //   }
-  // }
-  logger.info('[Frontend] Application NextJS, middleware Vite désactivé');
+  // 7. Frontend: NextJS gère son propre serveur et routing
+  // NestJS gère uniquement les routes /api/*
+  logger.info('[Frontend] NextJS server running on port 3000');
 
   // 8. Démarrer les services en arrière-plan
   logger.info('[Background Services] Démarrage des services en arrière-plan...');
