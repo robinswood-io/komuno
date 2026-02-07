@@ -73,8 +73,8 @@ const throttlerLimit = isDevelopment ? 10000 : 1000;
     FeaturesModule,
     NotificationsModule,
     MinIOModule,
-    // ViteModule gère le SPA fallback et les fichiers statiques via SpaFallbackController
-    ViteModule,
+    // ViteModule DÉSACTIVÉ - NextJS gère maintenant le routing et les fichiers statiques
+    // ViteModule,
   ],
   controllers: [],
   providers: [
