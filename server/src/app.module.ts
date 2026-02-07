@@ -36,7 +36,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 // avec @Get('*') et res.sendFile() au lieu du middleware Express ServeStaticModule
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
-const throttlerLimit = isDevelopment ? 10000 : 100;
+// Limite augmentée en prod: 1000 req/min au lieu de 100 (trop restrictif)
+const throttlerLimit = isDevelopment ? 10000 : 1000;
 
 @Module({
   imports: [
@@ -46,7 +47,8 @@ const throttlerLimit = isDevelopment ? 10000 : 100;
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 1 minute
-        limit: throttlerLimit, // 100 requêtes en prod, 10k en dev/test
+        limit: throttlerLimit, // 1000 requêtes en prod, 10k en dev/test
+        ignoreUserAgents: [/healthcheck/i], // Ignorer les healthchecks
       },
     ]),
     // Schedule pour les tâches cron

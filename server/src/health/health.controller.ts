@@ -1,8 +1,10 @@
 import { Controller, Get, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { HealthService } from './health.service';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
 
+@SkipThrottle() // Exclure les healthchecks du rate limiting
 @ApiTags('health')
 @Controller('api/health')
 export class HealthController {
@@ -75,6 +77,7 @@ export class HealthController {
   }
 }
 
+@SkipThrottle() // Exclure status/version du rate limiting
 @ApiTags('health')
 @Controller('api')
 export class StatusController {
