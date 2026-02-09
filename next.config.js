@@ -100,3 +100,5 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
+
+// Build cache invalidation: 2026-02-09T11:15:00Z
