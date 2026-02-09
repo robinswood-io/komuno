@@ -1,6 +1,7 @@
 /**
  * Script inline pour appliquer le thème AVANT l'hydration React
  * Évite le flash de thème (FOUC - Flash of Unstyled Content)
+ * Charge aussi les variables CSS critiques pour éviter le flash de couleurs
  */
 export function ThemeScript() {
   // Script qui s'exécute avant React pour appliquer le thème sauvegardé
@@ -19,6 +20,13 @@ export function ThemeScript() {
         } else {
           document.documentElement.classList.remove('dark');
         }
+
+        // Appliquer les variables CSS critiques immédiatement pour éviter le flash
+        // Ces valeurs correspondent aux variables définies dans globals.css
+        const root = document.documentElement;
+        root.style.setProperty('--primary', '140 69% 33%');
+        root.style.setProperty('--sidebar-accent', '211.5789 51.3514% 92.7451%');
+        root.style.setProperty('--sidebar-accent-foreground', '0 0% 0%');
       } catch (e) {
         // En cas d'erreur, ne rien faire (garder light par défaut)
       }

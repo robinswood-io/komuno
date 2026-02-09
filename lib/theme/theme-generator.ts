@@ -57,6 +57,24 @@ function formatHSL(hex: string): string {
 }
 
 /**
+ * Calcule une couleur de texte qui contraste avec le fond
+ * Retourne blanc ou noir selon la luminosité du fond
+ */
+function getContrastingTextColor(bgHex: string): string {
+  const { l } = hexToHSL(bgHex);
+  // Si la luminosité est > 50%, le fond est clair -> texte foncé
+  // Sinon, le fond est foncé -> texte clair
+  return l > 50 ? '0 0% 0%' : '0 0% 100%';
+}
+
+/**
+ * Calcule le contraste pour une couleur HSL directe (sans hex)
+ */
+function getContrastingTextColorFromHSL(h: number, s: number, l: number): string {
+  return l > 50 ? '0 0% 0%' : '0 0% 100%';
+}
+
+/**
  * Génère les variables CSS du thème light
  */
 export function generateLightThemeVars(): Record<string, string> {
@@ -113,7 +131,8 @@ export function generateLightThemeVars(): Record<string, string> {
     '--sidebar-primary': `hsl(${formatHSL(colors.primary)})`,
     '--sidebar-primary-foreground': 'hsl(0 0% 100%)',
     '--sidebar-accent': 'hsl(211.5789 51.3514% 92.7451%)',
-    '--sidebar-accent-foreground': `hsl(${formatHSL(colors.primary)})`,
+    // Calculer automatiquement la couleur de texte qui contraste avec sidebar-accent
+    '--sidebar-accent-foreground': `hsl(${getContrastingTextColorFromHSL(211.5789, 51.3514, 92.7451)})`,
     '--sidebar-border': 'hsl(205.0000 25.0000% 90.5882%)',
     '--sidebar-ring': `hsl(${formatHSL(colors.primary)})`,
 
