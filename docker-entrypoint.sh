@@ -22,7 +22,7 @@ sleep 5
 
 # Démarrer NextJS en background
 echo "🌐 Starting NextJS frontend on port 3000..."
-HOSTNAME=0.0.0.0 PORT=3000 node .next/standalone/server.js &
+HOSTNAME=0.0.0.0 PORT=3000 node server.js &
 FRONTEND_PID=$!
 
 echo "✅ Application started!"

@@ -68,8 +68,8 @@ COPY --from=builder /app/scripts/run-migrations.sh ./scripts/run-migrations.sh
 
 # Copier les fichiers buildés depuis le stage builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
 # Créer le dossier logs et symlink pour @shared (alias vers shared)
