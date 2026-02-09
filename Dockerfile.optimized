@@ -10,7 +10,8 @@ COPY package.json bun.lockb* package-lock.json* ./
 
 # Installer les dépendances avec Bun (5-10x plus rapide que npm)
 # --frozen-lockfile = équivalent de npm ci
-RUN bun install --frozen-lockfile --production=false || bun install --production=false
+# Pas de --production = installe tout (prod + dev deps nécessaires pour build)
+RUN bun install --frozen-lockfile || bun install
 
 # ===================================
 # Stage 2: Builder - Construction avec cache optimal
