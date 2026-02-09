@@ -56,6 +56,11 @@ const navItems: (NavItem | NavSection)[] = [
         icon: Users,
       },
       {
+        title: 'Statuts',
+        href: '/admin/settings/statuses',
+        icon: Tag,
+      },
+      {
         title: 'Tâches',
         href: '/admin/members/tasks',
         icon: CheckSquare,
