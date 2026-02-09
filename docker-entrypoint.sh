@@ -4,10 +4,13 @@ set -e
 echo "🚀 Starting application..."
 
 # Exécuter les migrations de base de données
-echo "🔄 Running database migrations..."
-npx drizzle-kit push --config=drizzle.config.ts || {
-  echo "⚠️  Migrations failed or already applied, continuing startup..."
-}
+if [ -f "/app/scripts/run-migrations.sh" ]; then
+  sh /app/scripts/run-migrations.sh || {
+    echo "⚠️  Migrations failed or already applied, continuing startup..."
+  }
+else
+  echo "⚠️  Migration script not found, skipping migrations"
+fi
 
 # Démarrer NestJS en background
 echo "📡 Starting NestJS backend on port 5000..."

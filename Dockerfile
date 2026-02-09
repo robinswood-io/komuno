@@ -43,11 +43,9 @@ RUN addgroup -S cjd && adduser -S cjduser -G cjd
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copier les fichiers nécessaires pour les migrations (drizzle-kit)
-COPY --from=builder /app/drizzle.config.ts ./
-COPY --from=builder /app/shared ./shared
+# Copier les fichiers nécessaires pour les migrations
 COPY --from=builder /app/migrations ./migrations
-COPY --from=builder /app/scripts/run-migrations.ts ./scripts/run-migrations.ts
+COPY --from=builder /app/scripts/run-migrations.sh ./scripts/run-migrations.sh
 
 # Copier les fichiers buildés depuis le stage builder
 COPY --from=builder /app/dist ./dist
@@ -65,7 +63,9 @@ COPY --from=builder /app/server/esm-loader.js ./server/esm-loader.js
 
 # Copier le script de démarrage
 COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh && chown cjduser:cjd /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh && \
+    chmod +x /app/scripts/run-migrations.sh && \
+    chown -R cjduser:cjd /app/docker-entrypoint.sh /app/scripts
 
 # Utiliser l'utilisateur non-root
 USER cjduser
