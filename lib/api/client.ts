@@ -174,6 +174,8 @@ export const queryKeys = {
       all: ['admin', 'administrators'] as const,
       list: () => ['admin', 'administrators', 'list'] as const,
     },
+    memberStatuses: (params?: { category?: string; isActive?: boolean }) =>
+      ['admin', 'memberStatuses', params] as const,
   },
 
   // Auth
