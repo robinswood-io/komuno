@@ -221,7 +221,7 @@ export class MemberStatusesService {
       // Vérifier qu'aucun membre n'utilise ce statut
       const { members } = await import('../../../shared/schema');
       const membersWithStatus = await db.query.members.findFirst({
-        where: (membersTable, helpers) => helpers.eq(membersTable.status, existing.code),
+        where: (membersTable: typeof members.$inferSelect, helpers: any) => helpers.eq(membersTable.status, existing.code),
       });
 
       if (membersWithStatus) {

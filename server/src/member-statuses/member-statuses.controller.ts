@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { MemberStatusesService } from './member-statuses.service';
-import { AdminGuard } from '../auth/admin.guard';
+import { AdminGuard } from '../auth/guards/admin.guard';
 
 /**
  * Contrôleur Member Statuses - Gestion des statuts personnalisables
