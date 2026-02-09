@@ -11,10 +11,11 @@ COPY --from=bun-stage /usr/local/bin/bunx /usr/local/bin/bunx
 WORKDIR /app
 
 # Copier les fichiers de dépendances
-COPY package*.json bun.lock* ./
+COPY package*.json ./
+COPY .npmrc* ./
 
-# Installer les dépendances avec Bun (3-5x plus rapide que npm)
-RUN bun install --frozen-lockfile 2>/dev/null || bun install
+# Installer les deps via npm (registre privé Verdaccio pour @robinswood/*)
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
 # Copier le code source
 COPY . .
