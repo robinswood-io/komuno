@@ -25,8 +25,17 @@ export function ThemeScript() {
         // Ces valeurs correspondent aux variables définies dans globals.css
         const root = document.documentElement;
         root.style.setProperty('--primary', '140 69% 33%');
-        root.style.setProperty('--sidebar-accent', '211.5789 51.3514% 92.7451%');
-        root.style.setProperty('--sidebar-accent-foreground', '0 0% 0%');
+
+        // Appliquer les bonnes valeurs selon le thème
+        if (activeTheme === 'dark') {
+          // Thème dark: fond foncé (L=7.8%), texte blanc
+          root.style.setProperty('--sidebar-accent', '205.7143 70% 7.8431%');
+          root.style.setProperty('--sidebar-accent-foreground', '0 0% 100%');
+        } else {
+          // Thème light: fond clair (L=92%), texte noir
+          root.style.setProperty('--sidebar-accent', '211.5789 51.3514% 92.7451%');
+          root.style.setProperty('--sidebar-accent-foreground', '0 0% 0%');
+        }
       } catch (e) {
         // En cas d'erreur, ne rien faire (garder light par défaut)
       }

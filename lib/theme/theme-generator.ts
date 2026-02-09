@@ -221,7 +221,8 @@ export function generateDarkThemeVars(): Record<string, string> {
     '--sidebar-primary': `hsl(${formatHSL(colors.primary)})`,
     '--sidebar-primary-foreground': 'hsl(0 0% 100%)',
     '--sidebar-accent': 'hsl(205.7143 70% 7.8431%)',
-    '--sidebar-accent-foreground': `hsl(${formatHSL(colors.primary)})`,
+    // Calculer automatiquement la couleur de texte qui contraste avec sidebar-accent (dark)
+    '--sidebar-accent-foreground': `hsl(${getContrastingTextColorFromHSL(205.7143, 70, 7.8431)})`,
     '--sidebar-border': 'hsl(205.7143 15.7895% 26.0784%)',
     '--sidebar-ring': `hsl(${formatHSL(colors.primary)})`,
 

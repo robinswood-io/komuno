@@ -190,10 +190,10 @@ export function AdminSidebar() {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
+              <p className="text-sm font-medium text-sidebar-accent-foreground truncate">
                 {`${user.firstName} ${user.lastName}`}
               </p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">
+              <p className="text-xs text-sidebar-accent-foreground/60 truncate">
                 {user.role}
               </p>
             </div>
