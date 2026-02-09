@@ -5,6 +5,7 @@ import { fromZodError } from 'zod-validation-error';
 import { z } from 'zod';
 import { memberStatuses } from '../../../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
+import { db } from '../../db';
 
 // Schémas de validation
 const createStatusSchema = z.object({
@@ -36,10 +37,6 @@ export class MemberStatusesService {
    */
   async listStatuses(filters?: { category?: string; isActive?: boolean }) {
     try {
-      const storage = this.storageService.instance as any;
-      const db = storage.db;
-
-      let query = db.select().from(memberStatuses);
 
       const conditions = [];
       if (filters?.category) {
@@ -49,9 +46,10 @@ export class MemberStatusesService {
         conditions.push(eq(memberStatuses.isActive, filters.isActive));
       }
 
-      if (conditions.length > 0) {
-        query = query.where(and(...conditions)) as any;
-      }
+      const baseQuery = db.select().from(memberStatuses);
+      const query = conditions.length > 0
+        ? baseQuery.where(and(...conditions))
+        : baseQuery;
 
       const statuses = await query.orderBy(memberStatuses.displayOrder, memberStatuses.createdAt);
 
@@ -66,8 +64,6 @@ export class MemberStatusesService {
    */
   async getStatusById(id: string) {
     try {
-      const storage = this.storageService.instance as any;
-      const db = storage.db;
 
       const [status] = await db
         .select()
@@ -94,8 +90,6 @@ export class MemberStatusesService {
   async createStatus(data: unknown) {
     try {
       const validatedData = createStatusSchema.parse(data);
-      const storage = this.storageService.instance as any;
-      const db = storage.db;
 
       // Vérifier que le code n'existe pas déjà
       const [existing] = await db
@@ -151,8 +145,6 @@ export class MemberStatusesService {
   async updateStatus(id: string, data: unknown) {
     try {
       const validatedData = updateStatusSchema.parse(data);
-      const storage = this.storageService.instance as any;
-      const db = storage.db;
 
       // Vérifier que le statut existe
       const [existing] = await db
@@ -199,8 +191,6 @@ export class MemberStatusesService {
    */
   async deleteStatus(id: string) {
     try {
-      const storage = this.storageService.instance as any;
-      const db = storage.db;
 
       // Vérifier que le statut existe
       const [existing] = await db
@@ -220,9 +210,11 @@ export class MemberStatusesService {
 
       // Vérifier qu'aucun membre n'utilise ce statut
       const { members } = await import('../../../shared/schema');
-      const membersWithStatus = await db.query.members.findFirst({
-        where: (membersTable: typeof members.$inferSelect, helpers: any) => helpers.eq(membersTable.status, existing.code),
-      });
+      const [membersWithStatus] = await db
+        .select()
+        .from(members)
+        .where(eq(members.status, existing.code))
+        .limit(1);
 
       if (membersWithStatus) {
         throw new BadRequestException(
@@ -248,8 +240,6 @@ export class MemberStatusesService {
    */
   async reorderStatuses(data: { id: string; displayOrder: number }[]) {
     try {
-      const storage = this.storageService.instance as any;
-      const db = storage.db;
 
       // Mettre à jour chaque statut avec son nouvel ordre
       for (const item of data) {
