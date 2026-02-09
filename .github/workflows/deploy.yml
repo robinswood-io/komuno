@@ -118,7 +118,7 @@ jobs:
 
   deploy-rep:
     name: Deploy to REP
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, rep]
     needs: build
     if: |
       github.event_name == 'push' ||
@@ -130,37 +130,27 @@ jobs:
       url: https://repicardie.fr
 
     steps:
-      - name: Deploy to REP server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.REP_HOST || secrets.VPS_HOST }}
-          username: ${{ secrets.REP_SSH_USER || secrets.VPS_USER }}
-          key: ${{ secrets.REP_SSH_KEY || secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.REP_PORT || secrets.VPS_PORT }}
-          script: |
-            set -e
-            cd /home/thibault
+      - name: Pull latest code
+        run: |
+          cd /docker/apps/komuno
+          git config --global --add safe.directory /docker/apps/komuno
+          git fetch --all --prune
+          git checkout main
+          git pull --ff-only
 
-            # Nettoyage automatique des anciennes images pour libérer de l'espace
-            echo "🧹 Nettoyage des anciennes images Docker..."
-            docker image prune -a -f --filter "until=24h" || true
+      - name: Build and deploy
+        run: |
+          cd /docker/apps/komuno
+          docker compose -f docker-compose.prod.yml up -d --build
+        timeout-minutes: 15
 
-            # Se connecter au registry
-            echo "${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Wait and verify health
+        run: |
+          echo "Attente du demarrage..."
+          sleep 30
+          docker ps --filter "name=rep" --format "table {{.Names}}\t{{.Status}}"
+          wget -q -O - http://localhost:5000/api/health || exit 1
 
-            # Pull de la nouvelle image
-            docker pull ghcr.io/${{ github.repository }}:latest
-
-            # Arrêter et supprimer l'ancien container
-            docker compose -f docker-compose.yml stop rep || true
-            docker compose -f docker-compose.yml rm -f rep || true
-
-            # Démarrer le nouveau container
-            docker compose -f docker-compose.yml up -d rep
-
-            # Attendre et vérifier
-            sleep 15
-            docker ps | grep rep
-
-            # Nettoyage post-déploiement (images non taguées)
-            docker image prune -f || true
+      - name: Cleanup old images
+        if: always()
+        run: docker image prune -f || true

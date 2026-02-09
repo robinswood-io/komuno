@@ -1,67 +1,112 @@
-version: '3.8'
-
 services:
   app:
-    image: gitea.robinswood.io/cjd80:latest
-    container_name: cjd80-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: komuno:latest
+    container_name: ${APP_NAME:-komuno}-app
     restart: unless-stopped
-    ports:
-      - "5000:5000"
     env_file:
       - .env
     environment:
       - NODE_ENV=production
-      - AUTH_MODE=local
+      - NODE_OPTIONS=--max-old-space-size=3072
+    expose:
+      - "5000"
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 90s
     volumes:
       - ./logs:/app/logs
     networks:
-      - cjd80-network
+      - traefik
+      - app-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.cjd80.rule=Host(\`cjd80.fr\`)"
-      - "traefik.http.routers.cjd80.entrypoints=websecure"
-      - "traefik.http.routers.cjd80.tls.certresolver=letsencrypt"
-      - "traefik.http.services.cjd80.loadbalancer.server.port=5000"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.${APP_NAME:-komuno}.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
+      - "traefik.http.routers.${APP_NAME:-komuno}.entrypoints=websecure"
+      - "traefik.http.routers.${APP_NAME:-komuno}.tls=true"
+      - "traefik.http.routers.${APP_NAME:-komuno}.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${APP_NAME:-komuno}.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.${APP_NAME:-komuno}-redirect.redirectregex.regex=^https://www\\.${DOMAIN}/(.*)"
+      - "traefik.http.middlewares.${APP_NAME:-komuno}-redirect.redirectregex.replacement=https://${DOMAIN}/$${1}"
+      - "traefik.http.routers.${APP_NAME:-komuno}.middlewares=${APP_NAME:-komuno}-redirect"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   postgres:
     image: postgres:16-alpine
-    container_name: cjd80-postgres
+    container_name: ${APP_NAME:-komuno}-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: cjd80
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      POSTGRES_DB: cjd80
+      POSTGRES_USER: ${DB_USER:-appuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-app_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - cjd80-network
+      - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cjd80 -d cjd80"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-appuser} -d ${DB_NAME:-app_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: cjd80-redis
+    container_name: ${APP_NAME:-komuno}-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
     networks:
-      - cjd80-network
+      - app-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  minio:
+    image: minio/minio:latest
+    container_name: ${APP_NAME:-komuno}-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 networks:
-  cjd80-network:
+  traefik:
+    external: true
+  app-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  redis_data:
+  minio_data:
