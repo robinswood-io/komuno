@@ -1,30 +1,29 @@
 # ===================================
 # Stage 1: Builder - Construction de l'application
 # ===================================
+FROM oven/bun:1-alpine AS bun-stage
 FROM node:20-alpine AS builder
+
+# Copier Bun depuis l'image officielle
+COPY --from=bun-stage /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=bun-stage /usr/local/bin/bunx /usr/local/bin/bunx
 
 WORKDIR /app
 
 # Copier les fichiers de dépendances
-COPY package*.json ./
+COPY package*.json bun.lock* ./
 
-# Installer les dépendances (toutes, y compris devDependencies pour le build)
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+# Installer les dépendances avec Bun (3-5x plus rapide que npm)
+RUN bun install --frozen-lockfile 2>/dev/null || bun install
 
 # Copier le code source
 COPY . .
 
-# Build arg pour le base path (vide par défaut pour servir à la racine)
-ARG VITE_BASE_PATH=/
-
-# Vérifications et build (frontend + backend)
 # Augmenter la limite de mémoire Node.js pour éviter les erreurs "heap out of memory"
-# Désactiver source maps en production pour économiser la mémoire
 ENV NODE_ENV=production
 ENV NODE_OPTIONS=--max-old-space-size=3072
-ENV VITE_BASE_PATH=${VITE_BASE_PATH}
-# Build frontend + backend (type-check déjà couvert en CI)
-RUN npm run build
+# Build frontend + backend (Next.js utilise Node, Bun orchestre)
+RUN bun run build
 
 # ===================================
 # Stage 2: Runner - Image de production
