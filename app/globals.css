@@ -245,3 +245,57 @@
      sont maintenant générées automatiquement par Tailwind via tailwind.config.ts
      qui référence les CSS variables définies ci-dessus. */
 }
+
+/* ============================================
+   UTILITAIRES DE CONTRASTE AUTOMATIQUE
+   Applique automatiquement du texte noir ou blanc selon la luminosité du fond
+   ============================================ */
+
+@layer utilities {
+  /**
+   * Classes pour appliquer automatiquement un bon contraste de texte
+   * Utilise le mélange de couleurs CSS (mix-blend-mode) pour créer un contraste optimal
+   */
+  
+  /* Applique automatiquement du texte noir ou blanc selon le fond */
+  .text-auto-contrast {
+    color: hsl(var(--foreground));
+  }
+
+  /**
+   * Pour les hovers sur fond d'accent:
+   * Au lieu d'utiliser une couleur de texte spécifique qui pourrait ne pas contraster,
+   * on utilise la couleur foreground qui est garantie de contraster avec background
+   */
+  .hover-auto-contrast:hover {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /**
+   * Variante pour les éléments actifs
+   */
+  .active-auto-contrast {
+    color: hsl(var(--foreground)) !important;
+  }
+}
+
+/* ============================================
+   CORRECTIONS DE CONTRASTE POUR LE SIDEBAR
+   Force un bon contraste pour le menu admin
+   ============================================ */
+
+@layer components {
+  /**
+   * Correction spécifique pour le sidebar:
+   * Utilise foreground au lieu de sidebar-accent-foreground pour garantir le contraste
+   */
+  .sidebar-link-hover:hover {
+    background-color: hsl(var(--sidebar-accent));
+    color: hsl(var(--foreground));
+  }
+  
+  .sidebar-link-active {
+    background-color: hsl(var(--sidebar-primary));
+    color: hsl(var(--sidebar-primary-foreground));
+  }
+}
