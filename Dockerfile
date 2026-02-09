@@ -38,6 +38,7 @@ ENV NEXT_PUBLIC_FEEDBACK_API=$NEXT_PUBLIC_FEEDBACK_API
 
 # Build frontend + backend (Bun orchestre, Next.js utilise Node)
 # IMPORTANT: Augmenté à 4096 MB pour éviter OOM lors du build CSS
+# Build 2026-02-09: Fix CSS generation issue
 RUN bun run build && \
     echo "✅ Build terminé" && \
     ls -la .next/static/ && \
