@@ -72,6 +72,7 @@ export class AdminMembersController {
   @ApiQuery({ name: 'search', required: false, description: 'Recherche par nom ou email', example: 'dupont' })
   @ApiQuery({ name: 'score', required: false, description: 'Filtrer par score d\'engagement', enum: ['high', 'medium', 'low'] })
   @ApiQuery({ name: 'activity', required: false, description: 'Filtrer par activité', enum: ['recent', 'inactive'] })
+  @ApiQuery({ name: 'prospectionStatus', required: false, description: 'Filtrer par statut de prospection', enum: ['2027', 'Refusé', 'A contacter', 'RDV prévu', 'Intérêt - à relancer'] })
   @ApiResponse({ status: 200, description: 'Liste des membres avec pagination' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
@@ -82,10 +83,11 @@ export class AdminMembersController {
     @Query('search') search?: string,
     @Query('score') score?: 'high' | 'medium' | 'low',
     @Query('activity') activity?: 'recent' | 'inactive',
+    @Query('prospectionStatus') prospectionStatus?: string,
   ) {
     const pageNum = parseInt(page || '1', 10);
     const limitNum = parseInt(limit || '20', 10);
-    return await this.membersService.getMembers(pageNum, limitNum, status, search, score, activity);
+    return await this.membersService.getMembers(pageNum, limitNum, status, search, score, activity, prospectionStatus);
   }
 
   @Post()
@@ -100,10 +102,24 @@ export class AdminMembersController {
         lastName: { type: 'string', example: 'Dupont' },
         email: { type: 'string', format: 'email', example: 'jean.dupont@example.com' },
         company: { type: 'string', example: 'Entreprise SAS' },
+        department: { type: 'string', example: 'Hauts-de-France' },
+        city: { type: 'string', example: 'Amiens' },
+        postalCode: { type: 'string', example: '80000' },
+        epci: { type: 'string', example: 'CA Amiens Métropole' },
+        prospectionStatus: {
+          type: 'string',
+          enum: ['2027', 'Refusé', 'A contacter', 'RDV prévu', 'Intérêt - à relancer', ''],
+          example: 'A contacter'
+        },
+        firstContactDate: { type: 'string', format: 'date', example: '2026-01-15' },
+        meetingDate: { type: 'string', format: 'date', example: '2026-02-20' },
+        sector: { type: 'string', example: 'Services aux entreprises' },
         phone: { type: 'string', example: '+33612345678' },
         role: { type: 'string', example: 'Directeur' },
+        cjdRole: { type: 'string', example: 'president' },
         notes: { type: 'string', example: 'Notes additionnelles' },
-        status: { type: 'string', enum: ['active', 'proposed'], default: 'active' }
+        status: { type: 'string', enum: ['active', 'proposed'], default: 'active' },
+        proposedBy: { type: 'string', format: 'email', example: 'parrain@example.com' }
       },
       required: ['firstName', 'lastName', 'email']
     }

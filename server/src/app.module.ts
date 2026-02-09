@@ -16,6 +16,7 @@ import { BrandingModule } from './branding/branding.module';
 import { AdminModule } from './admin/admin.module';
 import { GitHubModule } from './github/github.module';
 import { MembersModule } from './members/members.module';
+import { MemberStatusesModule } from './member-statuses/member-statuses.module';
 import { PatronsModule } from './patrons/patrons.module';
 import { LoansModule } from './loans/loans.module';
 import { ToolsModule } from './tools/tools.module';
@@ -59,6 +60,7 @@ const throttlerLimit = isDevelopment ? 10000 : 1000;
     AdminModule,
     GitHubModule,
     MembersModule,
+    MemberStatusesModule,
     PatronsModule,
     LoansModule,
     ToolsModule,

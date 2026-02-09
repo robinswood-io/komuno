@@ -19,6 +19,15 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, UserPlus, Eye, Download, BarChart3, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -53,6 +62,10 @@ interface Member {
   cjdRole?: string;
   notes?: string;
   proposedBy?: string;
+  prospectionStatus?: 'Refusé' | 'RDV prévu' | 'A contacter' | '2027' | 'Intérêt - à relancer' | null;
+  firstContactDate?: string | null;
+  appointmentDate?: string | null;
+  city?: string;
 }
 
 interface EditMemberFormData {
@@ -111,9 +124,11 @@ function exportToCSV(members: Member[]): void {
     'Téléphone',
     'Fonction',
     'Rôle CJD',
+    'Ville',
+    'Date 1er contact',
+    'Date RDV',
     'Statut',
-    'Score d\'engagement',
-    'Proposé par'
+    'Score d\'engagement'
   ];
 
   // Fonction pour échapper les valeurs CSV
@@ -129,6 +144,25 @@ function exportToCSV(members: Member[]): void {
     return stringValue;
   };
 
+  // Fonction pour formater les dates en dd/MM/yyyy
+  const formatDateForCSV = (dateString: string | null | undefined): string => {
+    if (!dateString) return '';
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy');
+    } catch {
+      return '';
+    }
+  };
+
+  // Fonction pour obtenir le statut unifié (statut membre ou statut prospection)
+  const getUnifiedStatus = (member: Member): string => {
+    if (member.status === 'active') return 'active';
+    if (member.status === 'proposed') return 'proposed';
+    if (member.status === 'inactive') return 'inactive';
+    if (member.prospectionStatus) return member.prospectionStatus;
+    return '';
+  };
+
   // Construire les lignes de données
   const rows = members.map(member => [
     escapeCSV(member.firstName),
@@ -138,9 +172,11 @@ function exportToCSV(members: Member[]): void {
     escapeCSV(member.phone),
     escapeCSV(member.role),
     escapeCSV(member.cjdRole),
-    escapeCSV(member.status === 'active' ? 'Actif' : 'Prospect'),
-    escapeCSV(member.status === 'active' ? member.engagementScore : ''),
-    escapeCSV(member.proposedBy)
+    escapeCSV(member.city),
+    formatDateForCSV(member.firstContactDate),
+    formatDateForCSV(member.appointmentDate),
+    escapeCSV(getUnifiedStatus(member)),
+    escapeCSV(member.status === 'active' ? member.engagementScore : '')
   ]);
 
   // Construire le contenu CSV avec BOM UTF-8 pour Excel
@@ -175,7 +211,7 @@ export default function AdminMembersPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'proposed'>('all');
+  const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set(['all']));
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -513,10 +549,20 @@ export default function AdminMembersPage() {
     }
   };
 
-  // Filtrés les membres selon le statut sélectionné
+  // Fonction pour obtenir le statut unifié
+  const getUnifiedStatus = (member: Member): string => {
+    if (member.status === 'active') return 'active';
+    if (member.status === 'proposed') return 'proposed';
+    if (member.status === 'inactive') return 'inactive';
+    if (member.prospectionStatus) return member.prospectionStatus;
+    return '';
+  };
+
+  // Filtrés les membres selon les statuts sélectionnés
   const filteredMembers = data?.data?.filter(member => {
-    if (statusFilter === 'all') return true;
-    return member.status === statusFilter;
+    if (statusFilters.has('all')) return true;
+    const unifiedStatus = getUnifiedStatus(member);
+    return statusFilters.has(unifiedStatus);
   });
 
   if (isLoading) {
@@ -586,27 +632,149 @@ export default function AdminMembersPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium text-muted-foreground">Filtrer par statut :</span>
               <Button
-                variant={statusFilter === 'all' ? 'default' : 'outline'}
+                variant={statusFilters.has('all') ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setStatusFilter('all')}
+                onClick={() => setStatusFilters(new Set(['all']))}
               >
                 Tous
               </Button>
               <Button
-                variant={statusFilter === 'active' ? 'default' : 'outline'}
+                variant={statusFilters.has('active') && !statusFilters.has('all') ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setStatusFilter('active')}
+                onClick={() => {
+                  const newFilters = new Set(statusFilters);
+                  if (newFilters.has('all')) newFilters.delete('all');
+                  if (newFilters.has('active')) {
+                    newFilters.delete('active');
+                    if (newFilters.size === 0) newFilters.add('all');
+                  } else {
+                    newFilters.add('active');
+                  }
+                  setStatusFilters(newFilters);
+                }}
               >
                 <UserCheck className="h-4 w-4 mr-2" />
-                Membres actifs
+                Actif
               </Button>
               <Button
-                variant={statusFilter === 'proposed' ? 'default' : 'outline'}
+                variant={statusFilters.has('proposed') && !statusFilters.has('all') ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setStatusFilter('proposed')}
+                onClick={() => {
+                  const newFilters = new Set(statusFilters);
+                  if (newFilters.has('all')) newFilters.delete('all');
+                  if (newFilters.has('proposed')) {
+                    newFilters.delete('proposed');
+                    if (newFilters.size === 0) newFilters.add('all');
+                  } else {
+                    newFilters.add('proposed');
+                  }
+                  setStatusFilters(newFilters);
+                }}
               >
                 <UserPlus className="h-4 w-4 mr-2" />
-                Prospects
+                Proposé
+              </Button>
+              <Button
+                variant={statusFilters.has('inactive') && !statusFilters.has('all') ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  const newFilters = new Set(statusFilters);
+                  if (newFilters.has('all')) newFilters.delete('all');
+                  if (newFilters.has('inactive')) {
+                    newFilters.delete('inactive');
+                    if (newFilters.size === 0) newFilters.add('all');
+                  } else {
+                    newFilters.add('inactive');
+                  }
+                  setStatusFilters(newFilters);
+                }}
+              >
+                Inactif
+              </Button>
+              <Button
+                variant={statusFilters.has('Refusé') && !statusFilters.has('all') ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  const newFilters = new Set(statusFilters);
+                  if (newFilters.has('all')) newFilters.delete('all');
+                  if (newFilters.has('Refusé')) {
+                    newFilters.delete('Refusé');
+                    if (newFilters.size === 0) newFilters.add('all');
+                  } else {
+                    newFilters.add('Refusé');
+                  }
+                  setStatusFilters(newFilters);
+                }}
+              >
+                Refusé
+              </Button>
+              <Button
+                variant={statusFilters.has('RDV prévu') && !statusFilters.has('all') ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  const newFilters = new Set(statusFilters);
+                  if (newFilters.has('all')) newFilters.delete('all');
+                  if (newFilters.has('RDV prévu')) {
+                    newFilters.delete('RDV prévu');
+                    if (newFilters.size === 0) newFilters.add('all');
+                  } else {
+                    newFilters.add('RDV prévu');
+                  }
+                  setStatusFilters(newFilters);
+                }}
+              >
+                RDV prévu
+              </Button>
+              <Button
+                variant={statusFilters.has('A contacter') && !statusFilters.has('all') ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  const newFilters = new Set(statusFilters);
+                  if (newFilters.has('all')) newFilters.delete('all');
+                  if (newFilters.has('A contacter')) {
+                    newFilters.delete('A contacter');
+                    if (newFilters.size === 0) newFilters.add('all');
+                  } else {
+                    newFilters.add('A contacter');
+                  }
+                  setStatusFilters(newFilters);
+                }}
+              >
+                A contacter
+              </Button>
+              <Button
+                variant={statusFilters.has('2027') && !statusFilters.has('all') ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  const newFilters = new Set(statusFilters);
+                  if (newFilters.has('all')) newFilters.delete('all');
+                  if (newFilters.has('2027')) {
+                    newFilters.delete('2027');
+                    if (newFilters.size === 0) newFilters.add('all');
+                  } else {
+                    newFilters.add('2027');
+                  }
+                  setStatusFilters(newFilters);
+                }}
+              >
+                2027
+              </Button>
+              <Button
+                variant={statusFilters.has('Intérêt - à relancer') && !statusFilters.has('all') ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  const newFilters = new Set(statusFilters);
+                  if (newFilters.has('all')) newFilters.delete('all');
+                  if (newFilters.has('Intérêt - à relancer')) {
+                    newFilters.delete('Intérêt - à relancer');
+                    if (newFilters.size === 0) newFilters.add('all');
+                  } else {
+                    newFilters.add('Intérêt - à relancer');
+                  }
+                  setStatusFilters(newFilters);
+                }}
+              >
+                Intérêt - à relancer
               </Button>
             </div>
 
@@ -628,116 +796,135 @@ export default function AdminMembersPage() {
               <TableRow>
                 <TableHead>Nom</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Entreprise</TableHead>
+                <TableHead>Ville</TableHead>
+                <TableHead>Date 1er contact</TableHead>
+                <TableHead>Date RDV</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead>Score</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredMembers && filteredMembers.length > 0 ? (
-                filteredMembers.map((member: Member) => (
-                  <TableRow
-                    key={member.email}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => {
-                      router.push(`/admin/members/${encodeURIComponent(member.email)}`);
-                    }}
-                  >
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <span>{member.firstName} {member.lastName}</span>
-                        {member.status === 'proposed' && member.proposedBy && (
-                          <span className="text-xs text-muted-foreground">(proposé par {member.proposedBy})</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      onClick={(e) => e.stopPropagation()}
-                      className="cursor-pointer hover:text-primary transition-colors"
-                      title="Cliquer pour copier l'email"
+                filteredMembers.map((member: Member) => {
+                  const unifiedStatus = getUnifiedStatus(member);
+                  const getStatusBadgeStyles = (status: string) => {
+                    switch (status) {
+                      case 'active':
+                        return { bg: 'bg-green-50', text: 'text-green-900', border: 'border-green-200', label: 'Actif' };
+                      case 'proposed':
+                        return { bg: 'bg-orange-50', text: 'text-orange-900', border: 'border-orange-200', label: 'Proposé' };
+                      case 'inactive':
+                        return { bg: 'bg-gray-50', text: 'text-gray-900', border: 'border-gray-200', label: 'Inactif' };
+                      case 'Refusé':
+                        return { bg: 'bg-red-50', text: 'text-red-900', border: 'border-red-200', label: 'Refusé' };
+                      case 'RDV prévu':
+                        return { bg: 'bg-blue-50', text: 'text-blue-900', border: 'border-blue-200', label: 'RDV prévu' };
+                      case 'A contacter':
+                        return { bg: 'bg-yellow-50', text: 'text-yellow-900', border: 'border-yellow-200', label: 'A contacter' };
+                      case '2027':
+                        return { bg: 'bg-purple-50', text: 'text-purple-900', border: 'border-purple-200', label: '2027' };
+                      case 'Intérêt - à relancer':
+                        return { bg: 'bg-cyan-50', text: 'text-cyan-900', border: 'border-cyan-200', label: 'Intérêt - à relancer' };
+                      default:
+                        return { bg: 'bg-gray-50', text: 'text-gray-900', border: 'border-gray-200', label: status };
+                    }
+                  };
+                  const statusStyles = getStatusBadgeStyles(unifiedStatus);
+
+                  return (
+                    <TableRow
+                      key={member.email}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => {
+                        router.push(`/admin/members/${encodeURIComponent(member.email)}`);
+                      }}
                     >
-                      <span
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(member.email);
-                            toast({
-                              title: 'Email copié',
-                              description: `${member.email} a été copié dans le presse-papier`,
-                            });
-                          } catch (error) {
-                            toast({
-                              title: 'Erreur',
-                              description: 'Impossible de copier l\'email',
-                              variant: 'destructive',
-                            });
-                          }
-                        }}
-                      >
-                        {member.email}
-                      </span>
-                    </TableCell>
-                    <TableCell>{member.company || '-'}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={member.status === 'active' ? 'default' : 'outline'}
-                        className={member.status === 'active' ? 'bg-green-50 text-green-900 border-green-200' : 'bg-orange-50 text-orange-900 border-orange-200'}
-                        data-testid="member-status-badge"
-                      >
-                        {member.status === 'active' ? '✓ Actif' : '○ Prospect'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {member.status === 'active' ? (
+                      <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-secondary rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary"
-                              style={{ width: `${member.engagementScore || 0}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            <span data-testid="member-engagement-score">
-                              {member.engagementScore || 0}
-                            </span>
-                          </span>
+                          <span>{member.firstName} {member.lastName}</span>
+                          {member.status === 'proposed' && member.proposedBy && (
+                            <span className="text-xs text-muted-foreground">(proposé par {member.proposedBy})</span>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {member.status === 'proposed' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              convertToActiveMutation.mutate(member.email);
-                            }}
-                            disabled={convertToActiveMutation.isPending}
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                          >
-                            {convertToActiveMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <>
-                                <UserCheck className="h-4 w-4 mr-1" />
-                                Convertir
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+                      <TableCell
+                        onClick={(e) => e.stopPropagation()}
+                        className="cursor-pointer hover:text-primary transition-colors"
+                        title="Cliquer pour copier l'email"
+                      >
+                        <span
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(member.email);
+                              toast({
+                                title: 'Email copié',
+                                description: `${member.email} a été copié dans le presse-papier`,
+                              });
+                            } catch (error) {
+                              toast({
+                                title: 'Erreur',
+                                description: 'Impossible de copier l\'email',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
+                        >
+                          {member.email}
+                        </span>
+                      </TableCell>
+                      <TableCell>{member.city || '-'}</TableCell>
+                      <TableCell>
+                        {member.firstContactDate
+                          ? format(new Date(member.firstContactDate), 'dd MMM yyyy', { locale: fr })
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {member.appointmentDate
+                          ? format(new Date(member.appointmentDate), 'dd MMM yyyy', { locale: fr })
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={`${statusStyles.bg} ${statusStyles.text} ${statusStyles.border}`}
+                          data-testid="member-status-badge"
+                        >
+                          {statusStyles.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {member.status === 'proposed' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                convertToActiveMutation.mutate(member.email);
+                              }}
+                              disabled={convertToActiveMutation.isPending}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            >
+                              {convertToActiveMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <UserCheck className="h-4 w-4 mr-1" />
+                                  Convertir
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     {data?.data && data.data.length > 0
-                      ? 'Aucun membre ne correspond à ce statut'
+                      ? 'Aucun membre ne correspond aux filtres sélectionnés'
                       : 'Aucun membre trouvé'
                     }
                   </TableCell>

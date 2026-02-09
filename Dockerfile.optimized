@@ -1,120 +1,112 @@
 # ===================================
-# Dockerfile optimisé pour production
-# Multi-stage build avec optimisations de sécurité et performance
+# Stage 1: Dependencies - Installation avec Bun (ultra-rapide)
 # ===================================
-
-# ===================================
-# Stage 1: Base - Image de base avec outils communs
-# ===================================
-FROM node:20-alpine AS base
-
-# Installer les dépendances système nécessaires
-RUN apk add --no-cache \
-    tini \
-    dumb-init \
-    wget \
-    curl
+FROM oven/bun:1.1-alpine AS deps
 
 WORKDIR /app
 
-# ===================================
-# Stage 2: Dependencies - Installation des dépendances
-# ===================================
-FROM base AS dependencies
+# Copier uniquement les fichiers de dépendances pour maximiser le cache
+COPY package.json bun.lockb* package-lock.json* ./
 
-# Copier les fichiers de dépendances
-COPY package*.json ./
-
-# Installer toutes les dépendances (dev + prod) pour le build
-RUN npm ci --legacy-peer-deps --prefer-offline --no-audit
+# Installer les dépendances avec Bun (5-10x plus rapide que npm)
+# --frozen-lockfile = équivalent de npm ci
+RUN bun install --frozen-lockfile --production=false || bun install --production=false
 
 # ===================================
-# Stage 3: Builder - Construction de l'application
+# Stage 2: Builder - Construction avec cache optimal
 # ===================================
-FROM dependencies AS builder
+FROM oven/bun:1.1-alpine AS builder
 
-# Copier le code source
-COPY . .
+WORKDIR /app
+
+# Copier node_modules depuis le stage deps (réutilise le cache)
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./
+
+# Copier uniquement les fichiers sources nécessaires au build
+# (exclure tests, docs, etc. pour accélérer le transfert)
+COPY shared ./shared
+COPY server ./server
+COPY app ./app
+COPY scripts ./scripts
+COPY migrations ./migrations
+COPY public ./public
+COPY next.config.js ./
+COPY tsconfig.json ./
+COPY drizzle.config.ts ./
+COPY docker-entrypoint.sh ./
+
+# Build args
+ARG VITE_BASE_PATH=/
+ARG NEXT_PUBLIC_FEEDBACK_ENABLED=true
+ARG NEXT_PUBLIC_APP_PHASE=production
+ARG NEXT_PUBLIC_FEEDBACK_API=https://work.robinswood.io/api/feedback
+ARG GIT_TAG=main-unknown
 
 # Variables d'environnement pour le build
 ENV NODE_ENV=production
-ENV NODE_OPTIONS=--max-old-space-size=3072
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+ENV NEXT_PUBLIC_FEEDBACK_ENABLED=$NEXT_PUBLIC_FEEDBACK_ENABLED
+ENV NEXT_PUBLIC_APP_PHASE=$NEXT_PUBLIC_APP_PHASE
+ENV NEXT_PUBLIC_FEEDBACK_API=$NEXT_PUBLIC_FEEDBACK_API
+ENV GIT_TAG=${GIT_TAG}
 
-# Vérifications TypeScript et build
-RUN npm run check && npm run build
+# Build avec Bun (type-check + compilation)
+# Bun utilise beaucoup moins de mémoire que Node
+RUN bun run build
 
-# ===================================
-# Stage 4: Production Dependencies - Dépendances production uniquement
-# ===================================
-FROM base AS prod-dependencies
-
-COPY package*.json ./
-
-# Installer UNIQUEMENT les dépendances de production + drizzle-kit pour migrations
-RUN npm ci --omit=dev --legacy-peer-deps --prefer-offline --no-audit && \
-    npm install drizzle-kit --save-dev --no-audit --no-fund
+# Supprimer devDependencies pour réduire la taille de l'image finale
+RUN bun install --frozen-lockfile --production || bun install --production
 
 # ===================================
-# Stage 5: Runner - Image de production finale
+# Stage 3: Runner - Image de production ultra-légère
 # ===================================
-FROM base AS runner
-
-# Créer un utilisateur non-root pour la sécurité
-RUN addgroup -S cjd && \
-    adduser -S cjduser -G cjd && \
-    mkdir -p /app/logs && \
-    chown -R cjduser:cjd /app
+FROM oven/bun:1.1-alpine AS runner
 
 WORKDIR /app
 
-# Copier les dépendances de production
-COPY --from=prod-dependencies --chown=cjduser:cjd /app/node_modules ./node_modules
+# Installer wget pour les health checks
+RUN apk add --no-cache wget
 
-# Copier package.json pour référence
-COPY --chown=cjduser:cjd package*.json ./
+# Créer un utilisateur non-root pour la sécurité
+RUN addgroup -S cjd && adduser -S cjduser -G cjd
 
-# Copier les fichiers nécessaires pour les migrations
-COPY --chown=cjduser:cjd drizzle.config.ts ./
-COPY --chown=cjduser:cjd shared ./shared
-
-# Créer vite.config.js stub (nécessaire pour imports dynamiques)
-RUN echo 'export default {};' > vite.config.js && \
-    chown cjduser:cjd vite.config.js
-
-# Copier les fichiers buildés
+# Copier uniquement les artefacts de production
+COPY --from=builder --chown=cjduser:cjd /app/package.json ./
+COPY --from=builder --chown=cjduser:cjd /app/node_modules ./node_modules
+COPY --from=builder --chown=cjduser:cjd /app/migrations ./migrations
+COPY --from=builder --chown=cjduser:cjd /app/scripts ./scripts
 COPY --from=builder --chown=cjduser:cjd /app/dist ./dist
+COPY --from=builder --chown=cjduser:cjd /app/.next ./.next
+COPY --from=builder --chown=cjduser:cjd /app/next.config.js ./
+COPY --from=builder --chown=cjduser:cjd /app/public ./public
+COPY --from=builder --chown=cjduser:cjd /app/server/esm-loader.js ./server/esm-loader.js
+COPY --from=builder --chown=cjduser:cjd /app/docker-entrypoint.sh ./
+
+# Créer dossiers nécessaires et symlink @shared
+RUN mkdir -p /app/logs /app/node_modules && \
+    ln -sf /app/shared /app/node_modules/@shared && \
+    chmod +x /app/docker-entrypoint.sh /app/scripts/run-migrations.sh && \
+    chown -R cjduser:cjd /app
 
 # Utiliser l'utilisateur non-root
 USER cjduser
 
-# Exposer le port
-EXPOSE 5000
+# Exposer les ports (NextJS:3000, NestJS:5000)
+EXPOSE 3000 5000
 
-# Build args pour métadonnées
-ARG GIT_TAG=unknown
-ARG BUILD_DATE
-ARG GIT_COMMIT
+# Build arg pour le tag Git
+ARG GIT_TAG=main-unknown
 
-# Labels OCI standard
-LABEL org.opencontainers.image.title="CJD80 Application"
-LABEL org.opencontainers.image.description="Application full-stack CJD Amiens"
-LABEL org.opencontainers.image.version="${GIT_TAG}"
-LABEL org.opencontainers.image.created="${BUILD_DATE}"
-LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
-LABEL org.opencontainers.image.vendor="CJD Amiens"
+# Variables d'environnement par défaut
+ENV NODE_ENV=production
+ENV PORT=5000
+ENV GIT_TAG=${GIT_TAG}
+ENV BUN_RUNTIME=true
 
-# Variables d'environnement
-ENV NODE_ENV=production \
-    PORT=5000 \
-    GIT_TAG=${GIT_TAG} \
-    NODE_OPTIONS="--max-old-space-size=512"
+# Health check optimisé avec Bun
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget -q -O- http://localhost:5000/api/health || exit 1
 
-# Health check optimisé
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD wget --spider -q http://localhost:5000/api/health/ready || exit 1
-
-# Utiliser tini comme init system pour gérer les signaux
-ENTRYPOINT ["/sbin/tini", "--"]
-
-# Commande de démarrage avec node directement (pas de npm)
-CMD ["node", "--enable-source-maps", "dist/main.js"]
+# Commande de démarrage
+CMD ["./docker-entrypoint.sh"]

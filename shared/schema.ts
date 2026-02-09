@@ -289,6 +289,25 @@ export const patrons = pgTable("patrons", {
   referrerIdIdx: index("patrons_referrer_id_idx").on(table.referrerId),
 }));
 
+// Patron contacts table - Contacts multiples pour un mécène (entreprise)
+export const patronContacts = pgTable("patron_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patronId: varchar("patron_id").references(() => patrons.id, { onDelete: "cascade" }).notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  role: text("role"), // Fonction du contact
+  email: text("email"), // Email du contact
+  phone: text("phone"), // Téléphone du contact
+  isPrimary: boolean("is_primary").default(false).notNull(), // Contact principal
+  notes: text("notes"), // Notes sur ce contact
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  patronIdIdx: index("patron_contacts_patron_id_idx").on(table.patronId),
+  emailIdx: index("patron_contacts_email_idx").on(table.email),
+  isPrimaryIdx: index("patron_contacts_is_primary_idx").on(table.isPrimary),
+}));
+
 // Patron donations table - Historique des dons
 export const patronDonations = pgTable("patron_donations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -341,6 +360,35 @@ export const ideaPatronProposals = pgTable("idea_patron_proposals", {
   statusIdx: index("idea_patron_proposals_status_idx").on(table.status),
 }));
 
+// Statuts des membres CRM - Combine statuts membres + prospection
+export const MEMBER_STATUS = {
+  // Statuts membres actifs
+  ACTIVE: "active",
+  PROPOSED: "proposed",
+  INACTIVE: "inactive",
+
+  // Statuts prospection
+  TARGET_2027: "2027",
+  REFUSED: "Refusé",
+  TO_CONTACT: "A contacter",
+  MEETING_SCHEDULED: "RDV prévu",
+  INTEREST_RELAUNCH: "Intérêt - à relancer",
+} as const;
+
+export type MemberStatus = typeof MEMBER_STATUS[keyof typeof MEMBER_STATUS];
+
+// Labels pour l'affichage
+export const MEMBER_STATUS_LABELS: Record<MemberStatus, string> = {
+  [MEMBER_STATUS.ACTIVE]: "Actif",
+  [MEMBER_STATUS.PROPOSED]: "Proposé",
+  [MEMBER_STATUS.INACTIVE]: "Inactif",
+  [MEMBER_STATUS.TARGET_2027]: "Cible 2027",
+  [MEMBER_STATUS.REFUSED]: "Refusé",
+  [MEMBER_STATUS.TO_CONTACT]: "À contacter",
+  [MEMBER_STATUS.MEETING_SCHEDULED]: "RDV prévu",
+  [MEMBER_STATUS.INTEREST_RELAUNCH]: "Intérêt - à relancer",
+};
+
 // CJD Roles definition - Rôles organisationnels CJD
 export const CJD_ROLES = {
   PRESIDENT: "president",
@@ -367,6 +415,25 @@ export const CJD_ROLE_LABELS: Record<CjdRole, string> = {
   [CJD_ROLES.RESPONSABLE_MECENES]: "Responsable mécènes",
 };
 
+// Member statuses table - Statuts personnalisables pour membres et prospects
+export const memberStatuses = pgTable("member_statuses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 50 }).notNull().unique(), // Code technique
+  label: varchar("label", { length: 100 }).notNull(), // Libellé affiché
+  category: varchar("category", { length: 20 }).notNull(), // "member" ou "prospect"
+  color: varchar("color", { length: 20 }).notNull().default("gray"), // Couleur badge
+  description: text("description"), // Description
+  isSystem: boolean("is_system").notNull().default(false), // Non supprimable
+  displayOrder: integer("display_order").notNull().default(0), // Ordre affichage
+  isActive: boolean("is_active").notNull().default(true), // Actif/désactivé
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  categoryIdx: index("member_statuses_category_idx").on(table.category),
+  isActiveIdx: index("member_statuses_is_active_idx").on(table.isActive),
+  displayOrderIdx: index("member_statuses_display_order_idx").on(table.displayOrder),
+}));
+
 // Members table - CRM pour la gestion des membres
 export const members = pgTable("members", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -377,12 +444,14 @@ export const members = pgTable("members", {
   department: text("department"), // Département
   city: text("city"), // Ville
   postalCode: text("postal_code"), // Code postal
+  firstContactDate: date("first_contact_date"), // Date du premier contact
+  meetingDate: date("meeting_date"), // Date du RDV
   sector: text("sector"), // Secteur d'activité
   phone: text("phone"),
   role: text("role"), // Rôle professionnel/métier
   cjdRole: text("cjd_role"), // Rôle organisationnel CJD (président, trésorier, etc.)
   notes: text("notes"),
-  status: text("status").default("active").notNull(),
+  status: text("status").default("active").notNull(), // Statut unifié: active, proposed, inactive, 2027, Refusé, A contacter, RDV prévu, Intérêt - à relancer
   proposedBy: text("proposed_by"),
   engagementScore: integer("engagement_score").default(0).notNull(),
   firstSeenAt: timestamp("first_seen_at").notNull(),
@@ -397,6 +466,7 @@ export const members = pgTable("members", {
   engagementScoreIdx: index("members_engagement_score_idx").on(table.engagementScore.desc()),
   statusIdx: index("members_status_idx").on(table.status),
   cjdRoleIdx: index("members_cjd_role_idx").on(table.cjdRole),
+  cityIdx: index("members_city_idx").on(table.city),
 }));
 
 // Member activities table - Journal d'activité des membres
@@ -1391,10 +1461,26 @@ export const insertMemberSchema = z.object({
   firstName: z.string().min(2).max(100).transform(sanitizeText),
   lastName: z.string().min(2).max(100).transform(sanitizeText),
   company: z.string().max(200).optional().transform(val => val ? sanitizeText(val) : undefined),
+  department: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
+  city: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
+  postalCode: z.string().max(20).optional().transform(val => val ? sanitizeText(val) : undefined),
+  firstContactDate: z.union([z.string().datetime(), z.date()]).optional(),
+  meetingDate: z.union([z.string().datetime(), z.date()]).optional(),
+  sector: z.string().max(200).optional().transform(val => val ? sanitizeText(val) : undefined),
   phone: z.string().max(20).optional().transform(val => val ? sanitizeText(val) : undefined),
   role: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
+  cjdRole: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
   notes: z.string().max(2000).optional().transform(val => val ? sanitizeText(val) : undefined),
-  status: z.enum(['active', 'proposed']).default('active'),
+  status: z.enum([
+    MEMBER_STATUS.ACTIVE,
+    MEMBER_STATUS.PROPOSED,
+    MEMBER_STATUS.INACTIVE,
+    MEMBER_STATUS.TARGET_2027,
+    MEMBER_STATUS.REFUSED,
+    MEMBER_STATUS.TO_CONTACT,
+    MEMBER_STATUS.MEETING_SCHEDULED,
+    MEMBER_STATUS.INTEREST_RELAUNCH,
+  ]).default(MEMBER_STATUS.ACTIVE),
   proposedBy: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
 });
 
@@ -1413,10 +1499,26 @@ export const updateMemberSchema = z.object({
   firstName: z.string().min(2).max(100).transform(sanitizeText).optional(),
   lastName: z.string().min(2).max(100).transform(sanitizeText).optional(),
   company: z.string().max(200).transform(sanitizeText).optional(),
+  department: z.string().max(100).transform(sanitizeText).optional(),
+  city: z.string().max(100).transform(sanitizeText).optional(),
+  postalCode: z.string().max(20).transform(sanitizeText).optional(),
+  firstContactDate: z.union([z.string().datetime(), z.date()]).optional(),
+  meetingDate: z.union([z.string().datetime(), z.date()]).optional(),
+  sector: z.string().max(200).transform(sanitizeText).optional(),
   phone: z.string().max(20).transform(sanitizeText).optional(),
   role: z.string().max(100).transform(sanitizeText).optional(),
+  cjdRole: z.string().max(100).transform(sanitizeText).optional(),
   notes: z.string().max(2000).transform(sanitizeText).optional(),
-  status: z.enum(['active', 'proposed']).optional(),
+  status: z.enum([
+    MEMBER_STATUS.ACTIVE,
+    MEMBER_STATUS.PROPOSED,
+    MEMBER_STATUS.INACTIVE,
+    MEMBER_STATUS.TARGET_2027,
+    MEMBER_STATUS.REFUSED,
+    MEMBER_STATUS.TO_CONTACT,
+    MEMBER_STATUS.MEETING_SCHEDULED,
+    MEMBER_STATUS.INTEREST_RELAUNCH,
+  ]).optional(),
 });
 
 export const proposeMemberSchema = z.object({
@@ -1424,10 +1526,59 @@ export const proposeMemberSchema = z.object({
   firstName: z.string().min(2, "Le prénom doit contenir au moins 2 caractères").max(100).transform(sanitizeText),
   lastName: z.string().min(2, "Le nom doit contenir au moins 2 caractères").max(100).transform(sanitizeText),
   company: z.string().max(200).optional().transform(val => val ? sanitizeText(val) : undefined),
+  department: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
+  city: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
+  postalCode: z.string().max(20).optional().transform(val => val ? sanitizeText(val) : undefined),
+  firstContactDate: z.union([z.string().datetime(), z.date()]).optional(),
+  meetingDate: z.union([z.string().datetime(), z.date()]).optional(),
+  sector: z.string().max(200).optional().transform(val => val ? sanitizeText(val) : undefined),
   phone: z.string().max(20).optional().transform(val => val ? sanitizeText(val) : undefined),
   role: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
+  cjdRole: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
   notes: z.string().max(2000).optional().transform(val => val ? sanitizeText(val) : undefined),
   proposedBy: z.string().email("Email du proposeur invalide").transform(sanitizeText),
+});
+
+// Schema pour les contacts de mécènes
+export const insertPatronContactSchema = z.object({
+  patronId: z.string().uuid(),
+  firstName: z.string().min(2).max(100).transform(sanitizeText),
+  lastName: z.string().min(2).max(100).transform(sanitizeText),
+  role: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
+  email: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+  phone: z.string().max(20).optional().transform(val => val ? sanitizeText(val) : undefined),
+  isPrimary: z.boolean().default(false),
+  notes: z.string().max(2000).optional().transform(val => val ? sanitizeText(val) : undefined),
+});
+
+export const updatePatronContactSchema = z.object({
+  firstName: z.string().min(2).max(100).transform(sanitizeText).optional(),
+  lastName: z.string().min(2).max(100).transform(sanitizeText).optional(),
+  role: z.string().max(100).transform(sanitizeText).optional(),
+  email: z.string().email().transform(sanitizeText).optional(),
+  phone: z.string().max(20).transform(sanitizeText).optional(),
+  isPrimary: z.boolean().optional(),
+  notes: z.string().max(2000).transform(sanitizeText).optional(),
+});
+
+// Schemas for member statuses (personnalisables)
+export const insertMemberStatusSchema = z.object({
+  code: z.string().min(1).max(50).transform(sanitizeText),
+  label: z.string().min(1).max(100).transform(sanitizeText),
+  category: z.enum(['member', 'prospect']),
+  color: z.enum(['green', 'orange', 'gray', 'red', 'blue', 'yellow', 'purple', 'cyan', 'pink', 'indigo']).default('gray'),
+  description: z.string().max(500).optional().transform(val => val ? sanitizeText(val) : undefined),
+  displayOrder: z.number().int().min(0).default(0),
+});
+
+export const updateMemberStatusSchema = z.object({
+  code: z.string().min(1).max(50).transform(sanitizeText).optional(),
+  label: z.string().min(1).max(100).transform(sanitizeText).optional(),
+  category: z.enum(['member', 'prospect']).optional(),
+  color: z.enum(['green', 'orange', 'gray', 'red', 'blue', 'yellow', 'purple', 'cyan', 'pink', 'indigo']).optional(),
+  description: z.string().max(500).transform(sanitizeText).optional(),
+  displayOrder: z.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
 });
 
 // Schemas for member tags

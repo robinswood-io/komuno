@@ -131,6 +131,7 @@ export class MembersService {
     search?: string,
     score?: 'high' | 'medium' | 'low',
     activity?: 'recent' | 'inactive',
+    prospectionStatus?: string,
   ) {
     const result = await this.storageService.instance.getMembers({
       page,
@@ -139,6 +140,7 @@ export class MembersService {
       ...(search && search.trim() ? { search } : {}),
       ...(score ? { score } : {}),
       ...(activity ? { activity } : {}),
+      ...(prospectionStatus && prospectionStatus !== 'all' ? { prospectionStatus } : {}),
     });
 
     if (!result.success) {

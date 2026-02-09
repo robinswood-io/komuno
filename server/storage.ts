@@ -2873,12 +2873,21 @@ export class DatabaseStorage implements IStorage {
           lastActivityAt: now,
           updatedAt: now
         };
-        
+
         if (memberData.firstName !== undefined) updateData.firstName = memberData.firstName;
         if (memberData.lastName !== undefined) updateData.lastName = memberData.lastName;
         if (memberData.company !== undefined) updateData.company = memberData.company;
+        if (memberData.department !== undefined) updateData.department = memberData.department;
+        if (memberData.city !== undefined) updateData.city = memberData.city;
+        if (memberData.postalCode !== undefined) updateData.postalCode = memberData.postalCode;
+        if (memberData.epci !== undefined) updateData.epci = memberData.epci;
+        if (memberData.prospectionStatus !== undefined) updateData.prospectionStatus = memberData.prospectionStatus;
+        if (memberData.firstContactDate !== undefined) updateData.firstContactDate = memberData.firstContactDate;
+        if (memberData.meetingDate !== undefined) updateData.meetingDate = memberData.meetingDate;
+        if (memberData.sector !== undefined) updateData.sector = memberData.sector;
         if (memberData.phone !== undefined) updateData.phone = memberData.phone;
         if (memberData.role !== undefined) updateData.role = memberData.role;
+        if (memberData.cjdRole !== undefined) updateData.cjdRole = memberData.cjdRole;
 
         const [updatedMember] = await db
           .update(members)
@@ -2894,8 +2903,17 @@ export class DatabaseStorage implements IStorage {
           firstName: memberData.firstName || '',
           lastName: memberData.lastName || '',
           company: memberData.company,
+          department: memberData.department,
+          city: memberData.city,
+          postalCode: memberData.postalCode,
+          epci: memberData.epci,
+          prospectionStatus: memberData.prospectionStatus,
+          firstContactDate: memberData.firstContactDate,
+          meetingDate: memberData.meetingDate,
+          sector: memberData.sector,
           phone: memberData.phone,
           role: memberData.role,
+          cjdRole: memberData.cjdRole,
           notes: memberData.notes,
           engagementScore: 0,
           firstSeenAt: now,
@@ -2957,13 +2975,14 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getMembers(options?: { 
-    page?: number; 
+  async getMembers(options?: {
+    page?: number;
     limit?: number;
     status?: string;
     search?: string;
     score?: 'high' | 'medium' | 'low';
     activity?: 'recent' | 'inactive';
+    prospectionStatus?: string;
   }): Promise<Result<{
     data: Member[];
     total: number;
@@ -2981,6 +3000,11 @@ export class DatabaseStorage implements IStorage {
       // Filtre par statut
       if (options?.status && options.status !== 'all') {
         conditions.push(eq(members.status, options.status));
+      }
+
+      // Filtre par statut de prospection
+      if (options?.prospectionStatus && options.prospectionStatus !== 'all') {
+        conditions.push(eq(members.prospectionStatus, options.prospectionStatus));
       }
 
       // Filtre de recherche textuelle

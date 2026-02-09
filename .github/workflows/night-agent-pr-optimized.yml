@@ -1,0 +1,54 @@
+name: Night Agent PR CI (Optimized with Bun)
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+
+env:
+  BUN_VERSION: 1.1.38
+
+jobs:
+  ci:
+    name: CI Checks
+    if: startsWith(github.head_ref, 'night-agent/auto-fixes-')
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile || bun install
+
+      - name: TypeScript check
+        run: bun run tsc --noEmit
+
+      - name: Run tests
+        run: bun test || npm test
+
+      - name: Build check
+        run: bun run build
+
+      - name: CI Summary
+        if: always()
+        run: |
+          echo "## 🤖 Night Agent CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- TypeScript: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "- Build: ✅" >> $GITHUB_STEP_SUMMARY

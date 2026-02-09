@@ -20,11 +20,29 @@ RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 # Copier le code source
 COPY . .
 
+# Build arg pour le base path (vide par défaut pour servir à la racine)
+ARG VITE_BASE_PATH=/
+
+# Variables d'environnement pour Next.js build
+ARG NEXT_PUBLIC_FEEDBACK_ENABLED=true
+ARG NEXT_PUBLIC_APP_PHASE=production
+ARG NEXT_PUBLIC_FEEDBACK_API=https://work.robinswood.io/api/feedback
+
 # Augmenter la limite de mémoire Node.js pour éviter les erreurs "heap out of memory"
 ENV NODE_ENV=production
-ENV NODE_OPTIONS=--max-old-space-size=3072
-# Build frontend + backend (Next.js utilise Node, Bun orchestre)
-RUN bun run build
+ENV NODE_OPTIONS=--max-old-space-size=4096
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+ENV NEXT_PUBLIC_FEEDBACK_ENABLED=$NEXT_PUBLIC_FEEDBACK_ENABLED
+ENV NEXT_PUBLIC_APP_PHASE=$NEXT_PUBLIC_APP_PHASE
+ENV NEXT_PUBLIC_FEEDBACK_API=$NEXT_PUBLIC_FEEDBACK_API
+
+# Build frontend + backend (Bun orchestre, Next.js utilise Node)
+# IMPORTANT: Augmenté à 4096 MB pour éviter OOM lors du build CSS
+RUN bun run build && \
+    echo "✅ Build terminé" && \
+    ls -la .next/static/ && \
+    echo "CSS files:" && \
+    find .next -name "*.css" -type f | head -10
 
 # ===================================
 # Stage 2: Runner - Image de production
