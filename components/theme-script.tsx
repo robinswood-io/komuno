@@ -26,15 +26,22 @@ export function ThemeScript() {
         const root = document.documentElement;
         root.style.setProperty('--primary', '140 69% 33%');
 
+        // Fonction pour calculer si le texte doit être noir ou blanc selon la luminosité du fond
+        function getContrastTextColor(h, s, l) {
+          // Si luminosité > 50%, fond clair -> texte noir
+          // Sinon, fond foncé -> texte blanc
+          return l > 50 ? '0 0% 0%' : '0 0% 100%';
+        }
+
         // Appliquer les bonnes valeurs selon le thème
         if (activeTheme === 'dark') {
           // Thème dark: fond foncé (L=7.8%), texte blanc
           root.style.setProperty('--sidebar-accent', '205.7143 70% 7.8431%');
-          root.style.setProperty('--sidebar-accent-foreground', '0 0% 100%');
+          root.style.setProperty('--sidebar-accent-foreground', getContrastTextColor(205.7143, 70, 7.8431));
         } else {
           // Thème light: fond clair (L=92%), texte noir
           root.style.setProperty('--sidebar-accent', '211.5789 51.3514% 92.7451%');
-          root.style.setProperty('--sidebar-accent-foreground', '0 0% 0%');
+          root.style.setProperty('--sidebar-accent-foreground', getContrastTextColor(211.5789, 51.3514, 92.7451));
         }
       } catch (e) {
         // En cas d'erreur, ne rien faire (garder light par défaut)

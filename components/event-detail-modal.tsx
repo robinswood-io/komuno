@@ -56,19 +56,19 @@ export default function EventDetailModal({
   // Fetch inscriptions for this event
   const { data: inscriptions, isLoading: inscriptionsLoading } = useQuery<Inscription[]>({
     queryKey: [`/api/admin/events/${event?.id}/inscriptions`],
-    enabled: !!event && showInscriptions,
+    enabled: !!event?.id && showInscriptions,
   });
 
   // Fetch unsubscriptions for this event - Always load to get count
   const { data: unsubscriptions, isLoading: unsubscriptionsLoading } = useQuery<Unsubscription[]>({
     queryKey: [`/api/admin/events/${event?.id}/unsubscriptions`],
-    enabled: !!event,
+    enabled: !!event?.id,
   });
 
   // Fetch public sponsors for this event (visible to everyone)
   const { data: sponsors, isLoading: sponsorsLoading } = useQuery<PublicSponsorship[]>({
     queryKey: [`/api/public/events/${event?.id}/sponsorships`],
-    enabled: !!event,
+    enabled: !!event?.id,
   });
 
   const deleteEventMutation = useMutation({
