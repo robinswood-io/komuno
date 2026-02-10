@@ -1,5 +1,10 @@
 name: Night Agent PR CI (Optimized with Bun)
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
 on:
   pull_request:
     branches: [main, master, develop]

@@ -66,7 +66,8 @@
     "test:startup": "./scripts/test-startup.sh",
     "check:deps": "./scripts/check-dependencies.sh",
     "validate:env": "./scripts/validate-env.sh",
-    "health:check": "./scripts/health-check-complete.sh"
+    "health:check": "./scripts/health-check-complete.sh",
+    "validate:theme": "bun scripts/validate-theme.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
