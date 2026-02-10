@@ -8,13 +8,12 @@ if [ -z "$DATABASE_URL" ]; then
   exit 0
 fi
 
-# Installer psql si nécessaire (Alpine)
+# Vérifier que psql est disponible
 if ! command -v psql >/dev/null 2>&1; then
-  echo "📦 Installing postgresql-client..."
-  apk add --no-cache postgresql-client || {
-    echo "⚠️  Could not install psql, skipping migrations"
-    exit 0
-  }
+  echo "❌ CRITICAL: psql (postgresql-client) is not installed!"
+  echo "   Migrations cannot run without psql."
+  echo "   Please ensure postgresql-client is installed in the Docker image."
+  exit 1
 fi
 
 # Créer la table de tracking des migrations si elle n'existe pas

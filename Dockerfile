@@ -52,8 +52,8 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Installer wget pour les health checks
-RUN apk add --no-cache wget
+# Installer wget pour les health checks et postgresql-client pour les migrations
+RUN apk add --no-cache wget postgresql-client
 
 # Créer un utilisateur non-root pour la sécurité
 RUN addgroup -S cjd && adduser -S cjduser -G cjd
