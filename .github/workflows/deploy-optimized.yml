@@ -237,7 +237,7 @@ jobs:
             docker pull ghcr.io/${{ github.repository }}:latest
 
             echo "🚀 Déploiement..."
-            docker compose up -d --no-deps cjd-app
+            docker compose up -d --no-deps --force-recreate cjd-app
 
             echo "⏳ Health check..."
             sleep 15
