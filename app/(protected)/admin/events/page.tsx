@@ -35,6 +35,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useModuleStatus } from '@/hooks/use-module-guard';
+import { ModuleDisabledAlert } from '@/components/admin/module-disabled-alert';
 
 type EventStatus = 'draft' | 'published' | 'cancelled' | 'postponed' | 'completed';
 
@@ -73,6 +75,7 @@ interface Inscription {
 export default function AdminEventsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isEnabled: moduleEnabled } = useModuleStatus('events');
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -351,6 +354,8 @@ export default function AdminEventsPage() {
 
   return (
     <div className="container py-8 space-y-8">
+      {!moduleEnabled && <ModuleDisabledAlert moduleName="Événements" />}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Gestion des Événements</h1>
@@ -358,7 +363,7 @@ export default function AdminEventsPage() {
             Créez et gérez les événements de l'association
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
+        <Button onClick={() => setShowCreateModal(true)} disabled={!moduleEnabled}>
           <Plus className="h-4 w-4 mr-2" />
           Créer un événement
         </Button>
@@ -474,7 +479,7 @@ export default function AdminEventsPage() {
                           title="Voir détails, inscriptions et désinscriptions"
                           data-testid="event-inscriptions-button"
                         >
-                          <Users className="h-4 w-4 text-green-600" />
+                          <Users className="h-4 w-4 text-success" />
                           <span className="font-medium">{event.inscriptionCount || 0}</span>
                           <span className="text-xs text-muted-foreground">inscrits</span>
                         </Button>

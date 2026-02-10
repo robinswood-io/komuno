@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { ToolCategory, ToolWithCategory } from '@/shared/schema';
+import { useModuleGuard } from '@/hooks/use-module-guard';
 
 export default function ToolsPage() {
+  const { isEnabled, isLoading: moduleLoading } = useModuleGuard('tools');
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<ToolCategory[]>({
     queryKey: ['/api/tools/categories'],
   });
@@ -20,7 +22,7 @@ export default function ToolsPage() {
     queryKey: ['/api/tools/featured'],
   });
 
-  const isLoading = categoriesLoading || toolsLoading;
+  const isLoading = categoriesLoading || toolsLoading || moduleLoading;
 
   // Grouper les outils par catégorie
   const toolsByCategory = tools.reduce((acc, tool) => {
@@ -44,6 +46,10 @@ export default function ToolsPage() {
     );
   }
 
+  if (!isEnabled) {
+    return null;
+  }
+
   // Si aucun outil n'existe, afficher le message "coming soon"
   if (tools.length === 0) {
     return (
@@ -51,7 +57,7 @@ export default function ToolsPage() {
         {/* En-tête de la page */}
         <div className="text-center mb-8 sm:mb-12">
           <div className="flex justify-center mb-4">
-            <div className="bg-gradient-to-r from-primary to-success-dark rounded-full p-4">
+            <div className="bg-primary rounded-full p-4">
               <Wrench className="w-8 h-8 text-white" />
             </div>
           </div>
@@ -64,7 +70,7 @@ export default function ToolsPage() {
         </div>
 
         {/* Section "Coming Soon" */}
-        <div className="bg-gradient-to-r from-primary to-success-dark rounded-xl shadow-lg p-8 sm:p-12 text-white text-center mb-8">
+        <div className="bg-primary rounded-xl shadow-lg p-8 sm:p-12 text-white text-center mb-8">
           <h2 className="text-2xl sm:text-3xl font-bold mb-4">Bientôt disponible</h2>
           <p className="text-success-light text-lg mb-6">
             Nous préparons une suite d'outils innovants pour vous accompagner dans votre développement professionnel.
@@ -83,7 +89,7 @@ export default function ToolsPage() {
       {/* En-tête */}
       <div className="text-center mb-8 sm:mb-12">
         <div className="flex justify-center mb-4">
-          <div className="bg-gradient-to-r from-primary to-success-dark rounded-full p-4">
+          <div className="bg-primary rounded-full p-4">
             <Wrench className="w-8 h-8 text-white" />
           </div>
         </div>
@@ -189,7 +195,7 @@ function ToolCard({ tool, featured = false }: { tool: ToolWithCategory; featured
               className="w-12 h-12 object-contain rounded-lg bg-gray-50 p-1"
             />
           ) : (
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-success-dark rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
               <Wrench className="w-6 h-6 text-white" />
             </div>
           )}

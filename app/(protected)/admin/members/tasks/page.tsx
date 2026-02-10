@@ -84,7 +84,7 @@ const statusLabels: Record<MemberTask['status'], string> = {
 const statusColors: Record<MemberTask['status'], string> = {
   'todo': 'bg-orange-50 text-orange-900 border-orange-200',
   'in_progress': 'bg-blue-50 text-blue-900 border-blue-200',
-  'completed': 'bg-green-50 text-green-900 border-green-200',
+  'completed': 'bg-success/10 text-success-dark border-success/30',
   'cancelled': 'bg-gray-50 text-gray-900 border-gray-200',
 };
 
@@ -567,7 +567,7 @@ export default function AdminMemberTasksPage() {
                               disabled={completeMutation.isPending}
                               title="Marquer comme complété"
                             >
-                              <Check className="h-4 w-4 text-green-600" />
+                              <Check className="h-4 w-4 text-success" />
                             </Button>
                           )}
                           <Button

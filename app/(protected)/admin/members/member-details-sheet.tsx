@@ -117,7 +117,7 @@ export function MemberDetailsSheet({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-green-50 text-green-700">Actif</Badge>;
+        return <Badge className="bg-success/10 text-success-dark">Actif</Badge>;
       case 'proposed':
         return <Badge className="bg-orange-50 text-orange-700">Prospect</Badge>;
       case 'inactive':
@@ -155,7 +155,7 @@ export function MemberDetailsSheet({
                         size="sm"
                         onClick={() => onConvertToActive(member.email)}
                         disabled={isConvertingToActive}
-                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        className="text-success hover:text-success-dark hover:bg-success/10"
                       >
                         {isConvertingToActive ? (
                           <Loader2 className="h-4 w-4 animate-spin" />

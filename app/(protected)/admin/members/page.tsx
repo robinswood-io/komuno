@@ -810,7 +810,7 @@ export default function AdminMembersPage() {
                   const getStatusBadgeStyles = (status: string) => {
                     switch (status) {
                       case 'active':
-                        return { bg: 'bg-green-50', text: 'text-green-900', border: 'border-green-200', label: 'Actif' };
+                        return { bg: 'bg-success/10', text: 'text-success-dark', border: 'border-success/30', label: 'Actif' };
                       case 'proposed':
                         return { bg: 'bg-orange-50', text: 'text-orange-900', border: 'border-orange-200', label: 'Proposé' };
                       case 'inactive':
@@ -903,7 +903,7 @@ export default function AdminMembersPage() {
                                 convertToActiveMutation.mutate(member.email);
                               }}
                               disabled={convertToActiveMutation.isPending}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              className="text-success hover:text-success-dark hover:bg-success/10"
                             >
                               {convertToActiveMutation.isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />

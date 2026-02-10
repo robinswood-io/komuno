@@ -52,7 +52,7 @@ interface Notification {
 const NOTIFICATION_TYPES = {
   'idea_update': { label: 'Idée', icon: Lightbulb, color: 'text-yellow-600' },
   'event_update': { label: 'Événement', icon: Calendar, color: 'text-blue-600' },
-  'loan_update': { label: 'Prêt', icon: Package, color: 'text-green-600' },
+  'loan_update': { label: 'Prêt', icon: Package, color: 'text-success' },
   'member_update': { label: 'Membre', icon: UserCheck, color: 'text-purple-600' },
   'task_reminder': { label: 'Tâche', icon: AlertCircle, color: 'text-orange-600' },
   'system': { label: 'Système', icon: Info, color: 'text-gray-600' },
@@ -267,7 +267,7 @@ export default function AdminNotificationsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-success">
               {total - (unreadCount || 0)}
             </div>
           </CardContent>

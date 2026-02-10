@@ -76,7 +76,7 @@ function SponsorsPreview({ eventId }: { eventId: string }) {
                 className="w-12 h-12 object-contain flex-shrink-0"
               />
             ) : (
-              <div className="w-12 h-12 bg-gradient-to-br from-primary to-success-dark rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
                 {getSponsorshipLevelIcon(sponsor.level)}
               </div>
             )}
@@ -213,7 +213,7 @@ export default function EventsSection() {
   return (
     <section className="space-y-6 sm:space-y-8">
       {/* Welcome Message */}
-      <div className="bg-gradient-to-r from-primary to-success-dark rounded-xl shadow-lg p-6 sm:p-8 text-white">
+      <div className="bg-primary rounded-xl shadow-lg p-6 sm:p-8 text-white">
         <div className="flex items-center gap-3 mb-3">
           <div className="bg-white/20 rounded-full p-2">
             <Calendar className="w-6 h-6 text-white" />
@@ -242,7 +242,7 @@ export default function EventsSection() {
                 <CardContent className="p-0">
                   <div className="flex flex-col lg:flex-row">
                     {/* Date Badge */}
-                    <div className="lg:w-32 flex lg:flex-col items-center justify-center bg-gradient-to-br from-primary to-success-dark text-white p-4 lg:p-6">
+                    <div className="lg:w-32 flex lg:flex-col items-center justify-center bg-primary text-white p-4 lg:p-6">
                       <div className="text-center">
                         <div className="text-2xl lg:text-4xl font-bold leading-tight">{shortDate.day}</div>
                         <div className="text-sm lg:text-base font-medium uppercase tracking-wide opacity-90">{shortDate.month}</div>
@@ -329,7 +329,7 @@ export default function EventsSection() {
 
                           {/* Participants Info - Admin only */}
                           {isAdmin && (event.maxParticipants || event.showInscriptionsCount) && (
-                            <div className="flex flex-wrap items-center gap-3 p-4 bg-gradient-to-r from-info-light to-success-light rounded-lg border border-info">
+                            <div className="flex flex-wrap items-center gap-3 p-4 bg-info/10 rounded-lg border border-info">
                               {event.showInscriptionsCount && (
                                 <div className="flex items-center bg-white rounded-full px-4 py-2 shadow-sm">
                                   <Users className="w-4 h-4 mr-2 text-info" />
@@ -376,7 +376,7 @@ export default function EventsSection() {
                                 className={`text-sm font-semibold px-6 py-3 transition-all duration-200 shadow-lg hover:shadow-xl ${
                                   isEventFull
                                     ? 'bg-muted cursor-not-allowed text-muted-foreground'
-                                    : 'bg-gradient-to-r from-primary to-success-dark text-white hover:from-success-dark hover:to-success-dark transform hover:scale-105'
+                                    : 'bg-primary text-white hover:bg-primary/90 transform hover:scale-105'
                                 }`}
                                 data-testid="button-register-event"
                               >

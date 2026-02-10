@@ -258,7 +258,7 @@ export default function EventDetailModal({
                               className="w-20 h-20 object-contain rounded-lg border border-gray-200 bg-white p-2"
                             />
                           ) : (
-                            <div className="w-20 h-20 bg-gradient-to-br from-primary to-success-dark rounded-lg flex items-center justify-center text-white font-bold text-2xl">
+                            <div className="w-20 h-20 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-2xl">
                               {getSponsorshipLevelIcon(sponsor.level)}
                             </div>
                           )}

@@ -94,7 +94,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge className="bg-green-50 text-green-700">Actif</Badge>;
+        return <Badge className="bg-success/10 text-success-dark">Actif</Badge>;
       case 'proposed':
         return <Badge className="bg-orange-50 text-orange-700">Prospect</Badge>;
       case 'inactive':

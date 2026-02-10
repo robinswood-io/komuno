@@ -352,7 +352,7 @@ export function AdministratorsTab() {
                     </TableCell>
                     <TableCell>
                       {admin.status === 'active' && (
-                        <Badge className="bg-green-50 text-green-900 border-green-200">
+                        <Badge className="bg-success/10 text-success-dark border-success/30">
                           ✓ Actif
                         </Badge>
                       )}

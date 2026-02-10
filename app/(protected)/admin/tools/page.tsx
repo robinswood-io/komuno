@@ -450,7 +450,7 @@ export default function AdminToolsPage() {
                         </TableCell>
                         <TableCell className="text-center">
                           {tool.isActive ? (
-                            <Eye className="w-4 h-4 text-green-500 mx-auto" />
+                            <Eye className="w-4 h-4 text-success mx-auto" />
                           ) : (
                             <EyeOff className="w-4 h-4 text-gray-300 mx-auto" />
                           )}
@@ -537,7 +537,7 @@ export default function AdminToolsPage() {
                         </TableCell>
                         <TableCell className="text-center">
                           {category.isActive ? (
-                            <Eye className="w-4 h-4 text-green-500 mx-auto" />
+                            <Eye className="w-4 h-4 text-success mx-auto" />
                           ) : (
                             <EyeOff className="w-4 h-4 text-gray-300 mx-auto" />
                           )}

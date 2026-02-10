@@ -21,6 +21,30 @@ export const brandingCore = {
     showLogo: true, // Afficher ou masquer le logo dans le header
   },
 
+  // Modules/Fonctionnalités activées
+  modules: {
+    events: {
+      enabled: true,
+      label: "Événements",
+      description: "Gestion et inscription aux événements",
+    },
+    ideas: {
+      enabled: true,
+      label: "Idées",
+      description: "Boîte à idées collaborative",
+    },
+    loans: {
+      enabled: true,
+      label: "Prêts",
+      description: "Gestion des prêts de matériel",
+    },
+    tools: {
+      enabled: true,
+      label: "Outils",
+      description: "Outils du dirigeant",
+    },
+  },
+
   // Couleurs du thème (format hexadécimal)
   colors: {
     // Couleurs de marque

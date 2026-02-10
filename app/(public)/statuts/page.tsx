@@ -152,7 +152,7 @@ export default function StatusPage() {
                       {data.environment}
                     </div>
                   </div>
-                  <div className="bg-gradient-to-r from-success-light to-success/10 rounded-lg p-4">
+                  <div className="bg-success/10 rounded-lg p-4">
                     <div className="text-sm text-gray-600 dark:text-gray-300 mb-1">Services actifs</div>
                     <div className="text-2xl font-bold text-success dark:text-success-light" data-testid="text-active-services">
                       {Object.values(data.checks).filter(c => c.status === 'healthy').length} / {Object.keys(data.checks).length}

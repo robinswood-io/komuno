@@ -1378,7 +1378,7 @@ export default function AdminFinancialPage() {
   const getStatusBadgeColor = (status: string): string => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-800';
+        return 'bg-success/20 text-success-dark';
       case 'expired':
         return 'bg-red-100 text-red-800';
       case 'pending':
@@ -1801,7 +1801,7 @@ export default function AdminFinancialPage() {
                 <CardTitle className="text-sm font-medium">Total Revenus</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-2xl font-bold text-success">
                   {formatCurrency((revenueStats?.totalAmount ?? 0) / 100)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1858,7 +1858,7 @@ export default function AdminFinancialPage() {
                         </div>
                         <span className="font-medium">{donor.name}</span>
                       </div>
-                      <span className="font-bold text-green-600">{formatCurrency(donor.total / 100)}</span>
+                      <span className="font-bold text-success">{formatCurrency(donor.total / 100)}</span>
                     </div>
                   ))}
                 </div>
@@ -1915,7 +1915,7 @@ export default function AdminFinancialPage() {
                               <div className="text-sm text-muted-foreground">{revenue.sourceContact}</div>
                             )}
                           </TableCell>
-                          <TableCell className="font-bold text-green-600">
+                          <TableCell className="font-bold text-success">
                             {formatCurrency(revenue.amountInCents / 100)}
                           </TableCell>
                           <TableCell>
@@ -2078,7 +2078,7 @@ export default function AdminFinancialPage() {
                     <CardTitle className="text-sm font-medium">Adherents Actifs</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-green-600">
+                    <div className="text-2xl font-bold text-success">
                       {subscriptionStats?.activeMembers ?? 0}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">

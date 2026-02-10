@@ -24,6 +24,8 @@ import {
   ClipboardList,
   Palette,
   Bell,
+  Wrench,
+  Boxes,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -51,14 +53,9 @@ const navItems: (NavItem | NavSection)[] = [
     title: 'CRM Membres',
     items: [
       {
-        title: 'Liste des membres',
+        title: 'Membres & Prospects',
         href: '/admin/members',
         icon: Users,
-      },
-      {
-        title: 'Statuts',
-        href: '/admin/settings/statuses',
-        icon: Tag,
       },
       {
         title: 'Tâches',
@@ -83,27 +80,37 @@ const navItems: (NavItem | NavSection)[] = [
     icon: Heart,
   },
   {
-    title: 'Idées',
-    href: '/admin/ideas',
-    icon: Lightbulb,
-  },
-  {
-    title: 'Événements',
-    href: '/admin/events',
-    icon: Calendar,
-  },
-  {
-    title: 'Prêts',
-    href: '/admin/loans',
-    icon: Package,
-  },
-  {
     title: 'Finance',
     href: '/admin/financial',
     icon: DollarSign,
   },
   {
-    title: 'Outils',
+    title: 'Contenu',
+    items: [
+      {
+        title: 'Événements',
+        href: '/admin/events',
+        icon: Calendar,
+      },
+      {
+        title: 'Idées',
+        href: '/admin/ideas',
+        icon: Lightbulb,
+      },
+      {
+        title: 'Prêts',
+        href: '/admin/loans',
+        icon: Package,
+      },
+      {
+        title: 'Outils',
+        href: '/admin/tools',
+        icon: Wrench,
+      },
+    ],
+  },
+  {
+    title: 'Système',
     items: [
       {
         title: 'Notifications',
@@ -119,11 +126,6 @@ const navItems: (NavItem | NavSection)[] = [
         title: 'Demandes dev',
         href: '/admin/development-requests',
         icon: ClipboardList,
-      },
-      {
-        title: 'Branding',
-        href: '/admin/branding',
-        icon: Palette,
       },
     ],
   },

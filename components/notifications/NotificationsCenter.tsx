@@ -245,7 +245,7 @@ export const NotificationsCenter: React.FC<NotificationsCenterProps> = ({
             <TabsTrigger value="offers">
               Par Offre
               {groupedByOffer.reduce((sum, g) => sum + g.unreadCount, 0) > 0 && (
-                <Badge className="ml-2 bg-green-500">
+                <Badge className="ml-2 bg-success">
                   {groupedByOffer.reduce((sum, g) => sum + g.unreadCount, 0)}
                 </Badge>
               )}
@@ -424,7 +424,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
               </span>
             )}
             {(notification.metadata as unknown as {offerId?: string})?.offerId && (
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+              <span className="text-xs bg-success/20 text-success-dark px-2 py-1 rounded">
                 Offre: {(notification.metadata as unknown as {offerId: string}).offerId}
               </span>
             )}

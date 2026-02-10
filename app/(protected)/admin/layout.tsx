@@ -41,6 +41,7 @@ export default function AdminLayout({
       tracking: 'Tracking',
       'development-requests': 'Demandes dev',
       branding: 'Branding',
+      tools: 'Outils du Dirigeant',
     };
 
     return titles[lastSegment] || lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1);

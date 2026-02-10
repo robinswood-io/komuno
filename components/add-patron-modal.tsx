@@ -125,7 +125,7 @@ export default function AddPatronModal({ open, onOpenChange }: AddPatronModalPro
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Plus className="w-5 h-5 text-green-600" />
+            <Plus className="w-5 h-5 text-success" />
             Ajouter un sponsor
           </DialogTitle>
           <DialogDescription>
@@ -268,7 +268,7 @@ export default function AddPatronModal({ open, onOpenChange }: AddPatronModalPro
             <Button
               type="submit"
               disabled={addPatronMutation.isPending || !firstName.trim() || !lastName.trim() || !email.trim()}
-              className="bg-green-600 hover:bg-green-700 px-6"
+              className="bg-success hover:bg-success-dark px-6"
             >
               {addPatronMutation.isPending ? (
                 <>

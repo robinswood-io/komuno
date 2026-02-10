@@ -65,6 +65,7 @@ function createDefaultConfig(): BrandingCore {
   return {
     organization: { ...(brandingCore.organization as Record<string, unknown>) } as typeof brandingCore.organization,
     app: { ...(brandingCore.app as Record<string, unknown>) } as typeof brandingCore.app,
+    modules: { ...(brandingCore.modules as Record<string, unknown>) } as typeof brandingCore.modules,
     colors: { ...(brandingCore.colors as Record<string, unknown>) } as typeof brandingCore.colors,
     fonts: { ...(brandingCore.fonts as Record<string, unknown>) } as typeof brandingCore.fonts,
     pwa: { ...(brandingCore.pwa as Record<string, unknown>) } as typeof brandingCore.pwa,
@@ -86,6 +87,10 @@ function mergeConfig(raw: unknown): BrandingCore {
         (base.app as Record<string, unknown>)[key] = value;
       }
     });
+  }
+
+  if (isRecord(raw.modules)) {
+    (base.modules as Record<string, unknown>) = { ...base.modules, ...raw.modules };
   }
 
   if (isRecord(raw.organization)) {
