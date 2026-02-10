@@ -105,9 +105,30 @@ export default function SettingsPage() {
   // Branding colors
   const [brandingColors, setBrandingColors] = useState({
     primary: '',
+    primaryDark: '',
+    primaryLight: '',
+    secondary: '',
+    accent: '',
     success: '',
+    successDark: '',
+    successLight: '',
     warning: '',
+    warningDark: '',
     error: '',
+    errorDark: '',
+    info: '',
+    infoDark: '',
+  });
+
+  // Notification settings
+  const [notificationSettings, setNotificationSettings] = useState({
+    enableEmailNotifications: true,
+    enablePushNotifications: true,
+    notifyOnNewIdea: true,
+    notifyOnNewEvent: true,
+    notifyOnEventUpdate: true,
+    notifyOnNewInscription: true,
+    notifyOnLoanRequest: true,
   });
 
   // Logo upload
@@ -128,9 +149,19 @@ export default function SettingsPage() {
       });
       setBrandingColors({
         primary: branding.colors?.primary || '',
+        primaryDark: branding.colors?.primaryDark || '',
+        primaryLight: branding.colors?.primaryLight || '',
+        secondary: branding.colors?.secondary || '',
+        accent: branding.colors?.accent || '',
         success: branding.colors?.success || '',
+        successDark: branding.colors?.successDark || '',
+        successLight: branding.colors?.successLight || '',
         warning: branding.colors?.warning || '',
+        warningDark: branding.colors?.warningDark || '',
         error: branding.colors?.error || '',
+        errorDark: branding.colors?.errorDark || '',
+        info: branding.colors?.info || '',
+        infoDark: branding.colors?.infoDark || '',
       });
 
       // Logo preview
@@ -601,74 +632,134 @@ export default function SettingsPage() {
                 Personnalisez les couleurs de votre application
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="primaryColor">Couleur principale</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="color"
-                      value={brandingColors.primary}
-                      onChange={(e) => setBrandingColors({ ...brandingColors, primary: e.target.value })}
-                      className="w-12 h-10 p-1"
-                    />
-                    <Input
-                      value={brandingColors.primary}
-                      onChange={(e) => setBrandingColors({ ...brandingColors, primary: e.target.value })}
-                      placeholder="#00a844"
-                      className="flex-1"
-                    />
+            <CardContent className="space-y-6">
+              <div>
+                <h4 className="text-sm font-medium mb-4">Couleurs principales</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Primaire</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="color"
+                        value={brandingColors.primary}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, primary: e.target.value })}
+                        className="w-12 h-10 p-1"
+                      />
+                      <Input
+                        value={brandingColors.primary}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, primary: e.target.value })}
+                        placeholder="#00a844"
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Secondaire</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="color"
+                        value={brandingColors.secondary}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, secondary: e.target.value })}
+                        className="w-12 h-10 p-1"
+                      />
+                      <Input
+                        value={brandingColors.secondary}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, secondary: e.target.value })}
+                        placeholder="#1a1a1a"
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Accent</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="color"
+                        value={brandingColors.accent}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, accent: e.target.value })}
+                        className="w-12 h-10 p-1"
+                      />
+                      <Input
+                        value={brandingColors.accent}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, accent: e.target.value })}
+                        placeholder="#2196f3"
+                        className="flex-1"
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="successColor">Couleur succès</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="color"
-                      value={brandingColors.success}
-                      onChange={(e) => setBrandingColors({ ...brandingColors, success: e.target.value })}
-                      className="w-12 h-10 p-1"
-                    />
-                    <Input
-                      value={brandingColors.success}
-                      onChange={(e) => setBrandingColors({ ...brandingColors, success: e.target.value })}
-                      placeholder="#00c853"
-                      className="flex-1"
-                    />
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium mb-4">Couleurs d'état</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Succès</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="color"
+                        value={brandingColors.success}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, success: e.target.value })}
+                        className="w-12 h-10 p-1"
+                      />
+                      <Input
+                        value={brandingColors.success}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, success: e.target.value })}
+                        placeholder="#00c853"
+                        className="flex-1"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="warningColor">Couleur avertissement</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="color"
-                      value={brandingColors.warning}
-                      onChange={(e) => setBrandingColors({ ...brandingColors, warning: e.target.value })}
-                      className="w-12 h-10 p-1"
-                    />
-                    <Input
-                      value={brandingColors.warning}
-                      onChange={(e) => setBrandingColors({ ...brandingColors, warning: e.target.value })}
-                      placeholder="#ffa726"
-                      className="flex-1"
-                    />
+                  <div className="space-y-2">
+                    <Label>Avertissement</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="color"
+                        value={brandingColors.warning}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, warning: e.target.value })}
+                        className="w-12 h-10 p-1"
+                      />
+                      <Input
+                        value={brandingColors.warning}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, warning: e.target.value })}
+                        placeholder="#ffa726"
+                        className="flex-1"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="errorColor">Couleur erreur</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="color"
-                      value={brandingColors.error}
-                      onChange={(e) => setBrandingColors({ ...brandingColors, error: e.target.value })}
-                      className="w-12 h-10 p-1"
-                    />
-                    <Input
-                      value={brandingColors.error}
-                      onChange={(e) => setBrandingColors({ ...brandingColors, error: e.target.value })}
-                      placeholder="#f44336"
-                      className="flex-1"
-                    />
+                  <div className="space-y-2">
+                    <Label>Erreur</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="color"
+                        value={brandingColors.error}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, error: e.target.value })}
+                        className="w-12 h-10 p-1"
+                      />
+                      <Input
+                        value={brandingColors.error}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, error: e.target.value })}
+                        placeholder="#f44336"
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Information</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="color"
+                        value={brandingColors.info}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, info: e.target.value })}
+                        className="w-12 h-10 p-1"
+                      />
+                      <Input
+                        value={brandingColors.info}
+                        onChange={(e) => setBrandingColors({ ...brandingColors, info: e.target.value })}
+                        placeholder="#2196f3"
+                        className="flex-1"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -719,20 +810,139 @@ export default function SettingsPage() {
         <TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Notifications</CardTitle>
+              <CardTitle>Paramètres généraux</CardTitle>
               <CardDescription>
-                Configurez les notifications de l'application
+                Activez ou désactivez les canaux de notification
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  La configuration des notifications sera disponible prochainement.
-                </AlertDescription>
-              </Alert>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Notifications par email</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Envoyer des notifications par email aux utilisateurs
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationSettings.enableEmailNotifications}
+                  onCheckedChange={(checked) =>
+                    setNotificationSettings({ ...notificationSettings, enableEmailNotifications: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Notifications push</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Envoyer des notifications push sur navigateur
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationSettings.enablePushNotifications}
+                  onCheckedChange={(checked) =>
+                    setNotificationSettings({ ...notificationSettings, enablePushNotifications: checked })
+                  }
+                />
+              </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Types de notifications</CardTitle>
+              <CardDescription>
+                Choisissez quels événements déclenchent des notifications
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Nouvelle idée</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Notifier lors de la publication d'une nouvelle idée
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationSettings.notifyOnNewIdea}
+                  onCheckedChange={(checked) =>
+                    setNotificationSettings({ ...notificationSettings, notifyOnNewIdea: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Nouvel événement</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Notifier lors de la création d'un nouvel événement
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationSettings.notifyOnNewEvent}
+                  onCheckedChange={(checked) =>
+                    setNotificationSettings({ ...notificationSettings, notifyOnNewEvent: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Modification d'événement</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Notifier les inscrits lors d'une modification d'événement
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationSettings.notifyOnEventUpdate}
+                  onCheckedChange={(checked) =>
+                    setNotificationSettings({ ...notificationSettings, notifyOnEventUpdate: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Nouvelle inscription</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Notifier les admins lors d'une inscription à un événement
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationSettings.notifyOnNewInscription}
+                  onCheckedChange={(checked) =>
+                    setNotificationSettings({ ...notificationSettings, notifyOnNewInscription: checked })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Demande de prêt</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Notifier lors d'une nouvelle demande de prêt de matériel
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationSettings.notifyOnLoanRequest}
+                  onCheckedChange={(checked) =>
+                    setNotificationSettings({ ...notificationSettings, notifyOnLoanRequest: checked })
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={handleSaveGeneral} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enregistrement...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Enregistrer
+                </>
+              )}
+            </Button>
+          </div>
         </TabsContent>
 
         {/* Administrators Tab */}
