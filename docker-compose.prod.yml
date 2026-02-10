@@ -35,26 +35,14 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      # Router pour l'API (NestJS port 5000) - priorité haute
-      - "traefik.http.routers.${APP_NAME:-komuno}-api.rule=(Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)) && PathPrefix(`/api`)"
-      - "traefik.http.routers.${APP_NAME:-komuno}-api.entrypoints=websecure"
-      - "traefik.http.routers.${APP_NAME:-komuno}-api.tls=true"
-      - "traefik.http.routers.${APP_NAME:-komuno}-api.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.${APP_NAME:-komuno}-api.priority=100"
-      - "traefik.http.routers.${APP_NAME:-komuno}-api.service=${APP_NAME:-komuno}-api"
-      - "traefik.http.services.${APP_NAME:-komuno}-api.loadbalancer.server.port=5000"
-      # Router pour le frontend (Next.js port 3000) - priorité basse
       - "traefik.http.routers.${APP_NAME:-komuno}.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
       - "traefik.http.routers.${APP_NAME:-komuno}.entrypoints=websecure"
       - "traefik.http.routers.${APP_NAME:-komuno}.tls=true"
       - "traefik.http.routers.${APP_NAME:-komuno}.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.${APP_NAME:-komuno}.priority=10"
       - "traefik.http.services.${APP_NAME:-komuno}.loadbalancer.server.port=3000"
-      # Middleware redirect www
       - "traefik.http.middlewares.${APP_NAME:-komuno}-redirect.redirectregex.regex=^https://www\\.${DOMAIN}/(.*)"
       - "traefik.http.middlewares.${APP_NAME:-komuno}-redirect.redirectregex.replacement=https://${DOMAIN}/$${1}"
       - "traefik.http.routers.${APP_NAME:-komuno}.middlewares=${APP_NAME:-komuno}-redirect"
-      - "traefik.http.routers.${APP_NAME:-komuno}-api.middlewares=${APP_NAME:-komuno}-redirect"
     logging:
       driver: "json-file"
       options:
