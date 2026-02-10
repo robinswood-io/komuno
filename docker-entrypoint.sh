@@ -5,9 +5,13 @@ echo "🚀 Starting application..."
 
 # Exécuter les migrations de base de données
 if [ -f "/app/scripts/run-migrations.sh" ]; then
-  sh /app/scripts/run-migrations.sh || {
-    echo "⚠️  Migrations failed or already applied, continuing startup..."
-  }
+  echo "🔄 Running database migrations..."
+  if ! sh /app/scripts/run-migrations.sh; then
+    echo "❌ CRITICAL: Database migrations failed!"
+    echo "   The application cannot start without a valid database schema."
+    echo "   Please check the database connection and migration logs."
+    exit 1
+  fi
 else
   echo "⚠️  Migration script not found, skipping migrations"
 fi
