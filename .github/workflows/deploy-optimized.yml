@@ -243,7 +243,41 @@ jobs:
             docker compose up -d --no-deps --force-recreate cjd-app
 
             echo "⏳ Health check..."
-            sleep 15
+            # Attendre 30s pour que l'app démarre
+            sleep 30
+
+            # Vérifier l'état du container
+            CONTAINER_STATE=$(docker inspect --format='{{.State.Status}}' cjd-app 2>/dev/null || echo "not_found")
+            RESTART_COUNT=$(docker inspect --format='{{.RestartCount}}' cjd-app 2>/dev/null || echo "0")
+
+            echo "Container state: $CONTAINER_STATE (restarts: $RESTART_COUNT)"
+
+            if [ "$CONTAINER_STATE" != "running" ]; then
+              echo "❌ Container not running! State: $CONTAINER_STATE"
+              echo "📋 Last 50 lines of logs:"
+              docker logs cjd-app --tail 50 || true
+              exit 1
+            fi
+
+            if [ "$RESTART_COUNT" -gt "0" ]; then
+              echo "⚠️  Container has restarted $RESTART_COUNT times"
+              echo "📋 Last 50 lines of logs:"
+              docker logs cjd-app --tail 50 || true
+              exit 1
+            fi
+
+            # Vérifier le health endpoint HTTP
+            echo "🔍 Checking HTTP health endpoint..."
+            HTTP_CODE=$(docker exec cjd-app wget -q -O - --timeout=5 http://localhost:5000/api/health 2>&1 | head -1 || echo "failed")
+
+            if [ "$HTTP_CODE" = "failed" ]; then
+              echo "❌ Health endpoint check failed!"
+              echo "📋 Last 50 lines of logs:"
+              docker logs cjd-app --tail 50 || true
+              exit 1
+            fi
+
+            echo "✅ Container running and healthy!"
             docker ps | grep cjd
 
             docker image prune -f || true
