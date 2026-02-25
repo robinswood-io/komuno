@@ -124,8 +124,7 @@ vite.config.ts.*
 *.zip
 *.gz
 
-# Dumps et backups (tous les fichiers SQL, dumps, backups)
-*.sql
+# Dumps et backups SQL (pas les migrations Drizzle)
 *.dump
 *.backup
 *.bak
@@ -133,13 +132,12 @@ dump_*.sql
 backup_*.sql
 *.sql.gz
 *.dump.gz
-**/*.sql
 **/*.dump
 **/dump_*
 **/backup_*
-!.cursor-config/migrations/*.sql
-!scripts/migrations/*.sql
-!scripts/create-loan-items-table.sql
+# Les migrations Drizzle sont commitées (critiques pour le déploiement)
+!migrations/*.sql
+!migrations/meta/*.json
 
 # Fichiers temporaires
 *.tmp
