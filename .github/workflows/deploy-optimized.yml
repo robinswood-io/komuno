@@ -266,14 +266,47 @@ jobs:
               exit 1
             fi
 
-            # Vérifier le health endpoint HTTP
-            echo "🔍 Checking HTTP health endpoint..."
-            HTTP_CODE=$(docker exec cjd-app wget -q -O - --timeout=5 http://localhost:5000/api/health 2>&1 | head -1 || echo "failed")
+            # Smoke tests : vérifier les endpoints critiques
+            echo "🔍 Smoke tests des endpoints critiques..."
+            FAIL=0
 
-            if [ "$HTTP_CODE" = "failed" ]; then
-              echo "❌ Health endpoint check failed!"
-              echo "📋 Last 50 lines of logs:"
-              docker logs cjd-app --tail 50 || true
+            # Vérifie qu'un endpoint répond sans erreur serveur (5xx)
+            # Les endpoints admin sans auth retournent 401 (normal), pas 500
+            check_no_server_error() {
+              local name="$1"
+              local url="$2"
+              local status
+              status=$(docker exec cjd-app wget -S -O /dev/null --timeout=10 "$url" 2>&1 | grep "HTTP/" | tail -1 | awk '{print $2}' || echo "000")
+              if [ "${status:0:1}" = "5" ]; then
+                echo "  ❌ $name → HTTP $status (erreur serveur !)"
+                FAIL=1
+              elif [ "$status" = "000" ]; then
+                echo "  ❌ $name → connexion impossible"
+                FAIL=1
+              else
+                echo "  ✅ $name → HTTP $status"
+              fi
+            }
+
+            # Health check : doit retourner 200 + success:true
+            HEALTH=$(docker exec cjd-app wget -q -O - --timeout=10 http://localhost:5000/api/health 2>/dev/null || echo "FAILED")
+            if echo "$HEALTH" | grep -q '"status":"healthy"'; then
+              echo "  ✅ GET /api/health → healthy"
+            else
+              echo "  ❌ GET /api/health → $HEALTH" | head -c 300
+              FAIL=1
+            fi
+
+            # Endpoints admin : 401 attendu (pas de 500)
+            check_no_server_error "GET /api/admin/events"   "http://localhost:5000/api/admin/events"
+            check_no_server_error "GET /api/admin/members"  "http://localhost:5000/api/admin/members"
+            check_no_server_error "GET /api/admin/ideas"    "http://localhost:5000/api/admin/ideas"
+            check_no_server_error "GET /api/admin/loans"    "http://localhost:5000/api/admin/loans"
+
+            if [ "$FAIL" -eq 1 ]; then
+              echo "❌ Smoke tests échoués !"
+              echo "📋 Derniers logs:"
+              docker logs cjd-app --tail 80 || true
               exit 1
             fi
 
