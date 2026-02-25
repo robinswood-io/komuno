@@ -88,6 +88,9 @@ jobs:
               shared/*)
                 SHARED_CHANGED=true
                 ;;
+              scripts/run-migrations.sh|scripts/docker-entrypoint.sh)\
+                DEPS_CHANGED=true
+                ;;
               package.json|package-lock.json|bun.lockb|Dockerfile*)
                 DEPS_CHANGED=true
                 ;;
