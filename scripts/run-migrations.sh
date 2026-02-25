@@ -8,6 +8,15 @@ if [ -z "$DATABASE_URL" ]; then
   exit 0
 fi
 
+# Utiliser DATABASE_URL_SUPERUSER si disponible (pour les DDL comme ALTER TABLE)
+# sinon fallback sur DATABASE_URL
+if [ -n "$DATABASE_URL_SUPERUSER" ]; then
+  MIGRATION_URL="$DATABASE_URL_SUPERUSER"
+  echo "🔑 Using superuser connection for migrations"
+else
+  MIGRATION_URL="$DATABASE_URL"
+fi
+
 # Vérifier que psql est disponible
 if ! command -v psql >/dev/null 2>&1; then
   echo "❌ CRITICAL: psql (postgresql-client) is not installed!"
@@ -18,7 +27,7 @@ fi
 
 # Créer la table de tracking des migrations si elle n'existe pas
 echo "📋 Initializing migrations tracking..."
-psql "$DATABASE_URL" -c "
+psql "$MIGRATION_URL" -c "
   CREATE TABLE IF NOT EXISTS _drizzle_migrations (
     id SERIAL PRIMARY KEY,
     filename VARCHAR(255) UNIQUE NOT NULL,
@@ -45,7 +54,7 @@ HISTORICAL_MIGRATIONS="
 for hist_migration in $HISTORICAL_MIGRATIONS; do
   hist_migration=$(echo "$hist_migration" | tr -d ' ')
   if [ -f "/app/migrations/$hist_migration" ]; then
-    psql "$DATABASE_URL" -c "
+    psql "$MIGRATION_URL" -c "
       INSERT INTO _drizzle_migrations (filename)
       VALUES ('$hist_migration')
       ON CONFLICT (filename) DO NOTHING;
@@ -63,7 +72,7 @@ for migration in /app/migrations/*.sql; do
     filename=$(basename "$migration")
 
     # Vérifier si la migration a déjà été appliquée
-    ALREADY_APPLIED=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM _drizzle_migrations WHERE filename = '$filename';" 2>/dev/null || echo "0")
+    ALREADY_APPLIED=$(psql "$MIGRATION_URL" -t -c "SELECT COUNT(*) FROM _drizzle_migrations WHERE filename = '$filename';" 2>/dev/null || echo "0")
 
     if [ "$ALREADY_APPLIED" -gt 0 ]; then
       echo "  ⏭️  Skipping (already applied): $filename"
@@ -72,9 +81,9 @@ for migration in /app/migrations/*.sql; do
       echo "  ▶️  Applying: $filename"
 
       # Exécuter la migration
-      if psql "$DATABASE_URL" -f "$migration" -v ON_ERROR_STOP=1; then
+      if psql "$MIGRATION_URL" -f "$migration" -v ON_ERROR_STOP=1; then
         # Enregistrer la migration comme appliquée
-        psql "$DATABASE_URL" -c "INSERT INTO _drizzle_migrations (filename) VALUES ('$filename');" || true
+        psql "$MIGRATION_URL" -c "INSERT INTO _drizzle_migrations (filename) VALUES ('$filename');" || true
         MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
         echo "  ✅ Applied: $filename"
       else
