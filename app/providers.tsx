@@ -7,6 +7,7 @@ import { AuthProvider } from '@/hooks/use-auth';
 import { BrandingProvider } from '@/contexts/BrandingContext';
 import { FeatureConfigProvider } from '@/contexts/FeatureConfigContext';
 import { Toaster } from '@/components/ui/toaster';
+import { getQueryFn } from '@/lib/queryClient';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -14,8 +15,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5 * 1000,
+            queryFn: getQueryFn({ on401: 'throw' }),
+            staleTime: 5 * 60 * 1000,
+            gcTime: 10 * 60 * 1000,
             refetchOnWindowFocus: false,
+            retry: 2,
+            retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 30000),
+          },
+          mutations: {
+            retry: 1,
           },
         },
       })

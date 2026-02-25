@@ -17,7 +17,7 @@ on:
         required: true
         type: choice
         options:
-          - cjd80
+          - komuno
           - rep
           - both
       force_build:
@@ -193,10 +193,10 @@ jobs:
           echo "**Digest:** \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
 
   # ===================================
-  # Job 3: Deploy CJD80
+  # Job 3: Deploy CJD80 (Komuno)
   # ===================================
   deploy-cjd80:
-    name: Deploy to CJD80
+    name: Deploy to CJD80 (Komuno)
     runs-on: ubuntu-latest
     needs: [detect-changes, build]
     if: |
@@ -204,7 +204,7 @@ jobs:
       (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
       (github.event_name == 'push' ||
        (github.event_name == 'workflow_dispatch' &&
-        (github.event.inputs.environment == 'cjd80' || github.event.inputs.environment == 'both')))
+        (github.event.inputs.environment == 'komuno' || github.event.inputs.environment == 'both')))
 
     environment:
       name: production-cjd80

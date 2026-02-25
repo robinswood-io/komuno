@@ -11,10 +11,7 @@ export default defineConfig({
   clean: false,
   dts: false,
   tsconfig: 'tsconfig.server.json',
-  external: [
-    './vite.config.js',
-    '../vite.config.js',
-  ],
+  external: [],
   skipNodeModulesBundle: true,
   // Utiliser SWC au lieu d'esbuild pour le support des décorateurs
   esbuildOptions(options) {

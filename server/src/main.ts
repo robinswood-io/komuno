@@ -22,7 +22,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 async function bootstrap() {
   // 1. Valider les variables d'environnement au démarrage (fail-fast)
   logger.info('======================================');
-  logger.info('🚀 Démarrage de l\'application CJD80');
+  logger.info('🚀 Démarrage de l\'application Komuno');
   logger.info('======================================');
   
   try {
@@ -37,40 +37,27 @@ async function bootstrap() {
   const dependencies = await checkExternalDependencies();
   logger.info('[Startup] État des dépendances:', dependencies);
   // 3. Créer l'application NestJS
-  logger.info('[DEBUG] Creating NestJS application...');
   const app = await NestFactory.create(AppModule, {
     logger: process.env.NODE_ENV === 'development' ? ['log', 'error', 'warn', 'debug'] : ['error', 'warn'],
     abortOnError: false,
     bufferLogs: true,
     rawBody: true,
   });
-  logger.error('[DEBUG] ========== NestFactory.create() COMPLETED ==========');
-
   // 4. Configuration de sécurité
-  console.log('[DEBUG] Getting Express app instance...');
   const expressApp = app.getHttpAdapter().getInstance() as Express;
-  console.log('[DEBUG] Express app instance obtained');
 
   // Trust proxy pour les headers X-Forwarded-* (important derrière Traefik/nginx)
-  console.log('[DEBUG] Setting trust proxy...');
   expressApp.set('trust proxy', 1);
-  console.log('[DEBUG] Trust proxy set');
 
   // Headers de sécurité HTTP avec Helmet
-  console.log('[DEBUG] Getting Helmet config...');
   const helmet = getHelmetConfig();
-  console.log('[DEBUG] Helmet config obtained, applying...');
   expressApp.use(helmet);
-  console.log('[DEBUG] Helmet applied');
   logger.info('[Security] ✅ Headers de sécurité HTTP configurés');
-  
+
   // Middleware pour rejeter les requêtes pendant le shutdown
-  console.log('[DEBUG] Adding shutdown middleware...');
   expressApp.use(rejectDuringShutdown());
-  console.log('[DEBUG] Shutdown middleware added');
 
   // 5. Configuration CORS
-  console.log('[DEBUG] Enabling CORS...');
   app.enableCors({
     origin: process.env.CORS_ORIGIN || '*',
     credentials: true,
@@ -78,7 +65,6 @@ async function bootstrap() {
   logger.info('[CORS] Origine autorisée:', process.env.CORS_ORIGIN || '*');
 
   // 5.5 Configuration Swagger/OpenAPI
-  console.log('[DEBUG] Configuring Swagger/OpenAPI...');
   const config = new DocumentBuilder()
     .setTitle('CJD Amiens API')
     .setDescription('API Boîte à Kiffs - Gestion collaborative idées, événements, prêts')
@@ -107,24 +93,15 @@ async function bootstrap() {
   });
   logger.info('[Swagger] ✅ Documentation API disponible sur /api/docs');
   logger.info('[Swagger] ✅ Export JSON disponible sur /api/docs-json');
-  console.log('[DEBUG] Swagger/OpenAPI configured');
 
   // Configurer les sessions Express et Passport
-  // Récupérer la configuration de session depuis AuthModule
-  console.log('[DEBUG] Getting SESSION_CONFIG...');
   const sessionConfig = app.get('SESSION_CONFIG');
-  console.log('[DEBUG] SESSION_CONFIG obtained, applying session middleware...');
   expressApp.use(session(sessionConfig));
-  console.log('[DEBUG] Session middleware applied');
   expressApp.use(passport.initialize());
-  console.log('[DEBUG] Passport initialized');
   expressApp.use(passport.session());
-  console.log('[DEBUG] Passport session applied');
 
   // Configurer Passport serialize/deserialize
-  console.log('[DEBUG] Getting AuthService...');
   const authService = app.get(AuthService);
-  console.log('[DEBUG] AuthService obtained, configuring Passport serializers...');
   passport.serializeUser((user: Express.User, done) => {
     done(null, authService.serializeUser(user));
   });
@@ -136,10 +113,8 @@ async function bootstrap() {
       done(error, null);
     }
   });
-  console.log('[DEBUG] Passport serializers configured');
 
   // Initialiser MinIO au démarrage
-  console.log('[DEBUG] Initializing MinIO...');
   try {
     const minioService = app.get(MinIOService);
     await minioService.initialize();
@@ -148,13 +123,9 @@ async function bootstrap() {
     logger.error('Failed to initialize MinIO service at startup', { error });
     // Ne pas bloquer le démarrage si MinIO échoue
   }
-  console.log('[DEBUG] MinIO initialization completed');
-
   // 6. Démarrer le serveur HTTP
-  console.log('[DEBUG] Starting HTTP server on port', process.env.PORT || '5000');
   const port = parseInt(process.env.PORT || '5000', 10);
   const httpServer = await app.listen(port, '0.0.0.0');
-  console.log('[DEBUG] HTTP server started successfully');
   
   logger.info('======================================');
   logger.info(`✅ Application démarrée avec succès`);

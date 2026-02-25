@@ -125,7 +125,7 @@ export class NotificationsService {
    */
   async getUnreadCount(userId: string): Promise<number> {
     const result = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(*)::int` })
       .from(notifications)
       .where(
         and(
@@ -145,7 +145,7 @@ export class NotificationsService {
     projectId: string
   ): Promise<number> {
     const result = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(*)::int` })
       .from(notifications)
       .where(
         and(
@@ -166,7 +166,7 @@ export class NotificationsService {
     offerId: string
   ): Promise<number> {
     const result = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(*)::int` })
       .from(notifications)
       .where(
         and(
@@ -289,7 +289,7 @@ export class NotificationsService {
     const result = await this.db
       .delete(notifications)
       .where(
-        sql`${notifications.createdAt} < NOW() - INTERVAL '${days} days'`
+        sql`${notifications.createdAt} < NOW() - INTERVAL '1 day' * ${days}`
       )
       .returning();
 
@@ -341,7 +341,7 @@ export class NotificationsService {
 
     // Get total count
     const countResult = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(*)::int` })
       .from(notifications)
       .where(and(...conditions));
 
@@ -372,13 +372,13 @@ export class NotificationsService {
     try {
       // Total notifications
       const totalResult = await this.db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(notifications);
       const total = totalResult[0]?.count || 0;
 
       // Unread notifications
       const unreadResult = await this.db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: sql<number>`count(*)::int` })
         .from(notifications)
         .where(eq(notifications.isRead, false));
       const unread = unreadResult[0]?.count || 0;
@@ -390,7 +390,7 @@ export class NotificationsService {
       const byTypeResult = await this.db
         .select({
           type: notifications.type,
-          count: sql<number>`count(*)`,
+          count: sql<number>`count(*)::int`,
         })
         .from(notifications)
         .groupBy(notifications.type);
@@ -404,7 +404,7 @@ export class NotificationsService {
       const byDayResult = await this.db
         .select({
           day: sql<string>`DATE(created_at)`,
-          count: sql<number>`count(*)`,
+          count: sql<number>`count(*)::int`,
         })
         .from(notifications)
         .where(

@@ -34,15 +34,8 @@ export function setupGracefulShutdown(app: INestApplication) {
       logger.info('[Graceful Shutdown] Fermeture de l\'application NestJS...');
       await app.close();
       
-      // 4. Fermer le pool de connexions PostgreSQL
-      logger.info('[Graceful Shutdown] Fermeture du pool PostgreSQL...');
-      try {
-        await pool.end();
-        logger.info('[Graceful Shutdown] ✅ Pool PostgreSQL fermé');
-      } catch (error) {
-        logger.error('[Graceful Shutdown] ❌ Erreur lors de la fermeture du pool', { error });
-      }
-      
+      // 4. Le pool PostgreSQL est fermé par NestJS via app.close() (OnModuleDestroy)
+
       // 5. Autres nettoyages si nécessaire
       logger.info('[Graceful Shutdown] Nettoyages finaux...');
       

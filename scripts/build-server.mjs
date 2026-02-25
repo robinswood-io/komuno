@@ -15,13 +15,7 @@ await esbuild.build({
       tsconfig: './tsconfig.server.json',
     }),
   ],
-  external: [
-    'vite',
-    '@vitejs/plugin-react',
-    '@replit/vite-plugin-runtime-error-modal',
-    '@replit/vite-plugin-cartographer',
-    '../vite.config.js',
-  ],
+  external: [],
 });
 
 console.log('✅ Server bundle created: dist/server-bundle.mjs');

@@ -51,7 +51,7 @@ if (dbProvider === 'neon') {
     min: 2,
     idleTimeoutMillis: 60000,
     connectionTimeoutMillis: 3000,
-    application_name: 'cjd-amiens-app',
+    application_name: 'komuno',
   });
 }
 

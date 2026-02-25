@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CJD Amiens "Boîte à Kiffs" - Modern internal web application for collaborative idea management, event organization with HelloAsso integration, and comprehensive administration interface.
+**Komuno** - Modern internal web application for collaborative idea management, event organization with HelloAsso integration, and comprehensive administration interface. Deployed as **cjd80** for CJD Amiens (production on client VPS).
 
 **Tech Stack:**
 - **Backend:** NestJS 11 (migrated from Express.js) + TypeScript + Drizzle ORM
@@ -580,10 +580,10 @@ Avant de considérer une tâche terminée, vérifier:
 
 - [ ] **TypeScript:** `npx tsc --noEmit` (exit 0)
 - [ ] **Tests:** `npm test` (100% pass)
-- [ ] **Container:** `docker ps | grep cjd80` (running, uptime > 30s)
-- [ ] **Logs:** `docker logs cjd80 --tail 100 | grep -i error` (0 matches)
-- [ ] **Browser:** Playwright test at `https://cjd80.rbw.ovh` (0 console errors)
-- [ ] **Health check:** `curl https://cjd80.rbw.ovh/api/health` (200 OK)
+- [ ] **Container:** `docker ps | grep komuno` (running, uptime > 30s)
+- [ ] **Logs:** `docker logs komuno --tail 100 | grep -i error` (0 matches)
+- [ ] **Browser:** Playwright test at `https://komuno.rbw.ovh` (0 console errors)
+- [ ] **Health check:** `curl https://komuno.rbw.ovh/api/health` (200 OK)
 - [ ] **PWA:** Service worker installé, offline ready
 
 **IMPORTANT:** Ces vérifications valident le staging (.rbw.ovh).
@@ -595,11 +595,11 @@ Production = serveur distant via CI/CD.
 
 ```bash
 cd /srv/workspace
-docker compose -f docker-compose.apps.yml up -d cjd80
-docker compose -f docker-compose.apps.yml logs -f cjd80
+docker compose -f docker-compose.apps.yml up -d komuno
+docker compose -f docker-compose.apps.yml logs -f komuno
 ```
 
-**URL Staging:** https://cjd80.rbw.ovh
+**URL Staging:** https://komuno.rbw.ovh
 
 ### Production (CI/CD uniquement)
 
@@ -614,7 +614,7 @@ Déploiement production via:
 
 | Environment | Location | URLs | Stack |
 |-------------|----------|------|-------|
-| **Dev/Staging** | `/srv/workspace/` | `cjd80.rbw.ovh` | Next.js 15 + React 19 + NestJS |
+| **Dev/Staging** | `/srv/workspace/` | `komuno.rbw.ovh` | Next.js 15 + React 19 + NestJS |
 | **Production** | Clients VPS | Production domain | Same stack, optimized build |
 
 **Hot Reload:** 99% modifications sans restart Docker (bind mounts + Turbopack).

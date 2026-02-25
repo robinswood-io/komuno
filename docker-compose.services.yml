@@ -13,7 +13,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-cjd80}
       POSTGRES_INITDB_ARGS: "-E UTF8"
     ports:
-      - "5436:5432"  # Port externe 5436 pour éviter conflits
+      - "127.0.0.1:5436:5432"  # Port externe 5436 pour éviter conflits
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -34,8 +34,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
     ports:
-      - "9000:9000"  # API S3
-      - "9001:9001"  # Console MinIO
+      - "127.0.0.1:9000:9000"  # API S3
+      - "127.0.0.1:9001:9001"  # Console MinIO
     volumes:
       - minio-data:/data
     healthcheck:
@@ -60,7 +60,7 @@ services:
       fi
       "
     ports:
-      - "6381:6379"  # Port externe 6381 pour éviter conflit avec game-plug-redis (6380)
+      - "127.0.0.1:6381:6379"  # Port externe 6381 pour éviter conflit avec game-plug-redis (6380)
     volumes:
       - redis-data:/data
     healthcheck:

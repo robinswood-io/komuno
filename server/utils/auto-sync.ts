@@ -7,8 +7,6 @@ import { statusFromGitHub, toStorageStatus } from "./development-request-status"
  */
 export async function autoSyncAllDevelopmentRequests(): Promise<void> {
   try {
-    console.log("[Auto-Sync] Début de la synchronisation automatique...");
-    
     // Récupérer toutes les demandes
     const result = await storage.getDevelopmentRequests();
     if (!result.success) {
@@ -19,9 +17,8 @@ export async function autoSyncAllDevelopmentRequests(): Promise<void> {
 
     const requests = result.data;
     const requestsWithGitHub = requests.filter(req => req.githubIssueNumber);
-    
+
     if (requestsWithGitHub.length === 0) {
-      console.log("[Auto-Sync] Aucune demande avec issue GitHub à synchroniser");
       return;
     }
 

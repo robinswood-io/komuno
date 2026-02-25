@@ -27,15 +27,7 @@ const nextConfig = {
   },
 
   // Allow cross-origin requests in development
-  allowedDevOrigins: ['cjd80.rbw.ovh', 'https://cjd80.rbw.ovh'],
-
-  // Experimental features (Next.js 16)
-  experimental: {
-    // typedRoutes is now stable in Next.js 16
-    serverActions: {
-      bodySizeLimit: '2mb',
-    },
-  },
+  allowedDevOrigins: ['komuno.rbw.ovh', 'https://komuno.rbw.ovh'],
 
   // Next.js 16: typedRoutes promoted from experimental
   typedRoutes: true,
@@ -57,7 +49,12 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'cjd80.rbw.ovh',
+        hostname: 'komuno.rbw.ovh',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cjd80.fr',
         pathname: '/**',
       },
     ],
