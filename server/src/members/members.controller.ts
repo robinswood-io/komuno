@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { MembersService } from './members.service';
@@ -131,6 +132,58 @@ export class AdminMembersController {
   @ApiResponse({ status: 409, description: 'Le membre existe déjà' })
   async createMember(@Body() body: unknown) {
     return await this.membersService.createMember(body);
+  }
+
+  // ===== Routes admin - Opérations en masse (AVANT les routes :email) =====
+
+  @Patch('bulk-status')
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Mettre à jour le statut de plusieurs membres en masse' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        emails: { type: 'array', items: { type: 'string', format: 'email' }, example: ['a@b.com', 'c@d.com'] },
+        status: { type: 'string', example: 'active' }
+      },
+      required: ['emails', 'status']
+    }
+  })
+  @ApiResponse({ status: 200, description: 'Statuts mis à jour en masse' })
+  @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  async bulkUpdateStatus(@Body() body: { emails: string[]; status: string }) {
+    const { emails, status } = body;
+    if (!Array.isArray(emails) || emails.length === 0) {
+      throw new BadRequestException('emails doit être un tableau non vide');
+    }
+    return await this.membersService.bulkUpdateStatus(emails, status);
+  }
+
+  @Post('bulk-tag')
+  @Permissions('admin.edit')
+  @ApiOperation({ summary: 'Assigner un tag à plusieurs membres en masse' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        emails: { type: 'array', items: { type: 'string', format: 'email' }, example: ['a@b.com', 'c@d.com'] },
+        tagId: { type: 'string', example: 'uuid-tag-123' }
+      },
+      required: ['emails', 'tagId']
+    }
+  })
+  @ApiResponse({ status: 201, description: 'Tag assigné en masse' })
+  @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  async bulkAssignTag(@Body() body: { emails: string[]; tagId: string }) {
+    const { emails, tagId } = body;
+    if (!Array.isArray(emails) || emails.length === 0) {
+      throw new BadRequestException('emails doit être un tableau non vide');
+    }
+    return await this.membersService.bulkAssignTag(emails, tagId);
   }
 
   @Get(':email')

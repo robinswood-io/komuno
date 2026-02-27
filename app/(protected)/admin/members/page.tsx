@@ -16,7 +16,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, UserPlus, Eye, Download, BarChart3, Tag } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, UserPlus, Eye, Download, BarChart3, Tag, List, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
@@ -47,6 +47,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AddMemberDialog } from './add-member-dialog';
 import { MemberDetailsSheet } from './member-details-sheet';
 
@@ -104,6 +105,27 @@ const DEFAULT_COLORS = [
   '#ec4899', // pink
   '#06b6d4', // cyan
   '#f97316', // orange
+];
+
+// Colonnes du Kanban prospection
+const KANBAN_COLUMNS: { id: string; label: string; color: string }[] = [
+  { id: 'A contacter', label: 'À contacter', color: 'bg-slate-100 border-slate-300' },
+  { id: 'RDV prévu', label: 'RDV prévu', color: 'bg-blue-50 border-blue-300' },
+  { id: 'Intérêt - à relancer', label: 'Intérêt — à relancer', color: 'bg-amber-50 border-amber-300' },
+  { id: 'active', label: 'Membre actif', color: 'bg-green-50 border-green-300' },
+  { id: 'Refusé', label: 'Refusé', color: 'bg-red-50 border-red-300' },
+];
+
+// Valeurs de statut disponibles pour les opérations en masse
+const BULK_STATUS_OPTIONS = [
+  { value: 'active', label: 'Actif' },
+  { value: 'inactive', label: 'Inactif' },
+  { value: 'proposed', label: 'Proposé' },
+  { value: 'A contacter', label: 'A contacter' },
+  { value: 'RDV prévu', label: 'RDV prévu' },
+  { value: 'Intérêt - à relancer', label: 'Intérêt - à relancer' },
+  { value: 'Refusé', label: 'Refusé' },
+  { value: '2027', label: '2027' },
 ];
 
 /**
@@ -203,7 +225,7 @@ function exportToCSV(members: Member[]): void {
 
 /**
  * Page Gestion Membres CRM
- * CRUD complet sur les membres avec pagination et recherche
+ * CRUD complet sur les membres avec pagination, recherche, vue kanban et opérations en masse
  */
 export default function AdminMembersPage() {
   const { toast } = useToast();
@@ -240,7 +262,13 @@ export default function AdminMembersPage() {
   });
   const [tagFormErrors, setTagFormErrors] = useState<Partial<TagFormData>>({});
 
-  // Query pour lister les membres
+  // Feature 2 - Vue Kanban
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+
+  // Feature 8 - Sélection multiple
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+
+  // Query pour lister les membres (vue liste avec pagination)
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.members.list({ page, limit: 20, search: search || undefined }),
     queryFn: () => api.get<PaginatedResponse<Member>>('/api/admin/members', {
@@ -248,6 +276,16 @@ export default function AdminMembersPage() {
       limit: 20,
       search: search || undefined,
     }),
+  });
+
+  // Query pour le kanban — charge tous les membres sans pagination
+  const { data: kanbanData, isLoading: isKanbanLoading } = useQuery({
+    queryKey: queryKeys.members.list({ page: 1, limit: 500, kanban: true }),
+    queryFn: () => api.get<PaginatedResponse<Member>>('/api/admin/members', {
+      page: 1,
+      limit: 500,
+    }),
+    enabled: viewMode === 'kanban',
   });
 
   // Mutation pour mettre à jour un membre
@@ -565,6 +603,98 @@ export default function AdminMembersPage() {
     return statusFilters.has(unifiedStatus);
   });
 
+  // Feature 8 — Sélection multiple
+  const allFilteredEmails = filteredMembers?.map(m => m.email) ?? [];
+  const allSelected = allFilteredEmails.length > 0 && allFilteredEmails.every(e => selectedEmails.includes(e));
+  const someSelected = allFilteredEmails.some(e => selectedEmails.includes(e));
+
+  const toggleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      setSelectedEmails(prev => {
+        const newEmails = new Set(prev);
+        allFilteredEmails.forEach(e => newEmails.add(e));
+        return Array.from(newEmails);
+      });
+    } else {
+      setSelectedEmails(prev => prev.filter(e => !allFilteredEmails.includes(e)));
+    }
+  };
+
+  const toggleSelect = (email: string) => {
+    setSelectedEmails(prev =>
+      prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
+    );
+  };
+
+  const handleBulkStatus = async (status: string) => {
+    try {
+      await api.patch<{ success: boolean; updated: number }>('/api/admin/members/bulk-status', {
+        emails: selectedEmails,
+        status,
+      });
+      toast({
+        title: 'Statuts mis à jour',
+        description: `${selectedEmails.length} membre(s) mis à jour avec le statut "${status}"`,
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.all });
+      setSelectedEmails([]);
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: (err as Error).message || 'Erreur lors de la mise à jour en masse',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBulkExport = () => {
+    const allMembers = data?.data ?? [];
+    const membersToExport = allMembers.filter(m => selectedEmails.includes(m.email));
+    if (membersToExport.length === 0) return;
+    exportToCSV(membersToExport);
+    toast({
+      title: 'Export CSV réussi',
+      description: `${membersToExport.length} membre(s) exporté(s)`,
+    });
+  };
+
+  // Feature 2 — Kanban: changer le statut d'une carte
+  const handleKanbanStatusChange = async (email: string, newStatus: string) => {
+    try {
+      await api.patch(`/api/admin/members/${encodeURIComponent(email)}`, { status: newStatus });
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.all });
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: (err as Error).message || 'Erreur lors du changement de statut',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const getStatusBadgeStyles = (status: string) => {
+    switch (status) {
+      case 'active':
+        return { bg: 'bg-success/10', text: 'text-success-dark', border: 'border-success/30', label: 'Actif' };
+      case 'proposed':
+        return { bg: 'bg-orange-50', text: 'text-orange-900', border: 'border-orange-200', label: 'Proposé' };
+      case 'inactive':
+        return { bg: 'bg-gray-50', text: 'text-gray-900', border: 'border-gray-200', label: 'Inactif' };
+      case 'Refusé':
+        return { bg: 'bg-red-50', text: 'text-red-900', border: 'border-red-200', label: 'Refusé' };
+      case 'RDV prévu':
+        return { bg: 'bg-blue-50', text: 'text-blue-900', border: 'border-blue-200', label: 'RDV prévu' };
+      case 'A contacter':
+        return { bg: 'bg-yellow-50', text: 'text-yellow-900', border: 'border-yellow-200', label: 'A contacter' };
+      case '2027':
+        return { bg: 'bg-purple-50', text: 'text-purple-900', border: 'border-purple-200', label: '2027' };
+      case 'Intérêt - à relancer':
+        return { bg: 'bg-cyan-50', text: 'text-cyan-900', border: 'border-cyan-200', label: 'Intérêt - à relancer' };
+      default:
+        return { bg: 'bg-gray-50', text: 'text-gray-900', border: 'border-gray-200', label: status };
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -622,10 +752,33 @@ export default function AdminMembersPage() {
 
       <Card data-testid="members-list">
         <CardHeader>
-          <CardTitle>Liste des membres</CardTitle>
-          <CardDescription>
-            {data?.total || 0} membres au total
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Liste des membres</CardTitle>
+              <CardDescription>
+                {data?.total || 0} membres au total
+              </CardDescription>
+            </div>
+            {/* Toggle vue liste / kanban */}
+            <div className="flex gap-1 border rounded-md p-1">
+              <Button
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                title="Vue liste"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('kanban')}
+                title="Vue kanban"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
           {/* Filtres par statut */}
           <div className="flex flex-col gap-4 mt-6">
@@ -791,174 +944,279 @@ export default function AdminMembersPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Ville</TableHead>
-                <TableHead>Date 1er contact</TableHead>
-                <TableHead>Date RDV</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredMembers && filteredMembers.length > 0 ? (
-                filteredMembers.map((member: Member) => {
-                  const unifiedStatus = getUnifiedStatus(member);
-                  const getStatusBadgeStyles = (status: string) => {
-                    switch (status) {
-                      case 'active':
-                        return { bg: 'bg-success/10', text: 'text-success-dark', border: 'border-success/30', label: 'Actif' };
-                      case 'proposed':
-                        return { bg: 'bg-orange-50', text: 'text-orange-900', border: 'border-orange-200', label: 'Proposé' };
-                      case 'inactive':
-                        return { bg: 'bg-gray-50', text: 'text-gray-900', border: 'border-gray-200', label: 'Inactif' };
-                      case 'Refusé':
-                        return { bg: 'bg-red-50', text: 'text-red-900', border: 'border-red-200', label: 'Refusé' };
-                      case 'RDV prévu':
-                        return { bg: 'bg-blue-50', text: 'text-blue-900', border: 'border-blue-200', label: 'RDV prévu' };
-                      case 'A contacter':
-                        return { bg: 'bg-yellow-50', text: 'text-yellow-900', border: 'border-yellow-200', label: 'A contacter' };
-                      case '2027':
-                        return { bg: 'bg-purple-50', text: 'text-purple-900', border: 'border-purple-200', label: '2027' };
-                      case 'Intérêt - à relancer':
-                        return { bg: 'bg-cyan-50', text: 'text-cyan-900', border: 'border-cyan-200', label: 'Intérêt - à relancer' };
-                      default:
-                        return { bg: 'bg-gray-50', text: 'text-gray-900', border: 'border-gray-200', label: status };
-                    }
-                  };
-                  const statusStyles = getStatusBadgeStyles(unifiedStatus);
-
-                  return (
-                    <TableRow
-                      key={member.email}
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => {
-                        router.push(`/admin/members/${encodeURIComponent(member.email)}`);
-                      }}
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <span>{member.firstName} {member.lastName}</span>
-                          {member.status === 'proposed' && member.proposedBy && (
-                            <span className="text-xs text-muted-foreground">(proposé par {member.proposedBy})</span>
+          {/* Vue Kanban */}
+          {viewMode === 'kanban' && (
+            <>
+              {isKanbanLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="flex gap-4 overflow-x-auto pb-4">
+                  {KANBAN_COLUMNS.map(column => {
+                    const allKanbanMembers = kanbanData?.data ?? [];
+                    const columnMembers = allKanbanMembers.filter(m => {
+                      const unified = getUnifiedStatus(m);
+                      return unified === column.id;
+                    });
+                    return (
+                      <div
+                        key={column.id}
+                        className={`flex-shrink-0 w-64 rounded-lg border-2 p-3 ${column.color}`}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-semibold text-sm">{column.label}</h3>
+                          <Badge variant="secondary">{columnMembers.length}</Badge>
+                        </div>
+                        <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
+                          {columnMembers.map(member => (
+                            <div
+                              key={member.email}
+                              className="bg-white rounded-md p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow"
+                              onClick={() => {
+                                router.push(`/admin/members/${encodeURIComponent(member.email)}`);
+                              }}
+                            >
+                              <p className="font-medium text-sm">{member.firstName} {member.lastName}</p>
+                              <p className="text-xs text-muted-foreground">{member.company || member.email}</p>
+                              {(member.engagementScore ?? 0) > 0 && (
+                                <div className="mt-1">
+                                  <span className="text-xs bg-primary/10 text-primary px-1 rounded">
+                                    Score: {member.engagementScore}
+                                  </span>
+                                </div>
+                              )}
+                              {/* Dropdown pour changer le statut directement depuis la carte */}
+                              <Select
+                                defaultValue={getUnifiedStatus(member)}
+                                onValueChange={(newStatus) => {
+                                  handleKanbanStatusChange(member.email, newStatus);
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="h-6 text-xs mt-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {KANBAN_COLUMNS.map(c => (
+                                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ))}
+                          {columnMembers.length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-4">Aucun membre</p>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell
-                        onClick={(e) => e.stopPropagation()}
-                        className="cursor-pointer hover:text-primary transition-colors"
-                        title="Cliquer pour copier l'email"
-                      >
-                        <span
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(member.email);
-                              toast({
-                                title: 'Email copié',
-                                description: `${member.email} a été copié dans le presse-papier`,
-                              });
-                            } catch (error) {
-                              toast({
-                                title: 'Erreur',
-                                description: 'Impossible de copier l\'email',
-                                variant: 'destructive',
-                              });
-                            }
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Vue Liste */}
+          {viewMode === 'list' && (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {/* Colonne checkbox */}
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Sélectionner tout"
+                      />
+                    </TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Ville</TableHead>
+                    <TableHead>Date 1er contact</TableHead>
+                    <TableHead>Date RDV</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredMembers && filteredMembers.length > 0 ? (
+                    filteredMembers.map((member: Member) => {
+                      const unifiedStatus = getUnifiedStatus(member);
+                      const statusStyles = getStatusBadgeStyles(unifiedStatus);
+                      const isChecked = selectedEmails.includes(member.email);
+
+                      return (
+                        <TableRow
+                          key={member.email}
+                          className="cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => {
+                            router.push(`/admin/members/${encodeURIComponent(member.email)}`);
                           }}
                         >
-                          {member.email}
-                        </span>
-                      </TableCell>
-                      <TableCell>{member.city || '-'}</TableCell>
-                      <TableCell>
-                        {member.firstContactDate
-                          ? format(new Date(member.firstContactDate), 'dd MMM yyyy', { locale: fr })
-                          : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {member.appointmentDate
-                          ? format(new Date(member.appointmentDate), 'dd MMM yyyy', { locale: fr })
-                          : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`${statusStyles.bg} ${statusStyles.text} ${statusStyles.border}`}
-                          data-testid="member-status-badge"
-                        >
-                          {statusStyles.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {member.status === 'proposed' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                convertToActiveMutation.mutate(member.email);
-                              }}
-                              disabled={convertToActiveMutation.isPending}
-                              className="text-success hover:text-success-dark hover:bg-success/10"
-                            >
-                              {convertToActiveMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <>
-                                  <UserCheck className="h-4 w-4 mr-1" />
-                                  Convertir
-                                </>
+                          {/* Checkbox colonne */}
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isChecked}
+                              onCheckedChange={() => toggleSelect(member.email)}
+                              aria-label={`Sélectionner ${member.firstName} ${member.lastName}`}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <span>{member.firstName} {member.lastName}</span>
+                              {member.status === 'proposed' && member.proposedBy && (
+                                <span className="text-xs text-muted-foreground">(proposé par {member.proposedBy})</span>
                               )}
-                            </Button>
-                          )}
-                        </div>
+                            </div>
+                          </TableCell>
+                          <TableCell
+                            onClick={(e) => e.stopPropagation()}
+                            className="cursor-pointer hover:text-primary transition-colors"
+                            title="Cliquer pour copier l'email"
+                          >
+                            <span
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(member.email);
+                                  toast({
+                                    title: 'Email copié',
+                                    description: `${member.email} a été copié dans le presse-papier`,
+                                  });
+                                } catch {
+                                  toast({
+                                    title: 'Erreur',
+                                    description: 'Impossible de copier l\'email',
+                                    variant: 'destructive',
+                                  });
+                                }
+                              }}
+                            >
+                              {member.email}
+                            </span>
+                          </TableCell>
+                          <TableCell>{member.city || '-'}</TableCell>
+                          <TableCell>
+                            {member.firstContactDate
+                              ? format(new Date(member.firstContactDate), 'dd MMM yyyy', { locale: fr })
+                              : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {member.appointmentDate
+                              ? format(new Date(member.appointmentDate), 'dd MMM yyyy', { locale: fr })
+                              : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={`${statusStyles.bg} ${statusStyles.text} ${statusStyles.border}`}
+                              data-testid="member-status-badge"
+                            >
+                              {statusStyles.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              {member.status === 'proposed' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    convertToActiveMutation.mutate(member.email);
+                                  }}
+                                  disabled={convertToActiveMutation.isPending}
+                                  className="text-success hover:text-success-dark hover:bg-success/10"
+                                >
+                                  {convertToActiveMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <UserCheck className="h-4 w-4 mr-1" />
+                                      Convertir
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        {data?.data && data.data.length > 0
+                          ? 'Aucun membre ne correspond aux filtres sélectionnés'
+                          : 'Aucun membre trouvé'
+                        }
                       </TableCell>
                     </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    {data?.data && data.data.length > 0
-                      ? 'Aucun membre ne correspond aux filtres sélectionnés'
-                      : 'Aucun membre trouvé'
-                    }
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                  )}
+                </TableBody>
+              </Table>
 
-          {/* Pagination */}
-          {data && Math.ceil(data.total / data.limit) > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                Précédent
-              </Button>
-              <div className="flex items-center px-4 text-sm">
-                Page {page} sur {Math.ceil(data.total / data.limit)}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(Math.ceil(data.total / data.limit), p + 1))}
-                disabled={page === Math.ceil(data.total / data.limit)}
-              >
-                Suivant
-              </Button>
-            </div>
+              {/* Pagination */}
+              {data && Math.ceil(data.total / data.limit) > 1 && (
+                <div className="flex justify-center gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    Précédent
+                  </Button>
+                  <div className="flex items-center px-4 text-sm">
+                    Page {page} sur {Math.ceil(data.total / data.limit)}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(Math.ceil(data.total / data.limit), p + 1))}
+                    disabled={page === Math.ceil(data.total / data.limit)}
+                  >
+                    Suivant
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+
+      {/* Feature 8 — Barre d'actions flottante (sélection multiple) */}
+      {selectedEmails.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white border shadow-lg rounded-lg px-4 py-3 flex items-center gap-3 z-50">
+          <span className="text-sm font-medium">{selectedEmails.length} membre(s) sélectionné(s)</span>
+
+          {/* Changer le statut */}
+          <Select onValueChange={(status) => handleBulkStatus(status)}>
+            <SelectTrigger className="w-40 h-8">
+              <SelectValue placeholder="Changer statut" />
+            </SelectTrigger>
+            <SelectContent>
+              {BULK_STATUS_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Exporter la sélection */}
+          <Button variant="outline" size="sm" onClick={handleBulkExport}>
+            <Download className="h-4 w-4 mr-1" />
+            Exporter CSV
+          </Button>
+
+          {/* Désélectionner */}
+          <Button variant="ghost" size="sm" onClick={() => setSelectedEmails([])}>
+            Annuler
+          </Button>
+        </div>
+      )}
 
       {/* Dialog Ajouter un membre */}
       <AddMemberDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />

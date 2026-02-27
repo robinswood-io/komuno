@@ -20,6 +20,9 @@ import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { logger } from '../../lib/logger';
 import { emailNotificationService } from '../../email-notification-service';
+import { db } from '../../db';
+import { members, memberTagAssignments } from '../../../shared/schema';
+import { inArray, sql, and, eq } from 'drizzle-orm';
 
 /**
  * Service Members - Gestion des membres/CRM
@@ -545,5 +548,68 @@ export class MembersService {
       }
       throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
     }
+  }
+
+  // ===== Routes admin - Opérations en masse =====
+
+  async bulkUpdateStatus(emails: string[], status: string): Promise<{ success: true; updated: number }> {
+    if (!emails || emails.length === 0) {
+      throw new BadRequestException('Aucun email fourni');
+    }
+    if (!status) {
+      throw new BadRequestException('Statut manquant');
+    }
+
+    try {
+      await db
+        .update(members)
+        .set({ status, updatedAt: sql`NOW()` })
+        .where(inArray(members.email, emails));
+
+      logger.info('Bulk status update', { count: emails.length, status });
+      return { success: true, updated: emails.length };
+    } catch (error) {
+      throw new BadRequestException(`Erreur lors de la mise à jour en masse: ${error}`);
+    }
+  }
+
+  async bulkAssignTag(emails: string[], tagId: string): Promise<{ success: true; assigned: number }> {
+    if (!emails || emails.length === 0) {
+      throw new BadRequestException('Aucun email fourni');
+    }
+    if (!tagId) {
+      throw new BadRequestException('Tag ID manquant');
+    }
+
+    let assigned = 0;
+    for (const email of emails) {
+      try {
+        // Vérifier si l'association existe déjà
+        const existing = await db
+          .select()
+          .from(memberTagAssignments)
+          .where(
+            and(
+              eq(memberTagAssignments.memberEmail, email),
+              eq(memberTagAssignments.tagId, tagId)
+            )
+          )
+          .limit(1);
+
+        if (existing.length === 0) {
+          await db.insert(memberTagAssignments).values({
+            memberEmail: email,
+            tagId,
+            assignedBy: 'bulk',
+          });
+          assigned++;
+        }
+      } catch {
+        // ignorer les erreurs individuelles
+      }
+    }
+
+    logger.info('Bulk tag assignment', { count: assigned, tagId });
+    return { success: true, assigned };
   }
 }
