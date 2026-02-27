@@ -267,6 +267,11 @@ export default function AdminMembersPage() {
 
   // Feature 8 - Sélection multiple
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [bulkSubscriptionOpen, setBulkSubscriptionOpen] = useState(false);
+  const [bulkSubTypeId, setBulkSubTypeId] = useState('');
+  const [bulkSubStartDate, setBulkSubStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [bulkSubPayment, setBulkSubPayment] = useState('');
 
   // Query pour lister les membres (vue liste avec pagination)
   const { data, isLoading, error } = useQuery({
@@ -277,6 +282,16 @@ export default function AdminMembersPage() {
       search: search || undefined,
     }),
   });
+
+  // Query types de cotisation (pour l'assignation en masse)
+  const { data: subscriptionTypesData } = useQuery({
+    queryKey: ['subscription-types'],
+    queryFn: () => api.get<{ success: boolean; data: { id: string; name: string; amountInCents: number; durationType: string }[] }>(
+      '/api/financial/subscription-types',
+    ),
+    staleTime: 300_000,
+  });
+  const subscriptionTypesList = subscriptionTypesData?.data ?? [];
 
   // Query pour le kanban — charge tous les membres sans pagination
   const { data: kanbanData, isLoading: isKanbanLoading } = useQuery({
@@ -656,6 +671,51 @@ export default function AdminMembersPage() {
       title: 'Export CSV réussi',
       description: `${membersToExport.length} membre(s) exporté(s)`,
     });
+  };
+
+  const handleBulkDelete = async () => {
+    try {
+      await api.post<{ success: boolean; deleted: number }>('/api/admin/members/bulk-delete', { emails: selectedEmails });
+      toast({
+        title: 'Membres supprimés',
+        description: `${selectedEmails.length} membre(s) supprimé(s)`,
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.all });
+      setSelectedEmails([]);
+      setBulkDeleteConfirmOpen(false);
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: (err as Error).message || 'Erreur lors de la suppression',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBulkSubscription = async () => {
+    if (!bulkSubTypeId) return;
+    try {
+      await api.post<{ success: boolean; assigned: number }>('/api/admin/members/bulk-subscription', {
+        emails: selectedEmails,
+        subscriptionTypeId: bulkSubTypeId,
+        startDate: bulkSubStartDate,
+        paymentMethod: bulkSubPayment || undefined,
+      });
+      toast({
+        title: 'Cotisations assignées',
+        description: `${selectedEmails.length} membre(s) mis à jour`,
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.all });
+      setSelectedEmails([]);
+      setBulkSubscriptionOpen(false);
+      setBulkSubTypeId('');
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: (err as Error).message || 'Erreur lors de l\'assignation',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Feature 2 — Kanban: changer le statut d'une carte
@@ -1191,12 +1251,15 @@ export default function AdminMembersPage() {
 
       {/* Feature 8 — Barre d'actions flottante (sélection multiple) */}
       {selectedEmails.length > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white border shadow-lg rounded-lg px-4 py-3 flex items-center gap-3 z-50">
-          <span className="text-sm font-medium">{selectedEmails.length} membre(s) sélectionné(s)</span>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white border shadow-lg rounded-xl px-4 py-3 flex items-center gap-2 z-50 flex-wrap max-w-[90vw]">
+          <span className="text-sm font-semibold text-primary whitespace-nowrap">
+            {selectedEmails.length} sélectionné(s)
+          </span>
+          <div className="h-4 w-px bg-border mx-1" />
 
           {/* Changer le statut */}
           <Select onValueChange={(status) => handleBulkStatus(status)}>
-            <SelectTrigger className="w-40 h-8">
+            <SelectTrigger className="w-40 h-8 text-xs">
               <SelectValue placeholder="Changer statut" />
             </SelectTrigger>
             <SelectContent>
@@ -1206,18 +1269,108 @@ export default function AdminMembersPage() {
             </SelectContent>
           </Select>
 
+          {/* Assigner cotisation */}
+          <Button variant="outline" size="sm" onClick={() => setBulkSubscriptionOpen(true)} className="h-8 text-xs">
+            Cotisation
+          </Button>
+
           {/* Exporter la sélection */}
-          <Button variant="outline" size="sm" onClick={handleBulkExport}>
-            <Download className="h-4 w-4 mr-1" />
-            Exporter CSV
+          <Button variant="outline" size="sm" onClick={handleBulkExport} className="h-8 text-xs">
+            <Download className="h-3 w-3 mr-1" />
+            CSV
+          </Button>
+
+          {/* Supprimer */}
+          <Button variant="destructive" size="sm" onClick={() => setBulkDeleteConfirmOpen(true)} className="h-8 text-xs">
+            <Trash2 className="h-3 w-3 mr-1" />
+            Supprimer
           </Button>
 
           {/* Désélectionner */}
-          <Button variant="ghost" size="sm" onClick={() => setSelectedEmails([])}>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedEmails([])} className="h-8 text-xs">
             Annuler
           </Button>
         </div>
       )}
+
+      {/* Dialog confirmation suppression en masse */}
+      <AlertDialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer {selectedEmails.length} membre(s) ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Les {selectedEmails.length} membre(s) sélectionné(s) seront définitivement supprimés avec toutes leurs données.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleBulkDelete}
+            >
+              Supprimer {selectedEmails.length} membre(s)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog assignation cotisation en masse */}
+      <Dialog open={bulkSubscriptionOpen} onOpenChange={setBulkSubscriptionOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Assigner une cotisation</DialogTitle>
+            <DialogDescription>
+              Assigner la même cotisation à {selectedEmails.length} membre(s) sélectionné(s)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Type de cotisation</Label>
+              <Select value={bulkSubTypeId} onValueChange={setBulkSubTypeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir un type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {subscriptionTypesList.map(st => (
+                    <SelectItem key={st.id} value={st.id}>
+                      {st.name} — {(st.amountInCents / 100).toFixed(0)} €/{st.durationType === 'monthly' ? 'mois' : st.durationType === 'quarterly' ? 'trim.' : 'an'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bulk-sub-start">Date de début</Label>
+              <Input
+                id="bulk-sub-start"
+                type="date"
+                value={bulkSubStartDate}
+                onChange={e => setBulkSubStartDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Mode de paiement (optionnel)</Label>
+              <Select value={bulkSubPayment} onValueChange={setBulkSubPayment}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Laisser vide si non défini" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Espèces</SelectItem>
+                  <SelectItem value="check">Chèque</SelectItem>
+                  <SelectItem value="bank_transfer">Virement</SelectItem>
+                  <SelectItem value="card">Carte</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkSubscriptionOpen(false)}>Annuler</Button>
+            <Button onClick={handleBulkSubscription} disabled={!bulkSubTypeId}>
+              Assigner la cotisation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog Ajouter un membre */}
       <AddMemberDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />

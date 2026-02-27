@@ -21,7 +21,7 @@ import { fromZodError } from 'zod-validation-error';
 import { logger } from '../../lib/logger';
 import { emailNotificationService } from '../../email-notification-service';
 import { db } from '../../db';
-import { members, memberTagAssignments } from '../../../shared/schema';
+import { members, memberTagAssignments, memberSubscriptions, subscriptionTypes } from '../../../shared/schema';
 import { inArray, sql, and, eq } from 'drizzle-orm';
 
 /**
@@ -610,6 +610,84 @@ export class MembersService {
     }
 
     logger.info('Bulk tag assignment', { count: assigned, tagId });
+    return { success: true, assigned };
+  }
+
+  async bulkDelete(emails: string[]): Promise<{ success: true; deleted: number }> {
+    if (!emails || emails.length === 0) {
+      throw new BadRequestException('Aucun email fourni');
+    }
+
+    try {
+      const result = await db
+        .delete(members)
+        .where(inArray(members.email, emails))
+        .returning({ email: members.email });
+
+      logger.info('Bulk member delete', { count: result.length });
+      return { success: true, deleted: result.length };
+    } catch (error) {
+      throw new BadRequestException(`Erreur lors de la suppression en masse: ${error}`);
+    }
+  }
+
+  async bulkAssignSubscription(
+    emails: string[],
+    subscriptionTypeId: string,
+    startDate: string,
+    paymentMethod: string | undefined,
+    assignedBy: string,
+  ): Promise<{ success: true; assigned: number }> {
+    if (!emails || emails.length === 0) {
+      throw new BadRequestException('Aucun email fourni');
+    }
+
+    // Vérifier que le type de cotisation existe
+    const subType = await db
+      .select()
+      .from(subscriptionTypes)
+      .where(eq(subscriptionTypes.id, subscriptionTypeId))
+      .limit(1);
+
+    if (subType.length === 0) {
+      throw new BadRequestException('Type de cotisation introuvable');
+    }
+
+    const { amountInCents, durationType } = subType[0];
+
+    // Calculer la date de fin selon le type
+    const start = new Date(startDate);
+    const end = new Date(start);
+    if (durationType === 'monthly') {
+      end.setMonth(end.getMonth() + 1);
+    } else if (durationType === 'quarterly') {
+      end.setMonth(end.getMonth() + 3);
+    } else {
+      end.setFullYear(end.getFullYear() + 1);
+    }
+    const endDate = end.toISOString().split('T')[0];
+
+    let assigned = 0;
+    for (const email of emails) {
+      try {
+        await db.insert(memberSubscriptions).values({
+          memberEmail: email,
+          subscriptionTypeId,
+          subscriptionType: durationType,
+          amountInCents,
+          startDate,
+          endDate,
+          status: 'active',
+          paymentMethod: paymentMethod ?? null,
+          assignedBy,
+        });
+        assigned++;
+      } catch {
+        // ignorer les erreurs individuelles (ex: membre inexistant)
+      }
+    }
+
+    logger.info('Bulk subscription assignment', { count: assigned, subscriptionTypeId });
     return { success: true, assigned };
   }
 }

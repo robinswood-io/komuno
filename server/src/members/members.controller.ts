@@ -186,6 +186,65 @@ export class AdminMembersController {
     return await this.membersService.bulkAssignTag(emails, tagId);
   }
 
+  @Post('bulk-delete')
+  @Permissions('admin.manage')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Supprimer plusieurs membres en masse' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        emails: { type: 'array', items: { type: 'string', format: 'email' }, example: ['a@b.com', 'c@d.com'] },
+      },
+      required: ['emails'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Membres supprimés en masse' })
+  @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  async bulkDelete(@Body() body: { emails: string[] }) {
+    const { emails } = body;
+    if (!Array.isArray(emails) || emails.length === 0) {
+      throw new BadRequestException('emails doit être un tableau non vide');
+    }
+    return await this.membersService.bulkDelete(emails);
+  }
+
+  @Post('bulk-subscription')
+  @Permissions('admin.edit')
+  @ApiOperation({ summary: 'Assigner une cotisation à plusieurs membres en masse' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        emails: { type: 'array', items: { type: 'string', format: 'email' } },
+        subscriptionTypeId: { type: 'string', format: 'uuid' },
+        startDate: { type: 'string', format: 'date', example: '2026-01-01' },
+        paymentMethod: { type: 'string', example: 'bank_transfer' },
+      },
+      required: ['emails', 'subscriptionTypeId', 'startDate'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Cotisations assignées en masse' })
+  @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  async bulkAssignSubscription(
+    @Body() body: { emails: string[]; subscriptionTypeId: string; startDate: string; paymentMethod?: string },
+    @User() user: { email: string },
+  ) {
+    const { emails, subscriptionTypeId, startDate, paymentMethod } = body;
+    if (!Array.isArray(emails) || emails.length === 0) {
+      throw new BadRequestException('emails doit être un tableau non vide');
+    }
+    return await this.membersService.bulkAssignSubscription(
+      emails,
+      subscriptionTypeId,
+      startDate,
+      paymentMethod,
+      user.email,
+    );
+  }
+
   @Get(':email')
   @Permissions('admin.view')
   @ApiOperation({ summary: 'Obtenir un membre par email' })
