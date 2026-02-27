@@ -25,6 +25,8 @@ import { TrackingModule } from './tracking/tracking.module';
 import { FeaturesModule } from './features/features.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { MinIOModule } from './integrations/minio/minio.module';
+import { EmailModule } from './common/email/email.module';
+import { SchedulerModule } from './common/scheduler/scheduler.module';
 import { DbMonitoringInterceptor } from './common/interceptors/db-monitoring.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
@@ -69,6 +71,8 @@ const throttlerLimit = isDevelopment ? 10000 : 1000;
     FeaturesModule,
     NotificationsModule,
     MinIOModule,
+    EmailModule,
+    SchedulerModule,
     // ViteModule DÉSACTIVÉ - NextJS gère maintenant le routing et les fichiers statiques
     // ViteModule,
   ],
