@@ -99,6 +99,18 @@ export class AdminPatronsController {
     return await this.patronsService.searchPatronByEmail(email);
   }
 
+  @Get(':id/details')
+  @Permissions('admin.manage')
+  @ApiOperation({ summary: 'Obtenir les détails complets d\'un mécène (contacts, dons, interactions, propositions)' })
+  @ApiParam({ name: 'id', description: 'ID du mécène', example: 'uuid-patron-123' })
+  @ApiResponse({ status: 200, description: 'Détails complets du mécène avec contacts, dons, interactions et propositions' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  @ApiResponse({ status: 404, description: 'Mécène non trouvé' })
+  async getPatronDetails(@Param('id') id: string) {
+    return await this.patronsService.getPatronDetails(id);
+  }
+
   @Get(':id')
   @Permissions('admin.manage')
   @ApiOperation({ summary: 'Obtenir un mécène par ID' })

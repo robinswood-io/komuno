@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys, type PaginatedResponse } from '@/lib/api/client';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +40,7 @@ interface Patron {
 export default function AdminPatronsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -167,7 +169,11 @@ export default function AdminPatronsPage() {
             <TableBody>
               {data?.data && data.data.length > 0 ? (
                 data.data.map((patron: Patron) => (
-                  <TableRow key={patron.id}>
+                  <TableRow
+                    key={patron.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => router.push(`/admin/patrons/${patron.id}`)}
+                  >
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -201,14 +207,14 @@ export default function AdminPatronsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleEdit(patron)}
+                          onClick={(e) => { e.stopPropagation(); handleEdit(patron); }}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(patron.id)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(patron.id); }}
                           disabled={deleteMutation.isPending}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />

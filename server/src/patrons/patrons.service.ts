@@ -14,6 +14,9 @@ import {
 import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { logger } from '../../lib/logger';
+import { db } from '../../db';
+import { patronContacts, patronDonations, patronUpdates, ideaPatronProposals, ideas } from '../../../shared/schema';
+import { eq, desc } from 'drizzle-orm';
 
 /**
  * Service Patrons - Gestion des mécènes
@@ -119,6 +122,64 @@ export class PatronsService {
       throw new NotFoundException('Mécène non trouvé');
     }
     return result.data;
+  }
+
+  async getPatronDetails(id: string) {
+    // Vérifier que le mécène existe
+    const patronResult = await this.storageService.instance.getPatronById(id);
+    if (!patronResult.success) {
+      throw new BadRequestException(('error' in patronResult ? patronResult.error : new Error('Unknown error')).message);
+    }
+    if (!patronResult.data) {
+      throw new NotFoundException('Mécène non trouvé');
+    }
+
+    // Récupérer les contacts du mécène
+    const contacts = await db
+      .select()
+      .from(patronContacts)
+      .where(eq(patronContacts.patronId, id))
+      .orderBy(desc(patronContacts.isPrimary), patronContacts.firstName);
+
+    // Récupérer les dons du mécène
+    const donations = await db
+      .select()
+      .from(patronDonations)
+      .where(eq(patronDonations.patronId, id))
+      .orderBy(desc(patronDonations.donatedAt));
+
+    // Récupérer les interactions du mécène
+    const updates = await db
+      .select()
+      .from(patronUpdates)
+      .where(eq(patronUpdates.patronId, id))
+      .orderBy(desc(patronUpdates.date));
+
+    // Récupérer les propositions idées-mécène avec le titre de l'idée
+    const proposals = await db
+      .select({
+        id: ideaPatronProposals.id,
+        ideaId: ideaPatronProposals.ideaId,
+        ideaTitle: ideas.title,
+        patronId: ideaPatronProposals.patronId,
+        proposedByAdminEmail: ideaPatronProposals.proposedByAdminEmail,
+        proposedAt: ideaPatronProposals.proposedAt,
+        status: ideaPatronProposals.status,
+        comments: ideaPatronProposals.comments,
+        updatedAt: ideaPatronProposals.updatedAt,
+      })
+      .from(ideaPatronProposals)
+      .leftJoin(ideas, eq(ideaPatronProposals.ideaId, ideas.id))
+      .where(eq(ideaPatronProposals.patronId, id))
+      .orderBy(desc(ideaPatronProposals.proposedAt));
+
+    return {
+      ...patronResult.data,
+      contacts,
+      donations,
+      updates,
+      proposals,
+    };
   }
 
   async createPatron(data: unknown, userEmail: string) {
