@@ -1,0 +1,410 @@
+name: Build and Deploy
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environnement à déployer'
+        required: true
+        type: choice
+        options:
+          - komuno
+          - rep
+          - both
+      force_build:
+        description: 'Forcer le rebuild même sans changements'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  BUN_VERSION: 1.1.38
+
+jobs:
+  # ===================================
+  # Job 1: Détection des changements
+  # ===================================
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_build: ${{ steps.changes.outputs.should_build }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect file changes
+        id: changes
+        run: |
+          if [ "${{ github.event.inputs.force_build }}" == "true" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "🔄 Force rebuild activé"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only HEAD^ HEAD 2>/dev/null || echo "")
+          echo "Fichiers modifiés:"
+          echo "$CHANGED"
+
+          SHOULD_BUILD=false
+          while IFS= read -r file; do
+            case "$file" in
+              app/*|public/*|next.config.*|server/*|migrations/*|shared/*|package.json|bun.lockb|Dockerfile*)
+                SHOULD_BUILD=true
+                break
+                ;;
+            esac
+          done <<< "$CHANGED"
+
+          echo "should_build=$SHOULD_BUILD" >> $GITHUB_OUTPUT
+          echo "📊 Build nécessaire: $SHOULD_BUILD"
+
+  # ===================================
+  # Job 2: Build et push image Docker
+  # ===================================
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should_build == 'true'
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=main-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_TAG=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
+
+      - name: Build summary
+        run: |
+          echo "## Build réussi" >> $GITHUB_STEP_SUMMARY
+          echo "| Champ | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Digest | \`${{ steps.build.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
+
+  # ===================================
+  # Job 3: Deploy CJD80 (cjd80.fr)
+  # ===================================
+  deploy-cjd80:
+    name: Deploy CJD80 (cjd80.fr)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [detect-changes, build]
+    if: |
+      always() &&
+      (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.environment == 'komuno' || github.event.inputs.environment == 'both')))
+
+    environment:
+      name: production-cjd80
+      url: https://cjd80.fr
+
+    steps:
+      - name: Skip (aucun changement)
+        if: needs.detect-changes.outputs.should_build == 'false'
+        run: echo "⏭️ Aucun changement détecté — déploiement ignoré"
+
+      - name: Deploy to CJD80
+        if: needs.detect-changes.outputs.should_build == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -euo pipefail
+            cd /docker/cjd80
+
+            echo "🔐 Login GHCR..."
+            echo "${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" | \
+              docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Sauvegarder l'image actuelle pour rollback
+            OLD_IMAGE=$(docker inspect cjd-app --format='{{.Image}}' 2>/dev/null || echo "")
+            echo "Image actuelle: ${OLD_IMAGE:-aucune}"
+
+            echo "📥 Pull image par digest (immuable)..."
+            docker pull "ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}"
+            docker tag  "ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}" cjd80:latest
+
+            echo "🚀 Déploiement..."
+            docker compose up -d --no-deps --force-recreate cjd-app
+
+            echo "⏳ Attente démarrage (max 60s)..."
+            for i in $(seq 1 12); do
+              STATE=$(docker inspect --format='{{.State.Status}}' cjd-app 2>/dev/null || echo "not_found")
+              if [ "$STATE" = "running" ]; then
+                echo "  ✅ Container running après $((i * 5))s"
+                break
+              fi
+              echo "  ⏳ Tentative $i/12 — état: $STATE"
+              sleep 5
+            done
+
+            # Vérifier état final
+            CONTAINER_STATE=$(docker inspect --format='{{.State.Status}}' cjd-app 2>/dev/null || echo "not_found")
+            RESTART_COUNT=$(docker inspect --format='{{.RestartCount}}' cjd-app 2>/dev/null || echo "0")
+
+            if [ "$CONTAINER_STATE" != "running" ] || [ "$RESTART_COUNT" -gt "0" ]; then
+              echo "❌ Container instable (état=$CONTAINER_STATE, restarts=$RESTART_COUNT)"
+              docker logs cjd-app --tail 80 || true
+              # Rollback vers l'image précédente
+              if [ -n "$OLD_IMAGE" ]; then
+                echo "🔄 Rollback vers $OLD_IMAGE..."
+                docker tag "$OLD_IMAGE" cjd80:latest
+                docker compose up -d --no-deps --force-recreate cjd-app
+                echo "✅ Rollback effectué"
+              fi
+              exit 1
+            fi
+
+            echo "🔍 Smoke tests..."
+            FAIL=0
+
+            # Health check avec validation JSON
+            HEALTH=$(docker exec cjd-app wget -q -O - --timeout=10 \
+              http://localhost:5000/api/health 2>/dev/null || echo "FAILED")
+            if echo "$HEALTH" | grep -q '"status":"healthy"'; then
+              echo "  ✅ GET /api/health → healthy"
+            else
+              echo "  ❌ GET /api/health → $(echo "$HEALTH" | head -c 200)"
+              FAIL=1
+            fi
+
+            # Endpoints API (401 attendu, 5xx = erreur)
+            check_endpoint() {
+              local name="$1" url="$2"
+              local status
+              status=$(docker exec cjd-app wget -S -O /dev/null --timeout=10 "$url" 2>&1 \
+                | grep "HTTP/" | tail -1 | awk '{print $2}' || echo "000")
+              if [ "${status:0:1}" = "5" ] || [ "$status" = "000" ]; then
+                echo "  ❌ $name → HTTP $status"
+                FAIL=1
+              else
+                echo "  ✅ $name → HTTP $status"
+              fi
+            }
+
+            check_endpoint "GET /api/admin/members"  "http://localhost:5000/api/admin/members"
+            check_endpoint "GET /api/admin/events"   "http://localhost:5000/api/admin/events"
+            check_endpoint "GET /api/admin/ideas"    "http://localhost:5000/api/admin/ideas"
+            check_endpoint "GET /api/patrons"        "http://localhost:5000/api/patrons"
+
+            if [ "$FAIL" -eq 1 ]; then
+              echo "❌ Smoke tests échoués — rollback..."
+              docker logs cjd-app --tail 80 || true
+              if [ -n "$OLD_IMAGE" ]; then
+                docker tag "$OLD_IMAGE" cjd80:latest
+                docker compose up -d --no-deps --force-recreate cjd-app
+                echo "✅ Rollback effectué"
+              fi
+              exit 1
+            fi
+
+            echo "✅ Déploiement CJD80 réussi!"
+            docker image prune -f || true
+
+      - name: Deployment summary
+        if: needs.detect-changes.outputs.should_build == 'true'
+        run: |
+          echo "## Déploiement CJD80 réussi" >> $GITHUB_STEP_SUMMARY
+          echo "| Champ | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | https://cjd80.fr |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Digest | \`${{ needs.build.outputs.image-digest }}\` |" >> $GITHUB_STEP_SUMMARY
+
+  # ===================================
+  # Job 4: Deploy REP (repicardie.fr)
+  # ===================================
+  deploy-rep:
+    name: Deploy REP (repicardie.fr)
+    runs-on: [self-hosted, rep]
+    timeout-minutes: 15
+    needs: [detect-changes, build]
+    if: |
+      always() &&
+      (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.environment == 'rep' || github.event.inputs.environment == 'both')))
+
+    environment:
+      name: production-rep
+      url: https://repicardie.fr
+
+    steps:
+      - name: Skip (aucun changement)
+        if: needs.detect-changes.outputs.should_build == 'false'
+        run: echo "⏭️ Aucun changement détecté — déploiement ignoré"
+
+      - name: Pull latest code
+        if: needs.detect-changes.outputs.should_build == 'true'
+        run: |
+          cd /docker/apps/komuno
+          git config --global --add safe.directory /docker/apps/komuno
+          git fetch --all --prune
+          git checkout main
+          git pull --ff-only
+
+      - name: Pull and deploy
+        if: needs.detect-changes.outputs.should_build == 'true'
+        run: |
+          set -euo pipefail
+          cd /docker/apps/komuno
+
+          echo "🔐 Login GHCR..."
+          echo "${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" | \
+            docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          # Sauvegarder l'image actuelle pour rollback
+          OLD_IMAGE=$(docker inspect rep-app --format='{{.Image}}' 2>/dev/null || echo "")
+          echo "Image actuelle: ${OLD_IMAGE:-aucune}"
+
+          echo "📥 Pull image par digest (immuable)..."
+          docker pull "ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}"
+          docker tag  "ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}" komuno:latest
+
+          echo "🚀 Déploiement..."
+          docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate rep-app
+
+          echo "⏳ Attente démarrage (max 60s)..."
+          for i in $(seq 1 12); do
+            STATE=$(docker inspect --format='{{.State.Status}}' rep-app 2>/dev/null || echo "not_found")
+            if [ "$STATE" = "running" ]; then
+              echo "  ✅ Container running après $((i * 5))s"
+              break
+            fi
+            echo "  ⏳ Tentative $i/12 — état: $STATE"
+            sleep 5
+          done
+
+          # Vérifier état final
+          CONTAINER_STATE=$(docker inspect --format='{{.State.Status}}' rep-app 2>/dev/null || echo "not_found")
+          RESTART_COUNT=$(docker inspect --format='{{.RestartCount}}' rep-app 2>/dev/null || echo "0")
+
+          if [ "$CONTAINER_STATE" != "running" ] || [ "$RESTART_COUNT" -gt "0" ]; then
+            echo "❌ Container instable (état=$CONTAINER_STATE, restarts=$RESTART_COUNT)"
+            docker logs rep-app --tail 80 || true
+            if [ -n "$OLD_IMAGE" ]; then
+              echo "🔄 Rollback vers $OLD_IMAGE..."
+              docker tag "$OLD_IMAGE" komuno:latest
+              docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate rep-app
+              echo "✅ Rollback effectué"
+            fi
+            exit 1
+          fi
+
+          echo "🔍 Smoke tests..."
+          FAIL=0
+
+          # Health check avec validation JSON
+          HEALTH=$(docker exec rep-app wget -q -O - --timeout=10 \
+            http://localhost:5000/api/health 2>/dev/null || echo "FAILED")
+          if echo "$HEALTH" | grep -q '"status":"healthy"'; then
+            echo "  ✅ GET /api/health → healthy"
+          else
+            echo "  ❌ GET /api/health → $(echo "$HEALTH" | head -c 200)"
+            FAIL=1
+          fi
+
+          # Endpoints API (401 attendu, 5xx = erreur)
+          check_endpoint() {
+            local name="$1" url="$2"
+            local status
+            status=$(docker exec rep-app wget -S -O /dev/null --timeout=10 "$url" 2>&1 \
+              | grep "HTTP/" | tail -1 | awk '{print $2}' || echo "000")
+            if [ "${status:0:1}" = "5" ] || [ "$status" = "000" ]; then
+              echo "  ❌ $name → HTTP $status"
+              FAIL=1
+            else
+              echo "  ✅ $name → HTTP $status"
+            fi
+          }
+
+          check_endpoint "GET /api/admin/members"  "http://localhost:5000/api/admin/members"
+          check_endpoint "GET /api/admin/events"   "http://localhost:5000/api/admin/events"
+          check_endpoint "GET /api/admin/ideas"    "http://localhost:5000/api/admin/ideas"
+          check_endpoint "GET /api/patrons"        "http://localhost:5000/api/patrons"
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo "❌ Smoke tests échoués — rollback..."
+            docker logs rep-app --tail 80 || true
+            if [ -n "$OLD_IMAGE" ]; then
+              docker tag "$OLD_IMAGE" komuno:latest
+              docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate rep-app
+              echo "✅ Rollback effectué"
+            fi
+            exit 1
+          fi
+
+          echo "✅ Déploiement REP réussi!"
+          docker image prune -f || true
+
+      - name: Deployment summary
+        if: needs.detect-changes.outputs.should_build == 'true'
+        run: |
+          echo "## Déploiement REP réussi" >> $GITHUB_STEP_SUMMARY
+          echo "| Champ | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | https://repicardie.fr |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Digest | \`${{ needs.build.outputs.image-digest }}\` |" >> $GITHUB_STEP_SUMMARY
