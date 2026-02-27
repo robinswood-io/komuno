@@ -29,14 +29,6 @@ CREATE TABLE "subscription_types" (
 --> statement-breakpoint
 ALTER TABLE "member_subscriptions" ADD COLUMN "subscription_type_id" uuid;--> statement-breakpoint
 ALTER TABLE "member_subscriptions" ADD COLUMN "assigned_by" varchar(255);--> statement-breakpoint
-ALTER TABLE "members" ADD COLUMN "department" text;--> statement-breakpoint
-ALTER TABLE "members" ADD COLUMN "city" text;--> statement-breakpoint
-ALTER TABLE "members" ADD COLUMN "postal_code" text;--> statement-breakpoint
-ALTER TABLE "members" ADD COLUMN "sector" text;--> statement-breakpoint
-ALTER TABLE "patrons" ADD COLUMN "department" text;--> statement-breakpoint
-ALTER TABLE "patrons" ADD COLUMN "city" text;--> statement-breakpoint
-ALTER TABLE "patrons" ADD COLUMN "postal_code" text;--> statement-breakpoint
-ALTER TABLE "patrons" ADD COLUMN "sector" text;--> statement-breakpoint
 CREATE INDEX "financial_revenues_type_idx" ON "financial_revenues" USING btree ("type");--> statement-breakpoint
 CREATE INDEX "financial_revenues_revenue_date_idx" ON "financial_revenues" USING btree ("revenue_date" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "financial_revenues_member_email_idx" ON "financial_revenues" USING btree ("member_email");--> statement-breakpoint
