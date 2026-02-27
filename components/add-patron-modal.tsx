@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Plus, Save, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { api, queryKeys } from '@/lib/api/client';
+import { NetworkSection, type PendingConnection } from '@/components/network/NetworkSection';
+import { SiretSearch, type SiretCompanyData } from '@/components/ui/siret-search';
 
 interface AddPatronModalProps {
   open: boolean;
@@ -23,6 +25,11 @@ export default function AddPatronModal({ open, onOpenChange }: AddPatronModalPro
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('');
   const [notes, setNotes] = useState('');
+  const [city, setCity] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [department, setDepartment] = useState('');
+  const [sector, setSector] = useState('');
+  const [pendingConnections, setPendingConnections] = useState<PendingConnection[]>([]);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -36,8 +43,21 @@ export default function AddPatronModal({ open, onOpenChange }: AddPatronModalPro
       setPhone('');
       setRole('');
       setNotes('');
+      setCity('');
+      setPostalCode('');
+      setDepartment('');
+      setSector('');
+      setPendingConnections([]);
     }
   }, [open]);
+
+  const handleSiretSelect = (data: SiretCompanyData) => {
+    if (data.company) setCompany(data.company);
+    if (data.city) setCity(data.city);
+    if (data.postalCode) setPostalCode(data.postalCode);
+    if (data.department) setDepartment(data.department);
+    if (data.sector) setSector(data.sector);
+  };
 
   const addPatronMutation = useMutation({
     mutationFn: async (data: {
@@ -48,10 +68,25 @@ export default function AddPatronModal({ open, onOpenChange }: AddPatronModalPro
       phone?: string;
       role?: string;
       notes?: string;
+      city?: string;
+      postalCode?: string;
+      department?: string;
+      sector?: string;
     }) => {
       return api.post('/api/patrons', data);
     },
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
+      // Create pending network connections
+      await Promise.allSettled(
+        pendingConnections.map((conn) =>
+          api.post('/api/network', {
+            ownerEmail: variables.email,
+            ownerType: 'patron',
+            connectedEmail: conn.email,
+            connectedType: conn.type,
+          }),
+        ),
+      );
       queryClient.invalidateQueries({ queryKey: queryKeys.patrons.all });
       toast({
         title: 'Sponsor ajoute',
@@ -106,6 +141,10 @@ export default function AddPatronModal({ open, onOpenChange }: AddPatronModalPro
       phone: phone.trim() || undefined,
       role: role.trim() || undefined,
       notes: notes.trim() || undefined,
+      city: city.trim() || undefined,
+      postalCode: postalCode.trim() || undefined,
+      department: department.trim() || undefined,
+      sector: sector.trim() || undefined,
     });
   };
 
@@ -117,6 +156,11 @@ export default function AddPatronModal({ open, onOpenChange }: AddPatronModalPro
     setPhone('');
     setRole('');
     setNotes('');
+    setCity('');
+    setPostalCode('');
+    setDepartment('');
+    setSector('');
+    setPendingConnections([]);
     onOpenChange(false);
   };
 
@@ -185,36 +229,105 @@ export default function AddPatronModal({ open, onOpenChange }: AddPatronModalPro
             />
           </div>
 
-          {/* Company and Role Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Company Fields */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold text-gray-700">Entreprise</Label>
+              <SiretSearch onSelect={handleSiretSelect} disabled={addPatronMutation.isPending} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-company" className="text-sm font-medium text-gray-700">
+                  Société
+                </Label>
+                <Input
+                  id="add-company"
+                  type="text"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="Nom de la société..."
+                  className="w-full"
+                  maxLength={200}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="add-role" className="text-sm font-medium text-gray-700">
+                  Fonction
+                </Label>
+                <Input
+                  id="add-role"
+                  type="text"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  placeholder="Ex: Directeur, President..."
+                  className="w-full"
+                  maxLength={100}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="add-company" className="text-sm font-medium text-gray-700">
-                Societe
+              <Label htmlFor="add-sector" className="text-sm font-medium text-gray-700">
+                Secteur d'activité
               </Label>
               <Input
-                id="add-company"
+                id="add-sector"
                 type="text"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="Nom de la societe..."
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                placeholder="Ex: Commerce, Services aux entreprises..."
                 className="w-full"
                 maxLength={200}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="add-role" className="text-sm font-medium text-gray-700">
-                Fonction
-              </Label>
-              <Input
-                id="add-role"
-                type="text"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                placeholder="Ex: Directeur, President..."
-                className="w-full"
-                maxLength={100}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-postal-code" className="text-sm font-medium text-gray-700">
+                  Code postal
+                </Label>
+                <Input
+                  id="add-postal-code"
+                  type="text"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  placeholder="80000"
+                  className="w-full"
+                  maxLength={20}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="add-city" className="text-sm font-medium text-gray-700">
+                  Ville
+                </Label>
+                <Input
+                  id="add-city"
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Amiens"
+                  className="w-full"
+                  maxLength={100}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="add-department" className="text-sm font-medium text-gray-700">
+                  Département
+                </Label>
+                <Input
+                  id="add-department"
+                  type="text"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  placeholder="Somme"
+                  className="w-full"
+                  maxLength={100}
+                />
+              </div>
             </div>
           </div>
 
@@ -251,6 +364,16 @@ export default function AddPatronModal({ open, onOpenChange }: AddPatronModalPro
             <p className="text-xs text-gray-500">
               {notes.length}/2000 caracteres
             </p>
+          </div>
+
+          {/* Réseau */}
+          <div className="pt-2 border-t border-gray-100">
+            <NetworkSection
+              mode="controlled"
+              ownerType="patron"
+              value={pendingConnections}
+              onChange={setPendingConnections}
+            />
           </div>
 
           {/* Action Buttons */}

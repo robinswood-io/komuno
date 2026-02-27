@@ -92,12 +92,12 @@ export default function AdminNotificationsPage() {
         params.type = typeFilter;
       }
 
-      const response = await api.get<{ notifications: Notification[]; total: number }>(
+      const response = await api.get<{ success: boolean; data: { notifications: Notification[]; total: number } }>(
         '/api/notifications',
         params
       );
 
-      return response;
+      return response.data ?? { notifications: [], total: 0 };
     },
   });
 
@@ -105,8 +105,8 @@ export default function AdminNotificationsPage() {
   const { data: unreadCount } = useQuery({
     queryKey: ['notifications', 'unread-count'],
     queryFn: async () => {
-      const response = await api.get<{ unreadCount: number }>('/api/notifications/unread');
-      return response.unreadCount;
+      const response = await api.get<{ success: boolean; data: { unreadCount: number } }>('/api/notifications/unread');
+      return response.data?.unreadCount ?? 0;
     },
     refetchInterval: 30000, // Rafraîchir toutes les 30 secondes
   });
@@ -130,15 +130,15 @@ export default function AdminNotificationsPage() {
   });
 
   // Mutation pour tout marquer comme lu
-  const markAllAsReadMutation = useMutation<{ marked: number }, Error, void>({
+  const markAllAsReadMutation = useMutation<{ success: boolean; data: { marked: number } }, Error, void>({
     mutationFn: async () => {
-      return api.post<{ marked: number }>('/api/notifications/read-all', {});
+      return api.post<{ success: boolean; data: { marked: number } }>('/api/notifications/read-all', {});
     },
-    onSuccess: (data) => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast({
         title: 'Notifications marquées',
-        description: `${data.marked} notification(s) marquée(s) comme lue(s)`,
+        description: `${res.data?.marked ?? 0} notification(s) marquée(s) comme lue(s)`,
       });
     },
     onError: (error: Error) => {

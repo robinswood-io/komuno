@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Pencil, Save, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { api, queryKeys } from '@/lib/api/client';
+import { NetworkSection } from '@/components/network/NetworkSection';
+import { SiretSearch, type SiretCompanyData } from '@/components/ui/siret-search';
 
 interface Patron {
   id: string;
@@ -20,6 +22,10 @@ interface Patron {
   role?: string;
   notes?: string;
   status?: string;
+  city?: string;
+  postalCode?: string;
+  department?: string;
+  sector?: string;
 }
 
 interface EditPatronModalProps {
@@ -36,6 +42,10 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('');
   const [notes, setNotes] = useState('');
+  const [city, setCity] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [department, setDepartment] = useState('');
+  const [sector, setSector] = useState('');
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -49,8 +59,11 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
       setPhone(patron.phone || '');
       setRole(patron.role || '');
       setNotes(patron.notes || '');
+      setCity(patron.city || '');
+      setPostalCode(patron.postalCode || '');
+      setDepartment(patron.department || '');
+      setSector(patron.sector || '');
     } else if (!open) {
-      // Reinitialiser les champs quand le modal se ferme
       setFirstName('');
       setLastName('');
       setEmail('');
@@ -58,8 +71,20 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
       setPhone('');
       setRole('');
       setNotes('');
+      setCity('');
+      setPostalCode('');
+      setDepartment('');
+      setSector('');
     }
   }, [open, patron]);
+
+  const handleSiretSelect = (data: SiretCompanyData) => {
+    if (data.company) setCompany(data.company);
+    if (data.city) setCity(data.city);
+    if (data.postalCode) setPostalCode(data.postalCode);
+    if (data.department) setDepartment(data.department);
+    if (data.sector) setSector(data.sector);
+  };
 
   const updatePatronMutation = useMutation({
     mutationFn: async (data: {
@@ -70,6 +95,10 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
       phone?: string;
       role?: string;
       notes?: string;
+      city?: string;
+      postalCode?: string;
+      department?: string;
+      sector?: string;
     }) => {
       if (!patron) throw new Error('Aucun sponsor selectione');
       return api.patch(`/api/patrons/${patron.id}`, data);
@@ -129,6 +158,10 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
       phone: phone.trim() || undefined,
       role: role.trim() || undefined,
       notes: notes.trim() || undefined,
+      city: city.trim() || undefined,
+      postalCode: postalCode.trim() || undefined,
+      department: department.trim() || undefined,
+      sector: sector.trim() || undefined,
     });
   };
 
@@ -141,6 +174,10 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
       setPhone(patron.phone || '');
       setRole(patron.role || '');
       setNotes(patron.notes || '');
+      setCity(patron.city || '');
+      setPostalCode(patron.postalCode || '');
+      setDepartment(patron.department || '');
+      setSector(patron.sector || '');
     }
     onOpenChange(false);
   };
@@ -210,36 +247,105 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
             />
           </div>
 
-          {/* Company and Role Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Company Fields */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold text-gray-700">Entreprise</Label>
+              <SiretSearch onSelect={handleSiretSelect} disabled={updatePatronMutation.isPending} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-company" className="text-sm font-medium text-gray-700">
+                  Société
+                </Label>
+                <Input
+                  id="edit-company"
+                  type="text"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="Nom de la société..."
+                  className="w-full"
+                  maxLength={200}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-role" className="text-sm font-medium text-gray-700">
+                  Fonction
+                </Label>
+                <Input
+                  id="edit-role"
+                  type="text"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  placeholder="Ex: Directeur, President..."
+                  className="w-full"
+                  maxLength={100}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="edit-company" className="text-sm font-medium text-gray-700">
-                Societe
+              <Label htmlFor="edit-sector" className="text-sm font-medium text-gray-700">
+                Secteur d'activité
               </Label>
               <Input
-                id="edit-company"
+                id="edit-sector"
                 type="text"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="Nom de la societe..."
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+                placeholder="Ex: Commerce, Services aux entreprises..."
                 className="w-full"
                 maxLength={200}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-role" className="text-sm font-medium text-gray-700">
-                Fonction
-              </Label>
-              <Input
-                id="edit-role"
-                type="text"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                placeholder="Ex: Directeur, President..."
-                className="w-full"
-                maxLength={100}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-postal-code" className="text-sm font-medium text-gray-700">
+                  Code postal
+                </Label>
+                <Input
+                  id="edit-postal-code"
+                  type="text"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  placeholder="80000"
+                  className="w-full"
+                  maxLength={20}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-city" className="text-sm font-medium text-gray-700">
+                  Ville
+                </Label>
+                <Input
+                  id="edit-city"
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Amiens"
+                  className="w-full"
+                  maxLength={100}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-department" className="text-sm font-medium text-gray-700">
+                  Département
+                </Label>
+                <Input
+                  id="edit-department"
+                  type="text"
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  placeholder="Somme"
+                  className="w-full"
+                  maxLength={100}
+                />
+              </div>
             </div>
           </div>
 
@@ -277,6 +383,17 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
               {notes.length}/2000 caracteres
             </p>
           </div>
+
+          {/* Réseau */}
+          {patron && (
+            <div className="pt-2 border-t border-gray-100">
+              <NetworkSection
+                mode="live"
+                ownerEmail={patron.email}
+                ownerType="patron"
+              />
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">

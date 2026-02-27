@@ -20,6 +20,8 @@ import { MemberStatusesModule } from './member-statuses/member-statuses.module';
 import { PatronsModule } from './patrons/patrons.module';
 import { LoansModule } from './loans/loans.module';
 import { ToolsModule } from './tools/tools.module';
+import { NetworkModule } from './network/network.module';
+
 import { FinancialModule } from './financial/financial.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { FeaturesModule } from './features/features.module';
@@ -66,6 +68,7 @@ const throttlerLimit = isDevelopment ? 10000 : 1000;
     PatronsModule,
     LoansModule,
     ToolsModule,
+    NetworkModule,
     FinancialModule,
     TrackingModule,
     FeaturesModule,

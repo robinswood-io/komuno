@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Loader2, Mail, Phone, Building2, Briefcase, UserCircle, Calendar, TrendingUp, Pencil, Trash2, UserCheck, ArrowLeft, Link2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { NetworkSection } from '@/components/network/NetworkSection';
 
 interface Member {
   email: string;
@@ -248,12 +249,13 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
 
       {/* Onglets - ORDRE CORRIGÉ: Activité, Tâches, Tags, Cotisations, Relations */}
       <Tabs defaultValue="activities" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="activities">Activité</TabsTrigger>
           <TabsTrigger value="tasks">Tâches</TabsTrigger>
           <TabsTrigger value="tags">Tags</TabsTrigger>
           <TabsTrigger value="subscriptions">Cotisations</TabsTrigger>
           <TabsTrigger value="relations">Relations</TabsTrigger>
+          <TabsTrigger value="network">Réseau</TabsTrigger>
         </TabsList>
 
         {/* Onglet Activité (fil d'actualité) */}
@@ -438,6 +440,23 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
               ) : (
                 <p className="text-sm text-muted-foreground">Aucune relation enregistrée</p>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Onglet Réseau */}
+        <TabsContent value="network" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Réseau</CardTitle>
+              <CardDescription>Connexions avec d'autres membres et mécènes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <NetworkSection
+                mode="live"
+                ownerEmail={decodedEmail}
+                ownerType="member"
+              />
             </CardContent>
           </Card>
         </TabsContent>

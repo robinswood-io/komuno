@@ -236,7 +236,7 @@ export function AdminSidebar() {
                   <ul className="space-y-1">
                     {item.items.map((subItem) => {
                       const Icon = subItem.icon;
-                      const isActive = pathname?.startsWith(subItem.href);
+                      const isActive = pathname === subItem.href || pathname?.startsWith(subItem.href + '/');
 
                       return (
                         <li key={subItem.href}>
@@ -268,7 +268,7 @@ export function AdminSidebar() {
 
             // Render regular item
             const Icon = item.icon;
-            const isActive = pathname?.startsWith(item.href);
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
 
             return (
               <li key={item.href}>

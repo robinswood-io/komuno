@@ -1196,6 +1196,22 @@ export const insertPatronSchema = z.object({
     .max(2000, "Les notes ne peuvent pas dépasser 2000 caractères")
     .optional()
     .transform(val => val ? sanitizeText(val) : undefined),
+  department: z.string()
+    .max(100, "Le département ne peut pas dépasser 100 caractères")
+    .optional()
+    .transform(val => val ? sanitizeText(val) : undefined),
+  city: z.string()
+    .max(100, "La ville ne peut pas dépasser 100 caractères")
+    .optional()
+    .transform(val => val ? sanitizeText(val) : undefined),
+  postalCode: z.string()
+    .max(20, "Le code postal ne peut pas dépasser 20 caractères")
+    .optional()
+    .transform(val => val ? sanitizeText(val) : undefined),
+  sector: z.string()
+    .max(200, "Le secteur ne peut pas dépasser 200 caractères")
+    .optional()
+    .transform(val => val ? sanitizeText(val) : undefined),
   referrerId: z.string()
     .optional()
     .transform(val => {
@@ -1363,6 +1379,22 @@ export const updatePatronSchema = z.object({
     .optional(),
   notes: z.string()
     .max(2000, "Les notes ne peuvent pas dépasser 2000 caractères")
+    .transform(val => sanitizeText(val))
+    .optional(),
+  department: z.string()
+    .max(100, "Le département ne peut pas dépasser 100 caractères")
+    .transform(val => sanitizeText(val))
+    .optional(),
+  city: z.string()
+    .max(100, "La ville ne peut pas dépasser 100 caractères")
+    .transform(val => sanitizeText(val))
+    .optional(),
+  postalCode: z.string()
+    .max(20, "Le code postal ne peut pas dépasser 20 caractères")
+    .transform(val => sanitizeText(val))
+    .optional(),
+  sector: z.string()
+    .max(200, "Le secteur ne peut pas dépasser 200 caractères")
     .transform(val => sanitizeText(val))
     .optional(),
   referrerId: z.string()
@@ -2661,3 +2693,32 @@ export const frontendErrorSchema = z.object({
   userAgent: z.string().max(500),
   timestamp: z.string().datetime()
 });
+
+// ============================================================
+// RÉSEAU - Connexions entre membres et mécènes
+// ============================================================
+
+export const networkConnections = pgTable("network_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerEmail: text("owner_email").notNull(),
+  ownerType: text("owner_type").notNull(), // 'member' | 'patron'
+  connectedEmail: text("connected_email").notNull(),
+  connectedType: text("connected_type").notNull(), // 'member' | 'patron'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: text("created_by"),
+}, (table) => ({
+  ownerEmailIdx: index("network_connections_owner_email_idx").on(table.ownerEmail),
+  connectedEmailIdx: index("network_connections_connected_email_idx").on(table.connectedEmail),
+  uniqueConnection: unique("network_connections_unique").on(table.ownerEmail, table.connectedEmail),
+}));
+
+export const insertNetworkConnectionSchema = z.object({
+  ownerEmail: z.string().email(),
+  ownerType: z.enum(['member', 'patron']),
+  connectedEmail: z.string().email(),
+  connectedType: z.enum(['member', 'patron']),
+  createdBy: z.string().email().optional(),
+});
+
+export type NetworkConnection = typeof networkConnections.$inferSelect;
+export type InsertNetworkConnection = z.infer<typeof insertNetworkConnectionSchema>;

@@ -31,6 +31,8 @@ import { CalendarIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { NetworkSection, type PendingConnection } from '@/components/network/NetworkSection';
+import { SiretSearch, type SiretCompanyData } from '@/components/ui/siret-search';
 
 interface AddMemberDialogProps {
   open: boolean;
@@ -75,11 +77,23 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof MemberFormData, string>>>({});
+  const [pendingConnections, setPendingConnections] = useState<PendingConnection[]>([]);
 
   // Mutation pour créer un membre
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/api/admin/members', data),
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
+      // Create pending network connections
+      await Promise.allSettled(
+        pendingConnections.map((conn) =>
+          api.post('/api/network', {
+            ownerEmail: variables.email,
+            ownerType: 'member',
+            connectedEmail: conn.email,
+            connectedType: conn.type,
+          }),
+        ),
+      );
       toast({
         title: 'Membre ajouté',
         description: 'Le membre a été créé avec succès',
@@ -115,6 +129,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
       status: 'active',
     });
     setErrors({});
+    setPendingConnections([]);
   };
 
   const validateForm = (): boolean => {
@@ -147,6 +162,17 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
         [field]: undefined,
       }));
     }
+  };
+
+  const handleSiretSelect = (data: SiretCompanyData) => {
+    setFormData((prev) => ({
+      ...prev,
+      ...(data.company && { company: data.company }),
+      ...(data.city && { city: data.city }),
+      ...(data.postalCode && { postalCode: data.postalCode }),
+      ...(data.department && { department: data.department }),
+      ...(data.sector && { sector: data.sector }),
+    }));
   };
 
   const handleDateChange = (field: 'firstContactDate' | 'meetingDate', value: Date | undefined) => {
@@ -269,7 +295,10 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
 
           {/* Informations entreprise */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-sm">Informations entreprise</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Informations entreprise</h3>
+              <SiretSearch onSelect={handleSiretSelect} disabled={createMutation.isPending} />
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="company">Entreprise</Label>
@@ -455,6 +484,16 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
               </Select>
             </div>
           </div>
+        </div>
+
+        {/* Réseau */}
+        <div className="pt-4 border-t border-gray-100">
+          <NetworkSection
+            mode="controlled"
+            ownerType="member"
+            value={pendingConnections}
+            onChange={setPendingConnections}
+          />
         </div>
 
         <DialogFooter>

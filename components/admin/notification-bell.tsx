@@ -42,8 +42,8 @@ export function NotificationBell() {
   const { data: unreadCount } = useQuery({
     queryKey: ['notifications', 'unread-count'],
     queryFn: async () => {
-      const response = await api.get<{ unreadCount: number }>('/api/notifications/unread');
-      return response.unreadCount;
+      const response = await api.get<{ success: boolean; data: { unreadCount: number } }>('/api/notifications/unread');
+      return response.data?.unreadCount ?? 0;
     },
     refetchInterval: 30000, // Rafraîchir toutes les 30 secondes
   });
@@ -52,11 +52,11 @@ export function NotificationBell() {
   const { data: recentNotifications, isLoading } = useQuery({
     queryKey: ['notifications', 'recent'],
     queryFn: async () => {
-      const response = await api.get<{ notifications: Notification[]; total: number }>(
+      const response = await api.get<{ success: boolean; data: { notifications: Notification[]; total: number } }>(
         '/api/notifications',
         { limit: '5', offset: '0' }
       );
-      return response.notifications;
+      return response.data?.notifications ?? [];
     },
     enabled: open,
   });
