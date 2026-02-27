@@ -1054,7 +1054,8 @@ export default function AdminMembersPage() {
                           key={member.email}
                           className="cursor-pointer hover:bg-muted/50 transition-colors"
                           onClick={() => {
-                            router.push(`/admin/members/${encodeURIComponent(member.email)}`);
+                            setDetailsEmail(member.email);
+                            setDetailsSheetOpen(true);
                           }}
                         >
                           {/* Checkbox colonne */}

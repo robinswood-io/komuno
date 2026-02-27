@@ -186,7 +186,10 @@ export default function PatronDetailPage() {
 
   const { data: patron, isLoading, error } = useQuery({
     queryKey: queryKeys.patrons.detail(id),
-    queryFn: () => api.get<PatronDetails>(`/api/patrons/${id}/details`),
+    queryFn: async () => {
+      const res = await api.get<{ success: boolean; data: PatronDetails }>(`/api/patrons/${id}/details`);
+      return res.data;
+    },
     enabled: !!id,
   });
 
@@ -246,16 +249,16 @@ export default function PatronDetailPage() {
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="infos">Infos</TabsTrigger>
           <TabsTrigger value="contacts">
-            Contacts {patron.contacts.length > 0 && `(${patron.contacts.length})`}
+            Contacts {(patron.contacts?.length ?? 0) > 0 && `(${patron.contacts.length})`}
           </TabsTrigger>
           <TabsTrigger value="dons">
-            Dons {patron.donations.length > 0 && `(${patron.donations.length})`}
+            Dons {(patron.donations?.length ?? 0) > 0 && `(${patron.donations.length})`}
           </TabsTrigger>
           <TabsTrigger value="interactions">
-            Interactions {patron.updates.length > 0 && `(${patron.updates.length})`}
+            Interactions {(patron.updates?.length ?? 0) > 0 && `(${patron.updates.length})`}
           </TabsTrigger>
           <TabsTrigger value="propositions">
-            Propositions {patron.proposals.length > 0 && `(${patron.proposals.length})`}
+            Propositions {(patron.proposals?.length ?? 0) > 0 && `(${patron.proposals.length})`}
           </TabsTrigger>
         </TabsList>
 
