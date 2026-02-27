@@ -283,14 +283,21 @@ jobs:
             echo "🚀 Déploiement..."
             docker compose up -d --no-deps --force-recreate cjd-app
 
-            echo "⏳ Attente démarrage (max 60s)..."
-            for i in $(seq 1 12); do
+            echo "⏳ Attente démarrage NestJS (max 90s)..."
+            for i in $(seq 1 18); do
               STATE=$(docker inspect --format='{{.State.Status}}' cjd-app 2>/dev/null || echo "not_found")
-              if [ "$STATE" = "running" ]; then
-                echo "  ✅ Container running après $((i * 5))s"
+              if [ "$STATE" != "running" ]; then
+                echo "  ⏳ Tentative $i/18 — container état: $STATE"
+                sleep 5
+                continue
+              fi
+              HEALTH=$(docker exec cjd-app wget -q -O - --timeout=5 \
+                http://localhost:5000/api/health 2>/dev/null || echo "")
+              if echo "$HEALTH" | grep -q '"status":"healthy"'; then
+                echo "  ✅ NestJS prêt après $((i * 5))s"
                 break
               fi
-              echo "  ⏳ Tentative $i/12 — état: $STATE"
+              echo "  ⏳ Tentative $i/18 — backend pas encore prêt..."
               sleep 5
             done
 
@@ -422,14 +429,21 @@ jobs:
           echo "🚀 Déploiement..."
           docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate rep-app
 
-          echo "⏳ Attente démarrage (max 60s)..."
-          for i in $(seq 1 12); do
+          echo "⏳ Attente démarrage NestJS (max 90s)..."
+          for i in $(seq 1 18); do
             STATE=$(docker inspect --format='{{.State.Status}}' rep-app 2>/dev/null || echo "not_found")
-            if [ "$STATE" = "running" ]; then
-              echo "  ✅ Container running après $((i * 5))s"
+            if [ "$STATE" != "running" ]; then
+              echo "  ⏳ Tentative $i/18 — container état: $STATE"
+              sleep 5
+              continue
+            fi
+            HEALTH=$(docker exec rep-app wget -q -O - --timeout=5 \
+              http://localhost:5000/api/health 2>/dev/null || echo "")
+            if echo "$HEALTH" | grep -q '"status":"healthy"'; then
+              echo "  ✅ NestJS prêt après $((i * 5))s"
               break
             fi
-            echo "  ⏳ Tentative $i/12 — état: $STATE"
+            echo "  ⏳ Tentative $i/18 — backend pas encore prêt..."
             sleep 5
           done
 
