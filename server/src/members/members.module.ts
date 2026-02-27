@@ -5,6 +5,7 @@ import {
   AdminMemberTagsController,
   AdminMemberTasksController,
   AdminMemberRelationsController,
+  AdminMemberContactsController,
 } from './members.controller';
 import { MembersService } from './members.service';
 import { StorageModule } from '../common/storage/storage.module';
@@ -18,6 +19,7 @@ import { AuthModule } from '../auth/auth.module';
     AdminMemberTagsController,
     AdminMemberTasksController,
     AdminMemberRelationsController,
+    AdminMemberContactsController,
   ],
   providers: [MembersService],
   exports: [MembersService],

@@ -133,7 +133,10 @@ import {
   updatePatronSchema,
   updateIdeaPatronProposalSchema,
   updateEventSponsorshipSchema,
-  updateMemberSchema
+  updateMemberSchema,
+  memberContacts,
+  type MemberContact,
+  type InsertMemberContact,
 } from "../shared/schema";
 import { z } from "zod";
 import { db, runDbQuery } from "./db";
@@ -421,7 +424,13 @@ export interface IStorage {
   getAllRelations(): Promise<Result<MemberRelation[]>>;
   createRelation(relation: InsertMemberRelation): Promise<Result<MemberRelation>>;
   deleteRelation(relationId: string): Promise<Result<void>>;
-  
+
+  // Member Contacts (historique d'interactions)
+  getMemberContacts(memberEmail: string): Promise<Result<MemberContact[]>>;
+  createMemberContact(contact: InsertMemberContact): Promise<Result<MemberContact>>;
+  updateMemberContact(id: string, data: Partial<InsertMemberContact>): Promise<Result<MemberContact>>;
+  deleteMemberContact(id: string): Promise<Result<void>>;
+
   // Branding configuration
   getBrandingConfig(): Promise<Result<BrandingConfig | null>>;
   updateBrandingConfig(config: string, updatedBy: string): Promise<Result<BrandingConfig>>;
@@ -3610,6 +3619,67 @@ export class DatabaseStorage implements IStorage {
       return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: new DatabaseError(`Erreur lors de la suppression de la relation: ${error}`) };
+    }
+  }
+
+  // Member Contacts implementation (historique d'interactions)
+  async getMemberContacts(memberEmail: string): Promise<Result<MemberContact[]>> {
+    try {
+      const contacts = await db.select()
+        .from(memberContacts)
+        .where(eq(memberContacts.memberEmail, memberEmail))
+        .orderBy(desc(memberContacts.date), desc(memberContacts.createdAt));
+
+      return { success: true, data: contacts };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération des contacts: ${error}`) };
+    }
+  }
+
+  async createMemberContact(contact: InsertMemberContact): Promise<Result<MemberContact>> {
+    try {
+      const [created] = await db.insert(memberContacts)
+        .values(contact)
+        .returning();
+
+      logger.info('Contact membre créé', { contactId: created.id, memberEmail: contact.memberEmail, type: contact.type });
+      return { success: true, data: created };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la création du contact: ${error}`) };
+    }
+  }
+
+  async updateMemberContact(id: string, data: Partial<InsertMemberContact>): Promise<Result<MemberContact>> {
+    try {
+      const [existing] = await db.select().from(memberContacts).where(eq(memberContacts.id, id));
+      if (!existing) {
+        return { success: false, error: new NotFoundError("Contact introuvable") };
+      }
+
+      const [updated] = await db.update(memberContacts)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(memberContacts.id, id))
+        .returning();
+
+      logger.info('Contact membre mis à jour', { contactId: id });
+      return { success: true, data: updated };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la mise à jour du contact: ${error}`) };
+    }
+  }
+
+  async deleteMemberContact(id: string): Promise<Result<void>> {
+    try {
+      const [contact] = await db.select().from(memberContacts).where(eq(memberContacts.id, id));
+      if (!contact) {
+        return { success: false, error: new NotFoundError("Contact introuvable") };
+      }
+
+      await db.delete(memberContacts).where(eq(memberContacts.id, id));
+      logger.info('Contact membre supprimé', { contactId: id });
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la suppression du contact: ${error}`) };
     }
   }
 

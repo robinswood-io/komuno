@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys } from '@/lib/api/client';
 import {
   Sheet,
@@ -12,9 +13,27 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Mail, Phone, Building2, Briefcase, UserCircle, Calendar, TrendingUp, Pencil, Trash2, UserCheck } from 'lucide-react';
+import { Loader2, Mail, Phone, Building2, Briefcase, UserCircle, Calendar, TrendingUp, Pencil, Trash2, UserCheck, Plus, MessageSquare } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Member {
   email: string;
@@ -48,6 +67,20 @@ interface Subscription {
   paymentMethod?: string;
 }
 
+interface MemberContact {
+  id: string;
+  memberEmail: string;
+  type: 'meeting' | 'email' | 'call' | 'lunch' | 'event';
+  subject: string;
+  date: string;
+  startTime?: string;
+  duration?: number;
+  description: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 interface MemberDetailsData {
   member: Member;
   tags: Array<{ id: string; name: string; color?: string }>;
@@ -78,6 +111,23 @@ interface MemberDetailsSheetProps {
   isDeletingMember?: boolean;
 }
 
+const CONTACT_TYPE_CONFIG: Record<MemberContact['type'], { label: string; className: string }> = {
+  meeting: { label: 'Réunion', className: 'bg-blue-100 text-blue-800' },
+  call: { label: 'Appel', className: 'bg-green-100 text-green-800' },
+  email: { label: 'Email', className: 'bg-gray-100 text-gray-800' },
+  lunch: { label: 'Déjeuner', className: 'bg-orange-100 text-orange-800' },
+  event: { label: 'Événement', className: 'bg-purple-100 text-purple-800' },
+};
+
+interface NewContactForm {
+  type: MemberContact['type'] | '';
+  subject: string;
+  date: string;
+  duration: string;
+  description: string;
+  notes: string;
+}
+
 export function MemberDetailsSheet({
   email,
   open,
@@ -88,6 +138,17 @@ export function MemberDetailsSheet({
   isConvertingToActive = false,
   isDeletingMember = false,
 }: MemberDetailsSheetProps) {
+  const queryClient = useQueryClient();
+  const [isAddContactOpen, setIsAddContactOpen] = useState(false);
+  const [newContact, setNewContact] = useState<NewContactForm>({
+    type: '',
+    subject: '',
+    date: '',
+    duration: '',
+    description: '',
+    notes: '',
+  });
+
   const detailsQuery = useQuery({
     queryKey: queryKeys.members.detail(email || ''),
     queryFn: async () => {
@@ -110,9 +171,44 @@ export function MemberDetailsSheet({
     enabled: !!email && open,
   });
 
+  const contactsQuery = useQuery({
+    queryKey: [...queryKeys.members.detail(email || ''), 'contacts'],
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: MemberContact[] }>(
+        `/api/admin/members/${encodeURIComponent(email!)}/contacts`
+      );
+      return response;
+    },
+    enabled: !!email && open,
+  });
+
+  const createContactMutation = useMutation({
+    mutationFn: async (data: { type: MemberContact['type']; subject: string; date: string; description: string; duration?: number; notes?: string }) => {
+      return await api.post<{ success: boolean; data: MemberContact }>(
+        `/api/admin/members/${encodeURIComponent(email!)}/contacts`,
+        data
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.members.detail(email || ''), 'contacts'] });
+      setIsAddContactOpen(false);
+      setNewContact({ type: '', subject: '', date: '', duration: '', description: '', notes: '' });
+    },
+  });
+
+  const deleteContactMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      return await api.delete<void>(`/api/admin/member-contacts/${contactId}`);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.members.detail(email || ''), 'contacts'] });
+    },
+  });
+
   const details = detailsQuery.data?.data;
   const member = details?.member;
   const activities = activitiesQuery.data?.data || [];
+  const contacts = contactsQuery.data?.data || [];
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -125,6 +221,19 @@ export function MemberDetailsSheet({
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const handleAddContact = () => {
+    if (!newContact.type || !newContact.subject || !newContact.date || !newContact.description) return;
+
+    createContactMutation.mutate({
+      type: newContact.type as MemberContact['type'],
+      subject: newContact.subject,
+      date: newContact.date,
+      description: newContact.description,
+      notes: newContact.notes || undefined,
+      duration: newContact.duration ? parseInt(newContact.duration, 10) : undefined,
+    });
   };
 
   return (
@@ -266,8 +375,9 @@ export function MemberDetailsSheet({
             )}
 
             <Tabs defaultValue="subscriptions" className="w-full">
-              <TabsList className="grid w-full grid-cols-4" data-testid="member-details-tabs">
+              <TabsList className="grid w-full grid-cols-5" data-testid="member-details-tabs">
                 <TabsTrigger value="subscriptions" data-testid="member-details-tab-subscriptions">Cotisations</TabsTrigger>
+                <TabsTrigger value="interactions" data-testid="member-details-tab-interactions">Interactions</TabsTrigger>
                 <TabsTrigger value="tags" data-testid="member-details-tab-tags">Tags</TabsTrigger>
                 <TabsTrigger value="tasks" data-testid="member-details-tab-tasks">Tâches</TabsTrigger>
                 <TabsTrigger value="activities" data-testid="member-details-tab-activities">Activités</TabsTrigger>
@@ -317,6 +427,86 @@ export function MemberDetailsSheet({
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">Aucune cotisation enregistrée</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="interactions" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">Interactions</CardTitle>
+                        <CardDescription>
+                          {contacts.length} interaction(s) enregistrée(s)
+                        </CardDescription>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => setIsAddContactOpen(true)}
+                        className="gap-1"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Ajouter
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {contactsQuery.isLoading ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    ) : contacts.length > 0 ? (
+                      <div className="space-y-3">
+                        {contacts.map((contact) => {
+                          const config = CONTACT_TYPE_CONFIG[contact.type];
+                          return (
+                            <div key={contact.id} className="border rounded-lg p-3">
+                              <div className="flex justify-between items-start">
+                                <div className="flex items-start gap-2 flex-1 min-w-0">
+                                  <Badge className={config.className}>
+                                    {config.label}
+                                  </Badge>
+                                  <div className="min-w-0">
+                                    <p className="font-medium truncate">{contact.subject}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {new Date(contact.date).toLocaleDateString('fr-FR')}
+                                      {contact.duration ? ` — ${contact.duration} min` : ''}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0 ml-2"
+                                  onClick={() => {
+                                    if (confirm('Supprimer cette interaction ?')) {
+                                      deleteContactMutation.mutate(contact.id);
+                                    }
+                                  }}
+                                  disabled={deleteContactMutation.isPending}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">
+                                {contact.description}
+                              </p>
+                              {contact.notes && (
+                                <p className="text-xs text-muted-foreground mt-1 italic border-t pt-1">
+                                  {contact.notes}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <MessageSquare className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">Aucune interaction enregistrée</p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -383,7 +573,7 @@ export function MemberDetailsSheet({
               <TabsContent value="activities" className="space-y-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Historique d'activité</CardTitle>
+                    <CardTitle className="text-lg">Historique d&apos;activité</CardTitle>
                     <CardDescription>
                       {activities.length} activité(s)
                     </CardDescription>
@@ -418,6 +608,117 @@ export function MemberDetailsSheet({
           </div>
         )}
       </SheetContent>
+
+      {/* Dialog Ajouter une interaction */}
+      <Dialog open={isAddContactOpen} onOpenChange={setIsAddContactOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nouvelle interaction</DialogTitle>
+            <DialogDescription>
+              Enregistrer une interaction avec ce membre
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="contact-type">Type *</Label>
+              <Select
+                value={newContact.type}
+                onValueChange={(val) => setNewContact(prev => ({ ...prev, type: val as MemberContact['type'] }))}
+              >
+                <SelectTrigger id="contact-type">
+                  <SelectValue placeholder="Sélectionner un type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call">Appel</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="meeting">Réunion</SelectItem>
+                  <SelectItem value="lunch">Déjeuner</SelectItem>
+                  <SelectItem value="event">Événement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contact-subject">Sujet *</Label>
+              <Input
+                id="contact-subject"
+                placeholder="Ex: Appel de suivi cotisation"
+                value={newContact.subject}
+                onChange={(e) => setNewContact(prev => ({ ...prev, subject: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="contact-date">Date *</Label>
+                <Input
+                  id="contact-date"
+                  type="date"
+                  value={newContact.date}
+                  onChange={(e) => setNewContact(prev => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contact-duration">Durée (min)</Label>
+                <Input
+                  id="contact-duration"
+                  type="number"
+                  min="0"
+                  placeholder="Ex: 30"
+                  value={newContact.duration}
+                  onChange={(e) => setNewContact(prev => ({ ...prev, duration: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contact-description">Description *</Label>
+              <Textarea
+                id="contact-description"
+                placeholder="Description de l'interaction..."
+                rows={3}
+                value={newContact.description}
+                onChange={(e) => setNewContact(prev => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contact-notes">Notes (optionnel)</Label>
+              <Textarea
+                id="contact-notes"
+                placeholder="Notes additionnelles..."
+                rows={2}
+                value={newContact.notes}
+                onChange={(e) => setNewContact(prev => ({ ...prev, notes: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAddContactOpen(false)}
+              disabled={createContactMutation.isPending}
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleAddContact}
+              disabled={
+                createContactMutation.isPending ||
+                !newContact.type ||
+                !newContact.subject ||
+                !newContact.date ||
+                !newContact.description
+              }
+            >
+              {createContactMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }

@@ -590,6 +590,25 @@ export const memberRelations = pgTable("member_relations", {
   relationTypeIdx: index("member_relations_relation_type_idx").on(table.relationType),
 }));
 
+// Member contacts table - Historique des interactions avec les membres (appel, email, réunion, déjeuner)
+export const memberContacts = pgTable("member_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  memberEmail: text("member_email").notNull().references(() => members.email, { onDelete: "cascade" }),
+  type: text("type").notNull(), // 'meeting' | 'email' | 'call' | 'lunch' | 'event'
+  subject: text("subject").notNull(),
+  date: date("date").notNull(),
+  startTime: text("start_time"),
+  duration: integer("duration"), // minutes
+  description: text("description").notNull(),
+  notes: text("notes"),
+  createdBy: text("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  memberEmailIdx: index("idx_member_contacts_email").on(table.memberEmail),
+  dateIdx: index("idx_member_contacts_date").on(table.date),
+}));
+
 // Event sponsorship levels definition
 export const SPONSORSHIP_LEVEL = {
   PLATINUM: "platinum",
@@ -808,6 +827,13 @@ export const membersRelations = relations(members, ({ many }) => ({
 export const memberActivitiesRelations = relations(memberActivities, ({ one }) => ({
   member: one(members, {
     fields: [memberActivities.memberEmail],
+    references: [members.email],
+  }),
+}));
+
+export const memberContactsRelations = relations(memberContacts, ({ one }) => ({
+  member: one(members, {
+    fields: [memberContacts.memberEmail],
     references: [members.email],
   }),
 }));
@@ -1631,6 +1657,67 @@ export const insertMemberRelationSchema = z.object({
   createdBy: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
 });
 
+// Schemas for member contacts (historique d'interactions)
+export const insertMemberContactSchema = z.object({
+  memberEmail: z.string().email("Email du membre invalide").transform(sanitizeText),
+  type: z.enum(["meeting", "email", "call", "lunch", "event"], {
+    message: "Le type doit être 'meeting', 'email', 'call', 'lunch' ou 'event'"
+  }),
+  subject: z.string()
+    .min(3, "Le sujet doit contenir au moins 3 caractères")
+    .max(200, "Le sujet ne peut pas dépasser 200 caractères")
+    .transform(sanitizeText),
+  date: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD"),
+  startTime: z.string()
+    .optional()
+    .transform(val => val ? sanitizeText(val) : undefined),
+  duration: z.number()
+    .int("La durée doit être un nombre entier")
+    .min(0, "La durée ne peut pas être négative")
+    .optional(),
+  description: z.string()
+    .min(1, "La description est obligatoire")
+    .max(3000, "La description ne peut pas dépasser 3000 caractères")
+    .transform(sanitizeText),
+  notes: z.string()
+    .optional()
+    .transform(val => val ? sanitizeText(val) : undefined),
+  createdBy: z.string()
+    .email("Email de l'administrateur invalide")
+    .optional()
+    .pipe(z.string().transform(sanitizeText).optional()),
+});
+
+export const updateMemberContactSchema = z.object({
+  type: z.enum(["meeting", "email", "call", "lunch", "event"]).optional(),
+  subject: z.string()
+    .min(3, "Le sujet doit contenir au moins 3 caractères")
+    .max(200, "Le sujet ne peut pas dépasser 200 caractères")
+    .transform(sanitizeText)
+    .optional(),
+  date: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD")
+    .optional(),
+  startTime: z.string()
+    .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "L'heure doit être au format HH:MM")
+    .transform(val => sanitizeText(val))
+    .optional(),
+  duration: z.number()
+    .int("La durée doit être un nombre entier")
+    .min(0, "La durée ne peut pas être négative")
+    .optional(),
+  description: z.string()
+    .min(1, "La description est obligatoire")
+    .max(3000, "La description ne peut pas dépasser 3000 caractères")
+    .transform(sanitizeText)
+    .optional(),
+  notes: z.string()
+    .max(2000, "Les notes ne peuvent pas dépasser 2000 caractères")
+    .transform(val => sanitizeText(val))
+    .optional(),
+});
+
 // Schemas for tracking metrics
 export const insertTrackingMetricSchema = z.object({
   entityType: z.enum(['member', 'patron']),
@@ -1726,6 +1813,9 @@ export type MemberTask = typeof memberTasks.$inferSelect;
 export type InsertMemberTask = z.infer<typeof insertMemberTaskSchema>;
 export type MemberRelation = typeof memberRelations.$inferSelect;
 export type InsertMemberRelation = z.infer<typeof insertMemberRelationSchema>;
+
+export type MemberContact = typeof memberContacts.$inferSelect;
+export type InsertMemberContact = z.infer<typeof insertMemberContactSchema>;
 
 // For compatibility with existing auth system
 export const users = admins;

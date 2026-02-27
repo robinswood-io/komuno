@@ -11,6 +11,8 @@ import {
   insertMemberTaskSchema,
   updateMemberTaskSchema,
   insertMemberRelationSchema,
+  insertMemberContactSchema,
+  updateMemberContactSchema,
   DuplicateError,
   type MemberTask,
 } from '../../../shared/schema';
@@ -484,5 +486,64 @@ export class MembersService {
       throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
     }
     return { success: true, data: result.data };
+  }
+
+  // ===== Routes admin - Contacts membres (historique d'interactions) =====
+
+  async getMemberContacts(memberEmail: string) {
+    const result = await this.storageService.instance.getMemberContacts(memberEmail);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
+  async createMemberContact(memberEmail: string, data: unknown, userEmail: string) {
+    try {
+      const validatedData = insertMemberContactSchema.parse({
+        ...(data as Record<string, unknown>),
+        memberEmail,
+        createdBy: userEmail,
+      });
+      const result = await this.storageService.instance.createMemberContact(validatedData);
+      if (!result.success) {
+        throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException(fromZodError(error).toString());
+      }
+      throw error;
+    }
+  }
+
+  async updateMemberContact(id: string, data: unknown) {
+    try {
+      const validatedData = updateMemberContactSchema.parse(data);
+      const result = await this.storageService.instance.updateMemberContact(id, validatedData);
+      if (!result.success) {
+        if (('error' in result ? result.error : new Error('Unknown error')).name === 'NotFoundError') {
+          throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+        }
+        throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+      }
+      return { success: true, data: result.data };
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException(fromZodError(error).toString());
+      }
+      throw error;
+    }
+  }
+
+  async deleteMemberContact(id: string) {
+    const result = await this.storageService.instance.deleteMemberContact(id);
+    if (!result.success) {
+      if (('error' in result ? result.error : new Error('Unknown error')).name === 'NotFoundError') {
+        throw new NotFoundException(('error' in result ? result.error : new Error('Unknown error')).message);
+      }
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
   }
 }

@@ -396,6 +396,52 @@ export class AdminMembersController {
   ) {
     return await this.membersService.createMemberRelation(email, body, user.email);
   }
+
+  // ===== Routes admin - Contacts membres (historique d'interactions) =====
+
+  @Get(':email/contacts')
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Obtenir l\'historique des interactions d\'un membre' })
+  @ApiParam({ name: 'email', description: 'Email du membre', example: 'jean.dupont@example.com' })
+  @ApiResponse({ status: 200, description: 'Liste des interactions du membre' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  @ApiResponse({ status: 404, description: 'Membre non trouvé' })
+  async getMemberContacts(@Param('email') email: string) {
+    return await this.membersService.getMemberContacts(email);
+  }
+
+  @Post(':email/contacts')
+  @Permissions('admin.edit')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Créer une interaction pour un membre' })
+  @ApiParam({ name: 'email', description: 'Email du membre', example: 'jean.dupont@example.com' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['meeting', 'email', 'call', 'lunch', 'event'], example: 'call' },
+        subject: { type: 'string', example: 'Appel de suivi' },
+        date: { type: 'string', format: 'date', example: '2026-02-27' },
+        description: { type: 'string', example: 'Discussion sur le renouvellement de cotisation' },
+        duration: { type: 'number', example: 30 },
+        startTime: { type: 'string', example: '14:30' },
+        notes: { type: 'string', example: 'Rappeler dans 2 semaines' },
+      },
+      required: ['type', 'subject', 'date', 'description']
+    }
+  })
+  @ApiResponse({ status: 201, description: 'Interaction créée avec succès' })
+  @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  async createMemberContact(
+    @Param('email') email: string,
+    @Body() body: unknown,
+    @User() user: { email: string },
+  ) {
+    return await this.membersService.createMemberContact(email, body, user.email);
+  }
 }
 
 /**
@@ -630,6 +676,56 @@ export class AdminMemberRelationsController {
   @ApiResponse({ status: 404, description: 'Relation non trouvée' })
   async deleteRelation(@Param('id') id: string) {
     await this.membersService.deleteRelation(id);
+  }
+}
+
+/**
+ * Controller Admin Member Contacts - Routes admin pour l'historique d'interactions membres
+ */
+@ApiTags('members')
+@ApiBearerAuth()
+@Controller('api/admin/member-contacts')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+export class AdminMemberContactsController {
+  constructor(private readonly membersService: MembersService) {}
+
+  @Patch(':id')
+  @Permissions('admin.edit')
+  @ApiOperation({ summary: 'Mettre à jour un contact membre' })
+  @ApiParam({ name: 'id', description: 'ID du contact', example: 'uuid-contact-123' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['meeting', 'email', 'call', 'lunch', 'event'] },
+        subject: { type: 'string', example: 'Appel de suivi' },
+        date: { type: 'string', format: 'date', example: '2026-02-27' },
+        description: { type: 'string', example: 'Description de l\'interaction' },
+        duration: { type: 'number', example: 30 },
+        notes: { type: 'string', example: 'Notes additionnelles' },
+      }
+    }
+  })
+  @ApiResponse({ status: 200, description: 'Contact mis à jour avec succès' })
+  @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  @ApiResponse({ status: 404, description: 'Contact non trouvé' })
+  async updateMemberContact(@Param('id') id: string, @Body() body: unknown) {
+    return await this.membersService.updateMemberContact(id, body);
+  }
+
+  @Delete(':id')
+  @Permissions('admin.edit')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Supprimer un contact membre' })
+  @ApiParam({ name: 'id', description: 'ID du contact', example: 'uuid-contact-123' })
+  @ApiResponse({ status: 204, description: 'Contact supprimé avec succès' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  @ApiResponse({ status: 404, description: 'Contact non trouvé' })
+  async deleteMemberContact(@Param('id') id: string) {
+    await this.membersService.deleteMemberContact(id);
   }
 }
 
