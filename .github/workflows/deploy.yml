@@ -138,15 +138,110 @@ jobs:
           echo "| Digest | \`${{ steps.build.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
 
   # ===================================
-  # Job 3: Deploy CJD80 (cjd80.fr)
+  # Job 3: Validation migrations (CI)
+  # Tourne en parallèle du build — bloque le déploiement si les SQL sont cassés
+  # ===================================
+  validate-migrations:
+    name: Validate DB Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: detect-changes
+    if: needs.detect-changes.outputs.should_build == 'true'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ciuser
+          POSTGRES_PASSWORD: cipassword
+          POSTGRES_DB: cidb
+        options: >-
+          --health-cmd "pg_isready -U ciuser -d cidb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install postgresql-client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Valider migrations sur DB vierge
+        env:
+          DATABASE_URL: postgres://ciuser:cipassword@localhost:5432/cidb
+          MIGRATIONS_DIR: ./migrations
+          SKIP_HISTORICAL_SEED: "true"
+        run: |
+          echo "🧪 Exécution de toutes les migrations sur PostgreSQL 16 vierge..."
+          sh scripts/run-migrations.sh
+
+      - name: Vérifier tables critiques
+        env:
+          DATABASE_URL: postgres://ciuser:cipassword@localhost:5432/cidb
+        run: |
+          echo "🔍 Vérification des tables critiques..."
+          TABLES=$(psql "$DATABASE_URL" -t -c \
+            "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename;" \
+            | tr -d ' ' | grep -v '^$')
+
+          echo "Tables créées:"
+          echo "$TABLES" | sed 's/^/  /'
+
+          CRITICAL="members admins"
+          FAIL=0
+          for table in $CRITICAL; do
+            if echo "$TABLES" | grep -qx "$table"; then
+              echo "  ✅ $table"
+            else
+              echo "  ❌ $table MANQUANTE"
+              FAIL=1
+            fi
+          done
+
+          APPLIED=$(psql "$DATABASE_URL" -t -c \
+            "SELECT COUNT(*) FROM _drizzle_migrations;" | tr -d ' \n')
+          TOTAL=$(echo "$TABLES" | wc -l | tr -d ' ')
+          echo ""
+          echo "📊 $APPLIED migrations appliquées — $TOTAL tables créées"
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo "❌ Tables critiques manquantes — déploiement bloqué"
+            exit 1
+          fi
+
+      - name: Migration summary
+        if: always()
+        env:
+          DATABASE_URL: postgres://ciuser:cipassword@localhost:5432/cidb
+        run: |
+          APPLIED=$(psql "$DATABASE_URL" -t -c \
+            "SELECT COUNT(*) FROM _drizzle_migrations;" 2>/dev/null \
+            | tr -d ' \n' || echo "N/A")
+          STATUS="${{ job.status == 'success' && '✅ OK' || '❌ ÉCHEC' }}"
+          echo "## Validation migrations" >> $GITHUB_STEP_SUMMARY
+          echo "| Champ | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Statut | $STATUS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Migrations appliquées | $APPLIED |" >> $GITHUB_STEP_SUMMARY
+          echo "| DB de test | PostgreSQL 16-alpine |" >> $GITHUB_STEP_SUMMARY
+
+  # ===================================
+  # Job 4: Deploy CJD80 (cjd80.fr)
   # ===================================
   deploy-cjd80:
     name: Deploy CJD80 (cjd80.fr)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [detect-changes, build]
+    needs: [detect-changes, build, validate-migrations]
     if: |
       always() &&
+      (needs.validate-migrations.result == 'success' || needs.validate-migrations.result == 'skipped') &&
       (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
       (github.event_name == 'push' ||
        (github.event_name == 'workflow_dispatch' &&
@@ -279,9 +374,10 @@ jobs:
     name: Deploy REP (repicardie.fr)
     runs-on: [self-hosted, rep]
     timeout-minutes: 15
-    needs: [detect-changes, build]
+    needs: [detect-changes, build, validate-migrations]
     if: |
       always() &&
+      (needs.validate-migrations.result == 'success' || needs.validate-migrations.result == 'skipped') &&
       (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
       (github.event_name == 'push' ||
        (github.event_name == 'workflow_dispatch' &&
