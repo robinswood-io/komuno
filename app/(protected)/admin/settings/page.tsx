@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useBranding } from '@/contexts/BrandingContext';
+import { brandingCore } from '@/lib/config/branding-core';
 import { useQuery } from '@tanstack/react-query';
 import { api, queryKeys, type ApiResponse } from '@/lib/api/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -89,8 +90,8 @@ export default function SettingsPage() {
 
   const canManageAdmins = currentUser?.role === 'super_admin';
 
-  // Modules state
-  const [modules, setModules] = useState<ModulesConfig | null>(null);
+  // Modules state — initialisé avec les defaults pour éviter le spinner infini
+  const [modules, setModules] = useState<ModulesConfig>(() => brandingCore.modules as ModulesConfig);
 
   // General settings
   const [generalSettings, setGeneralSettings] = useState({
@@ -369,7 +370,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (!branding || !modules) {
+  if (!branding) {
     return (
       <div className="flex justify-center items-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
