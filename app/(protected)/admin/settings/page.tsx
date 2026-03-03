@@ -139,7 +139,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (branding) {
-      setModules((branding.modules as ModulesConfig) || null);
+      setModules((branding.modules as ModulesConfig) ?? (brandingCore.modules as ModulesConfig));
       setGeneralSettings({
         appName: branding.app?.name || '',
         organizationName: branding.organization?.name || '',
