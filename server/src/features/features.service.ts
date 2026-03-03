@@ -37,7 +37,9 @@ export class FeaturesService {
         return this.defaultFeatures;
       }
 
-      return features;
+      // Merge: DB values take precedence, defaults fill gaps for new features
+      const dbMap = new Map(features.map(f => [f.featureKey, f]));
+      return this.defaultFeatures.map(def => dbMap.get(def.featureKey) ?? def);
     } catch (error) {
       this.logger.error('Error fetching features:', error);
       // Return defaults on error
