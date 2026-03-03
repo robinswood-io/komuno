@@ -42,6 +42,9 @@ export default function AdminLayout({
       'development-requests': 'Demandes dev',
       branding: 'Branding',
       tools: 'Outils du Dirigeant',
+      prospects: 'Prospects',
+      'member-graph': 'Relations',
+      notifications: 'Notifications',
     };
 
     return titles[lastSegment] || lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1);

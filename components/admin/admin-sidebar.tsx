@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Users,
+  UserSearch,
   Heart,
   Lightbulb,
   Calendar,
@@ -50,12 +51,27 @@ const navItems: (NavItem | NavSection)[] = [
     icon: LayoutDashboard,
   },
   {
-    title: 'CRM Membres',
+    title: 'Membres',
     items: [
       {
-        title: 'Membres & Prospects',
+        title: 'Membres',
         href: '/admin/members',
         icon: Users,
+      },
+      {
+        title: 'Statistiques',
+        href: '/admin/members/stats',
+        icon: BarChart3,
+      },
+    ],
+  },
+  {
+    title: 'Prospects',
+    items: [
+      {
+        title: 'Pipeline CRM',
+        href: '/admin/prospects',
+        icon: UserSearch,
       },
       {
         title: 'Tâches',
@@ -68,16 +84,11 @@ const navItems: (NavItem | NavSection)[] = [
         icon: Link2,
       },
       {
-        title: 'Statistiques',
-        href: '/admin/members/stats',
-        icon: BarChart3,
+        title: 'Mécènes',
+        href: '/admin/patrons',
+        icon: Heart,
       },
     ],
-  },
-  {
-    title: 'Mécènes',
-    href: '/admin/patrons',
-    icon: Heart,
   },
   {
     title: 'Finance',

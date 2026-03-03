@@ -16,7 +16,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, UserPlus, Eye, Download, BarChart3, Tag, List, LayoutGrid } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Search, UserCheck, UserPlus, Eye, Download, BarChart3, Tag, List, LayoutGrid, UserSearch } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
@@ -783,9 +783,9 @@ export default function AdminMembersPage() {
     <div className="container py-8 space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestion Membres</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Membres</h1>
           <p className="text-muted-foreground">
-            CRM - Gestion des membres de l'association
+            Gestion des membres actifs de l'association
           </p>
         </div>
         <div className="flex gap-2">
@@ -808,6 +808,15 @@ export default function AdminMembersPage() {
             Ajouter un membre
           </Button>
         </div>
+      </div>
+
+      {/* Bandeau Prospects */}
+      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-800 text-sm">
+        <UserSearch className="h-4 w-4 flex-shrink-0" />
+        <span>Le suivi des prospects et du pipeline CRM est disponible dans</span>
+        <Link href="/admin/prospects" className="font-semibold underline underline-offset-2 hover:text-blue-600">
+          Pipeline CRM →
+        </Link>
       </div>
 
       <Card data-testid="members-list">

@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Tech Stack:**
 - **Backend:** NestJS 11 (migrated from Express.js) + TypeScript + Drizzle ORM
-- **Frontend:** Next.js 15 App Router + React 19 + TypeScript + tRPC + TanStack Query
+- **Frontend:** Next.js 16 App Router + React 19 + TypeScript + TanStack Query (REST)
 - **Database:** PostgreSQL (Neon) with connection pooling
 - **Auth:** @robinswood/auth-unified (Local auth + JWT + RBAC)
 - **Storage:** MinIO (S3-compatible)
@@ -96,30 +96,34 @@ The `shared/` directory contains types used by **both frontend and backend**:
 3. Run `npm run db:push` to apply changes
 4. Use types in both backend (controllers/services) and frontend (components/hooks)
 
-### Frontend Architecture (Next.js 15)
+### Frontend Architecture (Next.js 16)
 
-**Next.js 15 App Router** with tRPC:
+**Next.js 16 App Router** with REST + TanStack Query:
 - **Structure:** `app/` directory for pages and routes
 - **Server Components:** Default rendering mode (faster, SEO-friendly)
 - **Client Components:** Use `"use client"` directive when needed (interactivity, hooks)
-- **tRPC integration:** Type-safe API calls with full TypeScript inference
-- **TanStack Query:** Server state management via tRPC React Query
+- **API Client:** `lib/api/client.ts` — typed REST helpers (get, post, put, patch, delete)
+- **API Proxy:** `app/api/[...path]/route.ts` → proxies to NestJS backend (:5000)
+- **TanStack Query:** Server state management via React Query v5
 
 **Example Pattern:**
 ```typescript
 // Server Component (app/page.tsx)
 export default async function HomePage() {
-  // Can fetch data directly in Server Component
   return <IdeasSection />;
 }
 
 // Client Component (components/ideas/ideas-section.tsx)
 "use client";
 
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+
 export function IdeasSection() {
-  // Use tRPC hooks
-  const { data: ideas, isLoading } = trpc.ideas.list.useQuery();
-  const createIdea = trpc.ideas.create.useMutation();
+  const { data: ideas, isLoading } = useQuery({
+    queryKey: ['/api/ideas'],
+    queryFn: () => apiClient.get('/api/ideas'),
+  });
 
   return <div>...</div>;
 }
