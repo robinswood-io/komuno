@@ -612,7 +612,7 @@ export class DatabaseStorage implements IStorage {
     }
     this.sessionStore = new PostgresSessionStore({
       pool: pool as import('pg').Pool,
-      createTableIfMissing: false, // Table created manually - avoid async blocking with Bun
+      createTableIfMissing: true, // Migration 0010 crée la table ; true = filet de sécurité si absent
       // Optimisations pour les sessions
       tableName: 'user_sessions',
       pruneSessionInterval: 3600, // 1 heure - moins fréquent
