@@ -37,6 +37,7 @@ import { SiretSearch, type SiretCompanyData } from '@/components/ui/siret-search
 interface AddMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultStatus?: MemberFormData['status'];
 }
 
 interface MemberFormData {
@@ -56,7 +57,7 @@ interface MemberFormData {
   status: 'active' | 'proposed' | 'inactive' | '2027' | 'Refusé' | 'A contacter' | 'RDV prévu' | 'Intérêt - à relancer';
 }
 
-export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
+export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMemberDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -73,7 +74,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
     phone: '',
     role: '',
     notes: '',
-    status: 'active',
+    status: defaultStatus ?? 'active',
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof MemberFormData, string>>>({});
@@ -126,7 +127,7 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
       phone: '',
       role: '',
       notes: '',
-      status: 'active',
+      status: defaultStatus ?? 'active',
     });
     setErrors({});
     setPendingConnections([]);

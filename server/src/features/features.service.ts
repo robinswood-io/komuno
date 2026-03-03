@@ -21,6 +21,7 @@ export class FeaturesService {
     { featureKey: 'financial', enabled: true },
     { featureKey: 'tracking', enabled: true },
     { featureKey: 'members', enabled: true },
+    { featureKey: 'crm', enabled: false },
   ];
 
   async getAllFeatures(): Promise<FeatureConfigDto[]> {

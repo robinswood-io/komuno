@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useState } from 'react';
 import { NotificationBell } from './notification-bell';
+import { useFeatureConfig } from '@/contexts/FeatureConfigContext';
 
 interface NavItem {
   title: string;
@@ -151,6 +152,7 @@ export function AdminSidebar() {
   const { user, logoutMutation } = useAuth();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { isFeatureEnabled } = useFeatureConfig();
 
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -234,6 +236,11 @@ export function AdminSidebar() {
         <ul className="space-y-1 px-2">
           {navItems.map((item, index) => {
             const isSection = 'items' in item;
+
+            // Gate "Prospects" section behind crm feature flag
+            if (isSection && item.title === 'Prospects' && !isFeatureEnabled('crm')) {
+              return null;
+            }
 
             if (isSection) {
               // Render section with nested items

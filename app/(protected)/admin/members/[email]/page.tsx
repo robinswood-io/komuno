@@ -1,16 +1,22 @@
 'use client';
 
-import { use } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { use, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys } from '@/lib/api/client';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Mail, Phone, Building2, Briefcase, UserCircle, Calendar, TrendingUp, Pencil, Trash2, UserCheck, ArrowLeft, Link2 } from 'lucide-react';
+import { Loader2, Mail, Phone, Building2, Briefcase, UserCircle, Calendar, TrendingUp, Pencil, Trash2, UserCheck, ArrowLeft, Link2, Plus, Trash } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { NetworkSection } from '@/components/network/NetworkSection';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 interface Member {
   email: string;
@@ -63,10 +69,42 @@ interface MemberDetailsData {
   subscriptions: Array<Subscription>;
 }
 
+interface MemberContact {
+  id: string;
+  memberEmail: string;
+  type: 'meeting' | 'email' | 'call' | 'lunch' | 'event';
+  subject: string;
+  date: string;
+  duration?: number;
+  description: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+const CONTACT_TYPE_CONFIG: Record<MemberContact['type'], { label: string; className: string }> = {
+  meeting: { label: 'Réunion', className: 'bg-blue-100 text-blue-800' },
+  call: { label: 'Appel', className: 'bg-green-100 text-green-800' },
+  email: { label: 'Email', className: 'bg-gray-100 text-gray-800' },
+  lunch: { label: 'Déjeuner', className: 'bg-orange-100 text-orange-800' },
+  event: { label: 'Événement', className: 'bg-purple-100 text-purple-800' },
+};
+
 export default function MemberDetailPage({ params }: { params: Promise<{ email: string }> }) {
   const { email } = use(params);
   const decodedEmail = decodeURIComponent(email);
   const router = useRouter();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [addInteractionOpen, setAddInteractionOpen] = useState(false);
+  const [interactionForm, setInteractionForm] = useState({
+    type: 'call' as MemberContact['type'],
+    subject: '',
+    date: new Date().toISOString().split('T')[0],
+    duration: '',
+    description: '',
+    notes: '',
+  });
 
   const detailsQuery = useQuery({
     queryKey: queryKeys.members.detail(decodedEmail),
@@ -88,9 +126,46 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
     },
   });
 
+  const contactsQuery = useQuery({
+    queryKey: [...queryKeys.members.detail(decodedEmail), 'contacts'],
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: MemberContact[] }>(
+        `/api/admin/members/${encodeURIComponent(decodedEmail)}/contacts`
+      );
+      return response;
+    },
+  });
+
+  const createContactMutation = useMutation({
+    mutationFn: (data: Omit<MemberContact, 'id' | 'memberEmail' | 'createdBy' | 'createdAt'>) =>
+      api.post(`/api/admin/members/${encodeURIComponent(decodedEmail)}/contacts`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.members.detail(decodedEmail), 'contacts'] });
+      toast({ title: 'Interaction ajoutée' });
+      setAddInteractionOpen(false);
+      setInteractionForm({ type: 'call', subject: '', date: new Date().toISOString().split('T')[0], duration: '', description: '', notes: '' });
+    },
+    onError: () => {
+      toast({ title: 'Erreur', description: "Impossible d'ajouter l'interaction", variant: 'destructive' });
+    },
+  });
+
+  const deleteContactMutation = useMutation({
+    mutationFn: (contactId: string) =>
+      api.delete(`/api/admin/members/${encodeURIComponent(decodedEmail)}/contacts/${contactId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.members.detail(decodedEmail), 'contacts'] });
+      toast({ title: 'Interaction supprimée' });
+    },
+    onError: () => {
+      toast({ title: 'Erreur', description: "Impossible de supprimer l'interaction", variant: 'destructive' });
+    },
+  });
+
   const details = detailsQuery.data?.data;
   const member = details?.member;
   const activities = activitiesQuery.data?.data || [];
+  const contacts = contactsQuery.data?.data || [];
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -247,11 +322,12 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
         </Card>
       )}
 
-      {/* Onglets - ORDRE CORRIGÉ: Activité, Tâches, Tags, Cotisations, Relations */}
+      {/* Onglets */}
       <Tabs defaultValue="activities" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="activities">Activité</TabsTrigger>
           <TabsTrigger value="tasks">Tâches</TabsTrigger>
+          <TabsTrigger value="interactions">Interactions</TabsTrigger>
           <TabsTrigger value="tags">Tags</TabsTrigger>
           <TabsTrigger value="subscriptions">Cotisations</TabsTrigger>
           <TabsTrigger value="relations">Relations</TabsTrigger>
@@ -328,6 +404,169 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Onglet Interactions */}
+        <TabsContent value="interactions" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Journal d'interactions</CardTitle>
+                <CardDescription>
+                  {contacts.length} interaction(s)
+                </CardDescription>
+              </div>
+              <Button size="sm" onClick={() => setAddInteractionOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter une interaction
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {contactsQuery.isLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : contacts.length > 0 ? (
+                <div className="space-y-3">
+                  {[...contacts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((contact) => {
+                    const typeConfig = CONTACT_TYPE_CONFIG[contact.type];
+                    return (
+                      <div key={contact.id} className="border rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${typeConfig.className}`}>
+                                {typeConfig.label}
+                              </span>
+                              <span className="font-medium text-sm">{contact.subject}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(contact.date).toLocaleDateString('fr-FR')}
+                              {contact.duration ? ` · ${contact.duration} min` : ''}
+                            </p>
+                            {contact.description && (
+                              <p className="text-sm mt-1">{contact.description}</p>
+                            )}
+                            {contact.notes && (
+                              <p className="text-xs text-muted-foreground mt-1 italic">{contact.notes}</p>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive flex-shrink-0"
+                            onClick={() => deleteContactMutation.mutate(contact.id)}
+                            disabled={deleteContactMutation.isPending}
+                          >
+                            <Trash className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aucune interaction enregistrée</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Dialog d'ajout d'interaction */}
+          <Dialog open={addInteractionOpen} onOpenChange={setAddInteractionOpen}>
+            <DialogContent className="sm:max-w-[480px]">
+              <DialogHeader>
+                <DialogTitle>Ajouter une interaction</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Type *</Label>
+                    <Select
+                      value={interactionForm.type}
+                      onValueChange={(v) => setInteractionForm(f => ({ ...f, type: v as MemberContact['type'] }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(CONTACT_TYPE_CONFIG) as MemberContact['type'][]).map((t) => (
+                          <SelectItem key={t} value={t}>{CONTACT_TYPE_CONFIG[t].label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Date *</Label>
+                    <Input
+                      type="date"
+                      value={interactionForm.date}
+                      onChange={(e) => setInteractionForm(f => ({ ...f, date: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Sujet *</Label>
+                  <Input
+                    placeholder="Ex: Appel de découverte"
+                    value={interactionForm.subject}
+                    onChange={(e) => setInteractionForm(f => ({ ...f, subject: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Durée (minutes)</Label>
+                  <Input
+                    type="number"
+                    placeholder="30"
+                    value={interactionForm.duration}
+                    onChange={(e) => setInteractionForm(f => ({ ...f, duration: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description *</Label>
+                  <Textarea
+                    placeholder="Résumé de l'échange..."
+                    rows={3}
+                    value={interactionForm.description}
+                    onChange={(e) => setInteractionForm(f => ({ ...f, description: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Notes</Label>
+                  <Textarea
+                    placeholder="Notes additionnelles..."
+                    rows={2}
+                    value={interactionForm.notes}
+                    onChange={(e) => setInteractionForm(f => ({ ...f, notes: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAddInteractionOpen(false)}>
+                  Annuler
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!interactionForm.subject || !interactionForm.date || !interactionForm.description) {
+                      toast({ title: 'Champs requis', description: 'Sujet, date et description sont obligatoires', variant: 'destructive' });
+                      return;
+                    }
+                    createContactMutation.mutate({
+                      type: interactionForm.type,
+                      subject: interactionForm.subject,
+                      date: interactionForm.date,
+                      duration: interactionForm.duration ? Number(interactionForm.duration) : undefined,
+                      description: interactionForm.description,
+                      notes: interactionForm.notes || undefined,
+                    });
+                  }}
+                  disabled={createContactMutation.isPending}
+                >
+                  {createContactMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Ajouter
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* Onglet Tags */}

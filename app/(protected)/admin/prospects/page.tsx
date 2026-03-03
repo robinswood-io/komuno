@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/hooks/use-toast';
+import { useFeatureConfig } from '@/contexts/FeatureConfigContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +38,9 @@ import {
   Clock,
   UserX,
   RefreshCw,
+  UserPlus,
 } from 'lucide-react';
+import { AddMemberDialog } from '../members/add-member-dialog';
 
 interface Member {
   email: string;
@@ -81,8 +84,10 @@ export default function ProspectsPage() {
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { isFeatureEnabled } = useFeatureConfig();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [addContactOpen, setAddContactOpen] = useState(false);
 
   // Charge tous les membres et filtre côté client les prospects
   const { data, isLoading } = useQuery({
@@ -121,6 +126,22 @@ export default function ProspectsPage() {
     },
   });
 
+  if (!isFeatureEnabled('crm')) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4 text-center">
+        <UserSearch className="h-12 w-12 text-muted-foreground opacity-40" />
+        <p className="text-lg font-medium text-muted-foreground">Module CRM désactivé</p>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Le module CRM n'est pas activé sur cet espace. Activez-le dans les Paramètres → Modules.
+        </p>
+        <Button variant="outline" onClick={() => router.push('/admin/settings?tab=modules')}>
+          <ExternalLink className="h-4 w-4 mr-2" />
+          Paramètres modules
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* En-tête */}
@@ -128,17 +149,32 @@ export default function ProspectsPage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <UserSearch className="h-8 w-8 text-primary" />
-            Pipeline CRM
+            CRM — Contacts
           </h1>
           <p className="text-muted-foreground mt-1">
             Suivi des prospects et du pipeline de recrutement
           </p>
         </div>
-        <Button onClick={() => router.push('/admin/members')}>
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Gérer les membres
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setAddContactOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Ajouter un contact
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/admin/members')}>
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Gérer les membres
+          </Button>
+        </div>
       </div>
+
+      <AddMemberDialog
+        open={addContactOpen}
+        onOpenChange={(open) => {
+          setAddContactOpen(open);
+          if (!open) queryClient.invalidateQueries({ queryKey: ['prospects'] });
+        }}
+        defaultStatus="A contacter"
+      />
 
       {/* Résumé par statut */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
