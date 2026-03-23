@@ -8,13 +8,13 @@ import { useBranding } from '@/contexts/BrandingContext';
  * en fonction de la configuration branding
  */
 export function DynamicTitle() {
-  const { branding } = useBranding();
+  const { branding, isLoading } = useBranding();
 
   useEffect(() => {
-    if (typeof document !== 'undefined' && branding?.app?.name) {
+    if (!isLoading && typeof document !== 'undefined' && branding?.app?.name) {
       document.title = branding.app.name;
     }
-  }, [branding]);
+  }, [branding, isLoading]);
 
   return null; // Ce composant n'affiche rien, il met juste à jour le title
 }
