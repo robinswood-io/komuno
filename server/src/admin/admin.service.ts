@@ -922,9 +922,10 @@ export class AdminService {
     // Utiliser le fromEmail de la config SMTP comme destinataire de test
     // (évite le rejet OVH si l'email admin est fictif, ex: setup@admin.cjd)
     const configResult = await this.storageService.instance.getEmailConfig();
-    const fromEmail = configResult.success && configResult.data?.fromEmail
-      ? configResult.data.fromEmail
-      : null;
+    let fromEmail: string | null = null;
+    if (configResult.success && configResult.data) {
+      fromEmail = configResult.data.fromEmail || null;
+    }
 
     // Fallback : chercher un admin avec un vrai email (domaine public)
     let testEmail = fromEmail;
