@@ -154,6 +154,8 @@ export default function ProspectsPage() {
   const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
   const [addContactOpen, setAddContactOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('kanban');
+  const [draggingEmail, setDraggingEmail] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   // Query admins pour le filtre responsable
   const { data: adminsData } = useQuery({
@@ -392,7 +394,32 @@ export default function ProspectsPage() {
                 return (
                   <div
                     key={column.value}
-                    className="flex-shrink-0 w-72 rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white"
+                    className={`flex-shrink-0 w-72 rounded-xl overflow-hidden border shadow-sm bg-white transition-all ${
+                      dragOverColumn === column.value
+                        ? 'border-primary ring-2 ring-primary/30 shadow-md'
+                        : 'border-gray-200'
+                    }`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDragOverColumn(column.value);
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        setDragOverColumn(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverColumn(null);
+                      if (draggingEmail) {
+                        const prospect = allMembers.find(m => m.email === draggingEmail);
+                        if (prospect && prospect.prospectionStatus !== column.value) {
+                          updateStatusMutation.mutate({ email: draggingEmail, prospectionStatus: column.value });
+                        }
+                        setDraggingEmail(null);
+                      }
+                    }}
                   >
                     {/* En-tête coloré */}
                     <div className={`${column.headerClass} px-4 py-3 text-white`}>
@@ -417,8 +444,23 @@ export default function ProspectsPage() {
                       {columnProspects.map(prospect => (
                         <div
                           key={prospect.email}
-                          className={`bg-white rounded-lg p-3 shadow-sm border border-l-[3px] ${column.accent} cursor-pointer hover:shadow-md transition-all`}
-                          onClick={() => router.push(`/admin/members/${encodeURIComponent(prospect.email)}`)}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = 'move';
+                            setDraggingEmail(prospect.email);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingEmail(null);
+                            setDragOverColumn(null);
+                          }}
+                          className={`bg-white rounded-lg p-3 shadow-sm border border-l-[3px] ${column.accent} cursor-grab active:cursor-grabbing hover:shadow-md transition-all select-none ${
+                            draggingEmail === prospect.email ? 'opacity-40 scale-95' : ''
+                          }`}
+                          onClick={() => {
+                            if (draggingEmail === null) {
+                              router.push(`/admin/members/${encodeURIComponent(prospect.email)}`);
+                            }
+                          }}
                         >
                           <div className="flex items-start gap-2.5">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${column.avatarBg}`}>
