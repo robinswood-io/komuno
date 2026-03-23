@@ -1635,7 +1635,7 @@ export const updateMemberSchema = z.object({
     PROSPECTION_STAGES.EN_REFLEXION,
     PROSPECTION_STAGES.REFUSE,
     PROSPECTION_STAGES.SIGNE,
-  ]).optional(),
+  ]).nullable().optional(),
   soncasProfile: z.enum(SONCAS_PROFILES).optional(),
   assignedTo: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
 });
