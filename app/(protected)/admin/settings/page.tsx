@@ -136,7 +136,7 @@ export default function SettingsPage() {
   const canManageAdmins = currentUser?.role === 'super_admin';
 
   // Modules state — initialisé avec les defaults pour éviter le spinner infini
-  const [modules, setModules] = useState<ModulesConfig>(() => brandingCore.modules as ModulesConfig);
+  const [modules, setModules] = useState<ModulesConfig | null>(() => brandingCore.modules as ModulesConfig);
 
   // General settings
   const [generalSettings, setGeneralSettings] = useState({
@@ -621,8 +621,9 @@ export default function SettingsPage() {
           </Alert>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {(Object.keys(modules) as Array<keyof ModulesConfig>).map((moduleKey) => {
+            {modules && (Object.keys(modules) as Array<keyof ModulesConfig>).map((moduleKey) => {
               const module = modules[moduleKey];
+              if (!module) return null;
               const Icon = MODULE_ICONS[moduleKey];
 
               return (

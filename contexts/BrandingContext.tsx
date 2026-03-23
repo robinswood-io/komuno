@@ -26,7 +26,7 @@ function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>)
       } else {
         result[key] = sourceValue as any;
       }
-    } else if (sourceValue !== undefined) {
+    } else if (sourceValue !== undefined && sourceValue !== null) {
       result[key] = sourceValue as any;
     }
   }
