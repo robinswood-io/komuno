@@ -1017,7 +1017,11 @@ export class AdminService {
 
     return {
       success: true,
-      data: result.data,
+      data: {
+        ...result.data,
+        // Ne jamais exposer le mot de passe SMTP dans la réponse API
+        password: result.data.password ? '***' : '',
+      },
     };
   }
 
@@ -1028,7 +1032,8 @@ export class AdminService {
       port: config.port,
       secure: config.secure,
       username: config.username,
-      password: config.password,
+      // Ne pas écraser le mot de passe si l'UI envoie '***' (valeur masquée) ou vide
+      password: (config.password && config.password !== '***') ? config.password : undefined,
       fromEmail: config.fromEmail,
       fromName: config.fromName,
       provider: 'smtp' as const,

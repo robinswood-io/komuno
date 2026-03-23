@@ -782,6 +782,8 @@ export const emailConfig = pgTable("email_config", {
   host: varchar("host", { length: 255 }).notNull(),
   port: integer("port").notNull().default(465),
   secure: boolean("secure").notNull().default(true),
+  username: text("username"),
+  password: text("password"),
   fromName: varchar("from_name", { length: 255 }),
   fromEmail: varchar("from_email", { length: 255 }).notNull(),
   updatedBy: text("updated_by"),

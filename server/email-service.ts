@@ -67,8 +67,8 @@ class EmailService {
         port,
         secure,
         auth: {
-          user: process.env.SMTP_USER || '',
-          pass: process.env.SMTP_PASSWORD || ''
+          user: dbConfig?.username || process.env.SMTP_USER || '',
+          pass: dbConfig?.password || process.env.SMTP_PASSWORD || ''
         },
         fromName: dbConfig?.fromName || process.env.SMTP_FROM_NAME || getShortAppName(),
         fromEmail: dbConfig?.fromEmail || process.env.SMTP_FROM_EMAIL || 'noreply@cjd-amiens.fr'
