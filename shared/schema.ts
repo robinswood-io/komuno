@@ -32,6 +32,7 @@ export const admins = pgTable("admins", {
   role: text("role").default(ADMIN_ROLES.IDEAS_READER).notNull(), // Rôle par défaut : consultation des idées
   status: text("status").default(ADMIN_STATUS.PENDING).notNull(), // Statut par défaut : en attente
   isActive: boolean("is_active").default(true).notNull(), // Permet de désactiver un admin sans le supprimer
+  notificationEmail: text("notification_email"), // Email réel pour les notifications (rappels tâches, etc.)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -955,6 +956,7 @@ export const updateAdminInfoSchema = z.object({
     .min(1, "Le nom de famille est obligatoire")
     .max(50, "Le nom de famille ne peut pas dépasser 50 caractères")
     .transform(sanitizeText),
+  notificationEmail: z.string().email("Email invalide").optional().nullable(),
 });
 
 export const updateAdminPasswordSchema = z.object({

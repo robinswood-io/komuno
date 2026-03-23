@@ -364,12 +364,8 @@ export class AdminService {
     }
   }
 
-  async updateAdministratorInfo(email: string, data: unknown, currentUserEmail: string) {
+  async updateAdministratorInfo(email: string, data: unknown, _currentUserEmail: string) {
     try {
-      if (email === currentUserEmail) {
-        throw new BadRequestException('Vous ne pouvez pas modifier vos propres informations');
-      }
-
       const validatedData = updateAdminInfoSchema.parse(data);
       const result = await this.storageService.instance.updateAdminInfo(email, validatedData);
 

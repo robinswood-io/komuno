@@ -82,6 +82,7 @@ export function AdministratorsTab() {
   const [editForm, setEditForm] = useState<EditAdminFormData>({
     firstName: '',
     lastName: '',
+    notificationEmail: '',
   });
 
   const [editRole, setEditRole] = useState<string>('');
@@ -247,9 +248,11 @@ export function AdministratorsTab() {
     if (!selectedAdmin) return;
 
     // Mettre à jour les informations si changées
+    const notifEmailChanged = editForm.notificationEmail !== (selectedAdmin.notificationEmail ?? '');
     if (
       editForm.firstName !== selectedAdmin.firstName ||
-      editForm.lastName !== selectedAdmin.lastName
+      editForm.lastName !== selectedAdmin.lastName ||
+      notifEmailChanged
     ) {
       updateInfoMutation.mutate({
         email: selectedAdmin.email,
@@ -257,8 +260,8 @@ export function AdministratorsTab() {
       });
     }
 
-    // Mettre à jour le rôle si changé
-    if (editRole !== selectedAdmin.role) {
+    // Mettre à jour le rôle si changé (pas pour soi-même)
+    if (editRole !== selectedAdmin.role && !isCurrentUser(selectedAdmin.email)) {
       updateRoleMutation.mutate({
         email: selectedAdmin.email,
         role: editRole,
@@ -290,6 +293,7 @@ export function AdministratorsTab() {
     setEditForm({
       firstName: admin.firstName,
       lastName: admin.lastName,
+      notificationEmail: admin.notificationEmail ?? '',
     });
     setEditRole(admin.role);
     setEditDialogOpen(true);
@@ -378,7 +382,6 @@ export function AdministratorsTab() {
                           variant="ghost"
                           size="sm"
                           onClick={() => openEditDialog(admin)}
-                          disabled={isCurrentUser(admin.email)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -507,8 +510,25 @@ export function AdministratorsTab() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="edit-notificationEmail">
+                Email de notification
+                <span className="ml-1 text-xs text-muted-foreground">(rappels tâches, alertes)</span>
+              </Label>
+              <Input
+                id="edit-notificationEmail"
+                type="email"
+                placeholder="votre.email@example.com"
+                value={editForm.notificationEmail ?? ''}
+                onChange={(e) => setEditForm({ ...editForm, notificationEmail: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="edit-role">Rôle</Label>
-              <Select value={editRole} onValueChange={setEditRole}>
+              <Select
+                value={editRole}
+                onValueChange={setEditRole}
+                disabled={selectedAdmin ? isCurrentUser(selectedAdmin.email) : false}
+              >
                 <SelectTrigger id="edit-role">
                   <SelectValue />
                 </SelectTrigger>

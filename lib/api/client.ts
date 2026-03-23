@@ -217,6 +217,7 @@ export interface Administrator {
   status: 'pending' | 'active' | 'inactive';
   isActive: boolean;
   addedBy?: string;
+  notificationEmail?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -231,4 +232,5 @@ export interface CreateAdminFormData {
 export interface EditAdminFormData {
   firstName: string;
   lastName: string;
+  notificationEmail?: string;
 }

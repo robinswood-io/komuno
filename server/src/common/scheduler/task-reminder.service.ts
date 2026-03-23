@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { and, eq, inArray, lte, gte, isNotNull } from 'drizzle-orm';
 import { DATABASE } from '../database/database.providers';
 import type { DrizzleDb } from '../database/types';
-import { memberTasks, members } from '../../../../shared/schema';
+import { memberTasks, members, admins } from '../../../../shared/schema';
 import { EmailService } from '../email/email.service';
 
 interface TaskRow {
@@ -90,15 +90,27 @@ export class TaskReminderService {
 
     this.logger.log(`${dueTasks.length} tâche(s) due(s) trouvée(s)`);
 
-    // Grouper les tâches par assignedTo (email admin responsable)
+    // Résoudre les notification emails des admins assignés
+    const assignedEmails = [...new Set(dueTasks.map(t => t.assignedTo).filter(Boolean))] as string[];
+    const adminRows = assignedEmails.length > 0
+      ? await this.db.select({ email: admins.email, notificationEmail: admins.notificationEmail })
+          .from(admins)
+          .where(inArray(admins.email, assignedEmails))
+      : [];
+    const notificationEmailMap = new Map<string, string>(
+      adminRows.map(a => [a.email, a.notificationEmail ?? a.email])
+    );
+
+    // Grouper les tâches par email de notification (fallback sur assignedTo)
     const grouped = new Map<string, TaskRow[]>();
 
     for (const task of dueTasks) {
-      const recipient = task.assignedTo;
-      if (!recipient) {
+      const assignee = task.assignedTo;
+      if (!assignee) {
         // Tâche sans responsable assigné — ignorée pour l'envoi email
         continue;
       }
+      const recipient = notificationEmailMap.get(assignee) ?? assignee;
       const existing = grouped.get(recipient) ?? [];
       existing.push(task);
       grouped.set(recipient, existing);

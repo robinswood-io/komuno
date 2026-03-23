@@ -171,7 +171,7 @@ export interface IStorage {
   updateAdminRole(email: string, role: string): Promise<Result<Admin>>;
   updateAdminStatus(email: string, isActive: boolean): Promise<Result<Admin>>;
   updateAdminPassword(email: string, hashedPassword: string): Promise<Result<void>>;
-  updateAdminInfo(email: string, info: { firstName?: string; lastName?: string }): Promise<Result<Admin>>;
+  updateAdminInfo(email: string, info: { firstName?: string; lastName?: string; notificationEmail?: string | null }): Promise<Result<Admin>>;
   deleteAdmin(email: string): Promise<Result<void>>;
   
   // Ideas - Ultra-robust with business validation
@@ -756,14 +756,15 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateAdminInfo(email: string, info: { firstName: string; lastName: string }): Promise<Result<Admin>> {
+  async updateAdminInfo(email: string, info: { firstName: string; lastName: string; notificationEmail?: string | null }): Promise<Result<Admin>> {
     try {
       const [updatedAdmin] = await db
         .update(admins)
-        .set({ 
+        .set({
           firstName: info.firstName,
           lastName: info.lastName,
-          updatedAt: sql`NOW()` 
+          ...(info.notificationEmail !== undefined ? { notificationEmail: info.notificationEmail } : {}),
+          updatedAt: sql`NOW()`
         })
         .where(eq(admins.email, email))
         .returning();
