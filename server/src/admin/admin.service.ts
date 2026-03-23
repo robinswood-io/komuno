@@ -919,31 +919,37 @@ export class AdminService {
   async testEmailSimple() {
     logger.info('[Test Email] Début du test d\'envoi email simple...');
 
-    const adminsResult = await this.storageService.instance.getAllAdmins();
-    if (!adminsResult.success) {
-      logger.error('[Test Email] Erreur lors de la récupération des admins');
-      throw new BadRequestException('Erreur lors de la récupération des administrateurs');
+    // Utiliser le fromEmail de la config SMTP comme destinataire de test
+    // (évite le rejet OVH si l'email admin est fictif, ex: setup@admin.cjd)
+    const configResult = await this.storageService.instance.getEmailConfig();
+    const fromEmail = configResult.success && configResult.data?.fromEmail
+      ? configResult.data.fromEmail
+      : null;
+
+    // Fallback : chercher un admin avec un vrai email (domaine public)
+    let testEmail = fromEmail;
+    if (!testEmail) {
+      const adminsResult = await this.storageService.instance.getAllAdmins();
+      const activeAdmins = adminsResult.success
+        ? (adminsResult.data?.filter((a: Admin) => a.isActive && a.status === 'active') || [])
+        : [];
+      const realAdmin = activeAdmins.find((a: Admin) => a.email.includes('.') && !a.email.endsWith('.cjd'));
+      testEmail = realAdmin?.email || activeAdmins[0]?.email;
     }
 
-    logger.info('[Test Email] Admins récupérés:', { count: adminsResult.data?.length || 0 });
-    const activeAdmins = adminsResult.data?.filter((a: Admin) => a.isActive && a.status === 'active') || [];
-    logger.info('[Test Email] Admins actifs:', { count: activeAdmins.length });
-
-    if (activeAdmins.length === 0) {
-      logger.warn('[Test Email] Aucun admin actif trouvé');
-      throw new BadRequestException('Aucun administrateur actif trouvé');
+    if (!testEmail) {
+      throw new BadRequestException('Aucune adresse email valide trouvée pour le test');
     }
 
-    const testEmail = activeAdmins[0].email;
     logger.info('[Test Email] Envoi vers:', { email: testEmail });
 
     const result = await emailService.sendEmail({
       to: [testEmail],
-      subject: 'Test Configuration SMTP - CJD Amiens',
+      subject: 'Test Configuration SMTP',
       html: `
         <h2>Test de Configuration Email</h2>
-        <p>Si vous recevez cet email, la configuration SMTP OVH est correcte!</p>
-        <p>Serveur: ssl0.ovh.net</p>
+        <p>Si vous recevez cet email, la configuration SMTP est correcte !</p>
+        <p>Serveur: ${configResult.data?.host || 'N/A'}</p>
         <p>Date: ${new Date().toLocaleString('fr-FR')}</p>
       `,
     });
