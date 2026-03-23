@@ -7,16 +7,17 @@ import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Mail, Phone, Building2, Briefcase, UserCircle, Calendar, TrendingUp, Pencil, Trash2, UserCheck, ArrowLeft, Link2, Plus, Trash } from 'lucide-react';
+import { Loader2, Mail, Phone, Building2, Briefcase, UserCircle, Calendar, TrendingUp, Pencil, Trash2, UserCheck, ArrowLeft, Link2, Plus, Trash, History } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { NetworkSection } from '@/components/network/NetworkSection';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 
 interface Member {
   email: string;
@@ -30,7 +31,27 @@ interface Member {
   cjdRole?: string;
   notes?: string;
   proposedBy?: string;
+  createdBy?: string;
+  assignedTo?: string;
   createdAt?: string;
+}
+
+interface OwnershipHistory {
+  id: string;
+  memberEmail: string;
+  action: string;
+  adminEmail: string;
+  fromEmail?: string;
+  toEmail: string;
+  note?: string;
+  createdAt: string;
+}
+
+interface Administrator {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  role: string;
 }
 
 interface Activity {
@@ -96,7 +117,11 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
   const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [addInteractionOpen, setAddInteractionOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignTo, setAssignTo] = useState('');
+  const [assignNote, setAssignNote] = useState('');
   const [interactionForm, setInteractionForm] = useState({
     type: 'call' as MemberContact['type'],
     subject: '',
@@ -159,6 +184,35 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
     },
     onError: () => {
       toast({ title: 'Erreur', description: "Impossible de supprimer l'interaction", variant: 'destructive' });
+    },
+  });
+
+  const ownershipHistoryQuery = useQuery({
+    queryKey: [...queryKeys.members.detail(decodedEmail), 'ownership-history'],
+    queryFn: () => api.get<{ success: boolean; data: OwnershipHistory[] }>(
+      `/api/admin/members/${encodeURIComponent(decodedEmail)}/ownership-history`
+    ),
+  });
+
+  const adminsQuery = useQuery({
+    queryKey: queryKeys.admin.administrators.list(),
+    queryFn: () => api.get<{ success: boolean; data: Administrator[] }>('/api/admin/administrators'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: (data: { assignedTo: string; note?: string }) =>
+      api.patch(`/api/admin/members/${encodeURIComponent(decodedEmail)}/assign`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.detail(decodedEmail) });
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.members.detail(decodedEmail), 'ownership-history'] });
+      toast({ title: 'Responsable mis à jour' });
+      setAssignDialogOpen(false);
+      setAssignTo('');
+      setAssignNote('');
+    },
+    onError: () => {
+      toast({ title: 'Erreur', description: "Impossible de modifier le responsable", variant: 'destructive' });
     },
   });
 
@@ -301,6 +355,30 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
               <span>{member.proposedBy}</span>
             </div>
           )}
+          {member.createdBy && (
+            <div className="flex items-center gap-2 text-sm">
+              <UserCircle className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Créé par:</span>
+              <span>{member.createdBy}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-sm">
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Responsable:</span>
+            <span>{member.assignedTo ?? '—'}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => {
+                setAssignTo(member.assignedTo ?? '');
+                setAssignDialogOpen(true);
+              }}
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              Changer
+            </Button>
+          </div>
           {member.createdAt && (
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -324,7 +402,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
 
       {/* Onglets */}
       <Tabs defaultValue="activities" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="activities">Activité</TabsTrigger>
           <TabsTrigger value="tasks">Tâches</TabsTrigger>
           <TabsTrigger value="interactions">Interactions</TabsTrigger>
@@ -332,6 +410,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
           <TabsTrigger value="subscriptions">Cotisations</TabsTrigger>
           <TabsTrigger value="relations">Relations</TabsTrigger>
           <TabsTrigger value="network">Réseau</TabsTrigger>
+          <TabsTrigger value="ownership">Responsabilité</TabsTrigger>
         </TabsList>
 
         {/* Onglet Activité (fil d'actualité) */}
@@ -471,102 +550,6 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
             </CardContent>
           </Card>
 
-          {/* Dialog d'ajout d'interaction */}
-          <Dialog open={addInteractionOpen} onOpenChange={setAddInteractionOpen}>
-            <DialogContent className="sm:max-w-[480px]">
-              <DialogHeader>
-                <DialogTitle>Ajouter une interaction</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Type *</Label>
-                    <Select
-                      value={interactionForm.type}
-                      onValueChange={(v) => setInteractionForm(f => ({ ...f, type: v as MemberContact['type'] }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.keys(CONTACT_TYPE_CONFIG) as MemberContact['type'][]).map((t) => (
-                          <SelectItem key={t} value={t}>{CONTACT_TYPE_CONFIG[t].label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Date *</Label>
-                    <Input
-                      type="date"
-                      value={interactionForm.date}
-                      onChange={(e) => setInteractionForm(f => ({ ...f, date: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Sujet *</Label>
-                  <Input
-                    placeholder="Ex: Appel de découverte"
-                    value={interactionForm.subject}
-                    onChange={(e) => setInteractionForm(f => ({ ...f, subject: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Durée (minutes)</Label>
-                  <Input
-                    type="number"
-                    placeholder="30"
-                    value={interactionForm.duration}
-                    onChange={(e) => setInteractionForm(f => ({ ...f, duration: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description *</Label>
-                  <Textarea
-                    placeholder="Résumé de l'échange..."
-                    rows={3}
-                    value={interactionForm.description}
-                    onChange={(e) => setInteractionForm(f => ({ ...f, description: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Notes</Label>
-                  <Textarea
-                    placeholder="Notes additionnelles..."
-                    rows={2}
-                    value={interactionForm.notes}
-                    onChange={(e) => setInteractionForm(f => ({ ...f, notes: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAddInteractionOpen(false)}>
-                  Annuler
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (!interactionForm.subject || !interactionForm.date || !interactionForm.description) {
-                      toast({ title: 'Champs requis', description: 'Sujet, date et description sont obligatoires', variant: 'destructive' });
-                      return;
-                    }
-                    createContactMutation.mutate({
-                      type: interactionForm.type,
-                      subject: interactionForm.subject,
-                      date: interactionForm.date,
-                      duration: interactionForm.duration ? Number(interactionForm.duration) : undefined,
-                      description: interactionForm.description,
-                      notes: interactionForm.notes || undefined,
-                    });
-                  }}
-                  disabled={createContactMutation.isPending}
-                >
-                  {createContactMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Ajouter
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </TabsContent>
 
         {/* Onglet Tags */}
@@ -699,7 +682,217 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Onglet Responsabilité */}
+        <TabsContent value="ownership" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Historique de responsabilité</CardTitle>
+                  <CardDescription>Créateurs et responsables successifs de ce membre</CardDescription>
+                </div>
+                <Button size="sm" onClick={() => { setAssignTo(member.assignedTo ?? ''); setAssignDialogOpen(true); }}>
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Attribuer
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {ownershipHistoryQuery.isLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : (ownershipHistoryQuery.data?.data ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Aucun historique disponible</p>
+              ) : (
+                <div className="space-y-3">
+                  {(ownershipHistoryQuery.data?.data ?? []).map((entry) => (
+                    <div key={entry.id} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+                      <History className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs">
+                            {entry.action === 'created' ? 'Créé' : entry.action === 'assigned' ? 'Attribué' : 'Réattribué'}
+                          </Badge>
+                          <span className="text-sm">
+                            {entry.action === 'created' ? (
+                              <>Créé et attribué à <strong>{entry.toEmail}</strong></>
+                            ) : (
+                              <>
+                                {entry.fromEmail ? <><strong>{entry.fromEmail}</strong> → </> : ''}
+                                <strong>{entry.toEmail}</strong>
+                              </>
+                            )}
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            par {entry.adminEmail} · {new Date(entry.createdAt).toLocaleDateString('fr-FR')}
+                          </span>
+                        </div>
+                        {entry.note && <p className="text-xs text-muted-foreground mt-1">{entry.note}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Dialog d'ajout d'interaction — hors des Tabs pour rester accessible depuis n'importe quel onglet */}
+      <Dialog open={addInteractionOpen} onOpenChange={setAddInteractionOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Ajouter une interaction</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Type *</Label>
+                <Select
+                  value={interactionForm.type}
+                  onValueChange={(v) => setInteractionForm(f => ({ ...f, type: v as MemberContact['type'] }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(CONTACT_TYPE_CONFIG) as MemberContact['type'][]).map((t) => (
+                      <SelectItem key={t} value={t}>{CONTACT_TYPE_CONFIG[t].label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Date *</Label>
+                <Input
+                  type="date"
+                  value={interactionForm.date}
+                  onChange={(e) => setInteractionForm(f => ({ ...f, date: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Sujet *</Label>
+              <Input
+                placeholder="Ex: Appel de découverte"
+                value={interactionForm.subject}
+                onChange={(e) => setInteractionForm(f => ({ ...f, subject: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Durée (minutes)</Label>
+              <Input
+                type="number"
+                placeholder="30"
+                value={interactionForm.duration}
+                onChange={(e) => setInteractionForm(f => ({ ...f, duration: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description *</Label>
+              <Textarea
+                placeholder="Résumé de l'échange..."
+                rows={3}
+                value={interactionForm.description}
+                onChange={(e) => setInteractionForm(f => ({ ...f, description: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Notes additionnelles..."
+                rows={2}
+                value={interactionForm.notes}
+                onChange={(e) => setInteractionForm(f => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddInteractionOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => {
+                if (!interactionForm.subject || !interactionForm.date || !interactionForm.description) {
+                  toast({ title: 'Champs requis', description: 'Sujet, date et description sont obligatoires', variant: 'destructive' });
+                  return;
+                }
+                createContactMutation.mutate({
+                  type: interactionForm.type,
+                  subject: interactionForm.subject,
+                  date: interactionForm.date,
+                  duration: interactionForm.duration ? Number(interactionForm.duration) : undefined,
+                  description: interactionForm.description,
+                  notes: interactionForm.notes || undefined,
+                });
+              }}
+              disabled={createContactMutation.isPending}
+            >
+              {createContactMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Ajouter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog d'attribution de responsable */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Attribuer un responsable</DialogTitle>
+            <DialogDescription>
+              Choisissez l'admin responsable de ce membre/prospect
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Responsable *</Label>
+              <Select value={assignTo} onValueChange={setAssignTo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir un admin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(adminsQuery.data?.data ?? []).map((admin) => (
+                    <SelectItem key={admin.email} value={admin.email}>
+                      <span className="font-medium">
+                        {admin.firstName && admin.lastName ? `${admin.firstName} ${admin.lastName}` : admin.email}
+                      </span>
+                      {admin.firstName && admin.lastName && (
+                        <span className="text-muted-foreground text-xs ml-2">— {admin.email}</span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Note (optionnel)</Label>
+              <Textarea
+                placeholder="Ex: Transfert suite à départ..."
+                rows={2}
+                value={assignNote}
+                onChange={(e) => setAssignNote(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Annuler</Button>
+            <Button
+              onClick={() => {
+                if (!assignTo) {
+                  toast({ title: 'Champ requis', description: 'Choisissez un responsable', variant: 'destructive' });
+                  return;
+                }
+                assignMutation.mutate({ assignedTo: assignTo, note: assignNote || undefined });
+              }}
+              disabled={assignMutation.isPending}
+            >
+              {assignMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

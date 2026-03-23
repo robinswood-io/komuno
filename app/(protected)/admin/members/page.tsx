@@ -63,7 +63,7 @@ interface Member {
   cjdRole?: string;
   notes?: string;
   proposedBy?: string;
-  prospectionStatus?: 'Refusé' | 'RDV prévu' | 'A contacter' | '2027' | 'Intérêt - à relancer' | null;
+  prospectionStatus?: 'Qualification' | 'R1' | 'R2' | 'Contractualisation' | 'Hors cible' | 'En réflexion' | 'Refusé' | 'Signé' | null;
   firstContactDate?: string | null;
   appointmentDate?: string | null;
   city?: string;
@@ -109,10 +109,11 @@ const DEFAULT_COLORS = [
 
 // Colonnes du Kanban prospection
 const KANBAN_COLUMNS: { id: string; label: string; color: string }[] = [
-  { id: 'A contacter', label: 'À contacter', color: 'bg-slate-100 border-slate-300' },
-  { id: 'RDV prévu', label: 'RDV prévu', color: 'bg-blue-50 border-blue-300' },
-  { id: 'Intérêt - à relancer', label: 'Intérêt — à relancer', color: 'bg-amber-50 border-amber-300' },
-  { id: 'active', label: 'Membre actif', color: 'bg-green-50 border-green-300' },
+  { id: 'Qualification', label: 'Qualification', color: 'bg-slate-100 border-slate-300' },
+  { id: 'R1', label: 'R1', color: 'bg-blue-50 border-blue-300' },
+  { id: 'R2', label: 'R2', color: 'bg-amber-50 border-amber-300' },
+  { id: 'Contractualisation', label: 'Contractualisation', color: 'bg-green-50 border-green-300' },
+  { id: 'active', label: 'Membre actif', color: 'bg-emerald-50 border-emerald-300' },
   { id: 'Refusé', label: 'Refusé', color: 'bg-red-50 border-red-300' },
 ];
 
@@ -121,11 +122,6 @@ const BULK_STATUS_OPTIONS = [
   { value: 'active', label: 'Actif' },
   { value: 'inactive', label: 'Inactif' },
   { value: 'proposed', label: 'Proposé' },
-  { value: 'A contacter', label: 'A contacter' },
-  { value: 'RDV prévu', label: 'RDV prévu' },
-  { value: 'Intérêt - à relancer', label: 'Intérêt - à relancer' },
-  { value: 'Refusé', label: 'Refusé' },
-  { value: '2027', label: '2027' },
 ];
 
 /**
@@ -234,6 +230,8 @@ export default function AdminMembersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set(['all']));
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -273,13 +271,23 @@ export default function AdminMembersPage() {
   const [bulkSubStartDate, setBulkSubStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [bulkSubPayment, setBulkSubPayment] = useState('');
 
+  // Query admins pour le filtre responsable
+  const { data: adminsForFilter } = useQuery({
+    queryKey: ['administrators'],
+    queryFn: () => api.get<{ success: boolean; data: { email: string; firstName?: string; lastName?: string }[] }>('/api/admin/administrators'),
+    staleTime: 5 * 60 * 1000,
+  });
+  const adminsList = adminsForFilter?.data ?? [];
+
   // Query pour lister les membres (vue liste avec pagination)
   const { data, isLoading, error } = useQuery({
-    queryKey: queryKeys.members.list({ page, limit: 20, search: search || undefined }),
+    queryKey: queryKeys.members.list({ page, limit: 20, search: search || undefined, department: departmentFilter !== 'all' ? departmentFilter : undefined, assignedTo: assignedToFilter !== 'all' ? assignedToFilter : undefined }),
     queryFn: () => api.get<PaginatedResponse<Member>>('/api/admin/members', {
       page,
       limit: 20,
       search: search || undefined,
+      department: departmentFilter !== 'all' ? departmentFilter : undefined,
+      assignedTo: assignedToFilter !== 'all' ? assignedToFilter : undefined,
     }),
   });
 
@@ -287,7 +295,7 @@ export default function AdminMembersPage() {
   const { data: subscriptionTypesData } = useQuery({
     queryKey: ['subscription-types'],
     queryFn: () => api.get<{ success: boolean; data: { id: string; name: string; amountInCents: number; durationType: string }[] }>(
-      '/api/financial/subscription-types',
+      '/api/admin/finance/subscription-types',
     ),
     staleTime: 300_000,
   });
@@ -611,8 +619,11 @@ export default function AdminMembersPage() {
     return '';
   };
 
+  // Membres uniquement (pas les prospects — ceux-ci sont dans Pipeline CRM)
+  const membersOnly = data?.data?.filter(member => !member.prospectionStatus) ?? [];
+
   // Filtrés les membres selon les statuts sélectionnés
-  const filteredMembers = data?.data?.filter(member => {
+  const filteredMembers = membersOnly.filter(member => {
     if (statusFilters.has('all')) return true;
     const unifiedStatus = getUnifiedStatus(member);
     return statusFilters.has(unifiedStatus);
@@ -740,16 +751,22 @@ export default function AdminMembersPage() {
         return { bg: 'bg-orange-50', text: 'text-orange-900', border: 'border-orange-200', label: 'Proposé' };
       case 'inactive':
         return { bg: 'bg-gray-50', text: 'text-gray-900', border: 'border-gray-200', label: 'Inactif' };
+      case 'Qualification':
+        return { bg: 'bg-slate-50', text: 'text-slate-900', border: 'border-slate-200', label: 'Qualification' };
+      case 'R1':
+        return { bg: 'bg-blue-50', text: 'text-blue-900', border: 'border-blue-200', label: 'R1' };
+      case 'R2':
+        return { bg: 'bg-amber-50', text: 'text-amber-900', border: 'border-amber-200', label: 'R2' };
+      case 'Contractualisation':
+        return { bg: 'bg-green-50', text: 'text-green-900', border: 'border-green-200', label: 'Contractualisation' };
+      case 'Hors cible':
+        return { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200', label: 'Hors cible' };
+      case 'En réflexion':
+        return { bg: 'bg-purple-50', text: 'text-purple-900', border: 'border-purple-200', label: 'En réflexion' };
       case 'Refusé':
         return { bg: 'bg-red-50', text: 'text-red-900', border: 'border-red-200', label: 'Refusé' };
-      case 'RDV prévu':
-        return { bg: 'bg-blue-50', text: 'text-blue-900', border: 'border-blue-200', label: 'RDV prévu' };
-      case 'A contacter':
-        return { bg: 'bg-yellow-50', text: 'text-yellow-900', border: 'border-yellow-200', label: 'A contacter' };
-      case '2027':
-        return { bg: 'bg-purple-50', text: 'text-purple-900', border: 'border-purple-200', label: '2027' };
-      case 'Intérêt - à relancer':
-        return { bg: 'bg-cyan-50', text: 'text-cyan-900', border: 'border-cyan-200', label: 'Intérêt - à relancer' };
+      case 'Signé':
+        return { bg: 'bg-emerald-50', text: 'text-emerald-900', border: 'border-emerald-200', label: 'Signé' };
       default:
         return { bg: 'bg-gray-50', text: 'text-gray-900', border: 'border-gray-200', label: status };
     }
@@ -825,27 +842,8 @@ export default function AdminMembersPage() {
             <div>
               <CardTitle>Liste des membres</CardTitle>
               <CardDescription>
-                {data?.total || 0} membres au total
+                {membersOnly.length} membre{membersOnly.length !== 1 ? 's' : ''} (actifs, proposés, inactifs) — les prospects sont dans la <a href="/admin/prospects" className="underline text-primary">Pipeline CRM</a>
               </CardDescription>
-            </div>
-            {/* Toggle vue liste / kanban */}
-            <div className="flex gap-1 border rounded-md p-1">
-              <Button
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-                title="Vue liste"
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('kanban')}
-                title="Vue kanban"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
@@ -913,91 +911,6 @@ export default function AdminMembersPage() {
               >
                 Inactif
               </Button>
-              <Button
-                variant={statusFilters.has('Refusé') && !statusFilters.has('all') ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  const newFilters = new Set(statusFilters);
-                  if (newFilters.has('all')) newFilters.delete('all');
-                  if (newFilters.has('Refusé')) {
-                    newFilters.delete('Refusé');
-                    if (newFilters.size === 0) newFilters.add('all');
-                  } else {
-                    newFilters.add('Refusé');
-                  }
-                  setStatusFilters(newFilters);
-                }}
-              >
-                Refusé
-              </Button>
-              <Button
-                variant={statusFilters.has('RDV prévu') && !statusFilters.has('all') ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  const newFilters = new Set(statusFilters);
-                  if (newFilters.has('all')) newFilters.delete('all');
-                  if (newFilters.has('RDV prévu')) {
-                    newFilters.delete('RDV prévu');
-                    if (newFilters.size === 0) newFilters.add('all');
-                  } else {
-                    newFilters.add('RDV prévu');
-                  }
-                  setStatusFilters(newFilters);
-                }}
-              >
-                RDV prévu
-              </Button>
-              <Button
-                variant={statusFilters.has('A contacter') && !statusFilters.has('all') ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  const newFilters = new Set(statusFilters);
-                  if (newFilters.has('all')) newFilters.delete('all');
-                  if (newFilters.has('A contacter')) {
-                    newFilters.delete('A contacter');
-                    if (newFilters.size === 0) newFilters.add('all');
-                  } else {
-                    newFilters.add('A contacter');
-                  }
-                  setStatusFilters(newFilters);
-                }}
-              >
-                A contacter
-              </Button>
-              <Button
-                variant={statusFilters.has('2027') && !statusFilters.has('all') ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  const newFilters = new Set(statusFilters);
-                  if (newFilters.has('all')) newFilters.delete('all');
-                  if (newFilters.has('2027')) {
-                    newFilters.delete('2027');
-                    if (newFilters.size === 0) newFilters.add('all');
-                  } else {
-                    newFilters.add('2027');
-                  }
-                  setStatusFilters(newFilters);
-                }}
-              >
-                2027
-              </Button>
-              <Button
-                variant={statusFilters.has('Intérêt - à relancer') && !statusFilters.has('all') ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => {
-                  const newFilters = new Set(statusFilters);
-                  if (newFilters.has('all')) newFilters.delete('all');
-                  if (newFilters.has('Intérêt - à relancer')) {
-                    newFilters.delete('Intérêt - à relancer');
-                    if (newFilters.size === 0) newFilters.add('all');
-                  } else {
-                    newFilters.add('Intérêt - à relancer');
-                  }
-                  setStatusFilters(newFilters);
-                }}
-              >
-                Intérêt - à relancer
-              </Button>
             </div>
 
             {/* Recherche */}
@@ -1010,88 +923,40 @@ export default function AdminMembersPage() {
                 className="pl-9"
               />
             </div>
+
+            {/* Filtre département */}
+            <Select value={departmentFilter} onValueChange={v => { setDepartmentFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Département" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les depts</SelectItem>
+                <SelectItem value="Somme">Somme (80)</SelectItem>
+                <SelectItem value="Aisne">Aisne (02)</SelectItem>
+                <SelectItem value="Oise">Oise (60)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Filtre responsable */}
+            <Select value={assignedToFilter} onValueChange={v => { setAssignedToFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Responsable" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les responsables</SelectItem>
+                {adminsList.map(admin => (
+                  <SelectItem key={admin.email} value={admin.email}>
+                    {admin.firstName && admin.lastName ? `${admin.firstName} ${admin.lastName}` : admin.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
-          {/* Vue Kanban */}
-          {viewMode === 'kanban' && (
-            <>
-              {isKanbanLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : (
-                <div className="flex gap-4 overflow-x-auto pb-4">
-                  {KANBAN_COLUMNS.map(column => {
-                    const allKanbanMembers = kanbanData?.data ?? [];
-                    const columnMembers = allKanbanMembers.filter(m => {
-                      const unified = getUnifiedStatus(m);
-                      return unified === column.id;
-                    });
-                    return (
-                      <div
-                        key={column.id}
-                        className={`flex-shrink-0 w-64 rounded-lg border-2 p-3 ${column.color}`}
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="font-semibold text-sm">{column.label}</h3>
-                          <Badge variant="secondary">{columnMembers.length}</Badge>
-                        </div>
-                        <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
-                          {columnMembers.map(member => (
-                            <div
-                              key={member.email}
-                              className="bg-white rounded-md p-3 shadow-sm border cursor-pointer hover:shadow-md transition-shadow"
-                              onClick={() => {
-                                router.push(`/admin/members/${encodeURIComponent(member.email)}`);
-                              }}
-                            >
-                              <p className="font-medium text-sm">{member.firstName} {member.lastName}</p>
-                              <p className="text-xs text-muted-foreground">{member.company || member.email}</p>
-                              {(member.engagementScore ?? 0) > 0 && (
-                                <div className="mt-1">
-                                  <span className="text-xs bg-primary/10 text-primary px-1 rounded">
-                                    Score: {member.engagementScore}
-                                  </span>
-                                </div>
-                              )}
-                              {/* Dropdown pour changer le statut directement depuis la carte */}
-                              <Select
-                                defaultValue={getUnifiedStatus(member)}
-                                onValueChange={(newStatus) => {
-                                  handleKanbanStatusChange(member.email, newStatus);
-                                }}
-                              >
-                                <SelectTrigger
-                                  className="h-6 text-xs mt-2"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {KANBAN_COLUMNS.map(c => (
-                                    <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          ))}
-                          {columnMembers.length === 0 && (
-                            <p className="text-xs text-muted-foreground text-center py-4">Aucun membre</p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-
           {/* Vue Liste */}
-          {viewMode === 'list' && (
-            <>
-              <Table>
+          <>
+            <Table>
                 <TableHeader>
                   <TableRow>
                     {/* Colonne checkbox */}
@@ -1136,11 +1001,16 @@ export default function AdminMembersPage() {
                             />
                           </TableCell>
                           <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <span>{member.firstName} {member.lastName}</span>
-                              {member.status === 'proposed' && member.proposedBy && (
-                                <span className="text-xs text-muted-foreground">(proposé par {member.proposedBy})</span>
-                              )}
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                                {member.firstName?.[0]?.toUpperCase()}{member.lastName?.[0]?.toUpperCase()}
+                              </div>
+                              <div>
+                                <span className="font-semibold">{member.firstName} {member.lastName}</span>
+                                {member.status === 'proposed' && member.proposedBy && (
+                                  <p className="text-xs text-muted-foreground">proposé par {member.proposedBy}</p>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell
@@ -1253,8 +1123,7 @@ export default function AdminMembersPage() {
                   </Button>
                 </div>
               )}
-            </>
-          )}
+          </>
         </CardContent>
       </Card>
 

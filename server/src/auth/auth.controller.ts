@@ -266,16 +266,21 @@ export class AuthController {
 
   /**
    * Route pour obtenir l'utilisateur actuel
-   * GET /api/user
+   * GET /api/auth/user
+   * Retourne null (200) si non authentifié (évite les 401 console sur pages publiques)
    */
   @Get('user')
   @SkipThrottle()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtenir les informations de l\'utilisateur connecté' })
-  @ApiResponse({ status: 200, description: 'Utilisateur connecté', schema: { type: 'object', properties: { email: { type: 'string' }, role: { type: 'string' }, permissions: { type: 'array', items: { type: 'string' } } } } })
-  @ApiResponse({ status: 401, description: 'Non authentifié' })
-  getCurrentUser(@User() user: Admin) {
+  @ApiResponse({ status: 200, description: 'Utilisateur connecté ou null si non authentifié' })
+  getCurrentUser(@Req() req: Request) {
+    const user = (req as any).user as Admin | undefined;
+    const isAuthenticated = typeof (req as any).isAuthenticated === 'function'
+      ? (req as any).isAuthenticated()
+      : !!user;
+    if (!isAuthenticated || !user) {
+      return { success: true, data: null };
+    }
     return this.authService.getUserWithoutPassword(user);
   }
 

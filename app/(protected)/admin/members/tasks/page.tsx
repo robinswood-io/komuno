@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { MemberSearchSelect } from '@/components/ui/member-search-select';
 
 interface Member {
   email: string;
@@ -59,11 +60,10 @@ interface MemberTask {
 
 interface CreateTaskFormData {
   memberEmail: string;
-  title: string;
-  description?: string;
   taskType: 'call' | 'email' | 'meeting' | 'custom';
-  status: 'todo' | 'in_progress' | 'completed' | 'cancelled';
   dueDate?: string;
+  dueTime?: string;
+  description?: string;
 }
 
 interface EditTaskFormData {
@@ -117,11 +117,10 @@ export default function AdminMemberTasksPage() {
   // Formulaire création
   const [createFormData, setCreateFormData] = useState<CreateTaskFormData>({
     memberEmail: '',
-    title: '',
-    description: '',
     taskType: 'call',
-    status: 'todo',
     dueDate: '',
+    dueTime: '',
+    description: '',
   });
 
   // Formulaire édition
@@ -185,17 +184,22 @@ export default function AdminMemberTasksPage() {
 
   // Mutation pour créer une tâche
   const createMutation = useMutation({
-    mutationFn: (data: CreateTaskFormData) =>
-      api.post(
+    mutationFn: (data: CreateTaskFormData) => {
+      let dueDate: string | undefined;
+      if (data.dueDate) {
+        const time = data.dueTime || '09:00';
+        dueDate = new Date(`${data.dueDate}T${time}:00`).toISOString();
+      }
+      return api.post(
         `/api/admin/members/${encodeURIComponent(data.memberEmail)}/tasks`,
         {
-          title: data.title,
+          title: taskTypeLabels[data.taskType],
           description: data.description || undefined,
           taskType: data.taskType,
-          status: data.status,
-          dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : undefined,
+          dueDate,
         }
-      ),
+      );
+    },
     onSuccess: () => {
       toast({
         title: 'Tâche créée',
@@ -205,11 +209,10 @@ export default function AdminMemberTasksPage() {
       setCreateDialogOpen(false);
       setCreateFormData({
         memberEmail: '',
-        title: '',
-        description: '',
         taskType: 'call',
-        status: 'todo',
         dueDate: '',
+        dueTime: '',
+        description: '',
       });
     },
     onError: (error: Error) => {
@@ -309,11 +312,10 @@ export default function AdminMemberTasksPage() {
   const handleOpenCreateDialog = () => {
     setCreateFormData({
       memberEmail: '',
-      title: '',
-      description: '',
       taskType: 'call',
-      status: 'todo',
       dueDate: '',
+      dueTime: '',
+      description: '',
     });
     setCreateDialogOpen(true);
   };
@@ -340,7 +342,6 @@ export default function AdminMemberTasksPage() {
   };
 
   const handleSaveCreate = () => {
-    // Validation
     if (!createFormData.memberEmail.trim()) {
       toast({
         title: 'Erreur',
@@ -349,16 +350,6 @@ export default function AdminMemberTasksPage() {
       });
       return;
     }
-
-    if (!createFormData.title.trim() || createFormData.title.trim().length < 3) {
-      toast({
-        title: 'Erreur',
-        description: 'Le titre doit contenir au moins 3 caractères',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     createMutation.mutate(createFormData);
   };
 
@@ -617,54 +608,16 @@ export default function AdminMemberTasksPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Sélectionner un membre */}
+            {/* Membre */}
             <div className="space-y-2">
-              <Label htmlFor="create-member">Membre *</Label>
-              <Select
+              <Label>Membre *</Label>
+              <MemberSearchSelect
                 value={createFormData.memberEmail}
                 onValueChange={(value) =>
                   setCreateFormData((prev) => ({ ...prev, memberEmail: value }))
                 }
-              >
-                <SelectTrigger id="create-member">
-                  <SelectValue placeholder="Sélectionner un membre" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allMembers.map((member) => (
-                    <SelectItem key={member.email} value={member.email}>
-                      {member.firstName} {member.lastName} ({member.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Titre */}
-            <div className="space-y-2">
-              <Label htmlFor="create-title">Titre *</Label>
-              <Input
-                id="create-title"
-                placeholder="Appeler le client..."
-                value={createFormData.title}
-                onChange={(e) =>
-                  setCreateFormData((prev) => ({ ...prev, title: e.target.value }))
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                Minimum 3 caractères
-              </p>
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="create-description">Description</Label>
-              <Textarea
-                id="create-description"
-                placeholder="Détails supplémentaires..."
-                value={createFormData.description}
-                onChange={(e) =>
-                  setCreateFormData((prev) => ({ ...prev, description: e.target.value }))
-                }
+                members={allMembers}
+                placeholder="Rechercher un membre..."
               />
             </div>
 
@@ -674,7 +627,7 @@ export default function AdminMemberTasksPage() {
               <Select
                 value={createFormData.taskType}
                 onValueChange={(value) =>
-                  setCreateFormData((prev) => ({ ...prev, taskType: value as any }))
+                  setCreateFormData((prev) => ({ ...prev, taskType: value as MemberTask['taskType'] }))
                 }
               >
                 <SelectTrigger id="create-taskType">
@@ -689,36 +642,41 @@ export default function AdminMemberTasksPage() {
               </Select>
             </div>
 
-            {/* Statut */}
-            <div className="space-y-2">
-              <Label htmlFor="create-status">Statut</Label>
-              <Select
-                value={createFormData.status}
-                onValueChange={(value) =>
-                  setCreateFormData((prev) => ({ ...prev, status: value as any }))
-                }
-              >
-                <SelectTrigger id="create-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todo">À faire</SelectItem>
-                  <SelectItem value="in_progress">En cours</SelectItem>
-                  <SelectItem value="completed">Complété</SelectItem>
-                  <SelectItem value="cancelled">Annulé</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Date + Heure */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="create-dueDate">Date</Label>
+                <Input
+                  id="create-dueDate"
+                  type="date"
+                  value={createFormData.dueDate}
+                  onChange={(e) =>
+                    setCreateFormData((prev) => ({ ...prev, dueDate: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-dueTime">Heure</Label>
+                <Input
+                  id="create-dueTime"
+                  type="time"
+                  value={createFormData.dueTime}
+                  onChange={(e) =>
+                    setCreateFormData((prev) => ({ ...prev, dueTime: e.target.value }))
+                  }
+                />
+              </div>
             </div>
 
-            {/* Échéance */}
+            {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="create-dueDate">Échéance</Label>
-              <Input
-                id="create-dueDate"
-                type="date"
-                value={createFormData.dueDate}
+              <Label htmlFor="create-description">Description</Label>
+              <Textarea
+                id="create-description"
+                placeholder="Détails supplémentaires..."
+                value={createFormData.description}
                 onChange={(e) =>
-                  setCreateFormData((prev) => ({ ...prev, dueDate: e.target.value }))
+                  setCreateFormData((prev) => ({ ...prev, description: e.target.value }))
                 }
               />
             </div>

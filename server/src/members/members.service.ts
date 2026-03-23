@@ -4,6 +4,7 @@ import {
   proposeMemberSchema,
   insertMemberSchema,
   updateMemberSchema,
+  assignMemberSchema,
   insertMemberSubscriptionSchema,
   insertMemberTagSchema,
   updateMemberTagSchema,
@@ -96,20 +97,32 @@ export class MembersService {
 
   // ===== Routes admin - Membres =====
 
-  async createMember(data: unknown) {
+  async createMember(data: unknown, creatorEmail: string) {
     try {
       const validatedData = insertMemberSchema.parse(data);
+      // Le responsable est l'utilisateur courant, sauf si explicitement fourni
+      const assignedTo = validatedData.assignedTo ?? creatorEmail;
 
       const result = await this.storageService.instance.createOrUpdateMember({
         email: validatedData.email,
         firstName: validatedData.firstName,
         lastName: validatedData.lastName,
         company: validatedData.company,
+        department: validatedData.department,
+        city: validatedData.city,
+        postalCode: validatedData.postalCode,
+        firstContactDate: validatedData.firstContactDate as any,
+        meetingDate: validatedData.meetingDate as any,
+        sector: validatedData.sector,
         phone: validatedData.phone,
         role: validatedData.role,
         notes: validatedData.notes,
         status: validatedData.status,
+        prospectionStatus: validatedData.prospectionStatus,
         proposedBy: validatedData.proposedBy,
+        soncasProfile: validatedData.soncasProfile,
+        createdBy: creatorEmail,
+        assignedTo,
       });
 
       if (!result.success) {
@@ -118,6 +131,16 @@ export class MembersService {
           throw new ConflictException(error.message);
         }
         throw new BadRequestException(error.message);
+      }
+
+      // Enregistrer l'historique de création
+      if (result.data) {
+        await this.storageService.instance.createOwnershipHistoryEntry({
+          memberEmail: result.data.email,
+          action: 'created',
+          adminEmail: creatorEmail,
+          toEmail: assignedTo,
+        }).catch((err) => logger.error('Failed to create ownership history entry', { error: err }));
       }
 
       return { success: true, data: result.data };
@@ -129,6 +152,36 @@ export class MembersService {
     }
   }
 
+  async assignMember(memberEmail: string, data: unknown, currentUserEmail: string) {
+    try {
+      const validatedData = assignMemberSchema.parse(data);
+      const result = await this.storageService.instance.assignMember(
+        memberEmail,
+        validatedData.assignedTo,
+        currentUserEmail,
+        validatedData.note,
+      );
+      if (!result.success) {
+        const error = 'error' in result ? result.error : new Error('Unknown error');
+        throw new BadRequestException(error.message);
+      }
+      return { success: true };
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException(fromZodError(error).toString());
+      }
+      throw error;
+    }
+  }
+
+  async getMemberOwnershipHistory(memberEmail: string) {
+    const result = await this.storageService.instance.getMemberOwnershipHistory(memberEmail);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
   async getMembers(
     page: number = 1,
     limit: number = 20,
@@ -137,6 +190,9 @@ export class MembersService {
     score?: 'high' | 'medium' | 'low',
     activity?: 'recent' | 'inactive',
     prospectionStatus?: string,
+    city?: string,
+    department?: string,
+    assignedTo?: string,
   ) {
     const result = await this.storageService.instance.getMembers({
       page,
@@ -146,6 +202,9 @@ export class MembersService {
       ...(score ? { score } : {}),
       ...(activity ? { activity } : {}),
       ...(prospectionStatus && prospectionStatus !== 'all' ? { prospectionStatus } : {}),
+      ...(city && city.trim() ? { city } : {}),
+      ...(department && department !== 'all' ? { department } : {}),
+      ...(assignedTo && assignedTo !== 'all' ? { assignedTo } : {}),
     });
 
     if (!result.success) {

@@ -8,11 +8,33 @@ class EmailNotificationService {
   private context: NotificationContext;
 
   constructor() {
-    // Configuration du contexte pour les emails
     this.context = {
       baseUrl: process.env.BASE_URL || 'http://localhost:5000',
-      adminDashboardUrl: process.env.BASE_URL ? `${process.env.BASE_URL}/admin` : 'http://localhost:5000/admin'
+      adminDashboardUrl: process.env.BASE_URL ? `${process.env.BASE_URL}/admin` : 'http://localhost:5000/admin',
     };
+    // Charger le branding depuis la DB au démarrage (async, best-effort)
+    this.loadBranding();
+  }
+
+  private async loadBranding(): Promise<void> {
+    try {
+      const result = await storage.getBrandingConfig();
+      if (result.success && result.data) {
+        const config = typeof result.data.config === 'string'
+          ? JSON.parse(result.data.config)
+          : result.data;
+        this.context = {
+          ...this.context,
+          branding: {
+            primaryColor: config?.colors?.primary,
+            appName: config?.app?.shortName || config?.app?.name,
+            orgFullName: config?.organization?.fullName || config?.organization?.name,
+          },
+        };
+      }
+    } catch {
+      // Fallback silencieux sur brandingCore
+    }
   }
 
   // Récupérer tous les emails des administrateurs actifs

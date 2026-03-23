@@ -137,6 +137,8 @@ import {
   memberContacts,
   type MemberContact,
   type InsertMemberContact,
+  memberOwnershipHistory,
+  type MemberOwnershipHistory,
 } from "../shared/schema";
 import { z } from "zod";
 import { db, runDbQuery } from "./db";
@@ -350,7 +352,7 @@ export interface IStorage {
   }>>;
   
   // Gestion des membres
-  createOrUpdateMember(memberData: Partial<InsertMember> & { email: string }): Promise<Result<Member>>;
+  createOrUpdateMember(memberData: Partial<InsertMember> & { email: string; createdBy?: string; assignedTo?: string }): Promise<Result<Member>>;
   proposeMember(memberData: Partial<InsertMember> & { email: string; firstName: string; lastName: string; proposedBy: string }): Promise<Result<Member>>;
   getMembers(options?: { 
     page?: number; 
@@ -430,6 +432,9 @@ export interface IStorage {
   createMemberContact(contact: InsertMemberContact): Promise<Result<MemberContact>>;
   updateMemberContact(id: string, data: Partial<InsertMemberContact>): Promise<Result<MemberContact>>;
   deleteMemberContact(id: string): Promise<Result<void>>;
+  getMemberOwnershipHistory(memberEmail: string): Promise<Result<MemberOwnershipHistory[]>>;
+  createOwnershipHistoryEntry(entry: { memberEmail: string; action: string; adminEmail: string; fromEmail?: string; toEmail: string; note?: string }): Promise<Result<MemberOwnershipHistory>>;
+  assignMember(memberEmail: string, toEmail: string, adminEmail: string, note?: string): Promise<Result<void>>;
 
   // Branding configuration
   getBrandingConfig(): Promise<Result<BrandingConfig | null>>;
@@ -2868,7 +2873,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createOrUpdateMember(memberData: Partial<InsertMember> & { email: string }): Promise<Result<Member>> {
+  async createOrUpdateMember(memberData: Partial<InsertMember> & { email: string; createdBy?: string; assignedTo?: string }): Promise<Result<Member>> {
     try {
       const [existingMember] = await db
         .select()
@@ -2891,6 +2896,8 @@ export class DatabaseStorage implements IStorage {
         if (memberData.postalCode !== undefined) updateData.postalCode = memberData.postalCode;
         if (memberData.epci !== undefined) updateData.epci = memberData.epci;
         if (memberData.prospectionStatus !== undefined) updateData.prospectionStatus = memberData.prospectionStatus;
+        if (memberData.soncasProfile !== undefined) updateData.soncasProfile = memberData.soncasProfile;
+        if (memberData.assignedTo !== undefined) updateData.assignedTo = memberData.assignedTo;
         if (memberData.firstContactDate !== undefined) updateData.firstContactDate = memberData.firstContactDate;
         if (memberData.meetingDate !== undefined) updateData.meetingDate = memberData.meetingDate;
         if (memberData.sector !== undefined) updateData.sector = memberData.sector;
@@ -2916,7 +2923,11 @@ export class DatabaseStorage implements IStorage {
           city: memberData.city,
           postalCode: memberData.postalCode,
           epci: memberData.epci,
+          status: memberData.status || 'active',
           prospectionStatus: memberData.prospectionStatus,
+          soncasProfile: memberData.soncasProfile,
+          createdBy: memberData.createdBy,
+          assignedTo: memberData.assignedTo ?? memberData.createdBy,
           firstContactDate: memberData.firstContactDate,
           meetingDate: memberData.meetingDate,
           sector: memberData.sector,
@@ -2992,6 +3003,9 @@ export class DatabaseStorage implements IStorage {
     score?: 'high' | 'medium' | 'low';
     activity?: 'recent' | 'inactive';
     prospectionStatus?: string;
+    city?: string;
+    department?: string;
+    assignedTo?: string;
   }): Promise<Result<{
     data: Member[];
     total: number;
@@ -3014,6 +3028,21 @@ export class DatabaseStorage implements IStorage {
       // Filtre par statut de prospection
       if (options?.prospectionStatus && options.prospectionStatus !== 'all') {
         conditions.push(eq(members.prospectionStatus, options.prospectionStatus));
+      }
+
+      // Filtre par ville
+      if (options?.city) {
+        conditions.push(ilike(members.city, `%${options.city}%`));
+      }
+
+      // Filtre par département
+      if (options?.department) {
+        conditions.push(eq(members.department, options.department));
+      }
+
+      // Filtre par responsable assigné
+      if (options?.assignedTo) {
+        conditions.push(eq(members.assignedTo, options.assignedTo));
       }
 
       // Filtre de recherche textuelle
@@ -3680,6 +3709,60 @@ export class DatabaseStorage implements IStorage {
       return { success: true, data: undefined };
     } catch (error) {
       return { success: false, error: new DatabaseError(`Erreur lors de la suppression du contact: ${error}`) };
+    }
+  }
+
+  // ===== Member ownership history =====
+
+  async getMemberOwnershipHistory(memberEmail: string): Promise<Result<MemberOwnershipHistory[]>> {
+    try {
+      const history = await db
+        .select()
+        .from(memberOwnershipHistory)
+        .where(eq(memberOwnershipHistory.memberEmail, memberEmail))
+        .orderBy(desc(memberOwnershipHistory.createdAt));
+      return { success: true, data: history };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la récupération de l'historique: ${error}`) };
+    }
+  }
+
+  async createOwnershipHistoryEntry(entry: { memberEmail: string; action: string; adminEmail: string; fromEmail?: string; toEmail: string; note?: string }): Promise<Result<MemberOwnershipHistory>> {
+    try {
+      const [created] = await db.insert(memberOwnershipHistory).values(entry).returning();
+      return { success: true, data: created };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de la création de l'entrée d'historique: ${error}`) };
+    }
+  }
+
+  async assignMember(memberEmail: string, toEmail: string, adminEmail: string, note?: string): Promise<Result<void>> {
+    try {
+      const [member] = await db.select().from(members).where(eq(members.email, memberEmail));
+      if (!member) {
+        return { success: false, error: new NotFoundError("Membre introuvable") };
+      }
+
+      const fromEmail = member.assignedTo ?? undefined;
+      const action = fromEmail ? 'reassigned' : 'assigned';
+
+      await db.update(members)
+        .set({ assignedTo: toEmail, updatedAt: sql`NOW()` })
+        .where(eq(members.email, memberEmail));
+
+      await db.insert(memberOwnershipHistory).values({
+        memberEmail,
+        action,
+        adminEmail,
+        fromEmail,
+        toEmail,
+        note,
+      });
+
+      logger.info('Member assigned', { memberEmail, from: fromEmail, to: toEmail, by: adminEmail });
+      return { success: true, data: undefined };
+    } catch (error) {
+      return { success: false, error: new DatabaseError(`Erreur lors de l'attribution du membre: ${error}`) };
     }
   }
 

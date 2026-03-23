@@ -73,7 +73,10 @@ export class AdminMembersController {
   @ApiQuery({ name: 'search', required: false, description: 'Recherche par nom ou email', example: 'dupont' })
   @ApiQuery({ name: 'score', required: false, description: 'Filtrer par score d\'engagement', enum: ['high', 'medium', 'low'] })
   @ApiQuery({ name: 'activity', required: false, description: 'Filtrer par activité', enum: ['recent', 'inactive'] })
-  @ApiQuery({ name: 'prospectionStatus', required: false, description: 'Filtrer par statut de prospection', enum: ['2027', 'Refusé', 'A contacter', 'RDV prévu', 'Intérêt - à relancer'] })
+  @ApiQuery({ name: 'prospectionStatus', required: false, description: 'Filtrer par statut de prospection', enum: ['Qualification', 'R1', 'R2', 'Contractualisation', 'Hors cible', 'En réflexion', 'Refusé', 'Signé'] })
+  @ApiQuery({ name: 'city', required: false, description: 'Filtrer par ville (partiel)', example: 'Amiens' })
+  @ApiQuery({ name: 'department', required: false, description: 'Filtrer par département', example: '80' })
+  @ApiQuery({ name: 'assignedTo', required: false, description: 'Filtrer par responsable (email)', example: 'delegue@example.com' })
   @ApiResponse({ status: 200, description: 'Liste des membres avec pagination' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
@@ -85,10 +88,13 @@ export class AdminMembersController {
     @Query('score') score?: 'high' | 'medium' | 'low',
     @Query('activity') activity?: 'recent' | 'inactive',
     @Query('prospectionStatus') prospectionStatus?: string,
+    @Query('city') city?: string,
+    @Query('department') department?: string,
+    @Query('assignedTo') assignedTo?: string,
   ) {
     const pageNum = parseInt(page || '1', 10);
     const limitNum = parseInt(limit || '20', 10);
-    return await this.membersService.getMembers(pageNum, limitNum, status, search, score, activity, prospectionStatus);
+    return await this.membersService.getMembers(pageNum, limitNum, status, search, score, activity, prospectionStatus, city, department, assignedTo);
   }
 
   @Post()
@@ -130,8 +136,11 @@ export class AdminMembersController {
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
   @ApiResponse({ status: 409, description: 'Le membre existe déjà' })
-  async createMember(@Body() body: unknown) {
-    return await this.membersService.createMember(body);
+  async createMember(
+    @Body() body: unknown,
+    @User() user: { email: string },
+  ) {
+    return await this.membersService.createMember(body, user.email);
   }
 
   // ===== Routes admin - Opérations en masse (AVANT les routes :email) =====
@@ -279,6 +288,38 @@ export class AdminMembersController {
   @ApiResponse({ status: 404, description: 'Membre non trouvé' })
   async getMemberDetails(@Param('email') email: string) {
     return await this.membersService.getMemberDetails(email);
+  }
+
+  @Get(':email/ownership-history')
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Historique des créateurs et responsables d\'un membre' })
+  @ApiParam({ name: 'email', description: 'Email du membre' })
+  @ApiResponse({ status: 200, description: 'Historique de responsabilité' })
+  async getMemberOwnershipHistory(@Param('email') email: string) {
+    return await this.membersService.getMemberOwnershipHistory(email);
+  }
+
+  @Patch(':email/assign')
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Attribuer un membre à un admin responsable' })
+  @ApiParam({ name: 'email', description: 'Email du membre' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        assignedTo: { type: 'string', format: 'email', example: 'manager@example.com' },
+        note: { type: 'string', example: 'Transfert suite à départ' },
+      },
+      required: ['assignedTo'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Attribution mise à jour' })
+  async assignMember(
+    @Param('email') email: string,
+    @Body() body: unknown,
+    @User() user: { email: string },
+  ) {
+    return await this.membersService.assignMember(email, body, user.email);
   }
 
   @Patch(':email')

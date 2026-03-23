@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
@@ -35,12 +35,16 @@ import {
   ExternalLink,
   Loader2,
   TrendingUp,
-  Clock,
   UserX,
   RefreshCw,
   UserPlus,
+  List,
+  LayoutGrid,
+  UserCheck,
 } from 'lucide-react';
 import { AddMemberDialog } from '../members/add-member-dialog';
+
+type ProspectionStage = 'Qualification' | 'R1' | 'R2' | 'Contractualisation' | 'Hors cible' | 'En réflexion' | 'Refusé' | 'Signé';
 
 interface Member {
   email: string;
@@ -50,11 +54,20 @@ interface Member {
   phone?: string;
   role?: string;
   city?: string;
+  department?: string;
   notes?: string;
   status: string;
-  prospectionStatus?: 'Refusé' | 'RDV prévu' | 'A contacter' | '2027' | 'Intérêt - à relancer' | null;
+  prospectionStatus?: ProspectionStage | null;
   firstContactDate?: string | null;
   appointmentDate?: string | null;
+  soncasProfile?: string | null;
+  assignedTo?: string | null;
+}
+
+interface Administrator {
+  email: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 interface PaginatedResponse<T> {
@@ -63,16 +76,66 @@ interface PaginatedResponse<T> {
   pagination?: { total: number; page: number; limit: number; totalPages: number };
 }
 
-const PROSPECTION_STATUSES = [
-  { value: 'A contacter', label: 'À contacter', color: 'bg-slate-100 text-slate-700 border-slate-300', icon: Phone },
-  { value: 'RDV prévu', label: 'RDV prévu', color: 'bg-blue-100 text-blue-700 border-blue-300', icon: Calendar },
-  { value: 'Intérêt - à relancer', label: 'Intérêt — à relancer', color: 'bg-amber-100 text-amber-700 border-amber-300', icon: RefreshCw },
-  { value: '2027', label: '2027', color: 'bg-purple-100 text-purple-700 border-purple-300', icon: Clock },
-  { value: 'Refusé', label: 'Refusé', color: 'bg-red-100 text-red-700 border-red-300', icon: UserX },
+// Colonnes actives du pipeline (dans l'ordre)
+const ACTIVE_STAGES = [
+  {
+    value: 'Qualification' as ProspectionStage,
+    label: 'Qualification',
+    color: 'bg-slate-50 text-slate-700 border-slate-200',
+    headerClass: 'bg-gradient-to-r from-slate-600 to-slate-700',
+    accent: 'border-l-slate-400',
+    avatarBg: 'bg-slate-100 text-slate-600',
+    icon: UserSearch,
+  },
+  {
+    value: 'R1' as ProspectionStage,
+    label: 'R1 — Premier RDV',
+    color: 'bg-blue-50 text-blue-700 border-blue-200',
+    headerClass: 'bg-gradient-to-r from-blue-500 to-blue-600',
+    accent: 'border-l-blue-400',
+    avatarBg: 'bg-blue-100 text-blue-600',
+    icon: Calendar,
+  },
+  {
+    value: 'R2' as ProspectionStage,
+    label: 'R2 — Second RDV',
+    color: 'bg-amber-50 text-amber-700 border-amber-200',
+    headerClass: 'bg-gradient-to-r from-amber-500 to-orange-500',
+    accent: 'border-l-amber-400',
+    avatarBg: 'bg-amber-100 text-amber-700',
+    icon: RefreshCw,
+  },
+  {
+    value: 'Contractualisation' as ProspectionStage,
+    label: 'Contractualisation',
+    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    headerClass: 'bg-gradient-to-r from-emerald-500 to-green-600',
+    accent: 'border-l-emerald-400',
+    avatarBg: 'bg-emerald-100 text-emerald-600',
+    icon: UserCheck,
+  },
 ];
 
-function getStatusConfig(status: string | null | undefined) {
-  return PROSPECTION_STATUSES.find(s => s.value === status) ?? null;
+// Statuts archivés
+const ARCHIVED_STAGES: ProspectionStage[] = ['Hors cible', 'En réflexion', 'Refusé', 'Signé'];
+
+// Tous les statuts pour les selects
+const ALL_STAGES = [
+  ...ACTIVE_STAGES.map(s => s.value),
+  ...ARCHIVED_STAGES,
+] as ProspectionStage[];
+
+function getStageConfig(status: string | null | undefined) {
+  return ACTIVE_STAGES.find(s => s.value === status) ?? null;
+}
+
+function getStageColor(status: string | null | undefined): string {
+  const config = getStageConfig(status);
+  if (config) return config.color;
+  if (status && ARCHIVED_STAGES.includes(status as ProspectionStage)) {
+    return 'bg-gray-100 text-gray-600 border-gray-300';
+  }
+  return 'bg-gray-100 text-gray-500 border-gray-200';
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -87,15 +150,28 @@ export default function ProspectsPage() {
   const { isFeatureEnabled } = useFeatureConfig();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
   const [addContactOpen, setAddContactOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('kanban');
+
+  // Query admins pour le filtre responsable
+  const { data: adminsData } = useQuery({
+    queryKey: ['administrators'],
+    queryFn: () => api.get<{ success: boolean; data: Administrator[] }>('/api/admin/administrators'),
+    staleTime: 5 * 60 * 1000,
+  });
+  const admins: Administrator[] = adminsData?.data ?? [];
 
   // Charge tous les membres et filtre côté client les prospects
   const { data, isLoading } = useQuery({
-    queryKey: ['prospects', { search }],
+    queryKey: ['prospects', { search, departmentFilter, assignedToFilter }],
     queryFn: () =>
       api.get<PaginatedResponse<Member>>('/api/admin/members', {
         limit: 500,
         search: search || undefined,
+        department: departmentFilter !== 'all' ? departmentFilter : undefined,
+        assignedTo: assignedToFilter !== 'all' ? assignedToFilter : undefined,
       }),
   });
 
@@ -107,22 +183,36 @@ export default function ProspectsPage() {
     (statusFilter === 'all' || m.prospectionStatus === statusFilter)
   );
 
-  // Comptages par statut pour les badges de résumé
-  const countByStatus = PROSPECTION_STATUSES.map(s => ({
-    ...s,
-    count: allMembers.filter(m => m.prospectionStatus === s.value).length,
-  }));
+  // Comptages par stage (calculé une seule fois, pas à chaque rendu)
+  const stageCounts = useMemo(() => {
+    const counts: Partial<Record<ProspectionStage, number>> = {};
+    for (const m of allMembers) {
+      if (m.prospectionStatus) {
+        const s = m.prospectionStatus as ProspectionStage;
+        counts[s] = (counts[s] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [allMembers]);
+
+  const countByStage = (stage: ProspectionStage) => stageCounts[stage] ?? 0;
+
+  const conversionRate = (from: ProspectionStage, to: ProspectionStage): number => {
+    const fromCount = countByStage(from);
+    if (fromCount === 0) return 0;
+    return Math.round((countByStage(to) / fromCount) * 100);
+  };
 
   // Mutation pour mettre à jour le statut de prospection
   const updateStatusMutation = useMutation({
     mutationFn: ({ email, prospectionStatus }: { email: string; prospectionStatus: string }) =>
-      api.patch(`/api/admin/members/${email}`, { prospectionStatus }),
+      api.patch(`/api/admin/members/${encodeURIComponent(email)}`, { prospectionStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
-      toast({ title: 'Statut mis à jour' });
+      toast({ title: 'Phase mise à jour' });
     },
     onError: () => {
-      toast({ title: 'Erreur', description: 'Impossible de mettre à jour le statut', variant: 'destructive' });
+      toast({ title: 'Erreur', description: 'Impossible de mettre à jour la phase', variant: 'destructive' });
     },
   });
 
@@ -149,16 +239,35 @@ export default function ProspectsPage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <UserSearch className="h-8 w-8 text-primary" />
-            CRM — Contacts
+            Pipeline CRM
           </h1>
           <p className="text-muted-foreground mt-1">
             Suivi des prospects et du pipeline de recrutement
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Toggle vue */}
+          <div className="flex gap-1 border rounded-md p-1">
+            <Button
+              variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              title="Vue tableau"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('kanban')}
+              title="Vue kanban"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
           <Button onClick={() => setAddContactOpen(true)}>
             <UserPlus className="h-4 w-4 mr-2" />
-            Ajouter un contact
+            Ajouter un prospect
           </Button>
           <Button variant="outline" onClick={() => router.push('/admin/members')}>
             <ExternalLink className="h-4 w-4 mr-2" />
@@ -173,26 +282,40 @@ export default function ProspectsPage() {
           setAddContactOpen(open);
           if (!open) queryClient.invalidateQueries({ queryKey: ['prospects'] });
         }}
-        defaultStatus="A contacter"
+        defaultStatus="Qualification"
       />
 
-      {/* Résumé par statut */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {countByStatus.map(({ value, label, color, icon: Icon, count }) => (
-          <button
-            key={value}
-            onClick={() => setStatusFilter(statusFilter === value ? 'all' : value)}
-            className={`rounded-xl border-2 p-3 text-left transition-all hover:shadow-md ${color} ${
-              statusFilter === value ? 'ring-2 ring-primary ring-offset-2' : ''
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Icon className="h-4 w-4" />
-              <span className="text-2xl font-bold">{count}</span>
-            </div>
-            <p className="text-xs font-medium leading-tight">{label}</p>
-          </button>
-        ))}
+      {/* Résumé par phase active */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {ACTIVE_STAGES.map((stage, idx) => {
+          const count = countByStage(stage.value);
+          const nextStage = ACTIVE_STAGES[idx + 1];
+          const rate = nextStage ? conversionRate(stage.value, nextStage.value) : null;
+          const isActive = statusFilter === stage.value;
+          return (
+            <button
+              key={stage.value}
+              onClick={() => setStatusFilter(isActive ? 'all' : stage.value)}
+              className={`rounded-xl border p-4 text-left transition-all hover:shadow-md shadow-sm bg-white ${
+                isActive ? 'ring-2 ring-primary ring-offset-2 border-primary/30' : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className={`p-2 rounded-lg ${stage.avatarBg}`}>
+                  <stage.icon className="h-4 w-4" />
+                </div>
+                <span className="text-3xl font-bold text-foreground">{count}</span>
+              </div>
+              <p className="font-semibold text-sm text-foreground truncate">{stage.label.split(' — ')[0]}</p>
+              {rate !== null && (
+                <div className="flex items-center gap-1 mt-1.5">
+                  <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">→ {nextStage?.label.split(' — ')[0]} : <span className="font-semibold">{rate}%</span></p>
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Filtres */}
@@ -209,18 +332,42 @@ export default function ProspectsPage() {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Tous les statuts" />
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Toutes les phases" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                {PROSPECTION_STATUSES.map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                <SelectItem value="all">Toutes les phases</SelectItem>
+                {ALL_STAGES.map(s => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {statusFilter !== 'all' && (
-              <Button variant="outline" size="sm" onClick={() => setStatusFilter('all')}>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Département" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les depts</SelectItem>
+                <SelectItem value="Somme">Somme (80)</SelectItem>
+                <SelectItem value="Aisne">Aisne (02)</SelectItem>
+                <SelectItem value="Oise">Oise (60)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Responsable" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les responsables</SelectItem>
+                {admins.map(admin => (
+                  <SelectItem key={admin.email} value={admin.email}>
+                    {admin.firstName && admin.lastName ? `${admin.firstName} ${admin.lastName}` : admin.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(statusFilter !== 'all' || departmentFilter !== 'all' || assignedToFilter !== 'all') && (
+              <Button variant="outline" size="sm" onClick={() => { setStatusFilter('all'); setDepartmentFilter('all'); setAssignedToFilter('all'); }}>
                 Réinitialiser
               </Button>
             )}
@@ -228,7 +375,189 @@ export default function ProspectsPage() {
         </CardContent>
       </Card>
 
+      {/* Vue Kanban */}
+      {viewMode === 'kanban' && (
+        <div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {/* 4 colonnes actives */}
+              {ACTIVE_STAGES.map((column, idx) => {
+                const columnProspects = allMembers.filter(m => m.prospectionStatus === column.value);
+                const nextStage = ACTIVE_STAGES[idx + 1];
+                const rate = nextStage ? conversionRate(column.value, nextStage.value) : null;
+                return (
+                  <div
+                    key={column.value}
+                    className="flex-shrink-0 w-72 rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white"
+                  >
+                    {/* En-tête coloré */}
+                    <div className={`${column.headerClass} px-4 py-3 text-white`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <column.icon className="h-4 w-4 opacity-90" />
+                          <h3 className="font-semibold text-sm">{column.label.split(' — ')[0]}</h3>
+                        </div>
+                        <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                          {columnProspects.length}
+                        </span>
+                      </div>
+                      {rate !== null && (
+                        <p className="text-xs text-white/70 mt-0.5 flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3" />
+                          → {nextStage?.label.split(' — ')[0]} : {rate}%
+                        </p>
+                      )}
+                    </div>
+                    {/* Cards */}
+                    <div className="p-2 space-y-2 max-h-[calc(100vh-380px)] overflow-y-auto bg-gray-50/60">
+                      {columnProspects.map(prospect => (
+                        <div
+                          key={prospect.email}
+                          className={`bg-white rounded-lg p-3 shadow-sm border border-l-[3px] ${column.accent} cursor-pointer hover:shadow-md transition-all`}
+                          onClick={() => router.push(`/admin/members/${encodeURIComponent(prospect.email)}`)}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${column.avatarBg}`}>
+                              {prospect.firstName?.[0]?.toUpperCase()}{prospect.lastName?.[0]?.toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm truncate">{prospect.firstName} {prospect.lastName}</p>
+                              {prospect.company && (
+                                <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                                  <Building2 className="h-3 w-3 flex-shrink-0" />
+                                  {prospect.company}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            {prospect.phone && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                {prospect.phone}
+                              </span>
+                            )}
+                            {prospect.soncasProfile && (
+                              <span className="text-xs bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded-full border border-purple-100">
+                                {prospect.soncasProfile}
+                              </span>
+                            )}
+                          </div>
+                          {prospect.assignedTo && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1.5">
+                              <UserCheck className="h-3 w-3" />
+                              {prospect.assignedTo.split('@')[0]}
+                            </p>
+                          )}
+                          <Select
+                            value={prospect.prospectionStatus ?? ''}
+                            onValueChange={value => {
+                              updateStatusMutation.mutate({ email: prospect.email, prospectionStatus: value });
+                            }}
+                          >
+                            <SelectTrigger
+                              className="h-6 text-xs mt-2"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ALL_STAGES.map(s => (
+                                <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                      {columnProspects.length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground/50">
+                          <column.icon className="h-6 w-6 mx-auto mb-2 opacity-30" />
+                          <p className="text-xs">Aucun prospect</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Colonne Archivés */}
+              {(() => {
+                const archivedProspects = allMembers.filter(
+                  m => m.prospectionStatus != null && ARCHIVED_STAGES.includes(m.prospectionStatus)
+                );
+                return (
+                  <div className="flex-shrink-0 w-72 rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+                    <div className="bg-gradient-to-r from-gray-500 to-gray-600 px-4 py-3 text-white">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <UserX className="h-4 w-4 opacity-90" />
+                          <h3 className="font-semibold text-sm">Archivés</h3>
+                        </div>
+                        <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                          {archivedProspects.length}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-2 space-y-2 max-h-[calc(100vh-380px)] overflow-y-auto bg-gray-50/60">
+                      {archivedProspects.map(prospect => (
+                        <div
+                          key={prospect.email}
+                          className="bg-white rounded-lg p-3 shadow-sm border border-l-[3px] border-l-gray-300 cursor-pointer hover:shadow-md transition-all opacity-80 hover:opacity-100"
+                          onClick={() => router.push(`/admin/members/${encodeURIComponent(prospect.email)}`)}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 flex-shrink-0">
+                              {prospect.firstName?.[0]?.toUpperCase()}{prospect.lastName?.[0]?.toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm truncate">{prospect.firstName} {prospect.lastName}</p>
+                              {prospect.company && (
+                                <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
+                                  <Building2 className="h-3 w-3 flex-shrink-0" />
+                                  {prospect.company}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant="outline" className="text-xs flex-shrink-0">{prospect.prospectionStatus}</Badge>
+                          </div>
+                          <Select
+                            value={prospect.prospectionStatus ?? ''}
+                            onValueChange={value => {
+                              updateStatusMutation.mutate({ email: prospect.email, prospectionStatus: value });
+                            }}
+                          >
+                            <SelectTrigger
+                              className="h-6 text-xs mt-2"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ALL_STAGES.map(s => (
+                                <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                      {archivedProspects.length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-6">Aucun prospect archivé</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Table des prospects */}
+      {viewMode === 'table' && (
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -236,7 +565,7 @@ export default function ProspectsPage() {
             {isLoading ? 'Chargement...' : `${prospects.length} prospect${prospects.length !== 1 ? 's' : ''}`}
             {statusFilter !== 'all' && (
               <Badge variant="secondary" className="ml-2">
-                Filtré: {getStatusConfig(statusFilter)?.label}
+                Filtré: {statusFilter}
               </Badge>
             )}
           </CardTitle>
@@ -272,7 +601,7 @@ export default function ProspectsPage() {
               </TableHeader>
               <TableBody>
                 {prospects.map(prospect => {
-                  const statusConfig = getStatusConfig(prospect.prospectionStatus);
+                  const stageColor = getStageColor(prospect.prospectionStatus);
                   return (
                     <TableRow key={prospect.email} className="group">
                       {/* Nom */}
@@ -329,12 +658,12 @@ export default function ProspectsPage() {
 
                       {/* Statut prospection */}
                       <TableCell>
-                        {statusConfig ? (
+                        {prospect.prospectionStatus ? (
                           <Badge
                             variant="outline"
-                            className={`text-xs ${statusConfig.color}`}
+                            className={`text-xs ${stageColor}`}
                           >
-                            {statusConfig.label}
+                            {prospect.prospectionStatus}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground text-sm">—</span>
@@ -376,10 +705,8 @@ export default function ProspectsPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {PROSPECTION_STATUSES.map(s => (
-                              <SelectItem key={s.value} value={s.value} className="text-xs">
-                                {s.label}
-                              </SelectItem>
+                            {ALL_STAGES.map(s => (
+                              <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -392,6 +719,7 @@ export default function ProspectsPage() {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

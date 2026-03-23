@@ -115,11 +115,11 @@ export default function AdminToolsPage() {
 
   // Queries
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<ToolCategory[]>({
-    queryKey: ['/api/admin/tools/categories', { includeInactive: 'true' }],
+    queryKey: ['/api/admin/tools/categories?includeInactive=true'],
   });
 
   const { data: tools = [], isLoading: toolsLoading } = useQuery<ToolWithCategory[]>({
-    queryKey: ['/api/admin/tools', { includeInactive: 'true' }],
+    queryKey: ['/api/admin/tools?includeInactive=true'],
   });
 
   const { data: stats } = useQuery<{ categoriesCount: number; toolsCount: number; featuredCount: number }>({

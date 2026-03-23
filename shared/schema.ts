@@ -360,19 +360,11 @@ export const ideaPatronProposals = pgTable("idea_patron_proposals", {
   statusIdx: index("idea_patron_proposals_status_idx").on(table.status),
 }));
 
-// Statuts des membres CRM - Combine statuts membres + prospection
+// Statuts de base des membres CRM (status column)
 export const MEMBER_STATUS = {
-  // Statuts membres actifs
   ACTIVE: "active",
   PROPOSED: "proposed",
   INACTIVE: "inactive",
-
-  // Statuts prospection
-  TARGET_2027: "2027",
-  REFUSED: "Refusé",
-  TO_CONTACT: "A contacter",
-  MEETING_SCHEDULED: "RDV prévu",
-  INTEREST_RELAUNCH: "Intérêt - à relancer",
 } as const;
 
 export type MemberStatus = typeof MEMBER_STATUS[keyof typeof MEMBER_STATUS];
@@ -382,12 +374,43 @@ export const MEMBER_STATUS_LABELS: Record<MemberStatus, string> = {
   [MEMBER_STATUS.ACTIVE]: "Actif",
   [MEMBER_STATUS.PROPOSED]: "Proposé",
   [MEMBER_STATUS.INACTIVE]: "Inactif",
-  [MEMBER_STATUS.TARGET_2027]: "Cible 2027",
-  [MEMBER_STATUS.REFUSED]: "Refusé",
-  [MEMBER_STATUS.TO_CONTACT]: "À contacter",
-  [MEMBER_STATUS.MEETING_SCHEDULED]: "RDV prévu",
-  [MEMBER_STATUS.INTEREST_RELAUNCH]: "Intérêt - à relancer",
 };
+
+// Étapes pipeline de prospection (prospection_status column)
+export const PROSPECTION_STAGES = {
+  QUALIFICATION: 'Qualification',
+  R1: 'R1',
+  R2: 'R2',
+  CONTRACTUALISATION: 'Contractualisation',
+  HORS_CIBLE: 'Hors cible',
+  EN_REFLEXION: 'En réflexion',
+  REFUSE: 'Refusé',
+  SIGNE: 'Signé',
+} as const;
+
+export type ProspectionStage = typeof PROSPECTION_STAGES[keyof typeof PROSPECTION_STAGES];
+
+export const PROSPECTION_STAGE_LABELS: Record<ProspectionStage, string> = {
+  [PROSPECTION_STAGES.QUALIFICATION]: 'Qualification',
+  [PROSPECTION_STAGES.R1]: 'R1',
+  [PROSPECTION_STAGES.R2]: 'R2',
+  [PROSPECTION_STAGES.CONTRACTUALISATION]: 'Contractualisation',
+  [PROSPECTION_STAGES.HORS_CIBLE]: 'Hors cible',
+  [PROSPECTION_STAGES.EN_REFLEXION]: 'En réflexion',
+  [PROSPECTION_STAGES.REFUSE]: 'Refusé',
+  [PROSPECTION_STAGES.SIGNE]: 'Signé',
+};
+
+// Profils SONCAS — méthode de vente (Sécurité, Orgueil, Nouveauté, Confort, Argent, Sympathie)
+export const SONCAS_PROFILES = [
+  "Sécurité",
+  "Orgueil",
+  "Nouveauté",
+  "Confort",
+  "Argent",
+  "Sympathie",
+] as const;
+export type SoncasProfile = typeof SONCAS_PROFILES[number];
 
 // CJD Roles definition - Rôles organisationnels CJD
 export const CJD_ROLES = {
@@ -451,8 +474,12 @@ export const members = pgTable("members", {
   role: text("role"), // Rôle professionnel/métier
   cjdRole: text("cjd_role"), // Rôle organisationnel CJD (président, trésorier, etc.)
   notes: text("notes"),
-  status: text("status").default("active").notNull(), // Statut unifié: active, proposed, inactive, 2027, Refusé, A contacter, RDV prévu, Intérêt - à relancer
+  status: text("status").default("active").notNull(), // Statut de base: active, proposed, inactive
+  prospectionStatus: text("prospection_status"), // Étape pipeline: Qualification, R1, R2, Contractualisation, Hors cible, En réflexion, Refusé, Signé
   proposedBy: text("proposed_by"),
+  soncasProfile: text("soncas_profile"), // Profil SONCAS: Sécurité, Orgueil, Nouveauté, Confort, Argent, Sympathie
+  createdBy: text("created_by"), // Email de l'admin créateur
+  assignedTo: text("assigned_to"), // Email de l'admin responsable actuel
   engagementScore: integer("engagement_score").default(0).notNull(),
   firstSeenAt: timestamp("first_seen_at").notNull(),
   lastActivityAt: timestamp("last_activity_at").notNull(),
@@ -485,6 +512,24 @@ export const memberActivities = pgTable("member_activities", {
   occurredAtIdx: index("member_activities_occurred_at_idx").on(table.occurredAt.desc()),
   activityTypeIdx: index("member_activities_activity_type_idx").on(table.activityType),
 }));
+
+// Member ownership history — historique des créateurs et responsables
+export const memberOwnershipHistory = pgTable("member_ownership_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  memberEmail: text("member_email").references(() => members.email, { onDelete: "cascade" }).notNull(),
+  action: text("action").notNull(), // 'created' | 'assigned' | 'reassigned'
+  adminEmail: text("admin_email").notNull(), // Qui a effectué l'action
+  fromEmail: text("from_email"), // Ancien responsable (null pour 'created')
+  toEmail: text("to_email").notNull(), // Nouveau responsable
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  memberEmailIdx: index("moh_member_email_idx").on(table.memberEmail),
+  createdAtIdx: index("moh_created_at_idx").on(table.createdAt.desc()),
+}));
+
+export type MemberOwnershipHistory = typeof memberOwnershipHistory.$inferSelect;
+export type InsertMemberOwnershipHistory = typeof memberOwnershipHistory.$inferInsert;
 
 // Constantes pour les types d'abonnement
 export const SUBSCRIPTION_TYPES = {
@@ -1533,13 +1578,20 @@ export const insertMemberSchema = z.object({
     MEMBER_STATUS.ACTIVE,
     MEMBER_STATUS.PROPOSED,
     MEMBER_STATUS.INACTIVE,
-    MEMBER_STATUS.TARGET_2027,
-    MEMBER_STATUS.REFUSED,
-    MEMBER_STATUS.TO_CONTACT,
-    MEMBER_STATUS.MEETING_SCHEDULED,
-    MEMBER_STATUS.INTEREST_RELAUNCH,
   ]).default(MEMBER_STATUS.ACTIVE),
+  prospectionStatus: z.enum([
+    PROSPECTION_STAGES.QUALIFICATION,
+    PROSPECTION_STAGES.R1,
+    PROSPECTION_STAGES.R2,
+    PROSPECTION_STAGES.CONTRACTUALISATION,
+    PROSPECTION_STAGES.HORS_CIBLE,
+    PROSPECTION_STAGES.EN_REFLEXION,
+    PROSPECTION_STAGES.REFUSE,
+    PROSPECTION_STAGES.SIGNE,
+  ]).optional(),
   proposedBy: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+  soncasProfile: z.enum(SONCAS_PROFILES).optional(),
+  assignedTo: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
 });
 
 // Pure Zod v4 schema
@@ -1571,12 +1623,24 @@ export const updateMemberSchema = z.object({
     MEMBER_STATUS.ACTIVE,
     MEMBER_STATUS.PROPOSED,
     MEMBER_STATUS.INACTIVE,
-    MEMBER_STATUS.TARGET_2027,
-    MEMBER_STATUS.REFUSED,
-    MEMBER_STATUS.TO_CONTACT,
-    MEMBER_STATUS.MEETING_SCHEDULED,
-    MEMBER_STATUS.INTEREST_RELAUNCH,
   ]).optional(),
+  prospectionStatus: z.enum([
+    PROSPECTION_STAGES.QUALIFICATION,
+    PROSPECTION_STAGES.R1,
+    PROSPECTION_STAGES.R2,
+    PROSPECTION_STAGES.CONTRACTUALISATION,
+    PROSPECTION_STAGES.HORS_CIBLE,
+    PROSPECTION_STAGES.EN_REFLEXION,
+    PROSPECTION_STAGES.REFUSE,
+    PROSPECTION_STAGES.SIGNE,
+  ]).optional(),
+  soncasProfile: z.enum(SONCAS_PROFILES).optional(),
+  assignedTo: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+});
+
+export const assignMemberSchema = z.object({
+  assignedTo: z.string().email("Email de l'admin invalide").transform(sanitizeText),
+  note: z.string().max(500).optional().transform(val => val ? sanitizeText(val) : undefined),
 });
 
 export const proposeMemberSchema = z.object({
@@ -1595,6 +1659,7 @@ export const proposeMemberSchema = z.object({
   cjdRole: z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
   notes: z.string().max(2000).optional().transform(val => val ? sanitizeText(val) : undefined),
   proposedBy: z.string().email("Email du proposeur invalide").transform(sanitizeText),
+  soncasProfile: z.enum(SONCAS_PROFILES).optional(),
 });
 
 // Schema pour les contacts de mécènes

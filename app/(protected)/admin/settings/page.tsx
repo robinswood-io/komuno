@@ -37,6 +37,13 @@ import {
   RotateCcw,
   Users,
   Shield,
+  Mail,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  XCircle,
+  Send,
+  Server,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -78,6 +85,44 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState(searchParams?.get('tab') || 'general');
   const [isSaving, setIsSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+
+  // Email SMTP state
+  const [emailConfig, setEmailConfig] = useState({
+    host: '',
+    port: 465,
+    secure: true,
+    username: '',
+    password: '',
+    fromEmail: '',
+    fromName: '',
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSavingEmail, setIsSavingEmail] = useState(false);
+  const [isTestingEmail, setIsTestingEmail] = useState(false);
+  const [emailTestResult, setEmailTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Query - Configuration email
+  const { data: emailConfigData } = useQuery({
+    queryKey: ['email-config'],
+    queryFn: () => api.get<{ success: boolean; data: Record<string, unknown> | null }>('/api/admin/email-config'),
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (emailConfigData?.data) {
+      const cfg = emailConfigData.data as Record<string, unknown>;
+      setEmailConfig(prev => ({
+        ...prev,
+        host: (cfg.host as string) || '',
+        port: (cfg.port as number) || 465,
+        secure: (cfg.secure as boolean) ?? true,
+        username: (cfg.username as string) || '',
+        fromEmail: (cfg.fromEmail as string) || '',
+        fromName: (cfg.fromName as string) || '',
+        password: '', // Jamais retourné par l'API
+      }));
+    }
+  }, [emailConfigData]);
 
   // Query - Utilisateur actuel pour vérifier le rôle
   const { data: currentUser } = useQuery({
@@ -182,6 +227,47 @@ export default function SettingsPage() {
         enabled: !modules[moduleKey].enabled,
       },
     });
+  };
+
+  const handleSaveEmail = async () => {
+    setIsSavingEmail(true);
+    setEmailTestResult(null);
+    try {
+      const payload: Record<string, unknown> = {
+        host: emailConfig.host,
+        port: emailConfig.port,
+        secure: emailConfig.secure,
+        username: emailConfig.username,
+        fromEmail: emailConfig.fromEmail,
+        fromName: emailConfig.fromName,
+      };
+      if (emailConfig.password) payload.password = emailConfig.password;
+      await api.put<{ success: boolean }>('/api/admin/email-config', payload);
+      toast({ title: 'Configuration email enregistrée', description: 'Serveur SMTP mis à jour' });
+      setEmailConfig(prev => ({ ...prev, password: '' }));
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible d\'enregistrer la configuration SMTP', variant: 'destructive' });
+    } finally {
+      setIsSavingEmail(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setIsTestingEmail(true);
+    setEmailTestResult(null);
+    try {
+      const result = await api.get<{ success: boolean; message?: string }>('/api/admin/test-email');
+      if (result.success) {
+        setEmailTestResult({ ok: true, message: 'Connexion SMTP réussie ✅' });
+      } else {
+        setEmailTestResult({ ok: false, message: result.message || 'Échec du test' });
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erreur lors du test';
+      setEmailTestResult({ ok: false, message: msg });
+    } finally {
+      setIsTestingEmail(false);
+    }
   };
 
   const handleSaveModules = async () => {
@@ -388,7 +474,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={`grid w-full ${canManageAdmins ? 'grid-cols-6' : 'grid-cols-5'}`}>
           <TabsTrigger value="general">
             <SettingsIcon className="h-4 w-4 mr-2" />
             Général
@@ -405,10 +491,14 @@ export default function SettingsPage() {
             <Bell className="h-4 w-4 mr-2" />
             Notifications
           </TabsTrigger>
+          <TabsTrigger value="email">
+            <Mail className="h-4 w-4 mr-2" />
+            Email
+          </TabsTrigger>
           {canManageAdmins && (
             <TabsTrigger value="admins">
               <Users className="h-4 w-4 mr-2" />
-              Administrateurs
+              Admins
             </TabsTrigger>
           )}
         </TabsList>
@@ -942,6 +1032,189 @@ export default function SettingsPage() {
                   Enregistrer
                 </>
               )}
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* Email Tab */}
+        <TabsContent value="email" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-50">
+                  <Server className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle>Serveur d'envoi (SMTP)</CardTitle>
+                  <CardDescription>
+                    Configurez le serveur d'envoi pour les emails automatiques (notifications, propositions membres, etc.)
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* Host + Port */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2 space-y-2">
+                  <Label htmlFor="smtp-host">Serveur SMTP *</Label>
+                  <Input
+                    id="smtp-host"
+                    placeholder="ssl0.ovh.net"
+                    value={emailConfig.host}
+                    onChange={e => setEmailConfig({ ...emailConfig, host: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-port">Port</Label>
+                  <Input
+                    id="smtp-port"
+                    type="number"
+                    value={emailConfig.port}
+                    onChange={e => setEmailConfig({ ...emailConfig, port: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              {/* Secure toggle */}
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label>Connexion sécurisée (SSL/TLS)</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Activé par défaut sur le port 465. Désactiver pour STARTTLS (port 587).
+                  </p>
+                </div>
+                <Switch
+                  checked={emailConfig.secure}
+                  onCheckedChange={checked => setEmailConfig({ ...emailConfig, secure: checked })}
+                />
+              </div>
+
+              {/* Credentials */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-user">Identifiant SMTP</Label>
+                  <Input
+                    id="smtp-user"
+                    placeholder="user@domaine.fr"
+                    value={emailConfig.username}
+                    onChange={e => setEmailConfig({ ...emailConfig, username: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-pass">Mot de passe</Label>
+                  <div className="relative">
+                    <Input
+                      id="smtp-pass"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder={emailConfigData?.data ? '••••••••' : ''}
+                      value={emailConfig.password}
+                      onChange={e => setEmailConfig({ ...emailConfig, password: e.target.value })}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {emailConfigData?.data && !emailConfig.password && (
+                    <p className="text-xs text-muted-foreground">Laisser vide pour conserver le mot de passe actuel</p>
+                  )}
+                </div>
+              </div>
+
+              {/* From */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="from-email">Email expéditeur *</Label>
+                  <Input
+                    id="from-email"
+                    type="email"
+                    placeholder="noreply@domaine.fr"
+                    value={emailConfig.fromEmail}
+                    onChange={e => setEmailConfig({ ...emailConfig, fromEmail: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="from-name">Nom d'affichage</Label>
+                  <Input
+                    id="from-name"
+                    placeholder="CJD Amiens"
+                    value={emailConfig.fromName}
+                    onChange={e => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Test result */}
+              {emailTestResult && (
+                <Alert className={emailTestResult.ok ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+                  {emailTestResult.ok
+                    ? <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    : <XCircle className="h-4 w-4 text-red-600" />
+                  }
+                  <AlertDescription className={emailTestResult.ok ? 'text-green-800' : 'text-red-800'}>
+                    {emailTestResult.message}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Aperçu branding emails */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-50">
+                  <Palette className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <CardTitle>Style des emails</CardTitle>
+                  <CardDescription>
+                    Les emails automatiques utilisent automatiquement la couleur principale définie dans l'onglet Apparence.
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border overflow-hidden text-sm">
+                {/* Mini preview email */}
+                <div
+                  className="px-6 py-4 text-white text-center"
+                  style={{ background: (branding as Record<string, unknown> & { colors?: { primary?: string } })?.colors?.primary || '#00a844' }}
+                >
+                  <p className="font-semibold">{(branding as Record<string, unknown> & { app?: { shortName?: string; name?: string } })?.app?.shortName || 'Votre app'}</p>
+                  <p className="text-xs opacity-80 mt-0.5">Notification administrative</p>
+                </div>
+                <div className="p-4 bg-white space-y-2">
+                  <p className="text-xs text-muted-foreground">Contenu de la notification...</p>
+                  <div
+                    className="inline-block text-white text-xs px-4 py-2 rounded"
+                    style={{ background: (branding as Record<string, unknown> & { colors?: { primary?: string } })?.colors?.primary || '#00a844' }}
+                  >
+                    Accéder au tableau de bord
+                  </div>
+                </div>
+                <div className="px-4 py-2 bg-gray-50 text-center text-xs text-gray-500">
+                  {(branding as Record<string, unknown> & { organization?: { fullName?: string; name?: string } })?.organization?.fullName || 'Votre organisation'} — Notification automatique
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                Modifiez la couleur principale dans l'onglet <button onClick={() => setActiveTab('branding')} className="text-primary underline">Apparence</button> pour changer le style des emails.
+              </p>
+            </CardContent>
+          </Card>
+
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={handleTestEmail} disabled={isTestingEmail || !emailConfig.host}>
+              {isTestingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              Tester la connexion
+            </Button>
+            <Button onClick={handleSaveEmail} disabled={isSavingEmail}>
+              {isSavingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Enregistrer
             </Button>
           </div>
         </TabsContent>

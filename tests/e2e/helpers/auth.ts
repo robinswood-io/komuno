@@ -302,7 +302,7 @@ export async function loginAsAdmin(
  */
 export async function loginAsAdminQuick(
   page: Page,
-  baseUrl: string = 'https://cjd80.rbw.ovh'
+  baseUrl: string = 'https://komuno.rbw.ovh'
 ): Promise<void> {
   const verbose = process.env.VERBOSE_AUTH === 'true';
   const devUser = {

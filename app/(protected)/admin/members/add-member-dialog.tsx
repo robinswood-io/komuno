@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys } from '@/lib/api/client';
+import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -27,7 +28,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2, User, Building2 as Building2Icon, MapPin, ClipboardList, Network } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -37,8 +38,19 @@ import { SiretSearch, type SiretCompanyData } from '@/components/ui/siret-search
 interface AddMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultStatus?: MemberFormData['status'];
+  defaultStatus?: MemberFormData['status'] | ProspectionStatus;
 }
+
+const SONCAS_OPTIONS = [
+  { value: 'Sécurité', label: 'Sécurité', description: 'Recherche la fiabilité et la stabilité' },
+  { value: 'Orgueil', label: 'Orgueil', description: 'Sensible au prestige et à la reconnaissance' },
+  { value: 'Nouveauté', label: 'Nouveauté', description: 'Attire par l\'innovation et l\'originalité' },
+  { value: 'Confort', label: 'Confort', description: 'Privilégie la facilité et le bien-être' },
+  { value: 'Argent', label: 'Argent', description: 'Motivé par le retour sur investissement' },
+  { value: 'Sympathie', label: 'Sympathie', description: 'Décide par la relation et la confiance' },
+] as const;
+
+type ProspectionStatus = 'Qualification' | 'R1' | 'R2' | 'Contractualisation' | 'Hors cible' | 'En réflexion' | 'Refusé' | 'Signé';
 
 interface MemberFormData {
   firstName: string;
@@ -54,12 +66,38 @@ interface MemberFormData {
   phone: string;
   role: string;
   notes: string;
-  status: 'active' | 'proposed' | 'inactive' | '2027' | 'Refusé' | 'A contacter' | 'RDV prévu' | 'Intérêt - à relancer';
+  soncasProfile?: 'Sécurité' | 'Orgueil' | 'Nouveauté' | 'Confort' | 'Argent' | 'Sympathie';
+  assignedTo?: string;
+  status: 'active' | 'proposed' | 'inactive';
+  prospectionStatus?: ProspectionStatus;
+}
+
+interface Administrator {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  role: string;
+}
+
+const PIPELINE_STATUSES: ProspectionStatus[] = ['Qualification', 'R1', 'R2', 'Contractualisation', 'Hors cible', 'En réflexion', 'Refusé', 'Signé'];
+
+function isPipelineStatus(s: string | undefined): s is ProspectionStatus {
+  return PIPELINE_STATUSES.includes(s as ProspectionStatus);
 }
 
 export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMemberDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const { data: adminsData } = useQuery({
+    queryKey: queryKeys.admin.administrators.list(),
+    queryFn: () => api.get<{ success: boolean; data: Administrator[] }>('/api/admin/administrators'),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const resolvedStatus: MemberFormData['status'] = isPipelineStatus(defaultStatus) ? 'proposed' : (defaultStatus ?? 'active');
+  const resolvedProspectionStatus: ProspectionStatus | undefined = isPipelineStatus(defaultStatus) ? defaultStatus : undefined;
 
   // Form state
   const [formData, setFormData] = useState<MemberFormData>({
@@ -74,7 +112,10 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
     phone: '',
     role: '',
     notes: '',
-    status: defaultStatus ?? 'active',
+    soncasProfile: undefined,
+    assignedTo: undefined,
+    status: resolvedStatus,
+    prospectionStatus: resolvedProspectionStatus,
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof MemberFormData, string>>>({});
@@ -82,7 +123,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
 
   // Mutation pour créer un membre
   const createMutation = useMutation({
-    mutationFn: (data: any) => api.post('/api/admin/members', data),
+    mutationFn: (data: Record<string, unknown>) => api.post('/api/admin/members', data),
     onSuccess: async (_, variables) => {
       // Create pending network connections
       await Promise.allSettled(
@@ -127,7 +168,10 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
       phone: '',
       role: '',
       notes: '',
-      status: defaultStatus ?? 'active',
+      soncasProfile: undefined,
+      assignedTo: undefined,
+      status: resolvedStatus,
+      prospectionStatus: resolvedProspectionStatus,
     });
     setErrors({});
     setPendingConnections([]);
@@ -199,7 +243,10 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
         phone: formData.phone.trim() || undefined,
         role: formData.role.trim() || undefined,
         notes: formData.notes.trim() || undefined,
+        soncasProfile: formData.soncasProfile || undefined,
+        assignedTo: formData.assignedTo || undefined,
         status: formData.status,
+        prospectionStatus: formData.prospectionStatus || undefined,
       });
     }
   };
@@ -214,10 +261,15 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-5 py-4">
           {/* Informations de base */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-sm">Informations de base</h3>
+            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+              <div className="p-1.5 rounded-md bg-blue-50">
+                <User className="h-4 w-4 text-blue-600" />
+              </div>
+              <h3 className="font-semibold text-sm text-foreground">Informations de base</h3>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               {/* Prénom */}
@@ -225,7 +277,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
                 <Label htmlFor="firstName">Prénom *</Label>
                 <Input
                   id="firstName"
-                  placeholder="Jean"
+                  placeholder=""
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
                   disabled={createMutation.isPending}
@@ -240,7 +292,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
                 <Label htmlFor="lastName">Nom *</Label>
                 <Input
                   id="lastName"
-                  placeholder="Dupont"
+                  placeholder=""
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
                   disabled={createMutation.isPending}
@@ -257,7 +309,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
               <Input
                 id="email"
                 type="email"
-                placeholder="jean.dupont@example.com"
+                placeholder=""
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 disabled={createMutation.isPending}
@@ -273,7 +325,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
                 <Label htmlFor="phone">Téléphone</Label>
                 <Input
                   id="phone"
-                  placeholder="06 12 34 56 78"
+                  placeholder=""
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   disabled={createMutation.isPending}
@@ -285,7 +337,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
                 <Label htmlFor="role">Fonction</Label>
                 <Input
                   id="role"
-                  placeholder="Directeur"
+                  placeholder=""
                   value={formData.role}
                   onChange={(e) => handleInputChange('role', e.target.value)}
                   disabled={createMutation.isPending}
@@ -296,8 +348,13 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
 
           {/* Informations entreprise */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Informations entreprise</h3>
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-md bg-amber-50">
+                  <Building2Icon className="h-4 w-4 text-amber-600" />
+                </div>
+                <h3 className="font-semibold text-sm text-foreground">Informations entreprise</h3>
+              </div>
               <SiretSearch onSelect={handleSiretSelect} disabled={createMutation.isPending} />
             </div>
 
@@ -305,7 +362,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
               <Label htmlFor="company">Entreprise</Label>
               <Input
                 id="company"
-                placeholder="Entreprise SAS"
+                placeholder=""
                 value={formData.company}
                 onChange={(e) => handleInputChange('company', e.target.value)}
                 disabled={createMutation.isPending}
@@ -316,7 +373,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
               <Label htmlFor="sector">Secteur d'activité</Label>
               <Input
                 id="sector"
-                placeholder="Services aux entreprises"
+                placeholder=""
                 value={formData.sector}
                 onChange={(e) => handleInputChange('sector', e.target.value)}
                 disabled={createMutation.isPending}
@@ -326,7 +383,12 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
 
           {/* Localisation */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-sm">Localisation</h3>
+            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+              <div className="p-1.5 rounded-md bg-emerald-50">
+                <MapPin className="h-4 w-4 text-emerald-600" />
+              </div>
+              <h3 className="font-semibold text-sm text-foreground">Localisation</h3>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               {/* Ville */}
@@ -334,7 +396,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
                 <Label htmlFor="city">Ville</Label>
                 <Input
                   id="city"
-                  placeholder="Amiens"
+                  placeholder=""
                   value={formData.city}
                   onChange={(e) => handleInputChange('city', e.target.value)}
                   disabled={createMutation.isPending}
@@ -346,7 +408,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
                 <Label htmlFor="postalCode">Code postal</Label>
                 <Input
                   id="postalCode"
-                  placeholder="80000"
+                  placeholder=""
                   value={formData.postalCode}
                   onChange={(e) => handleInputChange('postalCode', e.target.value)}
                   disabled={createMutation.isPending}
@@ -360,7 +422,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
                 <Label htmlFor="department">Département</Label>
                 <Input
                   id="department"
-                  placeholder="Somme"
+                  placeholder=""
                   value={formData.department}
                   onChange={(e) => handleInputChange('department', e.target.value)}
                   disabled={createMutation.isPending}
@@ -371,7 +433,12 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
 
           {/* Dates et statut */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-sm">Suivi</h3>
+            <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+              <div className="p-1.5 rounded-md bg-purple-50">
+                <ClipboardList className="h-4 w-4 text-purple-600" />
+              </div>
+              <h3 className="font-semibold text-sm text-foreground">Suivi pipeline</h3>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               {/* Date 1er contact */}
@@ -457,29 +524,94 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="status">Statut</Label>
+              <Label htmlFor="soncasProfile">Profil SONCAS</Label>
+              <Select
+                value={formData.soncasProfile ?? ''}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, soncasProfile: value as MemberFormData['soncasProfile'] || undefined }))}
+                disabled={createMutation.isPending}
+              >
+                <SelectTrigger id="soncasProfile">
+                  <SelectValue placeholder="Sélectionner un profil..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {SONCAS_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className="font-medium">{opt.value}</span>
+                      <span className="text-muted-foreground text-xs ml-2">— {opt.description}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="assignedTo">Responsable</Label>
+              <Select
+                value={formData.assignedTo ?? user?.email ?? ''}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, assignedTo: value || undefined }))}
+                disabled={createMutation.isPending}
+              >
+                <SelectTrigger id="assignedTo">
+                  <SelectValue placeholder="Choisir un responsable..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(adminsData?.data ?? []).map((admin) => (
+                    <SelectItem key={admin.email} value={admin.email}>
+                      <span className="font-medium">
+                        {admin.firstName && admin.lastName ? `${admin.firstName} ${admin.lastName}` : admin.email}
+                      </span>
+                      {admin.firstName && admin.lastName && (
+                        <span className="text-muted-foreground text-xs ml-2">— {admin.email}</span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Statut membre</Label>
               <Select
                 value={formData.status}
-                onValueChange={(value) => handleInputChange('status', value as any)}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as MemberFormData['status'] }))}
                 disabled={createMutation.isPending}
               >
                 <SelectTrigger id="status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="active">Actif</SelectItem>
+                  <SelectItem value="proposed">Proposé</SelectItem>
+                  <SelectItem value="inactive">Inactif</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="prospectionStatus">Étape pipeline</Label>
+              <Select
+                value={formData.prospectionStatus ?? '__none__'}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, prospectionStatus: value === '__none__' ? undefined : value as ProspectionStatus }))}
+                disabled={createMutation.isPending}
+              >
+                <SelectTrigger id="prospectionStatus">
+                  <SelectValue placeholder="Aucune (membre actif)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Aucune (membre actif)</SelectItem>
                   <SelectGroup>
-                    <SelectLabel>Statuts membres</SelectLabel>
-                    <SelectItem value="active">Actif</SelectItem>
-                    <SelectItem value="proposed">Proposé</SelectItem>
-                    <SelectItem value="inactive">Inactif</SelectItem>
+                    <SelectLabel>Phases actives</SelectLabel>
+                    <SelectItem value="Qualification">Qualification</SelectItem>
+                    <SelectItem value="R1">R1</SelectItem>
+                    <SelectItem value="R2">R2</SelectItem>
+                    <SelectItem value="Contractualisation">Contractualisation</SelectItem>
                   </SelectGroup>
                   <SelectGroup>
-                    <SelectLabel>Statuts prospection</SelectLabel>
-                    <SelectItem value="2027">Cible 2027</SelectItem>
+                    <SelectLabel>Archivés</SelectLabel>
+                    <SelectItem value="Hors cible">Hors cible</SelectItem>
+                    <SelectItem value="En réflexion">En réflexion</SelectItem>
                     <SelectItem value="Refusé">Refusé</SelectItem>
-                    <SelectItem value="A contacter">À contacter</SelectItem>
-                    <SelectItem value="RDV prévu">RDV prévu</SelectItem>
-                    <SelectItem value="Intérêt - à relancer">Intérêt - à relancer</SelectItem>
+                    <SelectItem value="Signé">Signé</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -488,7 +620,15 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
         </div>
 
         {/* Réseau */}
-        <div className="pt-4 border-t border-gray-100">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2.5 pb-2 border-b border-border">
+            <div className="p-1.5 rounded-md bg-indigo-50">
+              <Network className="h-4 w-4 text-indigo-600" />
+            </div>
+            <h3 className="font-semibold text-sm text-foreground">Réseau</h3>
+          </div>
+        </div>
+        <div className="pt-1">
           <NetworkSection
             mode="controlled"
             ownerType="member"

@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MemberSearchSelect } from '@/components/ui/member-search-select';
 
 interface Member {
   email: string;
@@ -462,24 +463,14 @@ export function RelationsTable() {
           <div className="space-y-4">
             {/* Membre principal */}
             <div className="space-y-2">
-              <Label htmlFor="memberEmail">Membre principal *</Label>
-              <Select value={formData.memberEmail} onValueChange={(value) => handleCreateFormChange('memberEmail', value)}>
-                <SelectTrigger id="memberEmail" className={errors.memberEmail ? 'border-destructive' : ''}>
-                  <SelectValue placeholder="Sélectionner un membre..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {members
-                    .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
-                    .map((member) => (
-                      <SelectItem key={member.email} value={member.email}>
-                        <div className="flex flex-col">
-                          <span>{member.firstName} {member.lastName}</span>
-                          <span className="text-xs text-muted-foreground">{member.email}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Label>Membre principal *</Label>
+              <MemberSearchSelect
+                value={formData.memberEmail}
+                onValueChange={(value) => handleCreateFormChange('memberEmail', value)}
+                members={members.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))}
+                placeholder="Rechercher un membre..."
+                hasError={!!errors.memberEmail}
+              />
               {errors.memberEmail && (
                 <p className="text-xs text-destructive">{errors.memberEmail}</p>
               )}
@@ -508,25 +499,16 @@ export function RelationsTable() {
 
             {/* Membre lié */}
             <div className="space-y-2">
-              <Label htmlFor="relatedMemberEmail">Membre lié *</Label>
-              <Select value={formData.relatedMemberEmail} onValueChange={(value) => handleCreateFormChange('relatedMemberEmail', value)}>
-                <SelectTrigger id="relatedMemberEmail" className={errors.relatedMemberEmail ? 'border-destructive' : ''}>
-                  <SelectValue placeholder="Sélectionner un membre..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {members
-                    .filter(m => m.email !== formData.memberEmail)
-                    .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
-                    .map((member) => (
-                      <SelectItem key={member.email} value={member.email}>
-                        <div className="flex flex-col">
-                          <span>{member.firstName} {member.lastName}</span>
-                          <span className="text-xs text-muted-foreground">{member.email}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Label>Membre lié *</Label>
+              <MemberSearchSelect
+                value={formData.relatedMemberEmail}
+                onValueChange={(value) => handleCreateFormChange('relatedMemberEmail', value)}
+                members={members
+                  .filter(m => m.email !== formData.memberEmail)
+                  .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))}
+                placeholder="Rechercher un membre..."
+                hasError={!!errors.relatedMemberEmail}
+              />
               {errors.relatedMemberEmail && (
                 <p className="text-xs text-destructive">{errors.relatedMemberEmail}</p>
               )}
