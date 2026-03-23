@@ -215,7 +215,8 @@ export function createNewEventEmailTemplate(
   return { subject, html };
 }
 
-export function createTestEmailTemplate(): { subject: string; html: string } {
+export function createTestEmailTemplate(context?: NotificationContext): { subject: string; html: string } {
+  const s = getStyles(context);
   const subject = `Test configuration email - ${getAppName(context)}`;
   
   const html = `

@@ -291,7 +291,7 @@ class EmailNotificationService {
 
       // Utiliser le template de test
       const { createTestEmailTemplate } = await import('./email-templates');
-      const { subject, html } = createTestEmailTemplate();
+      const { subject, html } = createTestEmailTemplate(this.context);
 
       // Envoyer uniquement au premier admin pour le test
       const testEmailResult = await emailService.sendEmail({
