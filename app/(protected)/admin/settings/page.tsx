@@ -280,8 +280,8 @@ export default function SettingsPage() {
         modules,
       };
 
-      const response = await api.post<ApiResponse<unknown>>(
-        '/api/admin/branding/config',
+      const response = await api.put<ApiResponse<unknown>>(
+        '/api/admin/branding',
         { config: JSON.stringify(updatedConfig) }
       );
 
@@ -322,8 +322,8 @@ export default function SettingsPage() {
         },
       };
 
-      const response = await api.post<ApiResponse<unknown>>(
-        '/api/admin/branding/config',
+      const response = await api.put<ApiResponse<unknown>>(
+        '/api/admin/branding',
         { config: JSON.stringify(updatedConfig) }
       );
 
@@ -359,8 +359,8 @@ export default function SettingsPage() {
         },
       };
 
-      const response = await api.post<ApiResponse<unknown>>(
-        '/api/admin/branding/config',
+      const response = await api.put<ApiResponse<unknown>>(
+        '/api/admin/branding',
         { config: JSON.stringify(updatedConfig) }
       );
 
