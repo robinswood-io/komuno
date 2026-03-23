@@ -209,9 +209,14 @@ export default function ProspectsPage() {
   const updateStatusMutation = useMutation({
     mutationFn: ({ email, prospectionStatus }: { email: string; prospectionStatus: string }) =>
       api.patch(`/api/admin/members/${encodeURIComponent(email)}`, { prospectionStatus }),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['prospects'] });
-      toast({ title: 'Phase mise à jour' });
+      queryClient.invalidateQueries({ queryKey: ['members'] });
+      if (variables.prospectionStatus === 'Signé') {
+        toast({ title: '🎉 Prospect converti en membre !', description: 'Il apparaît désormais dans la liste des membres.' });
+      } else {
+        toast({ title: 'Phase mise à jour' });
+      }
     },
     onError: () => {
       toast({ title: 'Erreur', description: 'Impossible de mettre à jour la phase', variant: 'destructive' });

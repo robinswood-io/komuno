@@ -249,11 +249,17 @@ export class MembersService {
     try {
       const validatedData = updateMemberSchema.parse(data);
 
+      // Conversion automatique : prospect Signé → membre actif
+      // prospectionStatus passe à null, status passe à 'active'
+      const updateData = validatedData.prospectionStatus === 'Signé'
+        ? { ...validatedData, status: 'active' as const, prospectionStatus: null }
+        : validatedData;
+
       // Récupérer le membre actuel pour détecter les changements de statut
       const currentMemberResult = await this.storageService.instance.getMemberByEmail(email);
       const currentMember = currentMemberResult.success ? currentMemberResult.data : null;
 
-      const result = await this.storageService.instance.updateMember(email, validatedData);
+      const result = await this.storageService.instance.updateMember(email, updateData);
       if (!result.success) {
         throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
       }
@@ -262,12 +268,11 @@ export class MembersService {
       if (
         currentMember &&
         result.data &&
-        'status' in validatedData &&
-        validatedData.status &&
-        validatedData.status !== currentMember.status
+        updateData.status &&
+        updateData.status !== currentMember.status
       ) {
         const oldStatus = currentMember.status;
-        const newStatus = validatedData.status;
+        const newStatus = updateData.status;
 
         // Métrique de changement de statut
         await this.storageService.instance
