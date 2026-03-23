@@ -17,13 +17,14 @@ export const viewport: Viewport = {
 };
 
 // Métadonnées dynamiques — fetchées server-side depuis l'API branding (public)
+// cache: 'no-store' indispensable : NestJS ne tourne pas au build time,
+// donc la valeur ne peut pas être pré-générée statiquement.
 export async function generateMetadata(): Promise<Metadata> {
-  const backendPort = process.env.PORT || '5000';
-  const backendUrl = `http://localhost:${backendPort}`;
+  const backendUrl = `http://localhost:${process.env.BACKEND_PORT || '5000'}`;
 
   try {
     const response = await fetch(`${backendUrl}/api/admin/branding`, {
-      next: { revalidate: 3600 }, // revalider toutes les heures
+      cache: 'no-store',
     });
     if (response.ok) {
       const result = await response.json();
