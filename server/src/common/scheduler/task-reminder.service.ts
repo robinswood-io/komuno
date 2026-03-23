@@ -1,6 +1,7 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
-import { and, eq, inArray, lte, isNotNull } from 'drizzle-orm';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
+import { and, eq, inArray, lte, gte, isNotNull } from 'drizzle-orm';
 import { DATABASE } from '../database/database.providers';
 import type { DrizzleDb } from '../database/types';
 import { memberTasks, members } from '../../../../shared/schema';
@@ -29,12 +30,13 @@ export class TaskReminderService {
   constructor(
     @Inject(DATABASE) private readonly db: DrizzleDb,
     private readonly emailService: EmailService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
-   * Cron quotidien à 8h00 — envoie les rappels de tâches dues aux admins assignés
+   * Cron quotidien à 9h00 (Europe/Paris) — envoie les rappels des tâches dues ce jour
    */
-  @Cron('0 8 * * *')
+  @Cron('0 9 * * *', { timeZone: 'Europe/Paris' })
   async sendDailyReminders(): Promise<void> {
     this.logger.log('Démarrage du rappel quotidien des tâches dues');
     await this.triggerManually();
@@ -44,8 +46,11 @@ export class TaskReminderService {
    * Point d'entrée commun pour le cron et le déclenchement manuel
    */
   async triggerManually(): Promise<{ tasksFound: number }> {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
+    // Rappels uniquement pour les tâches dues AUJOURD'HUI (pas les retards antérieurs)
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
 
     let dueTasks: TaskRow[];
 
@@ -67,7 +72,8 @@ export class TaskReminderService {
           and(
             inArray(memberTasks.status, ['todo', 'in_progress']),
             isNotNull(memberTasks.dueDate),
-            lte(memberTasks.dueDate, today),
+            gte(memberTasks.dueDate, startOfToday),
+            lte(memberTasks.dueDate, endOfToday),
           ),
         );
 
@@ -121,6 +127,7 @@ export class TaskReminderService {
   private async sendReminderEmail(group: GroupedTask): Promise<void> {
     const { email, tasks } = group;
     const count = tasks.length;
+    const appUrl = this.config.get<string>('APP_URL') ?? 'https://repicardie.fr';
 
     const typeLabels: Record<string, string> = {
       call: 'Appel',
@@ -156,13 +163,13 @@ export class TaskReminderService {
       .join('\n');
 
     const html = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-  <h2 style="color: #1e40af;">Rappel de tâches — Komuno CJD80</h2>
+  <h2 style="color: #1e40af;">Rappel de tâches du jour</h2>
   <p>Bonjour,</p>
-  <p>Vous avez <strong>${count} tâche(s)</strong> en attente :</p>
+  <p>Vous avez <strong>${count} tâche(s)</strong> à traiter aujourd'hui :</p>
   <table style="width:100%; border-collapse: collapse;">
     <thead>
       <tr style="background: #f1f5f9;">
-        <th style="padding: 8px; text-align: left; border: 1px solid #e2e8f0;">Membre</th>
+        <th style="padding: 8px; text-align: left; border: 1px solid #e2e8f0;">Prospect / Membre</th>
         <th style="padding: 8px; text-align: left; border: 1px solid #e2e8f0;">Tâche</th>
         <th style="padding: 8px; text-align: left; border: 1px solid #e2e8f0;">Type</th>
         <th style="padding: 8px; text-align: left; border: 1px solid #e2e8f0;">Échéance</th>
@@ -173,7 +180,7 @@ export class TaskReminderService {
     </tbody>
   </table>
   <p style="margin-top: 20px;">
-    <a href="https://cjd80.fr/admin/members/tasks" style="background: #1e40af; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
+    <a href="${appUrl}/admin/members/tasks" style="background: #1e40af; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
       Voir mes tâches →
     </a>
   </p>
