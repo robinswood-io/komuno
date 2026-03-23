@@ -142,7 +142,7 @@ import {
 } from "../shared/schema";
 import { z } from "zod";
 import { db, runDbQuery } from "./db";
-import { eq, desc, and, count, sql, or, asc, ne, like, ilike } from "drizzle-orm";
+import { eq, desc, and, count, sql, or, asc, ne, like, ilike, isNull, isNotNull } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -3003,6 +3003,8 @@ export class DatabaseStorage implements IStorage {
     score?: 'high' | 'medium' | 'low';
     activity?: 'recent' | 'inactive';
     prospectionStatus?: string;
+    onlyProspects?: boolean;
+    excludeProspects?: boolean;
     city?: string;
     department?: string;
     assignedTo?: string;
@@ -3014,7 +3016,7 @@ export class DatabaseStorage implements IStorage {
   }>> {
     try {
       const page = Math.max(1, options?.page || 1);
-      const limit = Math.min(100, Math.max(1, options?.limit || 20));
+      const limit = Math.min(500, Math.max(1, options?.limit || 20));
       const offset = (page - 1) * limit;
 
       // Construire les conditions WHERE
@@ -3028,6 +3030,16 @@ export class DatabaseStorage implements IStorage {
       // Filtre par statut de prospection
       if (options?.prospectionStatus && options.prospectionStatus !== 'all') {
         conditions.push(eq(members.prospectionStatus, options.prospectionStatus));
+      }
+
+      // Filtre prospects uniquement (Pipeline CRM)
+      if (options?.onlyProspects) {
+        conditions.push(isNotNull(members.prospectionStatus));
+      }
+
+      // Exclure les prospects (liste membres)
+      if (options?.excludeProspects) {
+        conditions.push(isNull(members.prospectionStatus));
       }
 
       // Filtre par ville
@@ -3073,7 +3085,7 @@ export class DatabaseStorage implements IStorage {
       if (options?.activity) {
         const now = new Date();
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        
+
         if (options.activity === 'recent') {
           conditions.push(sql`${members.lastActivityAt} >= ${thirtyDaysAgo.toISOString()}`);
         } else if (options.activity === 'inactive') {

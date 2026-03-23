@@ -77,6 +77,8 @@ export class AdminMembersController {
   @ApiQuery({ name: 'city', required: false, description: 'Filtrer par ville (partiel)', example: 'Amiens' })
   @ApiQuery({ name: 'department', required: false, description: 'Filtrer par département', example: '80' })
   @ApiQuery({ name: 'assignedTo', required: false, description: 'Filtrer par responsable (email)', example: 'delegue@example.com' })
+  @ApiQuery({ name: 'onlyProspects', required: false, description: 'Retourner uniquement les prospects (prospectionStatus != null)', type: 'boolean' })
+  @ApiQuery({ name: 'excludeProspects', required: false, description: 'Exclure les prospects (prospectionStatus != null)', type: 'boolean' })
   @ApiResponse({ status: 200, description: 'Liste des membres avec pagination' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
@@ -91,10 +93,12 @@ export class AdminMembersController {
     @Query('city') city?: string,
     @Query('department') department?: string,
     @Query('assignedTo') assignedTo?: string,
+    @Query('onlyProspects') onlyProspects?: string,
+    @Query('excludeProspects') excludeProspects?: string,
   ) {
     const pageNum = parseInt(page || '1', 10);
     const limitNum = parseInt(limit || '20', 10);
-    return await this.membersService.getMembers(pageNum, limitNum, status, search, score, activity, prospectionStatus, city, department, assignedTo);
+    return await this.membersService.getMembers(pageNum, limitNum, status, search, score, activity, prospectionStatus, city, department, assignedTo, onlyProspects === 'true', excludeProspects === 'true');
   }
 
   @Post()

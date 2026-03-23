@@ -279,12 +279,13 @@ export default function AdminMembersPage() {
   });
   const adminsList = adminsForFilter?.data ?? [];
 
-  // Query pour lister les membres (vue liste avec pagination)
+  // Query pour lister les membres (vue liste avec pagination) — exclut les prospects
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.members.list({ page, limit: 20, search: search || undefined, department: departmentFilter !== 'all' ? departmentFilter : undefined, assignedTo: assignedToFilter !== 'all' ? assignedToFilter : undefined }),
     queryFn: () => api.get<PaginatedResponse<Member>>('/api/admin/members', {
       page,
       limit: 20,
+      excludeProspects: true,
       search: search || undefined,
       department: departmentFilter !== 'all' ? departmentFilter : undefined,
       assignedTo: assignedToFilter !== 'all' ? assignedToFilter : undefined,
@@ -301,12 +302,13 @@ export default function AdminMembersPage() {
   });
   const subscriptionTypesList = subscriptionTypesData?.data ?? [];
 
-  // Query pour le kanban — charge tous les membres sans pagination
+  // Query pour le kanban — charge tous les membres sans pagination, exclut les prospects
   const { data: kanbanData, isLoading: isKanbanLoading } = useQuery({
     queryKey: queryKeys.members.list({ page: 1, limit: 500, kanban: true }),
     queryFn: () => api.get<PaginatedResponse<Member>>('/api/admin/members', {
       page: 1,
       limit: 500,
+      excludeProspects: true,
     }),
     enabled: viewMode === 'kanban',
   });
@@ -619,8 +621,8 @@ export default function AdminMembersPage() {
     return '';
   };
 
-  // Membres uniquement (pas les prospects — ceux-ci sont dans Pipeline CRM)
-  const membersOnly = data?.data?.filter(member => !member.prospectionStatus) ?? [];
+  // Membres uniquement (les prospects sont exclus côté serveur via excludeProspects=true)
+  const membersOnly = data?.data ?? [];
 
   // Filtrés les membres selon les statuts sélectionnés
   const filteredMembers = membersOnly.filter(member => {

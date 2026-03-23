@@ -163,12 +163,13 @@ export default function ProspectsPage() {
   });
   const admins: Administrator[] = adminsData?.data ?? [];
 
-  // Charge tous les membres et filtre côté client les prospects
+  // Charge uniquement les prospects (prospectionStatus != null) côté serveur
   const { data, isLoading } = useQuery({
     queryKey: ['prospects', { search, departmentFilter, assignedToFilter }],
     queryFn: () =>
       api.get<PaginatedResponse<Member>>('/api/admin/members', {
         limit: 500,
+        onlyProspects: true,
         search: search || undefined,
         department: departmentFilter !== 'all' ? departmentFilter : undefined,
         assignedTo: assignedToFilter !== 'all' ? assignedToFilter : undefined,
@@ -177,11 +178,10 @@ export default function ProspectsPage() {
 
   const allMembers: Member[] = data?.data ?? [];
 
-  // Filtrer : seuls ceux qui ont un prospectionStatus (pas null/undefined)
-  const prospects = allMembers.filter(m =>
-    m.prospectionStatus != null &&
-    (statusFilter === 'all' || m.prospectionStatus === statusFilter)
-  );
+  // Filtrer par étape si sélectionnée (tous les enregistrements sont déjà des prospects)
+  const prospects = statusFilter === 'all'
+    ? allMembers
+    : allMembers.filter(m => m.prospectionStatus === statusFilter);
 
   // Comptages par stage (calculé une seule fois, pas à chaque rendu)
   const stageCounts = useMemo(() => {

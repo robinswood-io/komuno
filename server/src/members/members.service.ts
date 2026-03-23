@@ -193,6 +193,8 @@ export class MembersService {
     city?: string,
     department?: string,
     assignedTo?: string,
+    onlyProspects?: boolean,
+    excludeProspects?: boolean,
   ) {
     const result = await this.storageService.instance.getMembers({
       page,
@@ -205,6 +207,8 @@ export class MembersService {
       ...(city && city.trim() ? { city } : {}),
       ...(department && department !== 'all' ? { department } : {}),
       ...(assignedTo && assignedTo !== 'all' ? { assignedTo } : {}),
+      ...(onlyProspects ? { onlyProspects: true } : {}),
+      ...(excludeProspects ? { excludeProspects: true } : {}),
     });
 
     if (!result.success) {
