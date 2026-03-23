@@ -34,17 +34,17 @@ function buildEmailStyles(primaryColor: string) {
   };
 }
 
-function getStyles(context: NotificationContext) {
-  const primary = context.branding?.primaryColor || brandingCore.colors.primary;
+function getStyles(context?: NotificationContext) {
+  const primary = context?.branding?.primaryColor || brandingCore.colors.primary;
   return buildEmailStyles(primary);
 }
 
-function getAppName(context: NotificationContext) {
-  return context.branding?.appName || getShortAppName();
+function getAppName(context?: NotificationContext) {
+  return context?.branding?.appName || getShortAppName();
 }
 
-function getOrgName(context: NotificationContext) {
-  return context.branding?.orgFullName || brandingCore.organization.fullName;
+function getOrgName(context?: NotificationContext) {
+  return context?.branding?.orgFullName || brandingCore.organization.fullName;
 }
 
 export function createNewIdeaEmailTemplate(
