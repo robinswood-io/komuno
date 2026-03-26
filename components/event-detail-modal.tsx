@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, MapPin, Users, Edit, Trash2, Download, ExternalLink, Award, ChevronDown } from "lucide-react";
+import { Calendar, MapPin, Users, Edit, Trash2, Download, ExternalLink, Award, ChevronDown, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -50,6 +52,10 @@ export default function EventDetailModal({
   const queryClient = useQueryClient();
   const [showInscriptions, setShowInscriptions] = useState(false);
   const [showUnsubscriptions, setShowUnsubscriptions] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newCompany, setNewCompany] = useState("");
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
@@ -93,6 +99,63 @@ export default function EventDetailModal({
       });
     },
   });
+
+  const deleteInscriptionMutation = useMutation({
+    mutationFn: async (inscriptionId: string) => {
+      await apiRequest("DELETE", `/api/admin/inscriptions/${inscriptionId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/events/${event?.id}/inscriptions`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      toast({ title: "Inscription supprimée" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addInscriptionMutation = useMutation({
+    mutationFn: async (data: { eventId: string; name: string; email: string; company?: string }) => {
+      await apiRequest("POST", "/api/admin/inscriptions", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/events/${event?.id}/inscriptions`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/events"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      setShowAddForm(false);
+      setNewName("");
+      setNewEmail("");
+      setNewCompany("");
+      toast({ title: "Inscription ajoutée" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteUnsubscriptionMutation = useMutation({
+    mutationFn: async (unsubscriptionId: string) => {
+      await apiRequest("DELETE", `/api/admin/unsubscriptions/${unsubscriptionId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/events/${event?.id}/unsubscriptions`] });
+      toast({ title: "Désinscription supprimée" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleAddInscription = () => {
+    if (!event || !newName.trim() || !newEmail.trim()) return;
+    addInscriptionMutation.mutate({
+      eventId: event.id,
+      name: newName.trim(),
+      email: newEmail.trim(),
+      company: newCompany.trim() || undefined,
+    });
+  };
 
   if (!event) return null;
 
@@ -306,6 +369,15 @@ export default function EventDetailModal({
                   Inscriptions ({event.inscriptionCount})
                 </h4>
               <div className="flex gap-2">
+                <Button
+                  onClick={() => setShowAddForm(!showAddForm)}
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-add-inscription"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Ajouter
+                </Button>
                 {inscriptions && inscriptions.length > 0 && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -358,6 +430,58 @@ export default function EventDetailModal({
               </div>
             </div>
 
+            {showAddForm && (
+              <div className="mb-3 p-4 border rounded-lg bg-gray-50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-700">Nouvelle inscription</p>
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddForm(false)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    <Label htmlFor="new-name" className="text-xs">Nom *</Label>
+                    <Input
+                      id="new-name"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder="Nom complet"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-email" className="text-xs">Email *</Label>
+                    <Input
+                      id="new-email"
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="email@exemple.fr"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-company" className="text-xs">Entreprise</Label>
+                    <Input
+                      id="new-company"
+                      value={newCompany}
+                      onChange={(e) => setNewCompany(e.target.value)}
+                      placeholder="Optionnel"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={handleAddInscription}
+                  disabled={!newName.trim() || !newEmail.trim() || addInscriptionMutation.isPending}
+                  size="sm"
+                  className="bg-primary hover:bg-primary text-white"
+                >
+                  {addInscriptionMutation.isPending ? "Ajout..." : "Confirmer"}
+                </Button>
+              </div>
+            )}
+
             {showInscriptions && (
               <div className="border rounded-lg">
                 {inscriptionsLoading ? (
@@ -373,6 +497,7 @@ export default function EventDetailModal({
                           <TableHead>Nom</TableHead>
                           <TableHead>Commentaire</TableHead>
                           <TableHead>Date d'inscription</TableHead>
+                          <TableHead className="w-12"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -391,6 +516,21 @@ export default function EventDetailModal({
                             </TableCell>
                             <TableCell>
                               {new Date(inscription.createdAt).toLocaleDateString("fr-FR")}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm(`Supprimer l'inscription de ${inscription.email} ?`)) {
+                                    deleteInscriptionMutation.mutate(inscription.id);
+                                  }
+                                }}
+                                disabled={deleteInscriptionMutation.isPending}
+                                className="h-7 w-7 p-0 text-gray-400 hover:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -477,6 +617,7 @@ export default function EventDetailModal({
                           <TableHead>Nom</TableHead>
                           <TableHead>Raison de l'absence</TableHead>
                           <TableHead>Date de déclaration</TableHead>
+                          <TableHead className="w-12"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -501,6 +642,21 @@ export default function EventDetailModal({
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm(`Supprimer la désinscription de ${unsubscription.email} ?`)) {
+                                    deleteUnsubscriptionMutation.mutate(unsubscription.id);
+                                  }
+                                }}
+                                disabled={deleteUnsubscriptionMutation.isPending}
+                                className="h-7 w-7 p-0 text-gray-400 hover:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
