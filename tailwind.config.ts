@@ -5,7 +5,7 @@ import type { Config } from "tailwindcss";
 // Cela permet des changements de thème en temps réel sans rebuild
 
 export default {
-  darkMode: ["class"],
+  darkMode: ["class", ".dark"],
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -13,11 +13,10 @@ export default {
     "./hooks/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    screens: {
-      'xs': '475px',
-      ...require('tailwindcss/defaultTheme').screens,
-    },
     extend: {
+      screens: {
+        'xs': '475px',
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -134,5 +133,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
+  plugins: [require("@tailwindcss/typography")],
 } satisfies Config;

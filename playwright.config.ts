@@ -20,6 +20,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     actionTimeout: 10000, // 10 seconds timeout for actions
+    ignoreHTTPSErrors: true, // Allow self-signed certificates
   },
 
   projects: [
