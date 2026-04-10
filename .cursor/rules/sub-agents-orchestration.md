@@ -1,1 +1,0 @@
-/Users/thibault/.cursor/rules/sub-agents-orchestration.md

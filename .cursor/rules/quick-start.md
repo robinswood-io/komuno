@@ -1,1 +1,0 @@
-/Users/thibault/.cursor/rules/quick-start.md

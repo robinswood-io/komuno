@@ -96,8 +96,11 @@ temp/
 
 # Fichiers Cursor
 .cursor/
+.cursor-config
 .cursor-config/
+.cursor-config-export/
 .cursor-version
+.cursorignore
 .cursorrules
 .cursorrules.backup.*
 .cursor.backup.*
@@ -193,6 +196,24 @@ local-*.sh
 # Claude Code local settings
 .claude/settings.json
 
+# Fichiers de contexte IA / orchestration locaux
+CLAUDE.md
+.claude-rules.md
+.claude-stack.md
+bmad/
+_bmad/
+_bmad/artifacts/
+
+# Playwright / E2E locaux (non nécessaires au runtime app)
+playwright*.config.ts
+playwright-report/
+docs/playwright-*.md
+scripts/playwright-*.ts
+scripts/playwright-analyze.sh
+scripts/playwright-maintenance.sh
+scripts/playwright-test.sh
+tests/playwright-*.ts
+tests/e2e/
+
 # Archives de documentation (rapports temporaires)
 docs/archives/
-
