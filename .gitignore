@@ -86,6 +86,7 @@ temp/
 # IDE et éditeurs
 # ============================================================================
 .vscode/
+.gitea/
 .idea/
 *.sublime-project
 *.sublime-workspace
