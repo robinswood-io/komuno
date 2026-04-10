@@ -1,40 +1,14 @@
-# Guide de Contribution - Komuno
+# Contribuer a Komuno
 
-Merci de votre intérêt pour contribuer à Komuno ! Ce document explique comment participer au développement du projet.
+Merci de votre interet pour Komuno.
 
-## Code de Conduite
+## Avant de commencer
 
-En participant à ce projet, vous acceptez de respecter notre [Code de Conduite](CODE_OF_CONDUCT.md).
+- Lisez le [Code de conduite](CODE_OF_CONDUCT.md)
+- Verifiez si une issue existe deja
+- Ouvrez une issue pour discuter des changements importants
 
-## Comment Contribuer
-
-### Signaler un Bug
-
-1. Vérifiez que le bug n'a pas déjà été signalé dans les [Issues](https://github.com/robinswood-io/komuno/issues)
-2. Créez une nouvelle issue avec le template "Bug Report"
-3. Incluez :
-   - Description claire du problème
-   - Étapes pour reproduire
-   - Comportement attendu vs observé
-   - Screenshots si applicable
-   - Environnement (navigateur, OS, version)
-
-### Proposer une Fonctionnalité
-
-1. Ouvrez une issue avec le template "Feature Request"
-2. Décrivez le problème que vous souhaitez résoudre
-3. Proposez votre solution
-4. Attendez la validation avant de commencer le développement
-
-### Soumettre du Code
-
-#### Prérequis
-
-- Node.js 20+
-- Docker & Docker Compose
-- Git
-
-#### Installation locale
+## Setup local
 
 ```bash
 git clone https://github.com/robinswood-io/komuno.git
@@ -44,113 +18,63 @@ cp .env.example .env
 npm run dev
 ```
 
-#### Workflow Git
+## Workflow recommande
 
-1. **Fork** le repository
-2. **Clone** votre fork :
-   ```bash
-   git clone https://github.com/VOTRE-USERNAME/komuno.git
-   ```
-3. **Créez une branche** depuis `main` :
-   ```bash
-   git checkout -b feat/ma-fonctionnalite
-   # ou
-   git checkout -b fix/mon-bugfix
-   ```
-4. **Développez** en respectant les standards (voir ci-dessous)
-5. **Committez** avec des messages clairs :
-   ```bash
-   git commit -m "feat: ajoute la fonctionnalité X"
-   ```
-6. **Push** votre branche :
-   ```bash
-   git push origin feat/ma-fonctionnalite
-   ```
-7. **Ouvrez une Pull Request** vers `main`
+1. Fork du repository
+2. Branche depuis `main`
+3. Implementation + tests
+4. Pull Request
 
-#### Convention de Commits
-
-Nous utilisons [Conventional Commits](https://www.conventionalcommits.org/) :
-
-| Type | Description |
-|------|-------------|
-| `feat` | Nouvelle fonctionnalité |
-| `fix` | Correction de bug |
-| `docs` | Documentation uniquement |
-| `style` | Formatage (pas de changement de code) |
-| `refactor` | Refactoring sans changement fonctionnel |
-| `test` | Ajout ou modification de tests |
-| `chore` | Maintenance, dépendances, config |
-
-**Format :** `type: description courte en français`
-
-**Exemples :**
-```
-feat: ajoute l'export PDF des inscriptions
-fix: corrige l'affichage du graphe sur mobile
-docs: met à jour le README avec les nouvelles instructions
-refactor: simplifie la logique de validation des formulaires
+```bash
+git checkout -b feat/ma-fonctionnalite
+# ou
+git checkout -b fix/mon-correctif
 ```
 
-## Standards de Code
+## Convention de commit
 
-### TypeScript
+Format Conventional Commits:
 
-- **Strict mode** obligatoire
-- **Pas de `any`** - Utiliser `unknown` avec guards
-- **Types explicites** pour les fonctions publiques
-- Vérifier : `npx tsc --noEmit`
+- `feat:` nouvelle fonctionnalite
+- `fix:` correction de bug
+- `docs:` documentation
+- `refactor:` refactor sans changement fonctionnel
+- `test:` ajout/modif de tests
+- `chore:` maintenance
 
-### Style
+Exemple:
 
-- ESLint + Prettier configurés
-- Indentation : 2 espaces
-- Guillemets simples pour les strings
-- Point-virgule obligatoire
-
-### Structure des fichiers
-
-```
-components/           # Composants React réutilisables
-├── ui/              # Composants UI de base (shadcn)
-├── layout/          # Composants de layout (header, footer)
-└── [feature]/       # Composants par fonctionnalité
-
-app/                 # Next.js App Router
-├── (auth)/          # Routes d'authentification
-├── (protected)/     # Routes protégées (admin)
-└── (public)/        # Routes publiques
-
-server/src/          # Backend NestJS
-├── [module]/        # Un dossier par module
-│   ├── dto/         # Data Transfer Objects
-│   ├── entities/    # Entités Drizzle
-│   └── *.service.ts # Services
-└── shared/          # Code partagé backend
+```text
+feat: ajoute le filtre avance des membres
 ```
 
-### Tests
+## Qualite minimale requise
 
-- Écrire des tests pour les nouvelles fonctionnalités
-- Exécuter : `npm test`
-- Couverture minimale : 70%
+Avant de soumettre votre PR:
 
-## Revue de Code
+```bash
+npx tsc --noEmit
+npm test
+```
 
-Toute PR sera revue par un mainteneur. Critères :
+Si vous modifiez l'UI, ajoutez une preuve de validation navigateur (Playwright ou equivalent).
 
-- [ ] Code conforme aux standards
-- [ ] Tests passent (`npm test`)
-- [ ] TypeScript compile (`npx tsc --noEmit`)
-- [ ] Pas de régression
-- [ ] Documentation mise à jour si nécessaire
-- [ ] Commits bien formatés
+## Recommandations de contribution
 
-## Questions ?
+- Preferez des PR petites et ciblees
+- Documentez les changements impactants
+- Ajoutez des tests de regression pour les bugs
+- Evitez les changements hors perimetre
 
-- Ouvrez une [Discussion](https://github.com/robinswood-io/komuno/discussions)
-- Contactez l'équipe : contact@robinswood.io
+## Pull Request checklist
 
----
+- [ ] Le code compile (`npx tsc --noEmit`)
+- [ ] Les tests passent (`npm test`)
+- [ ] La documentation est a jour
+- [ ] Aucun secret n'est committe
+- [ ] Le scope de la PR est clair
 
-Merci de contribuer à Komuno ! 🎉
+## Questions
+
+- Issues: https://github.com/robinswood-io/komuno/issues
+- Discussions: https://github.com/robinswood-io/komuno/discussions

@@ -6,42 +6,42 @@ labels: bug
 assignees: ''
 ---
 
-## Description du Bug
+## Description du bug
 
-Une description claire et concise du bug.
+Description claire et concise du probleme.
 
-## Étapes pour Reproduire
+## Etapes pour reproduire
 
-1. Aller sur '...'
-2. Cliquer sur '...'
-3. Faire défiler jusqu'à '...'
-4. Voir l'erreur
+1. Aller sur `...`
+2. Cliquer sur `...`
+3. Observer `...`
 
-## Comportement Attendu
+## Comportement attendu
 
-Une description claire de ce qui devrait se passer.
+Description de ce qui devrait se passer.
 
-## Comportement Observé
+## Comportement observe
 
-Une description de ce qui se passe réellement.
+Description de ce qui se passe reellement.
 
 ## Screenshots
 
-Si applicable, ajoutez des captures d'écran pour illustrer le problème.
+Ajoutez des captures d'ecran si utile.
 
 ## Environnement
 
-- **Instance** : [ ] CJD80 (cjd80.fr) / [ ] REP (repicardie.fr) / [ ] Autre
-- **Navigateur** : [ex: Chrome 120, Firefox 121, Safari 17]
-- **OS** : [ex: Windows 11, macOS Sonoma, Ubuntu 22.04]
-- **Appareil** : [ ] Desktop / [ ] Tablet / [ ] Mobile
+- Version Komuno: [ex: v2.1.0]
+- Mode d'execution: [ ] Docker [ ] Local natif [ ] Autre
+- Navigateur: [ex: Chrome 122, Firefox 123, Safari 17]
+- OS: [ex: Ubuntu 22.04, macOS 14, Windows 11]
+- URL (si applicable): `https://...`
 
-## Logs / Messages d'Erreur
+## Logs / erreurs
 
+```text
+Collez ici les messages d'erreur pertinents
 ```
-Collez ici les messages d'erreur ou logs pertinents
-```
 
-## Contexte Additionnel
+## Contexte additionnel
 
-Ajoutez tout autre contexte pertinent.
+Tout element utile pour reproduire/analyser le bug.

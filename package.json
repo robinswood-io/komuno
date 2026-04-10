@@ -1,7 +1,7 @@
 {
   "name": "komuno",
   "version": "1.0.0",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "scripts": {
     "test": "bun x vitest run",
     "test:watch": "bun x vitest watch",
