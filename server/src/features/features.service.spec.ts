@@ -67,8 +67,17 @@ describe('FeaturesService', () => {
       vi.mocked(db.select).mockReturnValue(mockBuilder as any);
 
       const result = await service.getAllFeatures();
+      const byKey = new Map(result.map((feature) => [feature.featureKey, feature.enabled]));
 
-      expect(result).toEqual(mockFeatures);
+      expect(result).toHaveLength(8);
+      expect(byKey.get('ideas')).toBe(true);
+      expect(byKey.get('events')).toBe(true);
+      expect(byKey.get('loan')).toBe(false);
+      expect(byKey.get('patrons')).toBe(true);
+      expect(byKey.get('financial')).toBe(true);
+      expect(byKey.get('tracking')).toBe(true);
+      expect(byKey.get('members')).toBe(true);
+      expect(byKey.get('crm')).toBe(false);
       expect(db.select).toHaveBeenCalled();
     });
 
@@ -103,7 +112,7 @@ describe('FeaturesService', () => {
       expect(result[0].enabled).toBe(true);
     });
 
-    it('should return all 7 default features when database is empty', async () => {
+    it('should return all 8 default features when database is empty', async () => {
       const mockBuilder = {
         from: vi.fn().mockResolvedValue([]),
       };
@@ -111,7 +120,7 @@ describe('FeaturesService', () => {
 
       const result = await service.getAllFeatures();
 
-      expect(result).toHaveLength(7);
+      expect(result).toHaveLength(8);
       expect(result.map(f => f.featureKey)).toEqual([
         'ideas',
         'events',
@@ -120,6 +129,7 @@ describe('FeaturesService', () => {
         'financial',
         'tracking',
         'members',
+        'crm',
       ]);
     });
   });
@@ -364,7 +374,7 @@ describe('FeaturesService', () => {
       await service.initializeDefaultFeatures();
 
       expect(db.insert).toHaveBeenCalledWith(featureConfig);
-      expect(insertBuilder.values).toHaveBeenCalledTimes(7);
+      expect(insertBuilder.values).toHaveBeenCalledTimes(8);
     });
 
     it('should not initialize when features exist', async () => {
@@ -379,7 +389,7 @@ describe('FeaturesService', () => {
       expect(db.insert).not.toHaveBeenCalled();
     });
 
-    it('should insert all 7 default features', async () => {
+    it('should insert all 8 default features', async () => {
       const selectBuilder = {
         from: vi.fn().mockResolvedValue([]),
       };
@@ -393,7 +403,7 @@ describe('FeaturesService', () => {
 
       await service.initializeDefaultFeatures();
 
-      expect(insertBuilder.values).toHaveBeenCalledTimes(7);
+      expect(insertBuilder.values).toHaveBeenCalledTimes(8);
 
       const calls = insertBuilder.values.mock.calls;
       const insertedFeatures = calls.map(call => call[0].featureKey);
@@ -405,6 +415,7 @@ describe('FeaturesService', () => {
       expect(insertedFeatures).toContain('financial');
       expect(insertedFeatures).toContain('tracking');
       expect(insertedFeatures).toContain('members');
+      expect(insertedFeatures).toContain('crm');
     });
 
     it('should set system as updatedBy', async () => {
@@ -457,7 +468,7 @@ describe('FeaturesService', () => {
       await expect(service.initializeDefaultFeatures()).resolves.not.toThrow();
     });
 
-    it('should enable all default features', async () => {
+    it('should apply expected enabled state for each default feature', async () => {
       const selectBuilder = {
         from: vi.fn().mockResolvedValue([]),
       };
@@ -472,9 +483,16 @@ describe('FeaturesService', () => {
       await service.initializeDefaultFeatures();
 
       const calls = insertBuilder.values.mock.calls;
-      calls.forEach(call => {
-        expect(call[0].enabled).toBe(true);
-      });
+      const enabledByFeature = new Map(calls.map((call) => [call[0].featureKey, call[0].enabled]));
+
+      expect(enabledByFeature.get('ideas')).toBe(true);
+      expect(enabledByFeature.get('events')).toBe(true);
+      expect(enabledByFeature.get('loan')).toBe(true);
+      expect(enabledByFeature.get('patrons')).toBe(true);
+      expect(enabledByFeature.get('financial')).toBe(true);
+      expect(enabledByFeature.get('tracking')).toBe(true);
+      expect(enabledByFeature.get('members')).toBe(true);
+      expect(enabledByFeature.get('crm')).toBe(false);
     });
   });
 
@@ -559,9 +577,13 @@ describe('FeaturesService', () => {
 
       const result = await service.getAllFeatures();
 
-      expect(result).toHaveLength(3);
-      expect(result[0].enabled).toBe(true);
-      expect(result[1].enabled).toBe(false);
+      const byKey = new Map(result.map((feature) => [feature.featureKey, feature.enabled]));
+
+      expect(result).toHaveLength(8);
+      expect(byKey.get('ideas')).toBe(true);
+      expect(byKey.get('events')).toBe(false);
+      expect(byKey.get('loan')).toBe(true);
+      expect(byKey.get('crm')).toBe(false);
     });
 
     it('should return consistent status across calls', async () => {

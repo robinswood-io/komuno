@@ -1,9 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NotificationsGeneratorService } from './notifications-generator.service';
 import { NotificationsService } from './notifications.service';
 import type { Database } from '../common/database/database.providers';
-import { DATABASE } from '../common/database/database.providers';
+import { members, memberTasks, events, admins } from '../../../shared/schema';
 
 // Mock the schema module
 vi.mock('../../../shared/schema', () => ({
@@ -15,7 +14,7 @@ vi.mock('../../../shared/schema', () => ({
     status: {},
     subscriptionEndDate: {},
   },
-  tasks: {
+  memberTasks: {
     id: {},
     title: {},
     description: {},
@@ -40,8 +39,13 @@ vi.mock('../../../shared/schema', () => ({
 
 describe('NotificationsGeneratorService', () => {
   let service: NotificationsGeneratorService;
-  let notificationsService: Partial<NotificationsService>;
-  let mockDb: Partial<Database>;
+  let notificationsService: {
+    createNotification: ReturnType<typeof vi.fn>;
+    searchNotifications: ReturnType<typeof vi.fn>;
+  };
+  let mockDb: {
+    select: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
     // Mock NotificationsService
@@ -57,17 +61,12 @@ describe('NotificationsGeneratorService', () => {
           where: vi.fn().mockResolvedValue([]),
         }),
       }),
-    } as any;
+    };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        NotificationsGeneratorService,
-        { provide: NotificationsService, useValue: notificationsService },
-        { provide: DATABASE, useValue: mockDb },
-      ],
-    }).compile();
-
-    service = module.get<NotificationsGeneratorService>(NotificationsGeneratorService);
+    service = new NotificationsGeneratorService(
+      mockDb as unknown as Database,
+      notificationsService as unknown as NotificationsService
+    );
   });
 
   afterEach(() => {
@@ -97,9 +96,9 @@ describe('NotificationsGeneratorService', () => {
       ];
 
       mockDb.select = vi.fn().mockImplementation(() => ({
-        from: vi.fn().mockImplementation((table: any) => ({
+        from: vi.fn().mockImplementation((table: unknown) => ({
           where: vi.fn().mockResolvedValue(
-            table === 'admins' ? mockAdmins : mockMembers
+            table === admins ? mockAdmins : mockMembers
           ),
         })),
       }));
@@ -126,9 +125,9 @@ describe('NotificationsGeneratorService', () => {
       ];
 
       mockDb.select = vi.fn().mockImplementation(() => ({
-        from: vi.fn().mockImplementation((table: any) => ({
+        from: vi.fn().mockImplementation((table: unknown) => ({
           where: vi.fn().mockResolvedValue(
-            table === 'admins' ? mockAdmins : mockMembers
+            table === admins ? mockAdmins : mockMembers
           ),
         })),
       }));
@@ -290,11 +289,10 @@ describe('NotificationsGeneratorService', () => {
         },
       ];
 
-      let callCount = 0;
       mockDb.select = vi.fn().mockImplementation(() => ({
-        from: vi.fn().mockImplementation(() => ({
+        from: vi.fn().mockImplementation((table: unknown) => ({
           where: vi.fn().mockResolvedValue(
-            callCount++ === 0 ? mockEvents : mockAdmins
+            table === events ? mockEvents : mockAdmins
           ),
         })),
       }));
@@ -327,11 +325,10 @@ describe('NotificationsGeneratorService', () => {
         },
       ];
 
-      let callCount = 0;
       mockDb.select = vi.fn().mockImplementation(() => ({
-        from: vi.fn().mockImplementation(() => ({
+        from: vi.fn().mockImplementation((table: unknown) => ({
           where: vi.fn().mockResolvedValue(
-            callCount++ === 0 ? mockEvents : mockAdmins
+            table === events ? mockEvents : mockAdmins
           ),
         })),
       }));

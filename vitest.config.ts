@@ -13,6 +13,7 @@ export default defineConfig({
       'node_modules',
       'dist',
       '.next',
+      'tests/e2e/**',
       'tests/e2e/e2e/**',
       'tests/e2e/api/**',
       'tests/e2e/frontend/**',
