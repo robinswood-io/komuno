@@ -51,6 +51,8 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+Le script `install.sh` utilise egalement `/srv/workspace/${APP_NAME}` (par defaut `/srv/workspace/komuno`) et deploie avec `docker-compose.prod.yml`.
+
 ## Mise a jour
 
 ```bash

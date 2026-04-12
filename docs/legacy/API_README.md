@@ -195,7 +195,7 @@ curl -X POST http://localhost:5000/api/ideas \
 
 CJD80 utilise une **architecture API hybride** combinant REST (NestJS) et tRPC pour des cas d'usage complémentaires.
 
-**Voir [ARCHITECTURE_API.md](../ARCHITECTURE_API.md) pour les détails complets.**
+**Voir [ARCHITECTURE_ANALYSIS.md](../ARCHITECTURE_ANALYSIS.md) pour les détails complets.**
 
 ### Séparation des Responsabilités
 
@@ -589,13 +589,13 @@ npm start                # Start production
 
 ## Licence
 
-MIT License - Voir [LICENSE](../LICENSE)
+MIT License - Voir [LICENSE](../../LICENSE)
 
 ---
 
 ## Contribution
 
-Les contributions sont les bienvenues ! Voir [CONTRIBUTING.md](../CONTRIBUTING.md) pour les guidelines.
+Les contributions sont les bienvenues ! Voir [CONTRIBUTING.md](../../CONTRIBUTING.md) pour les guidelines.
 
 ### Workflow de Contribution
 

@@ -547,10 +547,10 @@ Si vous rencontrez d'autres problèmes :
 
 ## 📚 Ressources
 
-- [Configuration centralisée](client/src/config/branding-core.ts) - Fichier principal de configuration
-- [Assets & imports](client/src/config/branding.ts) - Configuration avec assets
-- [Script de génération](scripts/generate-static-config.ts) - Génération des fichiers statiques
-- [Configuration Tailwind](tailwind.config.ts) - Personnalisation des couleurs Tailwind
+- [Configuration centralisée](../../../config/branding-core.ts) - Fichier principal de configuration
+- [Assets & imports](../../../config/branding.ts) - Configuration avec assets
+- [Script de génération](../../../scripts/generate-static-config.ts) - Génération des fichiers statiques
+- [Configuration Tailwind](../../../tailwind.config.ts) - Personnalisation des couleurs Tailwind
 
 ---
 

@@ -476,7 +476,7 @@ CREATE TABLE patron_donations (
 
 **Outils de migration**:
 - Script automatisé: `npm run migrate:v2`
-- Documentation: [MIGRATION_REPORT.md](../MIGRATION_REPORT.md)
+- Documentation: [MIGRATIONS.md](../MIGRATIONS.md)
 - Support: support@cjd80.rbw.ovh
 
 ---

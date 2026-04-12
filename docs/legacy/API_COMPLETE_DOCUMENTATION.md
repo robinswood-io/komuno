@@ -373,7 +373,7 @@ tRPC offre une API **type-safe** end-to-end. Les types TypeScript sont partagés
 
 **Point Important** : tRPC **n'utilise pas OpenAPI**. Les types sont générés automatiquement par TypeScript, rendant toute documentation OpenAPI inutile et redondante. Cette approche évite les doublons de validation et de documentation.
 
-**Voir [ARCHITECTURE_API.md](../ARCHITECTURE_API.md) pour comprendre pourquoi tRPC n'a pas besoin d'OpenAPI.**
+**Voir [ARCHITECTURE_ANALYSIS.md](../ARCHITECTURE_ANALYSIS.md) pour comprendre pourquoi tRPC n'a pas besoin d'OpenAPI.**
 
 ### Endpoint Principal
 

@@ -67,14 +67,17 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
           // Deep merge with defaults to preserve nested default values
           const mergedConfig = deepMerge(brandingCore, customConfig);
           
-          // Si un logo a été uploadé, utiliser celui-ci
+          // Prioriser logoFilename pour éviter les anciennes URLs MinIO internes
+          // stockées en base (ex: localhost/172.x non accessibles depuis le navigateur).
+          // Si pas de filename, n'accepter qu'une URL relative interne.
           let logoUrl: string = defaultBranding.assets.logo;
-          if (customConfig.logoFilename) {
-            // Le logo uploadé est accessible via MinIO
-            // URL MinIO: http://localhost:9000/assets/{filename}
-            const minioEndpoint = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_MINIO_ENDPOINT) || 'localhost:9000';
-            const minioProtocol = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_MINIO_USE_SSL === 'true') ? 'https' : 'http';
-            logoUrl = `${minioProtocol}://${minioEndpoint}/assets/${customConfig.logoFilename}`;
+          if (typeof customConfig.logoFilename === 'string' && customConfig.logoFilename.trim().length > 0) {
+            logoUrl = `/api/admin/branding/logo/${encodeURIComponent(customConfig.logoFilename)}`;
+          } else if (
+            typeof customConfig.logoUrl === 'string' &&
+            customConfig.logoUrl.trim().startsWith('/')
+          ) {
+            logoUrl = customConfig.logoUrl.trim();
           }
 
           setBrandingState({

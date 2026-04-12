@@ -52,13 +52,11 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        IconLeft: (iconProps: React.ComponentProps<typeof ChevronLeft>) => {
-          const { className: iconClassName, ...rest } = iconProps
-          return <ChevronLeft className={cn("h-4 w-4", iconClassName)} {...rest} />
-        },
-        IconRight: (iconProps: React.ComponentProps<typeof ChevronRight>) => {
-          const { className: iconClassName, ...rest } = iconProps
-          return <ChevronRight className={cn("h-4 w-4", iconClassName)} {...rest} />
+        Chevron: ({ className: iconClassName, orientation }) => {
+          if (orientation === "right") {
+            return <ChevronRight className={cn("h-4 w-4", iconClassName)} />
+          }
+          return <ChevronLeft className={cn("h-4 w-4", iconClassName)} />
         },
       }}
       {...props}

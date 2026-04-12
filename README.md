@@ -94,6 +94,8 @@ npm run test           # Tests unitaires
 npx tsc --noEmit       # Verification TypeScript
 npm run db:migrate     # Migrations DB
 npm run db:studio      # UI Drizzle
+npm run docs:check     # Verification des liens de documentation maintenue
+npm run docs:check:all # Verification de tous les liens Markdown (README + deploy + docs)
 ```
 
 ## Qualite et verification
@@ -103,9 +105,8 @@ Avant PR:
 ```bash
 npx tsc --noEmit
 npm test
+npm run docs:check
 ```
-
-Si vous modifiez l'UI, validez aussi le parcours navigateur (E2E/Playwright) selon votre pipeline.
 
 ## Structure du projet
 
@@ -117,15 +118,19 @@ komuno/
 ├── shared/              # Types/schemas partages
 ├── deploy/              # Installation et deploiement production
 ├── docs/                # Documentation projet
-└── tests/               # Tests unitaires/e2e
+├── tests/               # Tests integration / validation API
+└── test/                # Tests unitaires
 ```
 
 ## Documentation connexe
 
+- [docs/README.md](docs/README.md)
+- [docs/MAINTAINED_DOCS.md](docs/MAINTAINED_DOCS.md)
+- [deploy/README.md](deploy/README.md)
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [SECURITY.md](SECURITY.md)
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- [deploy/README.md](deploy/README.md)
+- [CHANGELOG.md](CHANGELOG.md)
 
 ## Licence
 

@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertLoanItemSchema, type InsertLoanItem, LOAN_STATUS } from "@/shared/schema";
+import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 // import { getShortAppName } from '@/lib/config/branding';
 import type { LoanItem } from "@/shared/schema";
@@ -77,6 +78,8 @@ interface LoanItemsSectionProps {
   onNavigateToPropose?: () => void;
 }
 
+type InsertLoanItemFormValues = z.input<typeof insertLoanItemSchema>;
+
 export default function LoanItemsSection({ onNavigateToPropose: _onNavigateToPropose }: LoanItemsSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -106,7 +109,7 @@ export default function LoanItemsSection({ onNavigateToPropose: _onNavigateToPro
     }),
   });
 
-  const form = useForm<InsertLoanItem>({
+  const form = useForm<InsertLoanItemFormValues, unknown, InsertLoanItem>({
     resolver: zodResolver(insertLoanItemSchema),
     defaultValues: {
       title: "",

@@ -159,6 +159,24 @@ export class MinIOService implements OnModuleInit {
     }
   }
 
+  async getObjectStream(bucket: string, filename: string): Promise<NodeJS.ReadableStream> {
+    if (!this.client || !this.initialized) {
+      await this.initialize();
+    }
+
+    if (!this.client) {
+      throw new Error('MinIO client not initialized');
+    }
+
+    try {
+      const stream = await this.client.getObject(bucket, filename);
+      return stream;
+    } catch (error) {
+      logger.error('Failed to get object stream from MinIO', { bucket, filename, error });
+      throw error;
+    }
+  }
+
   getFileUrl(bucket: string, filename: string): string {
     const protocol = this.useSSL ? 'https' : 'http';
     const host = this.endpoint === 'minio' ? 'localhost' : this.endpoint;
@@ -314,5 +332,3 @@ export class MinIOService implements OnModuleInit {
     return mimeTypes[ext.toLowerCase()] || 'application/octet-stream';
   }
 }
-
-

@@ -4,25 +4,33 @@ import { eq } from 'drizzle-orm';
 import { pushSubscriptions } from '../shared/schema';
 import { logger } from './lib/logger';
 
-// Configuration des clés VAPID - générées pour le développement
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BPKt_8r2V3SJwVJLGnrvbHcwXBHbMhKYPr3rXjMQhUZOQVbgMZC9_X8fK3HSDx9rDKXe7CgVGaYSLnwJVFtUnQM';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'h-rvwG_P4v5J2JQQ7JfnqoPlbPf_8fNEYPLYP8rQh2E';
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@cjd-amiens.fr';
+const VAPID_PUBLIC_KEY = (process.env.VAPID_PUBLIC_KEY ?? '').trim();
+const VAPID_PRIVATE_KEY = (process.env.VAPID_PRIVATE_KEY ?? '').trim();
+const VAPID_SUBJECT = (process.env.VAPID_SUBJECT ?? '').trim();
+const hasVapidConfig = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_SUBJECT);
+const PERMANENT_SUBSCRIPTION_ERROR_CODES = new Set([400, 404, 410]);
+
+let isPushEnabled = false;
 
 // Configuration de web-push seulement si les clés sont valides
-try {
-  webpush.setVapidDetails(
-    VAPID_SUBJECT,
-    VAPID_PUBLIC_KEY,
-    VAPID_PRIVATE_KEY
-  );
-  console.log('[Notifications] Configuration VAPID réussie');
-} catch (error) {
-  console.warn('[Notifications] Erreur configuration VAPID (mode développement):', (error as Error).message);
+if (hasVapidConfig) {
+  try {
+    webpush.setVapidDetails(
+      VAPID_SUBJECT,
+      VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY
+    );
+    isPushEnabled = true;
+    logger.info('[Notifications] Configuration VAPID chargée');
+  } catch (error) {
+    logger.error('[Notifications] Échec configuration VAPID, push désactivé', { error });
+  }
+} else {
+  logger.warn('[Notifications] Configuration VAPID absente, envoi push désactivé');
 }
 
 interface PushSubscription {
-  id?: number;
+  id?: string;
   endpoint: string;
   p256dh: string;
   auth: string;
@@ -36,7 +44,7 @@ interface NotificationPayload {
   icon?: string;
   badge?: string;
   tag?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   actions?: Array<{
     action: string;
     title: string;
@@ -48,6 +56,7 @@ export class NotificationService {
   private subscriptions: Map<string, PushSubscription> = new Map();
   private isLoaded: boolean = false;
   private loadingPromise: Promise<void> | null = null;
+  private readonly batchSize = this.resolveBatchSize(process.env.PUSH_BATCH_SIZE);
 
   constructor() {
     // Ne rien charger dans le constructor pour éviter de bloquer le démarrage
@@ -124,49 +133,68 @@ export class NotificationService {
   // Ajouter un nouvel abonnement
   async addSubscription(subscription: Omit<PushSubscription, 'id' | 'createdAt'>): Promise<boolean> {
     try {
+      await this.ensureLoaded();
+
       // Vérifier que l'abonnement est valide
       if (!subscription.endpoint || !subscription.p256dh || !subscription.auth) {
         throw new Error('Abonnement invalide');
       }
 
       // Vérifier si l'abonnement existe déjà
-      const existing = await db.select()
-        .from(pushSubscriptions)
-        .where(eq(pushSubscriptions.endpoint, subscription.endpoint))
-        .limit(1);
+      const existing = await runDbQuery(
+        async () =>
+          db.select()
+            .from(pushSubscriptions)
+            .where(eq(pushSubscriptions.endpoint, subscription.endpoint))
+            .limit(1),
+        'normal'
+      );
+
+      const now = new Date();
       
       if (existing.length === 0) {
         // Insérer dans la base de données
-        await db.insert(pushSubscriptions).values({
-          endpoint: subscription.endpoint,
-          p256dh: subscription.p256dh,
-          auth: subscription.auth,
-          userEmail: subscription.userId || null as any,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        } as any);
+        await runDbQuery(
+          async () =>
+            db.insert(pushSubscriptions).values({
+              endpoint: subscription.endpoint,
+              p256dh: subscription.p256dh,
+              auth: subscription.auth,
+              userEmail: subscription.userId ?? null,
+              createdAt: now,
+              updatedAt: now,
+            }),
+          'complex'
+        );
       } else {
         // Mettre à jour l'abonnement existant
-        await db.update(pushSubscriptions)
-          .set({
-            p256dh: subscription.p256dh,
-            auth: subscription.auth,
-            userEmail: subscription.userId || null as any,
-            updatedAt: new Date()
-          } as any)
-          .where(eq(pushSubscriptions.endpoint, subscription.endpoint));
+        await runDbQuery(
+          async () =>
+            db.update(pushSubscriptions)
+              .set({
+                p256dh: subscription.p256dh,
+                auth: subscription.auth,
+                userEmail: subscription.userId ?? null,
+                updatedAt: now,
+              })
+              .where(eq(pushSubscriptions.endpoint, subscription.endpoint)),
+          'complex'
+        );
       }
 
       // Mettre à jour le cache en mémoire
       this.subscriptions.set(subscription.endpoint, {
         ...subscription,
-        createdAt: new Date()
+        createdAt: now
       });
 
-      console.log(`[Notifications] Nouvel abonnement ajouté: ${subscription.endpoint.slice(0, 50)}...`);
+      logger.info('[Notifications] Nouvel abonnement push ajouté', {
+        endpoint: this.getEndpointPreview(subscription.endpoint),
+        totalSubscriptions: this.subscriptions.size,
+      });
       return true;
     } catch (error) {
-      console.error('[Notifications] Erreur ajout abonnement:', error);
+      logger.error('[Notifications] Erreur ajout abonnement push', { error });
       return false;
     }
   }
@@ -175,15 +203,22 @@ export class NotificationService {
   async removeSubscription(endpoint: string): Promise<boolean> {
     try {
       // Supprimer de la base de données
-      await db.delete(pushSubscriptions)
-        .where(eq(pushSubscriptions.endpoint, endpoint));
+      await runDbQuery(
+        async () =>
+          db.delete(pushSubscriptions)
+            .where(eq(pushSubscriptions.endpoint, endpoint)),
+        'complex'
+      );
       
       // Supprimer du cache en mémoire
       const removed = this.subscriptions.delete(endpoint);
-      console.log(`[Notifications] Abonnement supprimé: ${endpoint.slice(0, 50)}...`);
+      logger.info('[Notifications] Abonnement push supprimé', {
+        endpoint: this.getEndpointPreview(endpoint),
+        totalSubscriptions: this.subscriptions.size,
+      });
       return removed;
     } catch (error) {
-      console.error('[Notifications] Erreur suppression abonnement:', error);
+      logger.error('[Notifications] Erreur suppression abonnement push', { error });
       return false;
     }
   }
@@ -196,12 +231,24 @@ export class NotificationService {
     const results = { sent: 0, failed: 0 };
     const subscriptions = Array.from(this.subscriptions.values());
 
+    if (subscriptions.length === 0) {
+      logger.info('[Notifications] Aucun abonnement push actif');
+      return results;
+    }
+
+    if (!isPushEnabled) {
+      logger.warn('[Notifications] Envoi push ignoré: configuration VAPID absente');
+      return {
+        sent: 0,
+        failed: subscriptions.length,
+      };
+    }
+
     logger.info(`[Notifications] Envoi à ${subscriptions.length} abonnés: ${payload.title}`);
 
     // Envoyer en parallèle avec limite de concurrent
-    const batchSize = 10;
-    for (let i = 0; i < subscriptions.length; i += batchSize) {
-      const batch = subscriptions.slice(i, i + batchSize);
+    for (let i = 0; i < subscriptions.length; i += this.batchSize) {
+      const batch = subscriptions.slice(i, i + this.batchSize);
       const promises = batch.map(subscription => this.sendToSubscription(subscription, payload));
       
       const batchResults = await Promise.allSettled(promises);
@@ -246,11 +293,18 @@ export class NotificationService {
       });
 
       return true;
-    } catch (error: any) {
-      console.error(`[Notifications] Erreur envoi à ${subscription.endpoint.slice(0, 50)}:`, error.message);
+    } catch (error: unknown) {
+      const statusCode = this.getStatusCode(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      logger.warn('[Notifications] Échec envoi push vers un abonnement', {
+        endpoint: this.getEndpointPreview(subscription.endpoint),
+        statusCode,
+        error: errorMessage,
+      });
       
       // Supprimer les abonnements invalides (410 Gone, 400 Bad Request)
-      if (error.statusCode === 410 || error.statusCode === 400) {
+      if (statusCode !== null && PERMANENT_SUBSCRIPTION_ERROR_CODES.has(statusCode)) {
         await this.removeSubscription(subscription.endpoint);
       }
       
@@ -348,6 +402,26 @@ export class NotificationService {
   // Obtenir la clé publique VAPID
   getVapidPublicKey(): string {
     return VAPID_PUBLIC_KEY;
+  }
+
+  private resolveBatchSize(rawBatchSize: string | undefined): number {
+    const parsed = Number.parseInt(rawBatchSize ?? '', 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 10;
+    }
+    return Math.min(parsed, 100);
+  }
+
+  private getEndpointPreview(endpoint: string): string {
+    return endpoint.length <= 60 ? endpoint : `${endpoint.slice(0, 60)}...`;
+  }
+
+  private getStatusCode(error: unknown): number | null {
+    if (typeof error !== 'object' || error === null) {
+      return null;
+    }
+    const maybeStatusCode = (error as { statusCode?: unknown }).statusCode;
+    return typeof maybeStatusCode === 'number' ? maybeStatusCode : null;
   }
 }
 

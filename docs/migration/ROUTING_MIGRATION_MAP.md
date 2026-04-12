@@ -200,7 +200,7 @@ app/
 | Feature | Wouter | Next.js App Router |
 |---------|--------|-------------------|
 | **Link** | `<Link href="/path">` (wouter) | `<Link href="/path">` (next/link) |
-| **Redirect** | `useLocation()[1]("/path")` | `redirect("/path")` ou `useRouter().push()` |
+| **Redirect** | `const [, navigate] = useLocation(); navigate("/path")` | `redirect("/path")` ou `useRouter().push()` |
 | **Params** | `useParams()` | Props `params` automatique |
 | **Query** | `useSearch()` | Props `searchParams` automatique |
 

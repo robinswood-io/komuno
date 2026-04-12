@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -47,30 +47,40 @@ export function exportToCSV({ filename, columns, data }: ExportOptions): void {
  * Export data to Excel format
  */
 export function exportToExcel({ filename, title, columns, data }: ExportOptions): void {
-  const worksheetData = [
-    columns.map(col => col.header),
-    ...data.map(row =>
-      columns.map(col => {
-        const value = row[col.accessor];
-        return col.format ? col.format(value) : (value ?? '');
-      })
-    )
-  ];
+  void (async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(title || 'Export');
 
-  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, title || 'Export');
+    const headers = columns.map(col => col.header);
+    worksheet.addRow(headers);
 
-  // Auto-size columns
-  const colWidths = columns.map((col) => ({
-    wch: Math.max(
-      col.header.length,
-      ...data.map(row => String(row[col.accessor] ?? '').length)
-    )
-  }));
-  worksheet['!cols'] = colWidths;
+    for (const row of data) {
+      worksheet.addRow(
+        columns.map(col => {
+          const value = row[col.accessor];
+          return col.format ? col.format(value) : (value ?? '');
+        })
+      );
+    }
 
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
+    // Auto-size columns
+    columns.forEach((col, index) => {
+      const maxContentLength = Math.max(
+        col.header.length,
+        ...data.map(row => String(row[col.accessor] ?? '').length)
+      );
+      worksheet.getColumn(index + 1).width = maxContentLength + 2;
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob(
+      [buffer],
+      { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+    );
+    downloadBlob(blob, `${filename}.xlsx`);
+  })().catch((error: unknown) => {
+    console.error('[export-utils] Failed to export Excel file', error);
+  });
 }
 
 /**

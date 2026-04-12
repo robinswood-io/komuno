@@ -5,8 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.emailService = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
-const schema_1 = require("../shared/schema");
 const branding_core_1 = require("../lib/config/branding-core");
+const logger_1 = require("./lib/logger");
 class EmailService {
     constructor() {
         this.transporter = null;
@@ -16,7 +16,9 @@ class EmailService {
     }
     setStorage(storage) {
         this.storage = storage;
-        this.initializeTransporter();
+        void this.initializeTransporter().catch((error) => {
+            logger_1.logger.error('[Email] Erreur initialisation asynchrone du service', { error });
+        });
     }
     async initializeTransporter() {
         try {
@@ -27,9 +29,14 @@ class EmailService {
                 if (result.success && result.data) {
                     dbConfig = result.data;
                 }
+                else if (!result.success) {
+                    logger_1.logger.warn('[Email] Impossible de charger la configuration SMTP depuis la base', {
+                        error: String(result.error),
+                    });
+                }
             }
             // Configuration SMTP avec priorité: DB > Env vars
-            const port = dbConfig?.port || parseInt(process.env.SMTP_PORT || '465');
+            const port = this.parsePort(dbConfig?.port, process.env.SMTP_PORT);
             // Déterminer secure: DB > Env > Défaut basé sur le port (465=true, autres=false)
             let secure;
             if (dbConfig?.secure !== undefined) {
@@ -46,47 +53,69 @@ class EmailService {
                 port,
                 secure,
                 auth: {
-                    user: process.env.SMTP_USER || '',
-                    pass: process.env.SMTP_PASSWORD || ''
+                    user: dbConfig?.username || process.env.SMTP_USER || '',
+                    pass: dbConfig?.password || process.env.SMTP_PASSWORD || ''
                 },
                 fromName: dbConfig?.fromName || process.env.SMTP_FROM_NAME || (0, branding_core_1.getShortAppName)(),
                 fromEmail: dbConfig?.fromEmail || process.env.SMTP_FROM_EMAIL || 'noreply@cjd-amiens.fr'
             };
             if (!this.config.auth.user || !this.config.auth.pass) {
-                console.warn('[Email] Configuration SMTP incomplète - emails désactivés');
+                this.transporter = null;
+                logger_1.logger.warn('[Email] Configuration SMTP incomplète, envoi d\'emails désactivé');
                 return;
             }
             this.transporter = nodemailer_1.default.createTransport({
                 host: this.config.host,
                 port: this.config.port,
                 secure: this.config.secure,
-                auth: this.config.auth
+                auth: this.config.auth,
+                pool: true,
+                maxConnections: 5,
+                maxMessages: 100,
+                connectionTimeout: 10_000,
+                greetingTimeout: 10_000,
+                socketTimeout: 20_000,
             });
             const source = dbConfig ? 'base de données' : 'variables d\'environnement';
-            console.log(`[Email] Service email initialisé depuis ${source} (${this.config.host}:${this.config.port})`);
+            logger_1.logger.info('[Email] Service email initialisé', {
+                source,
+                host: this.config.host,
+                port: this.config.port,
+                secure: this.config.secure,
+            });
             // Vérifier la connexion
-            this.verifyConnection();
+            await this.verifyConnection();
         }
         catch (error) {
-            console.error('[Email] Erreur lors de l\'initialisation:', error);
+            this.transporter = null;
+            logger_1.logger.error('[Email] Erreur lors de l\'initialisation', { error });
         }
     }
     async verifyConnection() {
         if (!this.transporter)
-            return;
+            return false;
         try {
             await this.transporter.verify();
-            console.log('[Email] ✅ Connexion SMTP OVH vérifiée');
+            logger_1.logger.info('[Email] Connexion SMTP vérifiée');
+            return true;
         }
         catch (error) {
-            console.error('[Email] ❌ Erreur de connexion SMTP:', error);
+            logger_1.logger.error('[Email] Erreur de connexion SMTP', { error });
+            return false;
         }
     }
     async sendEmail(emailData) {
         if (!this.transporter || !this.config) {
             return {
                 success: false,
-                error: new schema_1.DatabaseError('Service email non configuré')
+                error: new Error('Service email non configuré')
+            };
+        }
+        const recipients = this.normalizeRecipients(emailData.to);
+        if (recipients.length === 0) {
+            return {
+                success: false,
+                error: new Error('Aucun destinataire valide fourni')
             };
         }
         try {
@@ -94,23 +123,31 @@ class EmailService {
             const fromEmail = this.config.fromEmail || this.config.auth.user;
             const mailOptions = {
                 from: `"${fromName}" <${fromEmail}>`,
-                to: emailData.to.join(', '),
+                to: recipients.join(', '),
                 subject: emailData.subject,
                 html: emailData.html,
                 text: emailData.text || this.stripHtml(emailData.html)
             };
             const info = await this.transporter.sendMail(mailOptions);
-            console.log('[Email] ✅ Email envoyé:', info.messageId);
+            logger_1.logger.info('[Email] Email envoyé', {
+                messageId: info.messageId,
+                recipients: recipients.length,
+            });
             return {
                 success: true,
-                data: info
+                data: {
+                    messageId: info.messageId,
+                    accepted: info.accepted.map(String),
+                    rejected: info.rejected.map(String),
+                    response: info.response,
+                }
             };
         }
         catch (error) {
-            console.error('[Email] ❌ Erreur envoi email:', error);
+            logger_1.logger.error('[Email] Erreur lors de l\'envoi SMTP', { error });
             return {
                 success: false,
-                error: new schema_1.DatabaseError(`Erreur envoi email: ${error}`)
+                error: new Error(`Erreur envoi email: ${String(error)}`)
             };
         }
     }
@@ -119,7 +156,12 @@ class EmailService {
         return html
             .replace(/<[^>]*>/g, '')
             .replace(/&nbsp;/g, ' ')
-            .replace(/&[a-z]+;/g, '')
+            .replace(/&amp;/g, '&')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, '\'')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/\s+/g, ' ')
             .trim();
     }
     // Test de connectivité
@@ -127,7 +169,7 @@ class EmailService {
         if (!this.transporter) {
             return {
                 success: false,
-                error: new schema_1.DatabaseError('Transporter non initialisé')
+                error: new Error('Transporter non initialisé')
             };
         }
         try {
@@ -137,7 +179,7 @@ class EmailService {
         catch (error) {
             return {
                 success: false,
-                error: new schema_1.DatabaseError(`Test connexion échoué: ${error}`)
+                error: new Error(`Test connexion échoué: ${String(error)}`)
             };
         }
     }
@@ -148,6 +190,21 @@ class EmailService {
     // Réinitialiser la configuration (pour compatibilité)
     async reinitialize() {
         await this.reloadConfig();
+    }
+    parsePort(dbPort, envPort) {
+        if (typeof dbPort === 'number' && Number.isFinite(dbPort) && dbPort > 0) {
+            return dbPort;
+        }
+        const parsedEnvPort = Number.parseInt(envPort ?? '', 10);
+        if (Number.isFinite(parsedEnvPort) && parsedEnvPort > 0) {
+            return parsedEnvPort;
+        }
+        return 465;
+    }
+    normalizeRecipients(recipients) {
+        return Array.from(new Set(recipients
+            .map((recipient) => recipient.trim().toLowerCase())
+            .filter((recipient) => recipient.length > 0)));
     }
 }
 // Instance singleton

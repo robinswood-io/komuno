@@ -15,7 +15,7 @@ on:
         required: true
         type: choice
         options:
-          - komuno
+          - cjd80
           - rep
           - both
       force_build:
@@ -245,10 +245,10 @@ jobs:
       (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
       (github.event_name == 'push' ||
        (github.event_name == 'workflow_dispatch' &&
-        (github.event.inputs.environment == 'komuno' || github.event.inputs.environment == 'both')))
+        (github.event.inputs.environment == 'cjd80' || github.event.inputs.environment == 'both')))
 
     environment:
-      name: production-cjd80
+      name: cjd80
       url: https://cjd80.fr
 
     steps:
@@ -391,7 +391,7 @@ jobs:
         (github.event.inputs.environment == 'rep' || github.event.inputs.environment == 'both')))
 
     environment:
-      name: production-rep
+      name: rep
       url: https://repicardie.fr
 
     steps:

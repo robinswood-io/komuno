@@ -36,11 +36,11 @@ cat migrations/XXXX_migration_name.sql
 
 Vérifier que les commandes SQL sont correctes (ALTER TABLE, CREATE TABLE, etc.)
 
-### 4. Tester localement (optionnel mais recommandé)
+### 4. Tester localement (optionnel mais recommande)
 
 ```bash
-# Appliquer sur la DB locale
-npm run db:push
+# Appliquer les migrations SQL sur la DB locale
+npm run db:migrate
 ```
 
 ### 5. Commit la migration
@@ -64,7 +64,8 @@ Lors du déploiement via GitHub Actions:
 | Commande | Description |
 |----------|-------------|
 | `npm run db:generate` | Génère une nouvelle migration basée sur les changements du schéma |
-| `npm run db:push` | Applique directement le schéma (dev uniquement, sans migration) |
+| `npm run db:push` | Synchronise le schema directement (dev uniquement, sans historique SQL) |
+| `npm run db:migrate` | Execute les migrations SQL via `scripts/run-migrations.sh` |
 | `npm run db:studio` | Ouvre Drizzle Studio pour explorer la DB |
 
 ## Comment ça fonctionne en production

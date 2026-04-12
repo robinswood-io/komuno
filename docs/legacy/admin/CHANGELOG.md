@@ -3,7 +3,7 @@
 **Date :** 2025-01-29  
 **Version :** 2.1.0
 
-> 📊 **Voir aussi** : [OPTIMIZATIONS_SUMMARY.md](./OPTIMIZATIONS_SUMMARY.md) pour un résumé détaillé des optimisations de performance.
+> 📊 **Voir aussi** : [performance-optimizations.md](../audit/performance-optimizations.md) pour un résumé détaillé des optimisations de performance.
 
 ## 🎉 Nouveautés Majeures
 
@@ -233,4 +233,3 @@ Les nouvelles routes modulaires sont disponibles en parallèle pour une migratio
 - **Gestion d'erreurs :** Affichage d'erreurs utilisateur dans dashboard et widgets
 - **Accessibilité :** Amélioration des labels ARIA pour la recherche
 - **Désactivation des fonctionnalités :** Système complet pour activer/désactiver les fonctionnalités (ideas, events, loan) avec protection des routes et interface admin
-

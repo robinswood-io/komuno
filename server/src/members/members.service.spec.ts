@@ -2,6 +2,12 @@ import { BadRequestException, NotFoundException, ConflictException } from '@nest
 import { MembersService } from './members.service';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+vi.mock('../../email-notification-service', () => ({
+  emailNotificationService: {
+    notifyNewMemberProposal: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe('MembersService', () => {
   let service: MembersService;
   let mockStorageService: any;
@@ -38,12 +44,6 @@ describe('MembersService', () => {
 
     service = new MembersService(mockStorageService);
 
-    // Mock email notification service
-    vi.mock('../../email-notification-service', () => ({
-      emailNotificationService: {
-        notifyNewMemberProposal: vi.fn().mockResolvedValue(undefined),
-      },
-    }));
   });
 
   afterEach(() => {

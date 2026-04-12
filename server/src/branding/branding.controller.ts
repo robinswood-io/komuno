@@ -1,7 +1,8 @@
-import { Controller, Get, Put, Delete, Body, UseGuards, Post, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Put, Delete, Body, UseGuards, Post, UseInterceptors, UploadedFile, BadRequestException, Param, Res, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
+import type { Response } from 'express';
 import { BrandingService } from './branding.service';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
@@ -21,6 +22,26 @@ export class BrandingController {
   async getBranding() {
     const data = await this.brandingService.getBrandingConfig();
     return { success: true, data };
+  }
+
+  @Get('logo/:filename')
+  @SkipThrottle()
+  @ApiOperation({ summary: 'Servir un logo uploadé depuis MinIO (public)' })
+  @ApiResponse({ status: 200, description: 'Flux image du logo' })
+  @ApiResponse({ status: 404, description: 'Logo introuvable' })
+  async getLogoByFilename(@Param('filename') filename: string, @Res() res: Response) {
+    if (!/^[a-zA-Z0-9._-]+$/.test(filename)) {
+      throw new BadRequestException('Nom de fichier invalide');
+    }
+
+    try {
+      const stream = await this.brandingService.getLogoStream(filename);
+      res.setHeader('Content-Type', this.getContentTypeFromFilename(filename));
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      stream.pipe(res);
+    } catch {
+      throw new NotFoundException('Logo introuvable');
+    }
   }
 
   @Put()
@@ -89,7 +110,7 @@ export class BrandingController {
         type: 'object',
         properties: {
           filename: { type: 'string', example: 'logo-1234567890.png' },
-          url: { type: 'string', example: 'http://localhost:9000/assets/logo-1234567890.png' }
+          url: { type: 'string', example: '/api/admin/branding/logo/logo-1234567890.png' }
         }
       }
     }
@@ -116,5 +137,24 @@ export class BrandingController {
 
     const data = await this.brandingService.uploadLogo(file, user.email);
     return { success: true, data };
+  }
+
+  private getContentTypeFromFilename(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'svg':
+        return 'image/svg+xml';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      default:
+        return 'application/octet-stream';
+    }
   }
 }

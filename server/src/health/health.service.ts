@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
+import fs from 'node:fs';
+import path from 'node:path';
 import { DATABASE } from '../common/database/database.providers';
 import { sql } from 'drizzle-orm';
 import { getPoolStats } from '../../db';
@@ -8,6 +10,46 @@ import { MinIOService } from '../integrations/minio/minio.service';
 import { logger } from '../../lib/logger';
 import type { StatusResponse, StatusCheck } from '../../../shared/schema';
 import type { DrizzleDb } from '../common/database/types';
+
+function isValidSemver(version: string): boolean {
+  return /^\d+\.\d+\.\d+$/.test(version.trim());
+}
+
+function readPackageVersion(): string | null {
+  try {
+    const packagePath = path.join(process.cwd(), 'package.json');
+    const content = fs.readFileSync(packagePath, 'utf8');
+    const parsed = JSON.parse(content) as { version?: string };
+    const version = parsed.version?.trim();
+    if (version && isValidSemver(version)) {
+      return version;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const packageVersion = readPackageVersion();
+
+function resolveAppVersion(): string {
+  const candidates = [
+    process.env.GIT_TAG,
+    process.env.APP_VERSION,
+    process.env.npm_package_version,
+    packageVersion,
+  ];
+
+  for (const value of candidates) {
+    if (!value) continue;
+    const cleaned = value.trim().replace(/^v/, '');
+    if (isValidSemver(cleaned)) {
+      return cleaned;
+    }
+  }
+
+  return '0.0.0';
+}
 
 @Injectable()
 export class HealthService {
@@ -26,7 +68,7 @@ export class HealthService {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        version: '1.0.0',
+        version: resolveAppVersion(),
         environment: process.env.NODE_ENV || 'development',
         database: {
           connected: true,
@@ -116,7 +158,7 @@ export class HealthService {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        version: '1.0.0',
+        version: resolveAppVersion(),
         environment: process.env.NODE_ENV || 'development',
         database: {
           connected: true,
@@ -197,7 +239,7 @@ export class HealthService {
 
   getVersion() {
     try {
-      const version = process.env.GIT_TAG || process.env.APP_VERSION || '1.0.0';
+      const version = resolveAppVersion();
       return {
         version,
         timestamp: new Date().toISOString(),
@@ -206,7 +248,7 @@ export class HealthService {
     } catch (error) {
       logger.error('Error getting version', { error });
       return {
-        version: '1.0.0',
+        version: '0.0.0',
         error: 'Failed to get version',
       };
     }
@@ -299,4 +341,3 @@ export class HealthService {
     return results;
   }
 }
-

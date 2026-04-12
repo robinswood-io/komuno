@@ -1,0 +1,19 @@
+{
+  "latest": {
+    "version": "1.0.0",
+    "releasedAt": "2026-04-10",
+    "summary": "Version actuelle de l'application Komuno.",
+    "sections": {
+      "majeurs": [],
+      "nouveautes": [],
+      "corrections": [],
+      "ameliorations": [],
+      "securite": [],
+      "maintenance": []
+    },
+    "commitCount": 0
+  },
+  "history": [],
+  "generatedAt": "2026-04-10T11:21:19Z",
+  "source": "runtime-bootstrap"
+}

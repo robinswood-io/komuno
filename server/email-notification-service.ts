@@ -1,11 +1,14 @@
 import { emailService } from './email-service';
 import { storage } from './storage';
 import { createNewIdeaEmailTemplate, createNewEventEmailTemplate, createNewMemberProposalEmailTemplate, createNewLoanItemEmailTemplate, type NotificationContext } from './email-templates';
-import type { Idea, Event, Result, Member, LoanItem } from '@shared/schema';
+import type { Idea, Event, Result, LoanItem } from '@shared/schema';
 import { CJD_ROLES } from '@shared/schema';
+import { logger } from './lib/logger';
 
 class EmailNotificationService {
   private context: NotificationContext;
+  private adminEmailCache: { emails: string[]; expiresAt: number } | null = null;
+  private readonly ADMIN_EMAIL_CACHE_TTL_MS = 60_000;
 
   constructor() {
     this.context = {
@@ -32,13 +35,22 @@ class EmailNotificationService {
           },
         };
       }
-    } catch {
-      // Fallback silencieux sur brandingCore
+    } catch (error) {
+      logger.warn('[Email Notifications] Impossible de charger le branding depuis la base, fallback par défaut', {
+        error: String(error),
+      });
     }
   }
 
   // Récupérer tous les emails des administrateurs actifs
-  private async getAdminEmails(): Promise<Result<string[]>> {
+  private async getAdminEmails(options?: { forceRefresh?: boolean }): Promise<Result<string[]>> {
+    if (!options?.forceRefresh && this.adminEmailCache && this.adminEmailCache.expiresAt > Date.now()) {
+      return {
+        success: true,
+        data: this.adminEmailCache.emails,
+      };
+    }
+
     try {
       const adminsResult = await storage.getAllAdmins();
       
@@ -52,40 +64,89 @@ class EmailNotificationService {
       // Filtrer les admins actifs uniquement
       const activeAdminEmails = adminsResult.data
         .filter(admin => admin.isActive && admin.status === 'active')
-        .map(admin => admin.email);
+        .map(admin => admin.email.trim().toLowerCase())
+        .filter((email) => email.length > 0);
 
-      console.log(`[Email Notifications] ${activeAdminEmails.length} administrateurs actifs trouvés`);
+      const uniqueAdminEmails = Array.from(new Set(activeAdminEmails));
+      this.adminEmailCache = {
+        emails: uniqueAdminEmails,
+        expiresAt: Date.now() + this.ADMIN_EMAIL_CACHE_TTL_MS,
+      };
+
+      logger.info('[Email Notifications] Destinataires administrateurs chargés', {
+        count: uniqueAdminEmails.length,
+      });
 
       return {
         success: true,
-        data: activeAdminEmails
+        data: uniqueAdminEmails
       };
     } catch (error) {
-      console.error('[Email Notifications] Erreur lors de la récupération des admins:', error);
+      logger.error('[Email Notifications] Erreur lors de la récupération des administrateurs', { error });
       return {
         success: false,
-        error: new Error(`Erreur récupération admins: ${error}`)
+        error: new Error(`Erreur récupération admins: ${String(error)}`)
       };
     }
   }
 
+  private normalizeRecipients(recipients: string[]): string[] {
+    return Array.from(
+      new Set(
+        recipients
+          .map((recipient) => recipient.trim().toLowerCase())
+          .filter((recipient) => recipient.length > 0)
+      )
+    );
+  }
+
+  private async sendToRecipients(
+    recipients: string[],
+    subject: string,
+    html: string,
+    context: string
+  ): Promise<Result<unknown>> {
+    const normalizedRecipients = this.normalizeRecipients(recipients);
+    if (normalizedRecipients.length === 0) {
+      logger.warn('[Email Notifications] Aucun destinataire trouvé, envoi ignoré', { context });
+      return {
+        success: true,
+        data: { message: 'Aucun destinataire à notifier' },
+      };
+    }
+
+    const emailResult = await emailService.sendEmail({
+      to: normalizedRecipients,
+      subject,
+      html,
+    });
+
+    if (emailResult.success) {
+      logger.info('[Email Notifications] Notification email envoyée', {
+        context,
+        recipients: normalizedRecipients.length,
+        messageId: emailResult.data.messageId,
+      });
+      return emailResult;
+    }
+
+    logger.error('[Email Notifications] Échec envoi notification email', {
+      context,
+      recipients: normalizedRecipients.length,
+      error: String(emailResult.error),
+    });
+    return emailResult;
+  }
+
   // Notifier les admins d'une nouvelle idée par email
-  async notifyNewIdea(idea: Idea): Promise<Result<any>> {
+  async notifyNewIdea(idea: Idea): Promise<Result<unknown>> {
     try {
-      console.log(`[Email Notifications] Envoi notification nouvelle idée: ${idea.title}`);
+      logger.info('[Email Notifications] Préparation notification nouvelle idée', { title: idea.title });
 
       // Récupérer les emails des administrateurs
       const adminEmailsResult = await this.getAdminEmails();
       if (!adminEmailsResult.success) {
         return adminEmailsResult;
-      }
-
-      if (adminEmailsResult.data.length === 0) {
-        console.warn('[Email Notifications] Aucun administrateur actif trouvé');
-        return {
-          success: true,
-          data: { message: 'Aucun administrateur à notifier' }
-        };
       }
 
       // Créer le template d'email
@@ -95,47 +156,25 @@ class EmailNotificationService {
         this.context
       );
 
-      // Envoyer l'email à tous les administrateurs
-      const emailResult = await emailService.sendEmail({
-        to: adminEmailsResult.data,
-        subject,
-        html
-      });
-
-      if (emailResult.success) {
-        console.log(`[Email Notifications] ✅ Notification idée envoyée à ${adminEmailsResult.data.length} administrateurs`);
-      } else {
-        const error = 'error' in emailResult ? emailResult.error : new Error('Unknown error');
-        console.error('[Email Notifications] ❌ Erreur envoi notification idée:', error);
-      }
-
-      return emailResult;
+      return this.sendToRecipients(adminEmailsResult.data, subject, html, 'new_idea');
     } catch (error) {
-      console.error('[Email Notifications] Erreur notification nouvelle idée:', error);
+      logger.error('[Email Notifications] Erreur notification nouvelle idée', { error, title: idea.title });
       return {
         success: false,
-        error: new Error(`Erreur notification idée: ${error}`)
+        error: new Error(`Erreur notification idée: ${String(error)}`)
       };
     }
   }
 
   // Notifier les admins d'un nouvel événement par email
-  async notifyNewEvent(event: Event, organizerName: string): Promise<Result<any>> {
+  async notifyNewEvent(event: Event, organizerName: string): Promise<Result<unknown>> {
     try {
-      console.log(`[Email Notifications] Envoi notification nouvel événement: ${event.title}`);
+      logger.info('[Email Notifications] Préparation notification nouvel événement', { title: event.title });
 
       // Récupérer les emails des administrateurs
       const adminEmailsResult = await this.getAdminEmails();
       if (!adminEmailsResult.success) {
         return adminEmailsResult;
-      }
-
-      if (adminEmailsResult.data.length === 0) {
-        console.warn('[Email Notifications] Aucun administrateur actif trouvé');
-        return {
-          success: true,
-          data: { message: 'Aucun administrateur à notifier' }
-        };
       }
 
       // Créer le template d'email
@@ -145,26 +184,12 @@ class EmailNotificationService {
         this.context
       );
 
-      // Envoyer l'email à tous les administrateurs
-      const emailResult = await emailService.sendEmail({
-        to: adminEmailsResult.data,
-        subject,
-        html
-      });
-
-      if (emailResult.success) {
-        console.log(`[Email Notifications] ✅ Notification événement envoyée à ${adminEmailsResult.data.length} administrateurs`);
-      } else {
-        const error = 'error' in emailResult ? emailResult.error : new Error('Unknown error');
-        console.error('[Email Notifications] ❌ Erreur envoi notification événement:', error);
-      }
-
-      return emailResult;
+      return this.sendToRecipients(adminEmailsResult.data, subject, html, 'new_event');
     } catch (error) {
-      console.error('[Email Notifications] Erreur notification nouvel événement:', error);
+      logger.error('[Email Notifications] Erreur notification nouvel événement', { error, title: event.title });
       return {
         success: false,
-        error: new Error(`Erreur notification événement: ${error}`)
+        error: new Error(`Erreur notification événement: ${String(error)}`)
       };
     }
   }
@@ -183,17 +208,19 @@ class EmailNotificationService {
       }
 
       const recruitmentManager = memberResult.data;
-      console.log('[Email Notifications] Responsable recrutement:', recruitmentManager ? recruitmentManager.email : 'Non défini');
+      logger.info('[Email Notifications] Responsable recrutement résolu', {
+        hasRecruitmentManager: Boolean(recruitmentManager?.email),
+      });
 
       return {
         success: true,
         data: recruitmentManager?.email || null
       };
     } catch (error) {
-      console.error('[Email Notifications] Erreur lors de la récupération du responsable recrutement:', error);
+      logger.error('[Email Notifications] Erreur lors de la récupération du responsable recrutement', { error });
       return {
         success: false,
-        error: new Error(`Erreur récupération responsable recrutement: ${error}`)
+        error: new Error(`Erreur récupération responsable recrutement: ${String(error)}`)
       };
     }
   }
@@ -208,9 +235,11 @@ class EmailNotificationService {
     role?: string;
     notes?: string;
     proposedBy: string;
-  }): Promise<Result<any>> {
+  }): Promise<Result<unknown>> {
     try {
-      console.log(`[Email Notifications] Envoi notification nouveau membre: ${memberData.firstName} ${memberData.lastName}`);
+      logger.info('[Email Notifications] Préparation notification nouvelle proposition membre', {
+        fullName: `${memberData.firstName} ${memberData.lastName}`,
+      });
 
       // Récupérer l'email du responsable recrutement
       const recruitmentManagerEmailResult = await this.getRecruitmentManagerEmail();
@@ -223,22 +252,16 @@ class EmailNotificationService {
       let recipients: string[];
       if (recruitmentManagerEmailResult.data) {
         recipients = [recruitmentManagerEmailResult.data];
-        console.log(`[Email Notifications] Envoi au responsable recrutement: ${recruitmentManagerEmailResult.data}`);
+        logger.info('[Email Notifications] Envoi dirigé vers le responsable recrutement');
       } else {
         const adminEmailsResult = await this.getAdminEmails();
         if (!adminEmailsResult.success) {
           return adminEmailsResult;
         }
         recipients = adminEmailsResult.data;
-        console.log(`[Email Notifications] Aucun responsable recrutement défini, envoi aux admins (${recipients.length})`);
-      }
-
-      if (recipients.length === 0) {
-        console.error('[Email Notifications] ❌ Configuration erreur: Aucun destinataire trouvé pour la proposition de membre');
-        return {
-          success: false,
-          error: new Error('Aucun destinataire configuré pour les notifications de proposition de membre. Veuillez assigner un responsable recrutement ou activer des administrateurs.')
-        };
+        logger.warn('[Email Notifications] Aucun responsable recrutement défini, fallback vers administrateurs', {
+          recipients: recipients.length,
+        });
       }
 
       // Créer le template d'email
@@ -247,37 +270,28 @@ class EmailNotificationService {
         this.context
       );
 
-      // Envoyer l'email
-      const emailResult = await emailService.sendEmail({
-        to: recipients,
+      return this.sendToRecipients(
+        recipients,
         subject,
-        html
-      });
-
-      if (emailResult.success) {
-        console.log(`[Email Notifications] ✅ Notification proposition membre envoyée à ${recipients.length} destinataire(s)`);
-      } else {
-        const error = 'error' in emailResult ? emailResult.error : new Error('Unknown error');
-        console.error('[Email Notifications] ❌ Erreur envoi notification proposition membre:', error);
-      }
-
-      return emailResult;
+        html,
+        'new_member_proposal'
+      );
     } catch (error) {
-      console.error('[Email Notifications] Erreur notification nouvelle proposition membre:', error);
+      logger.error('[Email Notifications] Erreur notification nouvelle proposition membre', { error });
       return {
         success: false,
-        error: new Error(`Erreur notification proposition membre: ${error}`)
+        error: new Error(`Erreur notification proposition membre: ${String(error)}`)
       };
     }
   }
 
   // Tester la configuration email
-  async testEmailConfiguration(): Promise<Result<any>> {
+  async testEmailConfiguration(): Promise<Result<unknown>> {
     try {
-      console.log('[Email Notifications] Test de configuration email...');
+      logger.info('[Email Notifications] Démarrage test de configuration email');
 
       // Récupérer les emails des administrateurs
-      const adminEmailsResult = await this.getAdminEmails();
+      const adminEmailsResult = await this.getAdminEmails({ forceRefresh: true });
       if (!adminEmailsResult.success) {
         return adminEmailsResult;
       }
@@ -293,44 +307,46 @@ class EmailNotificationService {
       const { createTestEmailTemplate } = await import('./email-templates');
       const { subject, html } = createTestEmailTemplate(this.context);
 
-      // Envoyer uniquement au premier admin pour le test
+      const testRecipient = adminEmailsResult.data[0];
       const testEmailResult = await emailService.sendEmail({
-        to: [adminEmailsResult.data[0]], // Test sur le premier admin uniquement
+        to: [testRecipient],
         subject,
         html
       });
 
       if (testEmailResult.success) {
-        console.log('[Email Notifications] ✅ Test email envoyé avec succès');
+        logger.info('[Email Notifications] Test email envoyé avec succès', {
+          recipient: testRecipient,
+          messageId: testEmailResult.data.messageId,
+        });
+      } else {
+        logger.error('[Email Notifications] Échec du test email', {
+          recipient: testRecipient,
+          error: String(testEmailResult.error),
+        });
       }
 
       return testEmailResult;
     } catch (error) {
-      console.error('[Email Notifications] Erreur lors du test email:', error);
+      logger.error('[Email Notifications] Erreur lors du test email', { error });
       return {
         success: false,
-        error: new Error(`Erreur test email: ${error}`)
+        error: new Error(`Erreur test email: ${String(error)}`)
       };
     }
   }
 
   // Notifier les admins d'un nouveau matériel proposé au prêt
-  async notifyNewLoanItem(loanItem: LoanItem): Promise<Result<any>> {
+  async notifyNewLoanItem(loanItem: LoanItem): Promise<Result<unknown>> {
     try {
-      console.log(`[Email Notifications] Envoi notification nouveau matériel: ${loanItem.title}`);
+      logger.info('[Email Notifications] Préparation notification nouveau matériel', {
+        title: loanItem.title,
+      });
 
       // Récupérer les emails des administrateurs
       const adminEmailsResult = await this.getAdminEmails();
       if (!adminEmailsResult.success) {
         return adminEmailsResult;
-      }
-
-      if (adminEmailsResult.data.length === 0) {
-        console.warn('[Email Notifications] Aucun administrateur actif trouvé');
-        return {
-          success: true,
-          data: { message: 'Aucun administrateur à notifier' }
-        };
       }
 
       // Créer le template d'email
@@ -339,26 +355,12 @@ class EmailNotificationService {
         this.context
       );
 
-      // Envoyer l'email à tous les administrateurs
-      const emailResult = await emailService.sendEmail({
-        to: adminEmailsResult.data,
-        subject,
-        html
-      });
-
-      if (emailResult.success) {
-        console.log(`[Email Notifications] ✅ Notification matériel envoyée à ${adminEmailsResult.data.length} administrateurs`);
-      } else {
-        const error = 'error' in emailResult ? emailResult.error : new Error('Unknown error');
-        console.error('[Email Notifications] ❌ Erreur envoi notification matériel:', error);
-      }
-
-      return emailResult;
+      return this.sendToRecipients(adminEmailsResult.data, subject, html, 'new_loan_item');
     } catch (error) {
-      console.error('[Email Notifications] Erreur notification nouveau matériel:', error);
+      logger.error('[Email Notifications] Erreur notification nouveau matériel', { error, title: loanItem.title });
       return {
         success: false,
-        error: new Error(`Erreur notification matériel: ${error}`)
+        error: new Error(`Erreur notification matériel: ${String(error)}`)
       };
     }
   }
@@ -366,7 +368,7 @@ class EmailNotificationService {
   // Mise à jour du contexte (utile si l'URL de base change)
   updateContext(newContext: Partial<NotificationContext>): void {
     this.context = { ...this.context, ...newContext };
-    console.log('[Email Notifications] Contexte mis à jour:', this.context);
+    logger.info('[Email Notifications] Contexte des notifications mis à jour');
   }
 }
 

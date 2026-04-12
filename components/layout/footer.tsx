@@ -2,10 +2,52 @@
 
 import Link from 'next/link';
 import { LogIn } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useBranding } from '@/contexts/BrandingContext';
+
+interface VersionPayload {
+  version: string;
+  summary?: string;
+  changelogUrl?: string;
+}
 
 export default function Footer() {
   const { branding } = useBranding();
+  const [versionInfo, setVersionInfo] = useState<VersionPayload | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetch('/version.json', { cache: 'no-store' })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as VersionPayload;
+        if (mounted && data.version) {
+          setVersionInfo(data);
+        }
+      })
+      .catch(async () => {
+        try {
+          const response = await fetch('/api/version', { cache: 'no-store' });
+          if (!response.ok) return;
+          const fallback = (await response.json()) as { version?: string };
+          if (mounted && fallback.version) {
+            setVersionInfo({
+              version: fallback.version,
+              changelogUrl: '/changelog',
+            });
+          }
+        } catch {
+          // Sans impact: footer garde son affichage standard.
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <footer className="bg-gray-100 border-t mt-auto">
@@ -27,7 +69,7 @@ export default function Footer() {
           </Link>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
+        <div className="mt-4 pt-4 border-t border-gray-200 text-center text-xs text-gray-500 space-y-2">
           <p>
             Propulsé par{' '}
             <a
@@ -39,6 +81,19 @@ export default function Footer() {
               Robinswood
             </a>
           </p>
+          {versionInfo?.version && (
+            <p className="text-gray-600">
+              Version {versionInfo.version}
+              {' · '}
+              <Link
+                href={versionInfo.changelogUrl || '/changelog'}
+                className="text-primary hover:underline"
+              >
+                Notes de version
+              </Link>
+              {versionInfo.summary ? ` · ${versionInfo.summary}` : ''}
+            </p>
+          )}
         </div>
       </div>
     </footer>

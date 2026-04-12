@@ -15,17 +15,26 @@ export default function HomePage() {
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
-    // Récupérer la version depuis l'API
-    fetch('/api/version')
+    // Récupérer la version générée automatiquement
+    fetch('/version.json', { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (data.version) {
           setVersion(data.version);
         }
       })
-      .catch(() => {
-        // Ignorer les erreurs silencieusement
-      });
+      .catch(() =>
+        fetch('/api/version')
+          .then(res => res.json())
+          .then(data => {
+            if (data.version) {
+              setVersion(data.version);
+            }
+          })
+          .catch(() => {
+            // Ignorer les erreurs silencieusement
+          })
+      );
   }, []);
 
   return (
@@ -84,7 +93,10 @@ export default function HomePage() {
                     </a>
                     {version && (
                       <span className="text-xs text-gray-500" data-testid="version-tag">
-                        {version}
+                        Version {version} ·{' '}
+                        <a href="/changelog" className="text-primary hover:underline">
+                          Notes de version
+                        </a>
                       </span>
                     )}
                   </div>

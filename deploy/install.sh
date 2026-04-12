@@ -4,14 +4,14 @@
 # Usage: curl -sSL https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/install.sh | bash
 # =============================================================================
 
-set -e
+set -euo pipefail
 
 echo "🚀 Installation de l'application Komuno..."
 
 # Variables
-APP_DIR="/srv/workspace/app"
-DOMAIN="${DOMAIN:-app.example.com}"
-APP_NAME="${APP_NAME:-app}"
+APP_NAME="${APP_NAME:-komuno}"
+APP_DIR="/srv/workspace/${APP_NAME}"
+DOMAIN="${DOMAIN:-example.org}"
 
 # Couleurs
 RED='\033[0;31m'
@@ -57,8 +57,8 @@ setup_directories() {
 download_files() {
     log_info "Téléchargement des fichiers de configuration..."
     
-    # Docker Compose
-    curl -sSL https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/docker-compose.prod.yml -o docker-compose.yml
+    # Docker Compose production
+    curl -sSL https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/docker-compose.prod.yml -o docker-compose.prod.yml
     
     # Env example
     curl -sSL https://raw.githubusercontent.com/robinswood-io/komuno/main/deploy/.env.example -o .env.example
@@ -97,10 +97,14 @@ docker_login() {
     log_info "Connexion au registry GitHub Container..."
     
     if [ -z "$GHCR_TOKEN" ]; then
-        log_warn "Variable GHCR_TOKEN non définie"
-        log_warn "Exécutez: export GHCR_TOKEN=votre_token"
+        log_warn "Variable GHCR_TOKEN non definie"
+        log_warn "Executez: export GHCR_TOKEN=votre_token"
         log_warn "Puis: echo \$GHCR_TOKEN | docker login ghcr.io -u USERNAME --password-stdin"
     else
+        if [ -z "${GHCR_USER:-}" ]; then
+            log_error "GHCR_USER non defini alors que GHCR_TOKEN est fourni"
+            exit 1
+        fi
         echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
         log_info "✅ Connecté au registry"
     fi
@@ -110,13 +114,13 @@ docker_login() {
 start_services() {
     log_info "Démarrage des services..."
     
-    docker compose pull
-    docker compose up -d
+    docker compose -f docker-compose.prod.yml pull
+    docker compose -f docker-compose.prod.yml up -d
     
     log_info "⏳ Attente du démarrage..."
     sleep 30
     
-    docker compose ps
+    docker compose -f docker-compose.prod.yml ps
     
     log_info "✅ Services démarrés"
 }
@@ -143,7 +147,7 @@ main() {
     echo "Prochaines étapes:"
     echo "1. Vérifiez le fichier .env: nano $APP_DIR/.env"
     echo "2. Configurez votre DNS pour pointer vers ce serveur"
-    echo "3. Vérifiez les logs: docker compose logs -f"
+    echo "3. Verifiez les logs: docker compose -f docker-compose.prod.yml logs -f"
     echo "4. Accédez à: https://$DOMAIN"
     echo ""
 }

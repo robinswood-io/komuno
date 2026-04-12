@@ -1,65 +1,50 @@
-# 📚 Documentation CJD Amiens
+# Documentation Komuno
 
-Bienvenue dans la documentation du projet **CJD Amiens** - Plateforme web interne "Boîte à Kiffs".
+Ce document est le point d'entree de la documentation maintenue.
 
-## 📖 Guide de Navigation
+## Statut de fiabilite
 
-### 🔌 API & Intégration
+Mise a jour et verification effectuees le 2026-04-10.
 
-- **[Documentation API tRPC](../TRPC_API_DOCUMENTATION.md)** - Documentation complète de l'API tRPC (74 endpoints, 9 routers)
-- **[API JSON Documentation](./trpc-api-documentation.json)** - Structure JSON pour intégration programmatique
-- **[API REST Complete](./API_COMPLETE_DOCUMENTATION.md)** - Documentation des endpoints REST NestJS
-- **[API Quick Start](./API_QUICK_START.md)** - Guide de démarrage rapide API
-- **[API Changelog](./API_CHANGELOG.md)** - Historique des changements API
+La liste canonique des documents consideres comme **source de verite** est maintenue ici:
 
-### 🚀 Déploiement & Infrastructure
+- [`./MAINTAINED_DOCS.md`](./MAINTAINED_DOCS.md)
 
-- **[Guide de Déploiement](./deployment/DEPLOYMENT.md)** - Instructions complètes pour déployer l'application en production
-- **[Secrets GitHub](./deployment/GITHUB-SECRETS.md)** - Configuration des secrets pour le déploiement automatique
-- **[Docker Compose Production](./deployment/docker-compose.prod.yml)** - Configuration Docker pour la production
+## Structure projet (actuelle)
 
-### ✨ Fonctionnalités & Personnalisation
-
-- **[Personnalisation du Branding](./features/CUSTOMIZATION.md)** - Guide pour personnaliser les couleurs, logos et l'identité visuelle
-- **[Invalidation du Cache](./features/CACHE-INVALIDATION.md)** - Stratégies de gestion du cache et invalidation
-
-### 🧪 Tests & Qualité
-
-- **[Rapport de Tests - Mémorisation Utilisateur](./testing/rapport-tests-memorisation-utilisateur.md)** - Rapport détaillé des tests de mémorisation utilisateur
-
-## 📁 Structure du Projet
-
-```
-cjd80/
-├── client/              # Frontend React + TypeScript
-├── server/              # Backend Express + API REST
-├── shared/              # Code partagé (schémas, types)
-├── docs/                # 📚 Documentation (vous êtes ici)
-│   ├── deployment/      # Guides de déploiement
-│   ├── features/        # Documentation des fonctionnalités
-│   └── testing/         # Rapports et guides de test
-├── tests/               # 🧪 Tests (Vitest, Playwright)
-│   ├── e2e/            # Tests end-to-end
-│   └── reports/        # Rapports générés
-├── scripts/             # 🛠️ Scripts utilitaires
-└── assets/              # 🖼️ Ressources statiques
-    ├── screenshots/    # Screenshots de démo
-    └── archive/        # Données historiques
+```text
+komuno/
+├── app/                 # Next.js App Router
+├── components/          # Composants UI
+├── server/src/          # API NestJS
+├── shared/              # Types/schemas partages
+├── deploy/              # Fichiers de deploiement
+├── docs/                # Documentation
+├── tests/               # Tests integration / validation API
+└── test/                # Tests unitaires
 ```
 
-## 🔗 Liens Rapides
+## Verification automatique de la documentation maintenue
 
-- [README Principal](../README.md) - Vue d'ensemble du projet
-- [Guide de Contribution](../CONTRIBUTING.md) - Comment contribuer au projet *(à créer)*
-- [Changelog](../CHANGELOG.md) - Historique des versions *(à créer)*
+Depuis la racine du projet:
 
-## 🆘 Support
+```bash
+npm run docs:check
+npm run docs:check:all
+```
 
-Pour toute question ou problème :
-1. Consultez d'abord la documentation pertinente ci-dessus
-2. Vérifiez les [Issues GitHub](https://github.com/Aoleon/cjd80/issues)
-3. Contactez l'équipe de développement
+`docs:check` couvre les documents prioritaires.
 
----
+`docs:check:all` couvre tous les fichiers Markdown dans `docs/` ainsi que `README.md` et `deploy/README.md`.
 
-*Dernière mise à jour : Octobre 2025*
+## Documents historiques
+
+Le dossier `docs/` contient encore des documents techniques historiques (anciennes iterations, anciens contextes projet, anciens workflows de deploiement).
+
+Ces documents sont conserves pour trace dans [`./legacy/README.md`](./legacy/README.md), mais **ne sont pas garantis a jour** tant qu'ils ne sont pas references dans la section "Statut de fiabilite" ci-dessus.
+
+## Documents operationnels (agents/autonomie)
+
+Les fichiers `docs/AGENT_*` sont utilises par les scripts d'orchestration autonome (`scripts/autonomous-run.ts`, `scripts/update-agent-metrics.ts`, etc.).
+
+Ils sont operationnels, mais leur cycle de vie est different des guides utilisateur/deploiement. Toute modification doit rester compatible avec ces scripts.

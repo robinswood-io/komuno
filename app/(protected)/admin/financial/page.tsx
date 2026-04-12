@@ -1582,7 +1582,15 @@ export default function AdminFinancialPage() {
                             <Cell key={`cell-${index}`} fill={['#22c55e', '#3b82f6', '#a855f7', '#f97316'][index % 4]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        <Tooltip
+                          formatter={(value) =>
+                            formatCurrency(
+                              typeof value === 'number'
+                                ? value
+                                : Number(Array.isArray(value) ? value[0] : value ?? 0)
+                            )
+                          }
+                        />
                         <Legend />
                       </PieChart>
                     </ResponsiveContainer>
@@ -1618,7 +1626,15 @@ export default function AdminFinancialPage() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="category" />
                         <YAxis />
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        <Tooltip
+                          formatter={(value) =>
+                            formatCurrency(
+                              typeof value === 'number'
+                                ? value
+                                : Number(Array.isArray(value) ? value[0] : value ?? 0)
+                            )
+                          }
+                        />
                         <Legend />
                         <Bar dataKey="amount" fill="#22c55e" name="Montant" />
                       </BarChart>
