@@ -1,7 +1,8 @@
 {
-  "version": "1.0.0",
-  "releasedAt": "2026-04-10",
-  "summary": "Version actuelle de l'application Komuno.",
-  "commitCount": 0,
+  "version": "2.1.0",
+  "previousVersion": "2.0.0",
+  "releasedAt": "2026-04-12",
+  "summary": "Cette version apporte 21 nouveaute(s), 68 correction(s), 4 amelioration(s).",
+  "commitCount": 109,
   "changelogUrl": "/changelog"
 }
