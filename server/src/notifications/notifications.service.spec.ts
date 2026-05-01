@@ -554,6 +554,39 @@ describe('NotificationsService', () => {
       expect(result.total).toBe(0);
       expect(result.notifications).toEqual([]);
     });
+
+    it('should search with offerId filter', async () => {
+      const userId = 'user-123';
+      const offerId = 'offer-99';
+
+      mockDb.select = vi
+        .fn()
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([{ count: 2 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockReturnValue({
+                limit: vi.fn().mockReturnValue({
+                  offset: vi.fn().mockResolvedValue([
+                    { id: 'notif-o1', type: 'offer_update' },
+                    { id: 'notif-o2', type: 'offer_update' },
+                  ]),
+                }),
+              }),
+            }),
+          }),
+        });
+
+      const result = await service.searchNotifications(userId, { offerId });
+
+      expect(result.total).toBe(2);
+      expect(result.notifications).toHaveLength(2);
+      expect(mockDb.select).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('getUnreadCount', () => {
@@ -625,6 +658,65 @@ describe('NotificationsService', () => {
 
       expect(result).toBe(2);
       expect(mockDb.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('getStatistics', () => {
+    it('should return aggregated statistics', async () => {
+      mockDb.select = vi
+        .fn()
+        .mockReturnValueOnce({
+          from: vi.fn().mockResolvedValue([{ count: 10 }]),
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([{ count: 4 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            groupBy: vi.fn().mockResolvedValue([
+              { type: 'idea_update', count: 7 },
+              { type: 'offer_update', count: 3 },
+            ]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              groupBy: vi.fn().mockReturnValue({
+                orderBy: vi.fn().mockResolvedValue([
+                  { day: '2026-04-30', count: 2 },
+                  { day: '2026-04-29', count: 1 },
+                ]),
+              }),
+            }),
+          }),
+        });
+
+      const result = await service.getStatistics();
+
+      expect(result).toEqual({
+        total: 10,
+        unread: 4,
+        read: 6,
+        byType: {
+          idea_update: 7,
+          offer_update: 3,
+        },
+        byDay: {
+          '2026-04-30': 2,
+          '2026-04-29': 1,
+        },
+      });
+    });
+
+    it('should rethrow when statistics query fails', async () => {
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockRejectedValue(new Error('stats query failed')),
+      });
+
+      await expect(service.getStatistics()).rejects.toThrow('stats query failed');
     });
   });
 });

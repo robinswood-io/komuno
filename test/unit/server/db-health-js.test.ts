@@ -234,6 +234,64 @@ describe('server/utils/db-health.js', () => {
     expect(logSpy).not.toHaveBeenCalled();
   });
 
+  it('continues in production mode when random gate is below threshold without dev-only logs', async () => {
+    process.env.NODE_ENV = 'production';
+
+    const setup = await loadDbHealthJsModule({ poolStats: basePoolStats });
+
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.01);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    setup.module.optimizePoolUsage();
+
+    expect(setup.getPoolStatsMock).toHaveBeenCalledTimes(1);
+    expect(randomSpy).toHaveBeenCalledTimes(1);
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(infoSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs base development diagnostics without warning/info when thresholds are not reached', async () => {
+    process.env.NODE_ENV = 'development';
+
+    const stats: PoolStats = {
+      ...basePoolStats,
+      waitingCount: 1,
+      totalCount: 10,
+      maxConnections: 20,
+    };
+
+    const setup = await loadDbHealthJsModule({ poolStats: stats });
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    setup.module.optimizePoolUsage();
+
+    expect(logSpy).toHaveBeenCalledWith('[DB Optimizer] Statistiques actuelles:', stats);
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(infoSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses default monitoring interval when not provided', async () => {
+    const setup = await loadDbHealthJsModule({ poolStats: basePoolStats });
+
+    const intervalSpy = vi
+      .spyOn(global, 'setInterval')
+      .mockImplementation(() => 456 as unknown as NodeJS.Timeout);
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    setup.module.startPoolMonitoring();
+
+    expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 60000);
+    expect(logSpy).toHaveBeenCalledWith(
+      '[DB Monitor] Monitoring du pool démarré (interval: 60000ms)',
+    );
+  });
+
   it('starts pool monitoring and executes optimizer through the interval callback', async () => {
     process.env.NODE_ENV = 'development';
 

@@ -71,6 +71,8 @@ describe('AdminService', () => {
         getDevelopmentRequests: vi.fn(),
         createDevelopmentRequest: vi.fn(),
         updateDevelopmentRequest: vi.fn(),
+        updateDevelopmentRequestStatus: vi.fn(),
+        deleteDevelopmentRequest: vi.fn(),
         getFeatureConfig: vi.fn(),
         updateFeatureConfig: vi.fn(),
         getEmailConfig: vi.fn(),
@@ -623,6 +625,45 @@ describe('AdminService', () => {
       }
     });
 
+    it('syncDevelopmentRequestWithGitHub should return skipped sync when github status cannot be fetched in non-production', async () => {
+      const previousNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'test';
+
+      const syncGitHubIssueStatusMock = vi.fn().mockResolvedValue(null);
+      vi.doMock('../../utils/github-integration', () => ({
+        syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+      }));
+
+      try {
+        vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+          success: true,
+          data: [
+            {
+              id: 'dev-sync-1',
+              title: 'Avec issue',
+              description: 'Desc',
+              type: 'feature',
+              status: 'open',
+              priority: 'high',
+              requestedBy: 'user@example.com',
+              requestedByName: 'User Name',
+              githubIssueNumber: 55,
+            },
+          ],
+        });
+
+        const result = await adminService.syncDevelopmentRequestWithGitHub('dev-sync-1');
+
+        expect(syncGitHubIssueStatusMock).toHaveBeenCalledWith(55);
+        expect(result.success).toBe(true);
+        expect(result.message).toContain('configuration manquante');
+        expect(result.data.status).toBe('pending');
+      } finally {
+        vi.doUnmock('../../utils/github-integration');
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    });
+
     it('syncDevelopmentRequestWithGitHub should throw in production when githubIssueNumber is missing', async () => {
       const previousNodeEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'production';
@@ -649,6 +690,82 @@ describe('AdminService', () => {
         );
       } finally {
         process.env.NODE_ENV = previousNodeEnv;
+      }
+    });
+
+    it('syncDevelopmentRequestWithGitHub should throw in production when github status cannot be fetched', async () => {
+      const previousNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
+      const syncGitHubIssueStatusMock = vi.fn().mockResolvedValue(null);
+      vi.doMock('../../utils/github-integration', () => ({
+        syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+      }));
+
+      try {
+        vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+          success: true,
+          data: [
+            {
+              id: 'dev-sync-2',
+              title: 'Avec issue prod',
+              description: 'Desc',
+              type: 'bug',
+              status: 'open',
+              priority: 'medium',
+              requestedBy: 'user@example.com',
+              requestedByName: 'User Name',
+              githubIssueNumber: 56,
+            },
+          ],
+        });
+
+        await expect(adminService.syncDevelopmentRequestWithGitHub('dev-sync-2')).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(syncGitHubIssueStatusMock).toHaveBeenCalledWith(56);
+      } finally {
+        vi.doUnmock('../../utils/github-integration');
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    });
+
+    it('syncDevelopmentRequestWithGitHub should throw when storage update fails after github sync', async () => {
+      const syncGitHubIssueStatusMock = vi.fn().mockResolvedValue({
+        status: 'closed',
+        labels: ['status-done'],
+      });
+      vi.doMock('../../utils/github-integration', () => ({
+        syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+      }));
+
+      try {
+        vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+          success: true,
+          data: [
+            {
+              id: 'dev-sync-3',
+              title: 'Issue',
+              description: 'Desc',
+              type: 'feature',
+              status: 'in_progress',
+              priority: 'high',
+              requestedBy: 'user@example.com',
+              requestedByName: 'User Name',
+              githubIssueNumber: 57,
+            },
+          ],
+        });
+        vi.mocked(storageService.instance.updateDevelopmentRequest).mockResolvedValue({
+          success: false,
+          error: new Error('update sync failed'),
+        });
+
+        await expect(adminService.syncDevelopmentRequestWithGitHub('dev-sync-3')).rejects.toThrow(
+          BadRequestException,
+        );
+      } finally {
+        vi.doUnmock('../../utils/github-integration');
       }
     });
   });
@@ -1506,6 +1623,54 @@ describe('AdminService', () => {
       await expect(adminService.getFeatureConfig()).rejects.toThrow(BadRequestException);
     });
 
+    it('getFeatureConfig should return data on success', async () => {
+      vi.mocked(storageService.instance.getFeatureConfig).mockResolvedValue({
+        success: true,
+        data: [{ key: 'new_ideas_enabled', enabled: true }],
+      });
+
+      const result = await adminService.getFeatureConfig();
+
+      expect(result).toEqual({
+        success: true,
+        data: [{ key: 'new_ideas_enabled', enabled: true }],
+      });
+    });
+
+    it('updateFeatureConfig should return data on success', async () => {
+      vi.mocked(storageService.instance.updateFeatureConfig).mockResolvedValue({
+        success: true,
+        data: { key: 'new_ideas_enabled', enabled: false, updatedBy: 'admin@example.org' },
+      });
+
+      const result = await adminService.updateFeatureConfig(
+        'new_ideas_enabled',
+        false,
+        'admin@example.org',
+      );
+
+      expect(storageService.instance.updateFeatureConfig).toHaveBeenCalledWith(
+        'new_ideas_enabled',
+        false,
+        'admin@example.org',
+      );
+      expect(result).toEqual({
+        success: true,
+        data: { key: 'new_ideas_enabled', enabled: false, updatedBy: 'admin@example.org' },
+      });
+    });
+
+    it('updateFeatureConfig should throw when storage update fails', async () => {
+      vi.mocked(storageService.instance.updateFeatureConfig).mockResolvedValue({
+        success: false,
+        error: new Error('feature update failed'),
+      });
+
+      await expect(
+        adminService.updateFeatureConfig('new_ideas_enabled', true, 'admin@example.org'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('createDevelopmentRequest should throw BadRequestException for invalid payload', async () => {
       await expect(
         adminService.createDevelopmentRequest(
@@ -1541,6 +1706,64 @@ describe('AdminService', () => {
       }
     });
 
+    it('updateDevelopmentRequestStatus should throw when request list loading fails', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: false,
+        error: new Error('load failed'),
+      });
+
+      await expect(
+        adminService.updateDevelopmentRequestStatus(
+          'dev-1',
+          { status: 'open' },
+          { email: 'super@example.org', role: 'super_admin' },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('updateDevelopmentRequestStatus should throw NotFoundException when request does not exist', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: true,
+        data: [{ id: 'dev-existing', status: 'open', type: 'feature', priority: 'medium' }],
+      });
+
+      await expect(
+        adminService.updateDevelopmentRequestStatus(
+          'dev-404',
+          { status: 'done' },
+          { email: 'super@example.org', role: 'super_admin' },
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('updateDevelopmentRequestStatus should update and return mapped status', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: true,
+        data: [{ id: 'dev-2', status: 'open', type: 'feature', priority: 'high' }],
+      });
+      vi.mocked(storageService.instance.updateDevelopmentRequestStatus).mockResolvedValue({
+        success: true,
+        data: { id: 'dev-2', status: 'closed' },
+      });
+
+      const result = await adminService.updateDevelopmentRequestStatus(
+        'dev-2',
+        { status: 'closed', adminComment: 'Livré' },
+        { email: 'super@example.org', role: 'super_admin' },
+      );
+
+      expect(storageService.instance.updateDevelopmentRequestStatus).toHaveBeenCalledWith(
+        'dev-2',
+        'closed',
+        'Livré',
+        'super@example.org',
+      );
+      expect(result).toEqual({
+        id: 'dev-2',
+        status: 'done',
+      });
+    });
+
     it('syncDevelopmentRequestFromGitHub should return success=false when no linked request exists', async () => {
       vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
         success: true,
@@ -1565,6 +1788,165 @@ describe('AdminService', () => {
         success: false,
         message: 'Aucune demande liée à cette issue',
       });
+    });
+
+    it('syncDevelopmentRequestFromGitHub should throw when request list loading fails', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: false,
+        error: new Error('github sync listing failed'),
+      });
+
+      await expect(
+        adminService.syncDevelopmentRequestFromGitHub({
+          issueNumber: 7,
+          issueUrl: 'https://github.com/org/repo/issues/7',
+          state: 'open',
+          labels: ['feature'],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('syncDevelopmentRequestFromGitHub should throw when update fails', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: true,
+        data: [{ id: 'dev-3', githubIssueNumber: 123, title: 'Titre actuel', status: 'open' }],
+      });
+      vi.mocked(storageService.instance.updateDevelopmentRequest).mockResolvedValue({
+        success: false,
+        error: new Error('github sync update failed'),
+      });
+
+      await expect(
+        adminService.syncDevelopmentRequestFromGitHub({
+          issueNumber: 123,
+          issueUrl: 'https://github.com/org/repo/issues/123',
+          state: 'closed',
+          labels: ['status-done'],
+          title: 'Titre mis à jour',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('syncDevelopmentRequestFromGitHub should update title and map returned status', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: true,
+        data: [{ id: 'dev-4', githubIssueNumber: 321, title: 'Titre initial', status: 'open' }],
+      });
+      vi.mocked(storageService.instance.updateDevelopmentRequest).mockResolvedValue({
+        success: true,
+        data: { id: 'dev-4', status: 'in_progress', title: 'Titre GitHub' },
+      });
+
+      const result = await adminService.syncDevelopmentRequestFromGitHub({
+        issueNumber: 321,
+        issueUrl: 'https://github.com/org/repo/issues/321',
+        state: 'open',
+        labels: ['status-in_progress'],
+        title: 'Titre GitHub',
+      });
+
+      expect(storageService.instance.updateDevelopmentRequest).toHaveBeenCalledWith(
+        'dev-4',
+        expect.objectContaining({
+          status: 'in_progress',
+          githubStatus: 'open',
+          githubIssueUrl: 'https://github.com/org/repo/issues/321',
+          title: 'Titre GitHub',
+        }),
+      );
+      expect(result).toEqual({
+        success: true,
+        data: { id: 'dev-4', status: 'in_progress', title: 'Titre GitHub' },
+      });
+    });
+
+    it('deleteDevelopmentRequest should return success message', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: true,
+        data: [{ id: 'dev-5', title: 'Demande locale', status: 'open' }],
+      });
+      vi.mocked(storageService.instance.deleteDevelopmentRequest).mockResolvedValue({
+        success: true,
+      });
+
+      const result = await adminService.deleteDevelopmentRequest('dev-5');
+
+      expect(storageService.instance.deleteDevelopmentRequest).toHaveBeenCalledWith('dev-5');
+      expect(result).toEqual({
+        success: true,
+        message: 'Demande supprimée avec succès',
+      });
+    });
+
+    it('deleteDevelopmentRequest should still delete when prefetch requests call fails', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: false,
+        error: new Error('prefetch failed'),
+      });
+      vi.mocked(storageService.instance.deleteDevelopmentRequest).mockResolvedValue({
+        success: true,
+      });
+
+      const result = await adminService.deleteDevelopmentRequest('dev-7');
+
+      expect(storageService.instance.deleteDevelopmentRequest).toHaveBeenCalledWith('dev-7');
+      expect(result.success).toBe(true);
+    });
+
+    it('deleteDevelopmentRequest should close linked GitHub issue when present', async () => {
+      const closeGitHubIssueMock = vi.fn().mockResolvedValue(true);
+      vi.doMock('../../utils/github-integration', () => ({
+        closeGitHubIssue: closeGitHubIssueMock,
+      }));
+
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: true,
+        data: [{ id: 'dev-6', title: 'Demande GitHub', status: 'open', githubIssueNumber: 88 }],
+      });
+      vi.mocked(storageService.instance.deleteDevelopmentRequest).mockResolvedValue({
+        success: true,
+      });
+
+      try {
+        await adminService.deleteDevelopmentRequest('dev-6');
+        expect(closeGitHubIssueMock).toHaveBeenCalledWith(88, 'not_planned');
+      } finally {
+        vi.doUnmock('../../utils/github-integration');
+      }
+    });
+
+    it('deleteDevelopmentRequest should throw when storage deletion fails', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: true,
+        data: [{ id: 'dev-8', title: 'Demande', status: 'open' }],
+      });
+      vi.mocked(storageService.instance.deleteDevelopmentRequest).mockResolvedValue({
+        success: false,
+        error: new Error('delete failed'),
+      });
+
+      await expect(adminService.deleteDevelopmentRequest('dev-8')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('updateDevelopmentRequestStatus should throw when storage status update fails', async () => {
+      vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
+        success: true,
+        data: [{ id: 'dev-9', status: 'open', type: 'feature', priority: 'low' }],
+      });
+      vi.mocked(storageService.instance.updateDevelopmentRequestStatus).mockResolvedValue({
+        success: false,
+        error: new Error('status update failed'),
+      });
+
+      await expect(
+        adminService.updateDevelopmentRequestStatus(
+          'dev-9',
+          { status: 'closed' },
+          { email: 'super@example.org', role: 'super_admin' },
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

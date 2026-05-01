@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import { INTERCEPTORS_METADATA } from '@nestjs/common/constants';
 import { LoansController, AdminLoansController } from './loans.controller';
 import { LoansService } from './loans.service';
 
@@ -19,6 +20,51 @@ vi.mock('./loans.service', () => ({
     uploadLoanItemPhoto: vi.fn(),
   })),
 }));
+
+type FileFilterCallback = (
+  error: BadRequestException | null,
+  acceptFile: boolean,
+) => void;
+
+type UploadFileCandidate = {
+  mimetype: string;
+  originalname: string;
+};
+
+type UploadFileFilter = (
+  req: unknown,
+  file: UploadFileCandidate,
+  cb: FileFilterCallback,
+) => void;
+
+type InterceptorClass = new (
+  options?: Record<string, unknown>,
+) => {
+  multer: {
+    fileFilter: UploadFileFilter;
+  };
+};
+
+type ReflectWithMetadata = {
+  getMetadata: (metadataKey: string, target: object) => unknown;
+};
+
+function getUploadPhotoFileFilter(): UploadFileFilter {
+  const reflector = Reflect as unknown as ReflectWithMetadata;
+  const metadata = reflector.getMetadata(
+    INTERCEPTORS_METADATA,
+    AdminLoansController.prototype.uploadLoanItemPhoto,
+  );
+
+  if (!Array.isArray(metadata) || metadata.length === 0) {
+    throw new Error('Intercepteur upload non trouvé sur uploadLoanItemPhoto');
+  }
+
+  const UploadInterceptor = metadata[0] as InterceptorClass;
+  const interceptorInstance = new UploadInterceptor({});
+
+  return interceptorInstance.multer.fileFilter;
+}
 
 describe('LoansController', () => {
   let controller: LoansController;
@@ -579,6 +625,78 @@ describe('AdminLoansController', () => {
       await expect(
         controller.uploadLoanItemPhoto('non-existent', mockFile as any),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject file when mimetype is not allowed (fileFilter branch)', () => {
+      const fileFilter = getUploadPhotoFileFilter();
+
+      let callbackError: BadRequestException | null = null;
+      let callbackAccepted = true;
+
+      fileFilter(
+        {},
+        {
+          mimetype: 'application/pdf',
+          originalname: 'document.pdf',
+        },
+        (error, acceptFile) => {
+          callbackError = error;
+          callbackAccepted = acceptFile;
+        },
+      );
+
+      expect(callbackAccepted).toBe(false);
+      expect(callbackError).toBeInstanceOf(BadRequestException);
+      expect(callbackError?.message).toContain(
+        'Format de fichier non autorisé',
+      );
+    });
+
+    it('should reject file when extension is not allowed (fileFilter branch)', () => {
+      const fileFilter = getUploadPhotoFileFilter();
+
+      let callbackError: BadRequestException | null = null;
+      let callbackAccepted = true;
+
+      fileFilter(
+        {},
+        {
+          mimetype: 'image/jpeg',
+          originalname: 'photo.exe',
+        },
+        (error, acceptFile) => {
+          callbackError = error;
+          callbackAccepted = acceptFile;
+        },
+      );
+
+      expect(callbackAccepted).toBe(false);
+      expect(callbackError).toBeInstanceOf(BadRequestException);
+      expect(callbackError?.message).toContain(
+        'Extension de fichier non autorisée',
+      );
+    });
+
+    it('should accept file when mimetype and extension are allowed (fileFilter branch)', () => {
+      const fileFilter = getUploadPhotoFileFilter();
+
+      let callbackError: BadRequestException | null = null;
+      let callbackAccepted = false;
+
+      fileFilter(
+        {},
+        {
+          mimetype: 'image/png',
+          originalname: 'photo.png',
+        },
+        (error, acceptFile) => {
+          callbackError = error;
+          callbackAccepted = acceptFile;
+        },
+      );
+
+      expect(callbackError).toBeNull();
+      expect(callbackAccepted).toBe(true);
     });
   });
 

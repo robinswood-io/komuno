@@ -702,6 +702,9 @@ describe('AdminController - Coverage Additions', () => {
       getVotesByIdea: vi.fn(),
       getAllEvents: vi.fn(),
       getEventInscriptions: vi.fn(),
+      createInscription: vi.fn(),
+      deleteInscription: vi.fn(),
+      bulkCreateInscriptions: vi.fn(),
       createVote: vi.fn(),
       deleteVote: vi.fn(),
       getDevelopmentRequests: vi.fn(),
@@ -712,9 +715,14 @@ describe('AdminController - Coverage Additions', () => {
       getAdminStats: vi.fn(),
       getDatabaseHealth: vi.fn(),
       getPoolStats: vi.fn(),
+      getEventUnsubscriptions: vi.fn(),
       deleteUnsubscription: vi.fn(),
       updateUnsubscription: vi.fn(),
+      testEmailConfiguration: vi.fn(),
+      testEmailSimple: vi.fn(),
+      getFeatureConfig: vi.fn(),
       updateFeatureConfig: vi.fn(),
+      getEmailConfig: vi.fn(),
       updateEmailConfig: vi.fn(),
       getErrorLogs: vi.fn(),
       updateEventStatus: vi.fn(),
@@ -785,6 +793,44 @@ describe('AdminController - Coverage Additions', () => {
     );
     expect(eventInscriptions).toEqual(firstResponse);
     expect(byEvent).toEqual(secondResponse);
+  });
+
+  it('should passthrough inscription creation, deletion and bulk creation endpoints', async () => {
+    const createdInscription = { success: true, data: { id: 'ins-1' } };
+    const deletedInscription = { success: true };
+    const bulkResult = { success: true, created: 2, errors: 0 };
+
+    vi.mocked(adminService.createInscription).mockResolvedValue(createdInscription);
+    vi.mocked(adminService.deleteInscription).mockResolvedValue(deletedInscription);
+    vi.mocked(adminService.bulkCreateInscriptions).mockResolvedValue(bulkResult);
+
+    const createPayload = {
+      eventId: 'event-1',
+      name: 'Alice',
+      email: 'alice@example.com',
+      comments: 'Présente',
+    };
+    const bulkPayload = {
+      eventId: 'event-1',
+      inscriptions: [
+        { name: 'Alice', email: 'alice@example.com' },
+        { name: 'Bob', email: 'bob@example.com' },
+      ],
+    };
+
+    const created = await controller.createInscription(createPayload);
+    const deleted = await controller.deleteInscription('ins-1');
+    const bulkCreated = await controller.bulkCreateInscriptions(bulkPayload);
+
+    expect(adminService.createInscription).toHaveBeenCalledWith(createPayload);
+    expect(adminService.deleteInscription).toHaveBeenCalledWith('ins-1');
+    expect(adminService.bulkCreateInscriptions).toHaveBeenCalledWith(
+      'event-1',
+      bulkPayload.inscriptions,
+    );
+    expect(created).toEqual(createdInscription);
+    expect(deleted).toEqual(deletedInscription);
+    expect(bulkCreated).toEqual(bulkResult);
   });
 
   it('should passthrough createVote payload and response', async () => {
@@ -873,6 +919,16 @@ describe('AdminController - Coverage Additions', () => {
       payload,
     );
     expect(result).toEqual(response);
+  });
+
+  it('should passthrough getEventUnsubscriptions to service', async () => {
+    const serviceResponse = { success: true, data: [{ id: 'unsub-1' }] };
+    vi.mocked(adminService.getEventUnsubscriptions).mockResolvedValue(serviceResponse);
+
+    const result = await controller.getEventUnsubscriptions('event-3');
+
+    expect(adminService.getEventUnsubscriptions).toHaveBeenCalledWith('event-3');
+    expect(result).toEqual(serviceResponse);
   });
 
   it('should propagate deleteUnsubscription service errors', async () => {
@@ -1093,6 +1149,16 @@ describe('AdminController - Coverage Additions', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('should return wrapped payload when development request sync succeeds', async () => {
+    const synced = { id: 'dr-sync-1', status: 'in_progress' };
+    vi.mocked(adminService.syncDevelopmentRequestWithGitHub).mockResolvedValue(synced);
+
+    const result = await controller.syncDevelopmentRequestWithGitHub('dr-sync-1');
+
+    expect(adminService.syncDevelopmentRequestWithGitHub).toHaveBeenCalledWith('dr-sync-1');
+    expect(result).toEqual({ success: true, data: synced });
+  });
+
   it('should propagate service failures for development request deletion', async () => {
     vi.mocked(adminService.deleteDevelopmentRequest).mockRejectedValue(
       new BadRequestException('Delete failed'),
@@ -1101,6 +1167,47 @@ describe('AdminController - Coverage Additions', () => {
     await expect(controller.deleteDevelopmentRequest('dr-fail-2')).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  it('should return success for development request deletion when service completes', async () => {
+    vi.mocked(adminService.deleteDevelopmentRequest).mockResolvedValue(undefined);
+
+    const result = await controller.deleteDevelopmentRequest('dr-ok-1');
+
+    expect(adminService.deleteDevelopmentRequest).toHaveBeenCalledWith('dr-ok-1');
+    expect(result).toEqual({ success: true });
+  });
+
+  it('should passthrough email test endpoints to service methods', async () => {
+    const fullResponse = { success: true, tested: 'full' };
+    const simpleResponse = { success: true, tested: 'simple' };
+
+    vi.mocked(adminService.testEmailConfiguration).mockResolvedValue(fullResponse);
+    vi.mocked(adminService.testEmailSimple).mockResolvedValue(simpleResponse);
+
+    const fullResult = await controller.testEmailConfiguration();
+    const simpleResult = await controller.testEmailSimple();
+
+    expect(adminService.testEmailConfiguration).toHaveBeenCalledOnce();
+    expect(adminService.testEmailSimple).toHaveBeenCalledOnce();
+    expect(fullResult).toEqual(fullResponse);
+    expect(simpleResult).toEqual(simpleResponse);
+  });
+
+  it('should passthrough feature and email config retrieval endpoints', async () => {
+    const featureConfig = [{ key: 'notifications', enabled: true }];
+    const emailConfig = { smtpHost: 'smtp.example.com', fromEmail: 'admin@example.com' };
+
+    vi.mocked(adminService.getFeatureConfig).mockResolvedValue(featureConfig);
+    vi.mocked(adminService.getEmailConfig).mockResolvedValue(emailConfig);
+
+    const featureResult = await controller.getFeatureConfig();
+    const emailResult = await controller.getEmailConfig();
+
+    expect(adminService.getFeatureConfig).toHaveBeenCalledOnce();
+    expect(adminService.getEmailConfig).toHaveBeenCalledOnce();
+    expect(featureResult).toEqual(featureConfig);
+    expect(emailResult).toEqual(emailConfig);
   });
 
   it('should propagate service failures for feature and email config updates', async () => {

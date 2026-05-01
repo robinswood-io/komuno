@@ -3,8 +3,11 @@ import { MembersService } from './members.service';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { emailNotificationService } from '../../email-notification-service';
 import { DuplicateError } from '../../../shared/schema';
+import * as sharedSchema from '../../../shared/schema';
 import { db } from '../../db';
 import { logger } from '../../lib/logger';
+import { z } from 'zod';
+import { pgTable, uuid } from 'drizzle-orm/pg-core';
 
 vi.mock('../../email-notification-service', () => ({
   emailNotificationService: {
@@ -54,6 +57,36 @@ describe('MembersService', () => {
   let mockStorageService: { instance: StorageInstanceMock };
 
   beforeEach(() => {
+    const schemaModule = sharedSchema as unknown as Record<string, unknown>;
+    if (!schemaModule.assignMemberSchema) {
+      schemaModule.assignMemberSchema = z.object({
+        assignedTo: z.string().email(),
+        note: z.string().max(500).optional(),
+      });
+    }
+    if (!schemaModule.insertMemberContactSchema) {
+      schemaModule.insertMemberContactSchema = z.object({
+        memberEmail: z.string().email(),
+        type: z.enum(['meeting', 'email', 'call', 'lunch', 'event']),
+        subject: z.string().min(3).max(200),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        description: z.string().min(1).max(3000),
+        createdBy: z.string().email().optional(),
+      });
+    }
+    if (!schemaModule.updateMemberContactSchema) {
+      schemaModule.updateMemberContactSchema = z.object({
+        subject: z.string().min(3).max(200).optional(),
+        description: z.string().min(1).max(3000).optional(),
+        type: z.enum(['meeting', 'email', 'call', 'lunch', 'event']).optional(),
+      });
+    }
+    if (!schemaModule.subscriptionTypes) {
+      schemaModule.subscriptionTypes = pgTable('subscription_types', {
+        id: uuid('id').primaryKey(),
+      });
+    }
+
     mockStorageService = {
       instance: {
         proposeMember: vi.fn(),
@@ -1311,6 +1344,149 @@ describe('MembersService', () => {
     it('should throw BadRequestException when bulkDelete receives empty emails', async () => {
       await expect(service.bulkDelete([])).rejects.toThrow(BadRequestException);
     });
+
+    it('should throw BadRequestException when subscription type is missing in bulkAssignSubscription', async () => {
+      const dbWithSelect = db as unknown as {
+        select: (...args: unknown[]) => {
+          from: (...fromArgs: unknown[]) => {
+            where: (...whereArgs: unknown[]) => { limit: (count: number) => Promise<unknown[]> };
+          };
+        };
+      };
+
+      const limitMock = vi.fn<(count: number) => Promise<unknown[]>>().mockResolvedValue([]);
+      const whereMock = vi.fn(() => ({ limit: limitMock }));
+      const fromMock = vi.fn(() => ({ where: whereMock }));
+      const selectMock = vi.fn(() => ({ from: fromMock }));
+      vi.spyOn(dbWithSelect, 'select').mockImplementation(selectMock);
+
+      await expect(
+        service.bulkAssignSubscription(
+          ['missing@example.com'],
+          'sub-not-found',
+          '2026-01-15',
+          undefined,
+          'admin@example.com',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should assign monthly subscriptions and ignore per-member insert failures', async () => {
+      const dbWithSelectInsert = db as unknown as {
+        select: (...args: unknown[]) => {
+          from: (...fromArgs: unknown[]) => {
+            where: (...whereArgs: unknown[]) => {
+              limit: (
+                count: number,
+              ) => Promise<Array<{ amountInCents: number; durationType: 'monthly' | 'quarterly' | 'yearly' }>>;
+            };
+          };
+        };
+        insert: (...args: unknown[]) => { values: (payload: unknown) => Promise<unknown> };
+      };
+
+      const limitMock = vi
+        .fn<
+          (count: number) => Promise<Array<{ amountInCents: number; durationType: 'monthly' | 'quarterly' | 'yearly' }>>
+        >()
+        .mockResolvedValue([{ amountInCents: 2500, durationType: 'monthly' }]);
+      const whereMock = vi.fn(() => ({ limit: limitMock }));
+      const fromMock = vi.fn(() => ({ where: whereMock }));
+      const selectMock = vi.fn(() => ({ from: fromMock }));
+      vi.spyOn(dbWithSelectInsert, 'select').mockImplementation(selectMock);
+
+      const payloads: Array<Record<string, unknown>> = [];
+      const valuesMock = vi
+        .fn<(payload: unknown) => Promise<unknown>>()
+        .mockImplementationOnce(async (payload) => {
+          payloads.push(payload as Record<string, unknown>);
+          return undefined;
+        })
+        .mockImplementationOnce(async (payload) => {
+          payloads.push(payload as Record<string, unknown>);
+          throw new Error('insert failed');
+        });
+      const insertMock = vi.fn(() => ({ values: valuesMock }));
+      vi.spyOn(dbWithSelectInsert, 'insert').mockImplementation(insertMock);
+
+      const loggerWithInfo = logger as unknown as {
+        info: (...args: unknown[]) => void;
+      };
+      const infoSpy = vi.spyOn(loggerWithInfo, 'info').mockImplementation(() => undefined);
+
+      const result = await service.bulkAssignSubscription(
+        ['a@example.com', 'b@example.com'],
+        'sub-monthly',
+        '2026-01-15',
+        undefined,
+        'admin@example.com',
+      );
+
+      expect(result).toEqual({ success: true, assigned: 1 });
+      expect(payloads[0]?.endDate).toBe('2026-02-15');
+      expect(payloads[0]?.paymentMethod).toBeNull();
+      expect(infoSpy).toHaveBeenCalledWith('Bulk subscription assignment', {
+        count: 1,
+        subscriptionTypeId: 'sub-monthly',
+      });
+    });
+
+    it('should compute quarterly and yearly subscription end dates', async () => {
+      const dbWithSelectInsert = db as unknown as {
+        select: (...args: unknown[]) => {
+          from: (...fromArgs: unknown[]) => {
+            where: (...whereArgs: unknown[]) => {
+              limit: (
+                count: number,
+              ) => Promise<Array<{ amountInCents: number; durationType: 'monthly' | 'quarterly' | 'yearly' }>>;
+            };
+          };
+        };
+        insert: (...args: unknown[]) => { values: (payload: unknown) => Promise<unknown> };
+      };
+
+      const limitMock = vi
+        .fn<
+          (count: number) => Promise<Array<{ amountInCents: number; durationType: 'monthly' | 'quarterly' | 'yearly' }>>
+        >()
+        .mockResolvedValueOnce([{ amountInCents: 5000, durationType: 'quarterly' }])
+        .mockResolvedValueOnce([{ amountInCents: 9000, durationType: 'yearly' }]);
+      const whereMock = vi.fn(() => ({ limit: limitMock }));
+      const fromMock = vi.fn(() => ({ where: whereMock }));
+      const selectMock = vi.fn(() => ({ from: fromMock }));
+      vi.spyOn(dbWithSelectInsert, 'select').mockImplementation(selectMock);
+
+      const payloads: Array<Record<string, unknown>> = [];
+      const valuesMock = vi.fn<(payload: unknown) => Promise<unknown>>().mockImplementation(async (payload) => {
+        payloads.push(payload as Record<string, unknown>);
+        return undefined;
+      });
+      const insertMock = vi.fn(() => ({ values: valuesMock }));
+      vi.spyOn(dbWithSelectInsert, 'insert').mockImplementation(insertMock);
+
+      const quarterlyResult = await service.bulkAssignSubscription(
+        ['q@example.com'],
+        'sub-quarterly',
+        '2026-01-15',
+        'transfer',
+        'admin@example.com',
+      );
+
+      const yearlyResult = await service.bulkAssignSubscription(
+        ['y@example.com'],
+        'sub-yearly',
+        '2026-01-15',
+        'card',
+        'admin@example.com',
+      );
+
+      expect(quarterlyResult).toEqual({ success: true, assigned: 1 });
+      expect(yearlyResult).toEqual({ success: true, assigned: 1 });
+      expect(payloads[0]?.endDate).toBe('2026-04-15');
+      expect(payloads[1]?.endDate).toBe('2027-01-15');
+      expect(payloads[0]?.paymentMethod).toBe('transfer');
+      expect(payloads[1]?.paymentMethod).toBe('card');
+    });
   });
 
   describe('getAllTasks', () => {
@@ -1341,6 +1517,121 @@ describe('MembersService', () => {
   });
 
   describe('Branches supplémentaires - erreurs et transitions', () => {
+    it('should assign member successfully with validated payload', async () => {
+      mockStorageService.instance.assignMember.mockResolvedValue({
+        success: true,
+      });
+
+      const result = await service.assignMember(
+        'member@example.com',
+        { assignedTo: 'owner@example.com', note: 'handover' },
+        'admin@example.com',
+      );
+
+      expect(result).toEqual({ success: true });
+      expect(mockStorageService.instance.assignMember).toHaveBeenCalledWith(
+        'member@example.com',
+        'owner@example.com',
+        'admin@example.com',
+        'handover',
+      );
+    });
+
+    it('should throw BadRequestException when assignMember storage fails', async () => {
+      mockStorageService.instance.assignMember.mockResolvedValue({
+        success: false,
+        error: new Error('assign failed'),
+      });
+
+      await expect(
+        service.assignMember(
+          'member@example.com',
+          { assignedTo: 'owner@example.com', note: 'handover' },
+          'admin@example.com',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when assignMember payload is invalid', async () => {
+      await expect(
+        service.assignMember(
+          'member@example.com',
+          { assignedTo: 'not-an-email' },
+          'admin@example.com',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create member contact successfully', async () => {
+      mockStorageService.instance.createMemberContact.mockResolvedValue({
+        success: true,
+        data: { id: 'contact-1' },
+      });
+
+      const result = await service.createMemberContact(
+        'member@example.com',
+        {
+          type: 'email',
+          subject: 'Relance CRM',
+          date: '2026-05-01',
+          description: 'Un échange a été initié',
+        },
+        'admin@example.com',
+      );
+
+      expect(result).toEqual({ success: true, data: { id: 'contact-1' } });
+    });
+
+    it('should throw BadRequestException when createMemberContact storage fails', async () => {
+      mockStorageService.instance.createMemberContact.mockResolvedValue({
+        success: false,
+        error: new Error('contact create failed'),
+      });
+
+      await expect(
+        service.createMemberContact(
+          'member@example.com',
+          {
+            type: 'call',
+            subject: 'Appel de suivi',
+            date: '2026-05-01',
+            description: 'Compte-rendu succinct',
+          },
+          'admin@example.com',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should update member contact and handle not found branch', async () => {
+      mockStorageService.instance.updateMemberContact.mockResolvedValueOnce({
+        success: true,
+        data: { id: 'contact-ok', subject: 'Sujet MAJ' },
+      });
+
+      const updated = await service.updateMemberContact('contact-ok', { subject: 'Sujet MAJ' });
+      expect(updated).toEqual({ success: true, data: { id: 'contact-ok', subject: 'Sujet MAJ' } });
+
+      const notFoundError = new Error('Contact not found');
+      notFoundError.name = 'NotFoundError';
+      mockStorageService.instance.updateMemberContact.mockResolvedValueOnce({
+        success: false,
+        error: notFoundError,
+      });
+
+      await expect(service.updateMemberContact('contact-missing', { subject: 'Sujet MAJ' }))
+        .rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when updateMemberContact fails with generic error', async () => {
+      mockStorageService.instance.updateMemberContact.mockResolvedValue({
+        success: false,
+        error: new Error('update contact failed'),
+      });
+
+      await expect(service.updateMemberContact('contact-err', { subject: 'Sujet MAJ' }))
+        .rejects.toThrow(BadRequestException);
+    });
+
     it('should throw BadRequestException when getMemberActivities fails', async () => {
       mockStorageService.instance.getMemberActivities.mockResolvedValue({
         success: false,

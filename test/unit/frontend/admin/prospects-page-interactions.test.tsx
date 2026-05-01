@@ -406,4 +406,16 @@ describe('ProspectsPage interactions', () => {
       });
     });
   });
+
+  it('renders administrator email fallback label and updates search input value', () => {
+    mocks.administrators = [{ email: 'owner-only@example.com' }];
+
+    render(<ProspectsPage />);
+
+    expect(screen.getByRole('button', { name: 'owner-only@example.com' })).toBeTruthy();
+
+    const searchInput = screen.getByPlaceholderText('Rechercher un prospect...') as HTMLInputElement;
+    fireEvent.change(searchInput, { target: { value: 'Martin' } });
+    expect(searchInput.value).toBe('Martin');
+  });
 });

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ProspectsPage from '@/app/(protected)/admin/prospects/page';
 
 type ProspectionStage =
@@ -399,5 +399,122 @@ describe('ProspectsPage iteration 5', () => {
       );
       expect(mocks.toast).toHaveBeenCalledWith({ title: 'Phase mise à jour' });
     });
+  });
+
+  it('toggles active stage filter back to all when clicking the same stage twice', () => {
+    render(<ProspectsPage />);
+
+    fireEvent.click(screen.getByTitle('Vue tableau'));
+
+    const qualificationLabel = screen.getAllByText('Qualification')[0];
+    const firstQualificationTile = qualificationLabel.closest('button');
+    expect(firstQualificationTile).toBeTruthy();
+    if (!firstQualificationTile) {
+      throw new Error('Qualification summary tile not found');
+    }
+
+    fireEvent.click(firstQualificationTile);
+    expect(screen.getByText('Filtré: Qualification')).toBeTruthy();
+
+    const qualificationLabelActive = screen.getAllByText('Qualification')[0];
+    const activeQualificationTile = qualificationLabelActive.closest('button');
+    expect(activeQualificationTile).toBeTruthy();
+    if (!activeQualificationTile) {
+      throw new Error('Active qualification summary tile not found');
+    }
+    fireEvent.click(activeQualificationTile);
+    expect(screen.queryByText('Filtré: Qualification')).toBeNull();
+  });
+
+  it('handles dragOver/dragLeave/drop with no dragging email and keeps state stable', () => {
+    const { container } = render(<ProspectsPage />);
+
+    const columns = getKanbanColumns(container);
+    expect(columns.length).toBeGreaterThan(0);
+
+    const firstColumn = columns[0];
+    const innerTarget = document.createElement('div');
+    firstColumn.appendChild(innerTarget);
+
+    fireEvent.dragOver(firstColumn, {
+      dataTransfer: {
+        dropEffect: 'none',
+      },
+    });
+    expect(firstColumn.className).toContain('ring-2');
+
+    const leaveInsideEvent = createEvent.dragLeave(firstColumn);
+    Object.defineProperty(leaveInsideEvent, 'relatedTarget', { value: innerTarget });
+    fireEvent(firstColumn, leaveInsideEvent);
+    expect(firstColumn.className).toContain('ring-2');
+
+    fireEvent.dragLeave(firstColumn, { relatedTarget: document.body });
+    expect(firstColumn.className).not.toContain('ring-2');
+
+    fireEvent.drop(firstColumn);
+    expect(mocks.patch).not.toHaveBeenCalled();
+  });
+
+  it('navigates from cards and table name buttons but not from status trigger clicks', async () => {
+    render(<ProspectsPage />);
+
+    const activeCard = screen.getByText('Alice Martin').closest('div[draggable="true"]');
+    expect(activeCard).toBeTruthy();
+    if (!activeCard) {
+      throw new Error('Active prospect card not found');
+    }
+
+    fireEvent.click(activeCard);
+    expect(mocks.push).toHaveBeenCalledWith('/admin/members/alice%40example.com');
+
+    fireEvent.click(within(activeCard).getAllByRole('button', { name: 'Qualification' })[0]);
+    expect(mocks.push).toHaveBeenCalledTimes(1);
+
+    const archivedCard = screen.getByText('Bob Durand').closest('div.cursor-pointer');
+    expect(archivedCard).toBeTruthy();
+    if (!archivedCard) {
+      throw new Error('Archived prospect card not found');
+    }
+
+    fireEvent.click(archivedCard);
+    expect(mocks.push).toHaveBeenCalledWith('/admin/members/bob%40example.com');
+    const pushCallsAfterArchivedClick = mocks.push.mock.calls.length;
+
+    fireEvent.click(within(archivedCard).getAllByRole('button', { name: 'Refusé' })[0]);
+    expect(mocks.push).toHaveBeenCalledTimes(pushCallsAfterArchivedClick);
+    fireEvent.click(within(archivedCard).getAllByRole('button', { name: 'R1' })[0]);
+
+    fireEvent.click(screen.getByTitle('Vue tableau'));
+    fireEvent.click(screen.getByRole('button', { name: 'Alice Martin' }));
+    expect(mocks.push).toHaveBeenCalledWith('/admin/members/alice%40example.com');
+
+    await waitFor(() => {
+      expect(mocks.patch).toHaveBeenCalledWith(
+        '/api/admin/members/bob%40example.com',
+        { prospectionStatus: 'R1' },
+      );
+    });
+  });
+
+  it('renders table fallback cells for null status and missing dates with singular counter', () => {
+    mocks.members = [
+      {
+        email: 'solo@example.com',
+        firstName: 'Solo',
+        lastName: 'User',
+        status: 'inactive',
+        prospectionStatus: null,
+        role: 'Consultant',
+        city: 'Amiens',
+      },
+    ];
+
+    render(<ProspectsPage />);
+    fireEvent.click(screen.getByTitle('Vue tableau'));
+
+    expect(screen.getByText('1 prospect')).toBeTruthy();
+    expect(screen.getByText('Amiens')).toBeTruthy();
+    expect(screen.getByText('Consultant')).toBeTruthy();
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
   });
 });
