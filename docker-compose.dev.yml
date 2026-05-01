@@ -22,7 +22,7 @@ services:
       - "host.docker.internal:host-gateway"
 
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/api/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -32,10 +32,21 @@ services:
       - ./logs:/app/logs
 
     networks:
+      - traefik_public
       - rbw-network
       - cjd80-dev-network
 
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.komuno-dev.rule=Host(`komuno.rbw.ovh`)"
+      - "traefik.http.routers.komuno-dev.entrypoints=websecure"
+      - "traefik.http.routers.komuno-dev.tls=true"
+      - "traefik.http.routers.komuno-dev.tls.certresolver=letsencrypt"
+      - "traefik.http.services.komuno-dev.loadbalancer.server.port=3000"
+
 networks:
+  traefik_public:
+    external: true
   rbw-network:
     driver: bridge
   cjd80-dev-network:

@@ -1,198 +1,194 @@
+/** @vitest-environment jsdom */
+import React, { type ReactElement } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { AuthProvider, useAuth } from '@/hooks/use-auth';
 
-// Mock fetch
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+const mockUseQuery = vi.fn();
+const mockUseMutation = vi.fn();
+const mockSetQueryData = vi.fn();
+const mockInvalidateQueries = vi.fn();
+const mockApiRequest = vi.fn();
+const mockToast = vi.fn();
 
-// Mock useQuery and useMutation
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: vi.fn(() => ({
-    data: null,
-    isLoading: false,
-    error: null,
-  })),
-  useMutation: vi.fn(() => ({
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-    isLoading: false,
-    error: null,
-  })),
-  useQueryClient: vi.fn(() => ({
-    invalidateQueries: vi.fn(),
-    setQueryData: vi.fn(),
-  })),
+type MutationConfig<TData, TVariables> = {
+  mutationFn: (variables: TVariables) => Promise<TData>;
+  onSuccess?: (data: TData) => void;
+  onError?: (error: Error) => void;
+};
+
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
+  return {
+    ...actual,
+    useQuery: (...args: unknown[]) => mockUseQuery(...args),
+    useMutation: (...args: unknown[]) => mockUseMutation(...args),
+  };
+});
+
+vi.mock('@/lib/queryClient', () => ({
+  getQueryFn: vi.fn(() => vi.fn()),
+  apiRequest: (...args: unknown[]) => mockApiRequest(...args),
+  queryClient: {
+    setQueryData: (...args: unknown[]) => mockSetQueryData(...args),
+    invalidateQueries: (...args: unknown[]) => mockInvalidateQueries(...args),
+  },
 }));
 
-// Mock toast
-vi.mock('../../../client/src/hooks/use-toast', () => ({
-  useToast: vi.fn(() => ({
-    toast: vi.fn(),
-  })),
+vi.mock('@/hooks/use-toast', () => ({
+  useToast: () => ({ toast: (...args: unknown[]) => mockToast(...args) }),
 }));
 
-describe('useAuth Hook', () => {
+function TestConsumer(): ReactElement {
+  const auth = useAuth();
+  return (
+    <div>
+      <div data-testid="loading">{String(auth.isLoading)}</div>
+      <div data-testid="user">{auth.user?.email ?? 'none'}</div>
+      <button
+        data-testid="trigger-login"
+        onClick={() => {
+          void auth.loginMutation
+            .mutateAsync({ email: 'admin@test.dev', password: 'pw' })
+            .catch(() => undefined);
+        }}
+      >
+        trigger
+      </button>
+      <button
+        data-testid="trigger-logout"
+        onClick={() => {
+          void auth.logoutMutation.mutateAsync().catch(() => undefined);
+        }}
+      >
+        trigger logout
+      </button>
+    </div>
+  );
+}
+
+function mountProvider(): void {
+  render(
+    <AuthProvider>
+      <TestConsumer />
+    </AuthProvider>
+  );
+}
+
+describe('AuthProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ mode: 'local' }),
+
+    vi.stubEnv('NEXT_PUBLIC_ENABLE_DEV_LOGIN', 'false');
+    window.localStorage.clear();
+
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isLoading: false,
+    });
+
+    mockUseMutation.mockImplementation(<TData, TVariables>(config: MutationConfig<TData, TVariables>) => ({
+      mutateAsync: async (variables: TVariables) => {
+        try {
+          const result = await config.mutationFn(variables);
+          config.onSuccess?.(result);
+          return result;
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error('Unknown error');
+          config.onError?.(error);
+          throw error;
+        }
+      },
+    }));
+
+    mockApiRequest.mockResolvedValue({
+      json: async () => ({
+        email: 'admin@test.dev',
+        role: 'super_admin',
+      }),
     });
   });
 
-  describe('Authentication State', () => {
-    it('should return user data when authenticated', async () => {
-      const mockUser = {
-        email: 'test@example.com',
-        firstName: 'Test',
-        lastName: 'User',
-        role: 'admin',
-      };
-      
-      // Simulated auth state
-      const authState = { user: mockUser, isAuthenticated: true };
-      
-      expect(authState.user).toEqual(mockUser);
-      expect(authState.isAuthenticated).toBe(true);
+  it('uses authenticated user query and exposes user state', () => {
+    mockUseQuery.mockReturnValueOnce({
+      data: { email: 'member@test.dev', role: 'member' },
+      error: null,
+      isLoading: true,
     });
 
-    it('should return null user when not authenticated', () => {
-      const authState = { user: null, isAuthenticated: false };
-      
-      expect(authState.user).toBeNull();
-      expect(authState.isAuthenticated).toBe(false);
+    mountProvider();
+
+    expect(screen.getByTestId('loading').textContent).toBe('true');
+    expect(screen.getByTestId('user').textContent).toBe('member@test.dev');
+
+    const queryArgs = mockUseQuery.mock.calls[0]?.[0] as { enabled: boolean; queryKey: string[] };
+    expect(queryArgs.queryKey).toEqual(['/api/auth/user']);
+    expect(queryArgs.enabled).toBe(true);
+  });
+
+  it('disables auth user query when dev login is enabled and admin-user exists', () => {
+    vi.stubEnv('NEXT_PUBLIC_ENABLE_DEV_LOGIN', 'true');
+    window.localStorage.setItem('admin-user', '{"email":"admin@test.dev"}');
+
+    mountProvider();
+
+    const queryArgs = mockUseQuery.mock.calls[0]?.[0] as { enabled: boolean };
+    expect(queryArgs.enabled).toBe(false);
+  });
+
+  it('handles login success branch with cache updates and redirect', async () => {
+    mountProvider();
+
+    screen.getByTestId('trigger-login').click();
+
+    await waitFor(() => {
+      expect(mockApiRequest).toHaveBeenCalledWith('POST', '/api/auth/login', {
+        email: 'admin@test.dev',
+        password: 'pw',
+      });
+      expect(mockSetQueryData).toHaveBeenCalledWith(['/api/auth/user'], {
+        email: 'admin@test.dev',
+        role: 'super_admin',
+      });
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['/api/auth/user'] });
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Connexion réussie',
+        description: 'Bienvenue !',
+      });
     });
   });
 
-  describe('Login Mutation', () => {
-    it('should call login endpoint with credentials', async () => {
-      const credentials = {
-        email: 'test@example.com',
-        password: 'password123',
-      };
+  it('handles login error branch and displays destructive toast', async () => {
+    mockApiRequest.mockRejectedValueOnce(new Error('Bad credentials'));
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
+    mountProvider();
+
+    screen.getByTestId('trigger-login').click();
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Erreur de connexion',
+        description: 'Bad credentials',
+        variant: 'destructive',
       });
-
-      // Simulated login call
-      const loginResult = await mockFetch('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(credentials),
-      });
-
-      expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', expect.any(Object));
-    });
-
-    it('should handle login error', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 401,
-        json: () => Promise.resolve({ message: 'Identifiants invalides' }),
-      });
-
-      const response = await mockFetch('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email: 'test@example.com', password: 'wrong' }),
-      });
-
-      expect(response.ok).toBe(false);
     });
   });
 
-  describe('Logout Mutation', () => {
-    it('should call logout endpoint', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
+  it('handles logout success branch', async () => {
+    mockApiRequest.mockResolvedValueOnce({ json: async () => ({}) });
+
+    mountProvider();
+
+    screen.getByTestId('trigger-logout').click();
+
+    await waitFor(() => {
+      expect(mockApiRequest).toHaveBeenCalledWith('POST', '/api/auth/logout');
+      expect(mockSetQueryData).toHaveBeenCalledWith(['/api/auth/user'], null);
+      expect(mockToast).toHaveBeenCalledWith({
+        title: 'Déconnexion',
+        description: 'Vous avez été déconnecté avec succès',
       });
-
-      await mockFetch('/api/logout', { method: 'POST' });
-
-      expect(mockFetch).toHaveBeenCalledWith('/api/logout', expect.any(Object));
-    });
-  });
-
-  describe('Auth Mode', () => {
-    it('should detect local auth mode', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ mode: 'local' }),
-      });
-
-      const response = await mockFetch('/api/auth/mode');
-      const data = await response.json();
-
-      expect(data.mode).toBe('local');
-    });
-
-    it('should detect oauth auth mode', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ mode: 'oauth' }),
-      });
-
-      const response = await mockFetch('/api/auth/mode');
-      const data = await response.json();
-
-      expect(data.mode).toBe('oauth');
-    });
-  });
-
-  describe('Password Reset', () => {
-    it('should call forgot password endpoint', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ message: 'Email sent' }),
-      });
-
-      await mockFetch('/api/auth/forgot-password', {
-        method: 'POST',
-        body: JSON.stringify({ email: 'test@example.com' }),
-      });
-
-      expect(mockFetch).toHaveBeenCalledWith('/api/auth/forgot-password', expect.any(Object));
-    });
-
-    it('should call reset password endpoint', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
-      });
-
-      await mockFetch('/api/auth/reset-password', {
-        method: 'POST',
-        body: JSON.stringify({ token: 'valid-token', password: 'NewPassword1' }),
-      });
-
-      expect(mockFetch).toHaveBeenCalledWith('/api/auth/reset-password', expect.any(Object));
-    });
-  });
-
-  describe('Permission Checks', () => {
-    it('should check user permissions', () => {
-      const user = { role: 'super_admin' };
-      const hasAdminAccess = user.role === 'super_admin';
-      
-      expect(hasAdminAccess).toBe(true);
-    });
-
-    it('should handle role-based access', () => {
-      const checkPermission = (role: string, permission: string) => {
-        const permissions: Record<string, string[]> = {
-          super_admin: ['admin.view', 'admin.edit', 'admin.manage'],
-          ideas_manager: ['ideas.view', 'ideas.edit', 'ideas.manage'],
-          ideas_reader: ['ideas.view'],
-          events_manager: ['events.view', 'events.edit', 'events.manage'],
-          events_reader: ['events.view'],
-        };
-        return permissions[role]?.includes(permission) || false;
-      };
-
-      expect(checkPermission('super_admin', 'admin.manage')).toBe(true);
-      expect(checkPermission('ideas_reader', 'ideas.manage')).toBe(false);
-      expect(checkPermission('events_manager', 'events.edit')).toBe(true);
     });
   });
 });

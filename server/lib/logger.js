@@ -16,25 +16,42 @@ if (!(0, fs_1.existsSync)(logsDir)) {
 }
 // List of sensitive fields to redact from logs
 const sensitiveFields = ['password', 'token', 'auth', 'p256dh', 'secret', 'apiKey', 'sessionId'];
+const sensitiveFieldSet = new Set(sensitiveFields);
+const protectedMetadataKeys = new Set(['level', 'message', 'timestamp', 'stack']);
+const isPlainObject = (value) => {
+    if (value === null || typeof value !== 'object') {
+        return false;
+    }
+    return Object.getPrototypeOf(value) === Object.prototype;
+};
+const sanitizeValue = (value) => {
+    if (Array.isArray(value)) {
+        return value.map(sanitizeValue);
+    }
+    if (!isPlainObject(value)) {
+        return value;
+    }
+    const sanitizedObject = {};
+    Object.entries(value).forEach(([field, fieldValue]) => {
+        if (sensitiveFieldSet.has(field)) {
+            sanitizedObject[field] = '[REDACTED]';
+            return;
+        }
+        sanitizedObject[field] = sanitizeValue(fieldValue);
+    });
+    return sanitizedObject;
+};
 // Custom format to sanitize sensitive data
 const sanitizeMetadata = winston_1.default.format((info) => {
-    if (info.subscription && typeof info.subscription === 'object') {
-        info.subscription = { ...info.subscription };
-        sensitiveFields.forEach(field => {
-            if (info.subscription[field]) {
-                info.subscription[field] = '[REDACTED]';
-            }
-        });
-    }
-    // Recursively sanitize any object in metadata
-    Object.keys(info).forEach(key => {
-        if (typeof info[key] === 'object' && info[key] !== null && key !== 'level' && key !== 'message') {
-            sensitiveFields.forEach(field => {
-                if (info[key][field]) {
-                    info[key][field] = '[REDACTED]';
-                }
-            });
+    Object.entries(info).forEach(([key, value]) => {
+        if (protectedMetadataKeys.has(key)) {
+            return;
         }
+        if (sensitiveFieldSet.has(key)) {
+            info[key] = '[REDACTED]';
+            return;
+        }
+        info[key] = sanitizeValue(value);
     });
     return info;
 });

@@ -1,6 +1,10 @@
 import { BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { MembersService } from './members.service';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { emailNotificationService } from '../../email-notification-service';
+import { DuplicateError } from '../../../shared/schema';
+import { db } from '../../db';
+import { logger } from '../../lib/logger';
 
 vi.mock('../../email-notification-service', () => ({
   emailNotificationService: {
@@ -8,14 +12,55 @@ vi.mock('../../email-notification-service', () => ({
   },
 }));
 
+type StorageInstanceMock = {
+  proposeMember: ReturnType<typeof vi.fn>;
+  createOrUpdateMember: ReturnType<typeof vi.fn>;
+  createOwnershipHistoryEntry: ReturnType<typeof vi.fn>;
+  assignMember: ReturnType<typeof vi.fn>;
+  getMemberOwnershipHistory: ReturnType<typeof vi.fn>;
+  getMembers: ReturnType<typeof vi.fn>;
+  getMemberByEmail: ReturnType<typeof vi.fn>;
+  getMemberActivities: ReturnType<typeof vi.fn>;
+  getMemberDetails: ReturnType<typeof vi.fn>;
+  updateMember: ReturnType<typeof vi.fn>;
+  deleteMember: ReturnType<typeof vi.fn>;
+  getSubscriptionsByMember: ReturnType<typeof vi.fn>;
+  createSubscription: ReturnType<typeof vi.fn>;
+  getAllTags: ReturnType<typeof vi.fn>;
+  createTag: ReturnType<typeof vi.fn>;
+  updateTag: ReturnType<typeof vi.fn>;
+  deleteTag: ReturnType<typeof vi.fn>;
+  getTagsByMember: ReturnType<typeof vi.fn>;
+  assignTagToMember: ReturnType<typeof vi.fn>;
+  removeTagFromMember: ReturnType<typeof vi.fn>;
+  getTasksByMember: ReturnType<typeof vi.fn>;
+  createTask: ReturnType<typeof vi.fn>;
+  updateTask: ReturnType<typeof vi.fn>;
+  deleteTask: ReturnType<typeof vi.fn>;
+  getRelationsByMember: ReturnType<typeof vi.fn>;
+  createRelation: ReturnType<typeof vi.fn>;
+  deleteRelation: ReturnType<typeof vi.fn>;
+  getAllRelations: ReturnType<typeof vi.fn>;
+  getAllTasks: ReturnType<typeof vi.fn>;
+  createTrackingMetric: ReturnType<typeof vi.fn>;
+  getMemberContacts: ReturnType<typeof vi.fn>;
+  createMemberContact: ReturnType<typeof vi.fn>;
+  updateMemberContact: ReturnType<typeof vi.fn>;
+  deleteMemberContact: ReturnType<typeof vi.fn>;
+};
+
 describe('MembersService', () => {
   let service: MembersService;
-  let mockStorageService: any;
+  let mockStorageService: { instance: StorageInstanceMock };
 
   beforeEach(() => {
     mockStorageService = {
       instance: {
         proposeMember: vi.fn(),
+        createOrUpdateMember: vi.fn(),
+        createOwnershipHistoryEntry: vi.fn(),
+        assignMember: vi.fn(),
+        getMemberOwnershipHistory: vi.fn(),
         getMembers: vi.fn(),
         getMemberByEmail: vi.fn(),
         getMemberActivities: vi.fn(),
@@ -38,7 +83,13 @@ describe('MembersService', () => {
         getRelationsByMember: vi.fn(),
         createRelation: vi.fn(),
         deleteRelation: vi.fn(),
+        getAllRelations: vi.fn(),
+        getAllTasks: vi.fn(),
         createTrackingMetric: vi.fn(),
+        getMemberContacts: vi.fn(),
+        createMemberContact: vi.fn(),
+        updateMemberContact: vi.fn(),
+        deleteMemberContact: vi.fn(),
       },
     };
 
@@ -93,15 +144,56 @@ describe('MembersService', () => {
         proposedBy: 'proposer@example.com',
       };
 
-      const duplicateError = new Error('Email already exists');
-      (duplicateError as any).name = 'DuplicateError';
+      vi.spyOn(mockStorageService.instance, 'proposeMember').mockResolvedValue({
+        success: false,
+        error: new DuplicateError('Email already exists'),
+      });
+
+      await expect(service.proposeMember(memberData)).rejects.toThrow(ConflictException);
+    });
+
+    it('should continue even if tracking metric creation fails', async () => {
+      const memberData = {
+        firstName: 'Alice',
+        lastName: 'Martin',
+        email: 'alice.martin@example.com',
+        proposedBy: 'proposer@example.com',
+      };
+
+      const mockMember = {
+        id: 'member-456',
+        ...memberData,
+      };
+
+      mockStorageService.instance.proposeMember.mockResolvedValue({
+        success: true,
+        data: mockMember,
+      });
+
+      mockStorageService.instance.createTrackingMetric.mockRejectedValue(new Error('metric failed'));
+
+      const result = await service.proposeMember(memberData);
+
+      expect(result.success).toBe(true);
+      expect(emailNotificationService.notifyNewMemberProposal).toHaveBeenCalledWith(expect.objectContaining({
+        email: memberData.email,
+      }));
+    });
+
+    it('should throw BadRequestException on non-duplicate storage error', async () => {
+      const memberData = {
+        firstName: 'Jean',
+        lastName: 'Dupont',
+        email: 'jean.dupont@example.com',
+        proposedBy: 'proposer@example.com',
+      };
 
       vi.spyOn(mockStorageService.instance, 'proposeMember').mockResolvedValue({
         success: false,
-        error: duplicateError,
+        error: new Error('storage error'),
       });
 
-      await expect(service.proposeMember(memberData)).rejects.toThrow();
+      await expect(service.proposeMember(memberData)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException on invalid data', async () => {
@@ -285,6 +377,53 @@ describe('MembersService', () => {
         activity: 'recent',
       });
     });
+
+    it('should apply prospects pipeline filters', async () => {
+      vi.spyOn(mockStorageService.instance, 'getMembers').mockResolvedValue({
+        success: true,
+        data: { data: [], total: 0, page: 1, limit: 20, pageCount: 0 },
+      });
+
+      await service.getMembers(
+        1,
+        20,
+        'all',
+        undefined,
+        undefined,
+        undefined,
+        'En discussion',
+        'Lyon',
+        '69',
+        'owner@example.com',
+        true,
+        false,
+      );
+
+      expect(mockStorageService.instance.getMembers).toHaveBeenCalledWith({
+        page: 1,
+        limit: 20,
+        prospectionStatus: 'En discussion',
+        city: 'Lyon',
+        department: '69',
+        assignedTo: 'owner@example.com',
+        onlyProspects: true,
+      });
+    });
+
+    it('should apply excludeProspects filter without optional empty filters', async () => {
+      vi.spyOn(mockStorageService.instance, 'getMembers').mockResolvedValue({
+        success: true,
+        data: { data: [], total: 0, page: 1, limit: 20, pageCount: 0 },
+      });
+
+      await service.getMembers(1, 20, 'all', '', undefined, undefined, 'all', '   ', 'all', 'all', false, true);
+
+      expect(mockStorageService.instance.getMembers).toHaveBeenCalledWith({
+        page: 1,
+        limit: 20,
+        excludeProspects: true,
+      });
+    });
   });
 
   describe('getMemberByEmail', () => {
@@ -327,6 +466,140 @@ describe('MembersService', () => {
       await expect(service.getMemberByEmail('jean.dupont@example.com')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('createMember', () => {
+    it('should default assignedTo to creator email when missing', async () => {
+      const payload = {
+        email: 'new.member@example.com',
+        firstName: 'Nina',
+        lastName: 'Durand',
+      };
+      const creatorEmail = 'admin@example.com';
+      const createdMember = {
+        id: 'member-created',
+        ...payload,
+        assignedTo: creatorEmail,
+      };
+
+      mockStorageService.instance.createOrUpdateMember.mockResolvedValue({
+        success: true,
+        data: createdMember,
+      });
+      mockStorageService.instance.createOwnershipHistoryEntry.mockResolvedValue({});
+
+      const result = await service.createMember(payload, creatorEmail);
+
+      expect(result).toEqual({ success: true, data: createdMember });
+      expect(mockStorageService.instance.createOrUpdateMember).toHaveBeenCalledWith(expect.objectContaining({
+        email: payload.email,
+        assignedTo: creatorEmail,
+        createdBy: creatorEmail,
+      }));
+      expect(mockStorageService.instance.createOwnershipHistoryEntry).toHaveBeenCalledWith({
+        memberEmail: payload.email,
+        action: 'created',
+        adminEmail: creatorEmail,
+        toEmail: creatorEmail,
+      });
+    });
+
+    it('should throw ConflictException on duplicate member creation', async () => {
+      const payload = {
+        email: 'duplicate.member@example.com',
+        firstName: 'Nina',
+        lastName: 'Durand',
+      };
+
+      mockStorageService.instance.createOrUpdateMember.mockResolvedValue({
+        success: false,
+        error: new DuplicateError('duplicate'),
+      });
+
+      await expect(service.createMember(payload, 'admin@example.com')).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw BadRequestException on invalid payload', async () => {
+      const payload = {
+        email: 'invalid-email',
+        firstName: 'N',
+        lastName: 'D',
+      };
+
+      await expect(service.createMember(payload, 'admin@example.com')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException on non-duplicate storage error', async () => {
+      const payload = {
+        email: 'broken.member@example.com',
+        firstName: 'Nina',
+        lastName: 'Durand',
+      };
+
+      mockStorageService.instance.createOrUpdateMember.mockResolvedValue({
+        success: false,
+        error: new Error('insert failed'),
+      });
+
+      await expect(service.createMember(payload, 'admin@example.com')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should still return success when ownership history entry fails', async () => {
+      const payload = {
+        email: 'history.fail@example.com',
+        firstName: 'Nina',
+        lastName: 'Durand',
+      };
+      const creatorEmail = 'admin@example.com';
+      const createdMember = {
+        id: 'member-history-fail',
+        ...payload,
+      };
+
+      mockStorageService.instance.createOrUpdateMember.mockResolvedValue({
+        success: true,
+        data: createdMember,
+      });
+      mockStorageService.instance.createOwnershipHistoryEntry.mockRejectedValue(
+        new Error('history write failed'),
+      );
+
+      const result = await service.createMember(payload, creatorEmail);
+
+      expect(result).toEqual({ success: true, data: createdMember });
+    });
+  });
+
+  describe('getMemberOwnershipHistory', () => {
+    it('should return ownership history when storage succeeds', async () => {
+      const historyEntries = [
+        {
+          id: 'history-1',
+          memberEmail: 'member@example.com',
+          action: 'assigned',
+          fromEmail: 'old-owner@example.com',
+          toEmail: 'new-owner@example.com',
+        },
+      ];
+
+      mockStorageService.instance.getMemberOwnershipHistory.mockResolvedValue({
+        success: true,
+        data: historyEntries,
+      });
+
+      const result = await service.getMemberOwnershipHistory('member@example.com');
+
+      expect(result).toEqual({ success: true, data: historyEntries });
+    });
+
+    it('should throw BadRequestException when history retrieval fails', async () => {
+      mockStorageService.instance.getMemberOwnershipHistory.mockResolvedValue({
+        success: false,
+        error: new Error('history error'),
+      });
+
+      await expect(service.getMemberOwnershipHistory('member@example.com')).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -412,8 +685,7 @@ describe('MembersService', () => {
 
       await service.updateMember(email, updateData, 'admin@example.com');
 
-      // Tracking metrics are called asynchronously with catch, so we just verify the flow completes
-      expect(mockStorageService.instance.updateMember).toHaveBeenCalled();
+      expect(mockStorageService.instance.updateMember).toHaveBeenCalledWith(email, {});
     });
 
     it('should handle status change from active to inactive', async () => {
@@ -440,8 +712,9 @@ describe('MembersService', () => {
       await service.updateMember(email, updateData, 'admin@example.com');
 
       // Verify update was called with the email parameter
-      expect(mockStorageService.instance.updateMember).toHaveBeenCalledWith(email, expect.any(Object));
+      expect(mockStorageService.instance.updateMember).toHaveBeenCalledWith(email, {});
     });
+
   });
 
   describe('deleteMember', () => {
@@ -460,7 +733,7 @@ describe('MembersService', () => {
     it('should throw NotFoundException when member not found', async () => {
       const email = 'nonexistent@example.com';
       const notFoundError = new Error('Member not found');
-      (notFoundError as any).name = 'NotFoundError';
+      notFoundError.name = 'NotFoundError';
 
       vi.spyOn(mockStorageService.instance, 'deleteMember').mockResolvedValue({
         success: false,
@@ -533,6 +806,20 @@ describe('MembersService', () => {
         BadRequestException,
       );
     });
+
+    it('should rethrow non-zod errors from subscription creation', async () => {
+      const email = 'user@example.com';
+      const subscriptionData = {
+        amountInCents: 50000,
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+      };
+
+      const storageError = new Error('db timeout');
+      vi.spyOn(mockStorageService.instance, 'createSubscription').mockRejectedValue(storageError);
+
+      await expect(service.createMemberSubscription(email, subscriptionData)).rejects.toBe(storageError);
+    });
   });
 
   describe('Tags Management', () => {
@@ -571,7 +858,7 @@ describe('MembersService', () => {
     it('should throw ConflictException on duplicate tag', async () => {
       const tagData = { name: 'VIP' };
       const duplicateError = new Error('Tag already exists');
-      (duplicateError as any).name = 'DuplicateError';
+      duplicateError.name = 'DuplicateError';
 
       vi.spyOn(mockStorageService.instance, 'createTag').mockResolvedValue({
         success: false,
@@ -600,7 +887,7 @@ describe('MembersService', () => {
     it('should throw NotFoundException when updating non-existent tag', async () => {
       const tagId = 'nonexistent-tag';
       const notFoundError = new Error('Tag not found');
-      (notFoundError as any).name = 'NotFoundError';
+      notFoundError.name = 'NotFoundError';
 
       vi.spyOn(mockStorageService.instance, 'updateTag').mockResolvedValue({
         success: false,
@@ -707,6 +994,13 @@ describe('MembersService', () => {
       expect(result.data).toEqual(mockTask);
     });
 
+    it('should throw BadRequestException when userEmail is missing for task creation', async () => {
+      const email = 'user@example.com';
+      const taskData = { title: 'Plan next call', priority: 'medium', taskType: 'call' };
+
+      await expect(service.createMemberTask(email, taskData)).rejects.toThrow(BadRequestException);
+    });
+
     it('should update task status to completed', async () => {
       const taskId = 'task-1';
       const updateData = { status: 'completed' };
@@ -721,6 +1015,27 @@ describe('MembersService', () => {
 
       expect(result.success).toBe(true);
       expect(result.data.status).toBe('completed');
+      expect(mockStorageService.instance.updateTask).toHaveBeenCalledWith(taskId, {
+        status: 'completed',
+        completedBy: 'admin@example.com',
+      });
+    });
+
+    it('should preserve completedBy when already provided in payload', async () => {
+      const taskId = 'task-keep-completed-by';
+      const updateData = { status: 'completed', completedBy: 'manager@example.com' as const };
+
+      vi.spyOn(mockStorageService.instance, 'updateTask').mockResolvedValue({
+        success: true,
+        data: { id: taskId, ...updateData },
+      });
+
+      await service.updateTask(taskId, updateData, 'admin@example.com');
+
+      expect(mockStorageService.instance.updateTask).toHaveBeenCalledWith(taskId, {
+        status: 'completed',
+        completedBy: 'manager@example.com',
+      });
     });
 
     it('should handle dueDate null value', async () => {
@@ -734,7 +1049,32 @@ describe('MembersService', () => {
 
       await service.updateTask(taskId, updateData);
 
-      expect(mockStorageService.instance.updateTask).toHaveBeenCalled();
+      expect(mockStorageService.instance.updateTask).toHaveBeenCalledWith(taskId, {
+        dueDate: undefined,
+      });
+    });
+
+    it('should throw NotFoundException when updating missing task', async () => {
+      const notFoundError = new Error('Task not found');
+      notFoundError.name = 'NotFoundError';
+
+      mockStorageService.instance.updateTask.mockResolvedValue({
+        success: false,
+        error: notFoundError,
+      });
+
+      await expect(service.updateTask('missing-task', { title: 'A valid title' }, 'admin@example.com'))
+        .rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when updating task fails', async () => {
+      mockStorageService.instance.updateTask.mockResolvedValue({
+        success: false,
+        error: new Error('task update failed'),
+      });
+
+      await expect(service.updateTask('task-2', { title: 'A valid title' }, 'admin@example.com'))
+        .rejects.toThrow(BadRequestException);
     });
 
     it('should delete a task', async () => {
@@ -801,6 +1141,294 @@ describe('MembersService', () => {
       await service.deleteRelation(relationId);
 
       expect(mockStorageService.instance.deleteRelation).toHaveBeenCalledWith(relationId);
+    });
+  });
+
+  describe('Member Contacts (Interactions)', () => {
+    it('should retrieve interaction history for a member', async () => {
+      const contacts = [{ id: 'c1', type: 'email', summary: 'Relance J+3' }];
+      mockStorageService.instance.getMemberContacts.mockResolvedValue({
+        success: true,
+        data: contacts,
+      });
+
+      const result = await service.getMemberContacts('user@example.com');
+
+      expect(result).toEqual({ success: true, data: contacts });
+      expect(mockStorageService.instance.getMemberContacts).toHaveBeenCalledWith('user@example.com');
+    });
+
+    it('should throw NotFoundException when deleting a missing interaction', async () => {
+      const notFoundError = new Error('Contact not found');
+      notFoundError.name = 'NotFoundError';
+      mockStorageService.instance.deleteMemberContact.mockResolvedValue({
+        success: false,
+        error: notFoundError,
+      });
+
+      await expect(service.deleteMemberContact('contact-unknown')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should delete an interaction successfully', async () => {
+      mockStorageService.instance.deleteMemberContact.mockResolvedValue({
+        success: true,
+      });
+
+      await service.deleteMemberContact('contact-1');
+
+      expect(mockStorageService.instance.deleteMemberContact).toHaveBeenCalledWith('contact-1');
+    });
+
+    it('should throw BadRequestException when deleting interaction fails with generic error', async () => {
+      mockStorageService.instance.deleteMemberContact.mockResolvedValue({
+        success: false,
+        error: new Error('delete failed'),
+      });
+
+      await expect(service.deleteMemberContact('contact-1')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('Bulk operations - erreurs et cas limites', () => {
+    it('should throw BadRequestException when bulkUpdateStatus receives empty emails', async () => {
+      await expect(service.bulkUpdateStatus([], 'active')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when bulkUpdateStatus fails at database layer', async () => {
+      const dbWithUpdate = db as unknown as {
+        update: (...args: unknown[]) => {
+          set: (...setArgs: unknown[]) => { where: (...whereArgs: unknown[]) => Promise<unknown> };
+        };
+      };
+
+      const whereMock = vi.fn(async () => {
+        throw new Error('db update failed');
+      });
+      const setMock = vi.fn(() => ({ where: whereMock }));
+      vi.spyOn(dbWithUpdate, 'update').mockReturnValue({ set: setMock });
+
+      await expect(service.bulkUpdateStatus(['a@example.com'], 'inactive')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should assign tags only when missing and ignore per-member insert errors', async () => {
+      const dbWithSelectInsert = db as unknown as {
+        select: (...args: unknown[]) => {
+          from: (...fromArgs: unknown[]) => {
+            where: (...whereArgs: unknown[]) => { limit: (count: number) => Promise<unknown[]> };
+          };
+        };
+        insert: (...args: unknown[]) => { values: (payload: unknown) => Promise<unknown> };
+      };
+
+      const limitMock = vi.fn<(count: number) => Promise<unknown[]>>()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{}])
+        .mockResolvedValueOnce([]);
+      const whereMock = vi.fn(() => ({ limit: limitMock }));
+      const fromMock = vi.fn(() => ({ where: whereMock }));
+      const selectMock = vi.fn(() => ({ from: fromMock }));
+      vi.spyOn(dbWithSelectInsert, 'select').mockImplementation(selectMock);
+
+      const valuesMock = vi.fn<(payload: unknown) => Promise<unknown>>()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('insert failed'));
+      const insertMock = vi.fn(() => ({ values: valuesMock }));
+      vi.spyOn(dbWithSelectInsert, 'insert').mockImplementation(insertMock);
+
+      const loggerWithInfo = logger as unknown as {
+        info: (...args: unknown[]) => void;
+      };
+      const infoSpy = vi.spyOn(loggerWithInfo, 'info').mockImplementation(() => undefined);
+
+      const result = await service.bulkAssignTag(
+        ['first@example.com', 'second@example.com', 'third@example.com'],
+        'tag-123',
+      );
+
+      expect(result).toEqual({ success: true, assigned: 1 });
+      expect(valuesMock).toHaveBeenCalledTimes(2);
+      expect(infoSpy).toHaveBeenCalledWith('Bulk tag assignment', { count: 1, tagId: 'tag-123' });
+    });
+
+    it('should throw BadRequestException when bulkDelete fails at database layer', async () => {
+      const dbWithDelete = db as unknown as {
+        delete: (...args: unknown[]) => {
+          where: (...whereArgs: unknown[]) => {
+            returning: (...returningArgs: unknown[]) => Promise<Array<{ email: string }>>;
+          };
+        };
+      };
+
+      const returningMock = vi.fn(async () => {
+        throw new Error('delete failed');
+      });
+      const whereMock = vi.fn(() => ({ returning: returningMock }));
+      const deleteMock = vi.fn(() => ({ where: whereMock }));
+      vi.spyOn(dbWithDelete, 'delete').mockImplementation(deleteMock);
+
+      await expect(service.bulkDelete(['x@example.com'])).rejects.toThrow(BadRequestException);
+    });
+
+    it('should return deleted count in bulkDelete success path', async () => {
+      const dbWithDelete = db as unknown as {
+        delete: (...args: unknown[]) => {
+          where: (...whereArgs: unknown[]) => {
+            returning: (...returningArgs: unknown[]) => Promise<Array<{ email: string }>>;
+          };
+        };
+      };
+
+      const returningMock = vi.fn(async () => [{ email: 'a@example.com' }, { email: 'b@example.com' }]);
+      const whereMock = vi.fn(() => ({ returning: returningMock }));
+      const deleteMock = vi.fn(() => ({ where: whereMock }));
+      vi.spyOn(dbWithDelete, 'delete').mockImplementation(deleteMock);
+
+      const loggerWithInfo = logger as unknown as {
+        info: (...args: unknown[]) => void;
+      };
+      const infoSpy = vi.spyOn(loggerWithInfo, 'info').mockImplementation(() => undefined);
+
+      const result = await service.bulkDelete(['a@example.com', 'b@example.com']);
+
+      expect(result).toEqual({ success: true, deleted: 2 });
+      expect(infoSpy).toHaveBeenCalledWith('Bulk member delete', { count: 2 });
+    });
+
+    it('should throw BadRequestException when bulkAssignSubscription receives empty emails', async () => {
+      await expect(
+        service.bulkAssignSubscription([], 'sub-quarterly', '2026-01-15', 'card', 'admin@example.com'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when bulkUpdateStatus receives empty status', async () => {
+      await expect(service.bulkUpdateStatus(['a@example.com'], '')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when bulkAssignTag receives empty tagId', async () => {
+      await expect(service.bulkAssignTag(['a@example.com'], '')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when bulkDelete receives empty emails', async () => {
+      await expect(service.bulkDelete([])).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('getAllTasks', () => {
+    it('should return all tasks with forwarded filters', async () => {
+      const tasks = [{ id: 'task-1', status: 'pending', assignedTo: 'owner@example.com' }];
+      mockStorageService.instance.getAllTasks.mockResolvedValue({
+        success: true,
+        data: tasks,
+      });
+
+      const result = await service.getAllTasks({ status: 'pending', assignedTo: 'owner@example.com' });
+
+      expect(mockStorageService.instance.getAllTasks).toHaveBeenCalledWith({
+        status: 'pending',
+        assignedTo: 'owner@example.com',
+      });
+      expect(result).toEqual({ success: true, data: tasks });
+    });
+
+    it('should throw BadRequestException when getAllTasks fails', async () => {
+      mockStorageService.instance.getAllTasks.mockResolvedValue({
+        success: false,
+        error: new Error('all tasks failed'),
+      });
+
+      await expect(service.getAllTasks({ status: 'pending' })).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('Branches supplémentaires - erreurs et transitions', () => {
+    it('should throw BadRequestException when getMemberActivities fails', async () => {
+      mockStorageService.instance.getMemberActivities.mockResolvedValue({
+        success: false,
+        error: new Error('activities failed'),
+      });
+
+      await expect(service.getMemberActivities('member@example.com')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException when getMemberDetails fails', async () => {
+      mockStorageService.instance.getMemberDetails.mockResolvedValue({
+        success: false,
+        error: new Error('member details not found'),
+      });
+
+      await expect(service.getMemberDetails('missing@example.com')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when getAllTags fails', async () => {
+      mockStorageService.instance.getAllTags.mockResolvedValue({
+        success: false,
+        error: new Error('tags read failed'),
+      });
+
+      await expect(service.getAllTags()).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when deleteTag fails', async () => {
+      mockStorageService.instance.deleteTag.mockResolvedValue({
+        success: false,
+        error: new Error('delete tag failed'),
+      });
+
+      await expect(service.deleteTag('tag-404')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when getMemberTags fails', async () => {
+      mockStorageService.instance.getTagsByMember.mockResolvedValue({
+        success: false,
+        error: new Error('member tags failed'),
+      });
+
+      await expect(service.getMemberTags('member@example.com')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when getMemberTasks fails', async () => {
+      mockStorageService.instance.getTasksByMember.mockResolvedValue({
+        success: false,
+        error: new Error('tasks read failed'),
+      });
+
+      await expect(service.getMemberTasks('member@example.com')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when deleteTask fails', async () => {
+      mockStorageService.instance.deleteTask.mockResolvedValue({
+        success: false,
+        error: new Error('task delete failed'),
+      });
+
+      await expect(service.deleteTask('task-404')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when getMemberRelations fails', async () => {
+      mockStorageService.instance.getRelationsByMember.mockResolvedValue({
+        success: false,
+        error: new Error('relations read failed'),
+      });
+
+      await expect(service.getMemberRelations('member@example.com')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when deleteRelation fails', async () => {
+      mockStorageService.instance.deleteRelation.mockResolvedValue({
+        success: false,
+        error: new Error('relation delete failed'),
+      });
+
+      await expect(service.deleteRelation('relation-404')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException when getAllRelations fails', async () => {
+      mockStorageService.instance.getAllRelations.mockResolvedValue({
+        success: false,
+        error: new Error('all relations failed'),
+      });
+
+      await expect(service.getAllRelations()).rejects.toThrow(BadRequestException);
     });
   });
 });

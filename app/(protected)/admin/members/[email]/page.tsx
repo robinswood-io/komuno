@@ -170,20 +170,28 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
       setAddInteractionOpen(false);
       setInteractionForm({ type: 'call', subject: '', date: new Date().toISOString().split('T')[0], duration: '', description: '', notes: '' });
     },
-    onError: () => {
-      toast({ title: 'Erreur', description: "Impossible d'ajouter l'interaction", variant: 'destructive' });
+    onError: (error: Error) => {
+      toast({
+        title: 'Erreur',
+        description: error.message || "Impossible d'ajouter l'interaction",
+        variant: 'destructive',
+      });
     },
   });
 
   const deleteContactMutation = useMutation({
     mutationFn: (contactId: string) =>
-      api.delete(`/api/admin/members/${encodeURIComponent(decodedEmail)}/contacts/${contactId}`),
+      api.delete(`/api/admin/member-contacts/${contactId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...queryKeys.members.detail(decodedEmail), 'contacts'] });
       toast({ title: 'Interaction supprimée' });
     },
-    onError: () => {
-      toast({ title: 'Erreur', description: "Impossible de supprimer l'interaction", variant: 'destructive' });
+    onError: (error: Error) => {
+      toast({
+        title: 'Erreur',
+        description: error.message || "Impossible de supprimer l'interaction",
+        variant: 'destructive',
+      });
     },
   });
 
@@ -291,7 +299,11 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/admin/members?edit=${encodeURIComponent(member.email)}`)}
+            >
               <Pencil className="h-4 w-4 mr-2" />
               Modifier
             </Button>

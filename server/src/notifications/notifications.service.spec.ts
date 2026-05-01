@@ -155,6 +155,44 @@ describe('NotificationsService', () => {
     });
   });
 
+  describe('getNotificationsByProject / getNotificationsByOffer', () => {
+    it('should fetch notifications filtered by project', async () => {
+      const userId = 'user-123';
+      const projectId = 'project-42';
+
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([{ id: 'notif-p1', userId }]),
+          }),
+        }),
+      });
+
+      const result = await service.getNotificationsByProject(userId, projectId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('notif-p1');
+    });
+
+    it('should fetch notifications filtered by offer', async () => {
+      const userId = 'user-123';
+      const offerId = 'offer-42';
+
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockResolvedValue([{ id: 'notif-o1', userId }]),
+          }),
+        }),
+      });
+
+      const result = await service.getNotificationsByOffer(userId, offerId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('notif-o1');
+    });
+  });
+
   describe('getGroupedNotifications', () => {
     it('should group notifications by project', async () => {
       const userId = 'user-123';
@@ -247,6 +285,47 @@ describe('NotificationsService', () => {
       expect(result).toHaveProperty('offer-1');
       expect(result).toHaveProperty('offer-2');
     });
+
+    it('should group by entity and fallback to ungrouped for missing fields', async () => {
+      const userId = 'user-123';
+      const mockNotifications = [
+        {
+          id: 'notif-1',
+          userId,
+          type: 'idea_update',
+          title: 'Entity update',
+          body: 'Body 1',
+          isRead: false,
+          metadata: {},
+          entityType: 'idea',
+          entityId: 'idea-77',
+          createdAt: new Date(),
+        },
+        {
+          id: 'notif-2',
+          userId,
+          type: 'misc',
+          title: 'No entity and no metadata',
+          body: 'Body 2',
+          isRead: false,
+          metadata: undefined,
+          entityType: undefined,
+          entityId: undefined,
+          createdAt: new Date(),
+        },
+      ];
+
+      vi.spyOn(service, 'getNotificationsByUser').mockResolvedValue(
+        mockNotifications as unknown as Awaited<ReturnType<typeof service.getNotificationsByUser>>,
+      );
+
+      const result = await service.getGroupedNotifications(userId, 'entity');
+
+      expect(result).toHaveProperty('idea:idea-77');
+      expect(result).toHaveProperty('ungrouped');
+      expect(result['idea:idea-77']).toHaveLength(1);
+      expect(result.ungrouped).toHaveLength(1);
+    });
   });
 
   describe('markAsRead', () => {
@@ -258,6 +337,20 @@ describe('NotificationsService', () => {
       expect(result).toBeDefined();
       expect(result.isRead).toBe(true);
       expect(mockDb.update).toHaveBeenCalled();
+    });
+
+    it('should return undefined when no row is updated', async () => {
+      mockDb.update = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+      const result = await service.markAsRead('missing-id');
+
+      expect(result).toBeUndefined();
     });
   });
 
@@ -296,6 +389,85 @@ describe('NotificationsService', () => {
 
       expect(result).toBe(true);
       expect(mockDb.delete).toHaveBeenCalled();
+    });
+
+    it('should return false when no notification is deleted', async () => {
+      mockDb.delete = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
+        }),
+      });
+
+      const result = await service.deleteNotification('missing-id');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('markAllAsRead / markProjectAsRead / updateNotification', () => {
+    it('should mark all unread notifications as read for a user', async () => {
+      mockDb.update = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: 'n1' }, { id: 'n2' }]),
+          }),
+        }),
+      });
+
+      const result = await service.markAllAsRead('user-123');
+
+      expect(result).toBe(2);
+    });
+
+    it('should mark project notifications as read for a user', async () => {
+      mockDb.update = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: 'n1' }]),
+          }),
+        }),
+      });
+
+      const result = await service.markProjectAsRead('user-123', 'project-1');
+
+      expect(result).toBe(1);
+    });
+
+    it('should update notification with metadata only', async () => {
+      const updated = {
+        id: 'notif-1',
+        isRead: false,
+        metadata: { projectId: 'project-1', extra: 'yes' },
+      };
+
+      mockDb.update = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([updated]),
+          }),
+        }),
+      });
+
+      const result = await service.updateNotification('notif-1', {
+        metadata: { projectId: 'project-1', extra: 'yes' } as unknown as import('../../../shared/schema').NotificationMetadata,
+      });
+
+      expect(result).toEqual(updated);
+    });
+
+    it('should update notification with isRead only', async () => {
+      const updated = { id: 'notif-1', isRead: true, metadata: { offerId: 'offer-1' } };
+      mockDb.update = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([updated]),
+          }),
+        }),
+      });
+
+      const result = await service.updateNotification('notif-1', { isRead: true });
+
+      expect(result.isRead).toBe(true);
     });
   });
 
@@ -350,6 +522,38 @@ describe('NotificationsService', () => {
       expect(result).toHaveProperty('notifications');
       expect(result).toHaveProperty('total');
     });
+
+    it('should return total=0 when count query is empty and honor explicit limit/offset', async () => {
+      mockDb.select = vi
+        .fn()
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockReturnValue({
+                limit: vi.fn().mockReturnValue({
+                  offset: vi.fn().mockResolvedValue([]),
+                }),
+              }),
+            }),
+          }),
+        });
+
+      const result = await service.searchNotifications('user-123', {
+        entityType: 'idea',
+        entityId: 'idea-1',
+        isRead: false,
+        limit: 5,
+        offset: 10,
+      });
+
+      expect(result.total).toBe(0);
+      expect(result.notifications).toEqual([]);
+    });
   });
 
   describe('getUnreadCount', () => {
@@ -365,6 +569,44 @@ describe('NotificationsService', () => {
       const result = await service.getUnreadCount(userId);
 
       expect(result).toBe(5);
+    });
+
+    it('should return 0 when count query has no rows', async () => {
+      const userId = 'user-123';
+
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      });
+
+      const result = await service.getUnreadCount(userId);
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('getUnreadCountByProject / getUnreadCountByOffer', () => {
+    it('should return unread count by project', async () => {
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([{ count: 3 }]),
+        }),
+      });
+
+      const result = await service.getUnreadCountByProject('user-123', 'project-1');
+      expect(result).toBe(3);
+    });
+
+    it('should return unread count by offer with fallback to 0', async () => {
+      mockDb.select = vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue([]),
+        }),
+      });
+
+      const result = await service.getUnreadCountByOffer('user-123', 'offer-1');
+      expect(result).toBe(0);
     });
   });
 

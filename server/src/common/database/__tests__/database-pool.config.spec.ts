@@ -1,269 +1,421 @@
-/**
- * Tests pour la configuration du database pooling
- */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getPoolStats } from '../../../db';
+type PoolStatus = 'healthy' | 'warning' | 'critical';
+
+interface TestPoolStats {
+  totalCount: number;
+  idleCount: number;
+  activeCount: number;
+  waitingCount: number;
+  provider: 'neon' | 'standard';
+  minConnections: number;
+  maxConnections: number;
+  utilization: {
+    percent: number;
+    status: PoolStatus;
+  };
+  availableConnections: number;
+  availableFromIdle: number;
+  warning: {
+    threshold: number;
+    current: number;
+    breached: boolean;
+  };
+  critical: {
+    threshold: number;
+    current: number;
+    breached: boolean;
+  };
+}
+
+type PoolStatsOverrides = Omit<
+  Partial<TestPoolStats>,
+  'utilization' | 'warning' | 'critical'
+> & {
+  utilization?: Partial<TestPoolStats['utilization']>;
+  warning?: Partial<TestPoolStats['warning']>;
+  critical?: Partial<TestPoolStats['critical']>;
+};
+
+const getPoolStatsMock = vi.hoisted(() => vi.fn<() => TestPoolStats>());
+const loggerSpies = vi.hoisted(() => ({
+  error: vi.fn<(message: string, payload?: unknown) => void>(),
+  warn: vi.fn<(message: string, payload?: unknown) => void>(),
+  info: vi.fn<(message: string, payload?: unknown) => void>(),
+  debug: vi.fn<(message: string, payload?: unknown) => void>(),
+}));
+
+vi.mock('../../../../db.js', () => ({
+  getPoolStats: getPoolStatsMock,
+}));
+
+vi.mock('../../../../lib/logger.js', () => ({
+  logger: loggerSpies,
+}));
+
+import { getPoolStats } from '../../../../db.js';
 import {
   checkPoolHealth,
-  getPoolSummary,
-  getPoolMetrics,
-  isPoolCritical,
-  isPoolWarning,
-  isPoolHealthy,
+  enrichContextWithPoolStats,
+  getAdditionalTimeout,
   getAvailableConnections,
+  getPoolMetrics,
+  getPoolSummary,
   getPoolUtilizationPercent,
+  isPoolCritical,
+  isPoolHealthy,
+  isPoolWarning,
+  startPoolMonitoring,
   suggestTimeout,
-} from '../../../utils/database-config.utils';
+} from '../../../../utils/database-config.utils.ts';
 
-/**
- * Tests des utilitaires du pool
- *
- * Note: Ces tests vérifient que les fonctions n'ont pas d'erreurs de runtime.
- * Pour des tests complets, vous auriez besoin d'une base de données de test.
- */
+const createPoolStats = (overrides: PoolStatsOverrides = {}): TestPoolStats => {
+  const base: TestPoolStats = {
+    totalCount: 5,
+    idleCount: 2,
+    activeCount: 3,
+    waitingCount: 0,
+    provider: 'standard',
+    minConnections: 2,
+    maxConnections: 10,
+    utilization: {
+      percent: 30,
+      status: 'healthy',
+    },
+    availableConnections: 5,
+    availableFromIdle: 2,
+    warning: {
+      threshold: 7,
+      current: 3,
+      breached: false,
+    },
+    critical: {
+      threshold: 9,
+      current: 3,
+      breached: false,
+    },
+  };
+
+  return {
+    ...base,
+    ...overrides,
+    utilization: {
+      ...base.utilization,
+      ...overrides.utilization,
+    },
+    warning: {
+      ...base.warning,
+      ...overrides.warning,
+    },
+    critical: {
+      ...base.critical,
+      ...overrides.critical,
+    },
+  };
+};
+
 describe('Database Pool Configuration', () => {
-  describe('getPoolStats()', () => {
-    it('should return pool statistics', () => {
-      const stats = getPoolStats();
+  const mockedGetPoolStats = vi.mocked(getPoolStats);
 
-      expect(stats).toBeDefined();
-      expect(typeof stats.totalCount).toBe('number');
-      expect(typeof stats.idleCount).toBe('number');
-      expect(typeof stats.activeCount).toBe('number');
-      expect(typeof stats.waitingCount).toBe('number');
-    });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
+    mockedGetPoolStats.mockReturnValue(createPoolStats());
+  });
 
-    it('should have valid configuration', () => {
-      const stats = getPoolStats();
-
-      expect(stats.minConnections).toBeDefined();
-      expect(stats.maxConnections).toBeDefined();
-      expect(stats.minConnections).toBeLessThanOrEqual(stats.maxConnections);
-    });
-
-    it('should calculate utilization percentage', () => {
-      const stats = getPoolStats();
-
-      expect(stats.utilization).toBeDefined();
-      expect(typeof stats.utilization.percent).toBe('number');
-      expect(stats.utilization.percent).toBeGreaterThanOrEqual(0);
-      expect(stats.utilization.percent).toBeLessThanOrEqual(100);
-    });
-
-    it('should report pool status (healthy, warning, critical)', () => {
-      const stats = getPoolStats();
-
-      expect(['healthy', 'warning', 'critical']).toContain(
-        stats.utilization.status
-      );
-    });
-
-    it('should have valid threshold checks', () => {
-      const stats = getPoolStats();
-
-      expect(stats.warning).toBeDefined();
-      expect(stats.critical).toBeDefined();
-      expect(stats.warning.threshold).toBeLessThan(stats.critical.threshold);
-    });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('checkPoolHealth()', () => {
-    it('should return null or alert object', () => {
+    it('returns critical alert and logs error when critical threshold is breached', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          waitingCount: 4,
+          warning: { breached: true },
+          critical: { breached: true },
+          utilization: { percent: 95, status: 'critical' },
+        })
+      );
+
       const alert = checkPoolHealth();
 
-      if (alert) {
-        expect(alert.severity).toBeDefined();
-        expect(['critical', 'warning', 'info']).toContain(alert.severity);
-        expect(typeof alert.message).toBe('string');
-      }
+      expect(alert).not.toBeNull();
+      expect(alert?.severity).toBe('critical');
+      expect(alert?.waitingRequests).toBe(4);
+      expect(loggerSpies.error).toHaveBeenCalledTimes(1);
+      expect(loggerSpies.warn).not.toHaveBeenCalled();
+      expect(loggerSpies.info).not.toHaveBeenCalled();
+    });
+
+    it('returns warning alert and logs warning when warning threshold is breached', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          warning: { breached: true },
+          critical: { breached: false },
+          utilization: { percent: 80, status: 'warning' },
+        })
+      );
+
+      const alert = checkPoolHealth();
+
+      expect(alert).not.toBeNull();
+      expect(alert?.severity).toBe('warning');
+      expect(loggerSpies.warn).toHaveBeenCalledTimes(1);
+      expect(loggerSpies.error).not.toHaveBeenCalled();
+      expect(loggerSpies.info).not.toHaveBeenCalled();
+    });
+
+    it('returns info alert and logs info when requests are waiting', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          waitingCount: 2,
+          warning: { breached: false },
+          critical: { breached: false },
+        })
+      );
+
+      const alert = checkPoolHealth();
+
+      expect(alert).toEqual(
+        expect.objectContaining({
+          severity: 'info',
+          waitingRequests: 2,
+        })
+      );
+      expect(loggerSpies.info).toHaveBeenCalledTimes(1);
+      expect(loggerSpies.warn).not.toHaveBeenCalled();
+      expect(loggerSpies.error).not.toHaveBeenCalled();
+    });
+
+    it('returns null when pool has no warning, critical, or waiting signal', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          waitingCount: 0,
+          warning: { breached: false },
+          critical: { breached: false },
+        })
+      );
+
+      const alert = checkPoolHealth();
+
+      expect(alert).toBeNull();
+      expect(loggerSpies.info).not.toHaveBeenCalled();
+      expect(loggerSpies.warn).not.toHaveBeenCalled();
+      expect(loggerSpies.error).not.toHaveBeenCalled();
     });
   });
 
-  describe('getPoolSummary()', () => {
-    it('should return formatted string summary', () => {
-      const summary = getPoolSummary();
+  describe('formatted helpers', () => {
+    it('builds summary with active/max utilization, idle and waiting', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          activeCount: 6,
+          maxConnections: 12,
+          idleCount: 4,
+          waitingCount: 1,
+          utilization: { percent: 50 },
+        })
+      );
 
-      expect(typeof summary).toBe('string');
-      expect(summary).toContain('Pool');
-      expect(summary).toContain('%');
+      expect(getPoolSummary()).toBe('Pool 6/12 (50%) | 4 idle, 1 waiting');
     });
 
-    it('should include connection counts', () => {
-      const summary = getPoolSummary();
+    it('maps pool metrics fields and formats utilization as percentage string', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          totalCount: 8,
+          activeCount: 7,
+          idleCount: 1,
+          waitingCount: 3,
+          minConnections: 2,
+          maxConnections: 12,
+          availableConnections: 4,
+          utilization: { percent: 58.5, status: 'warning' },
+        })
+      );
 
-      // Devrait contenir des chiffres
-      expect(/\d+/.test(summary)).toBe(true);
-    });
-  });
-
-  describe('getPoolMetrics()', () => {
-    it('should return all pool metrics', () => {
-      const metrics = getPoolMetrics();
-
-      expect(metrics).toBeDefined();
-      expect(metrics.total).toBeDefined();
-      expect(metrics.active).toBeDefined();
-      expect(metrics.idle).toBeDefined();
-      expect(metrics.waiting).toBeDefined();
-      expect(metrics.max).toBeDefined();
-      expect(metrics.min).toBeDefined();
-    });
-
-    it('should have consistent totals', () => {
-      const metrics = getPoolMetrics();
-
-      expect(metrics.active + metrics.idle).toBeLessThanOrEqual(metrics.total);
-    });
-  });
-
-  describe('Pool health check functions', () => {
-    it('isPoolHealthy should be boolean', () => {
-      const result = isPoolHealthy();
-      expect(typeof result).toBe('boolean');
-    });
-
-    it('isPoolWarning should be boolean', () => {
-      const result = isPoolWarning();
-      expect(typeof result).toBe('boolean');
-    });
-
-    it('isPoolCritical should be boolean', () => {
-      const result = isPoolCritical();
-      expect(typeof result).toBe('boolean');
-    });
-
-    it('states should be mutually exclusive', () => {
-      const healthy = isPoolHealthy();
-      const warning = isPoolWarning();
-      const critical = isPoolCritical();
-
-      // Au maximum un seul peut être vrai
-      const count = [healthy, warning, critical].filter(Boolean).length;
-      expect(count).toBeLessThanOrEqual(1);
+      expect(getPoolMetrics()).toEqual({
+        total: 8,
+        active: 7,
+        idle: 1,
+        waiting: 3,
+        max: 12,
+        min: 2,
+        utilization: '58.5%',
+        status: 'warning',
+        available: 4,
+      });
     });
   });
 
-  describe('getAvailableConnections()', () => {
-    it('should return non-negative number', () => {
-      const available = getAvailableConnections();
+  describe('state helpers', () => {
+    it('isPoolCritical mirrors critical breach flag', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ critical: { breached: true } })
+      );
+      expect(isPoolCritical()).toBe(true);
 
-      expect(typeof available).toBe('number');
-      expect(available).toBeGreaterThanOrEqual(0);
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ critical: { breached: false } })
+      );
+      expect(isPoolCritical()).toBe(false);
     });
 
-    it('should not exceed max connections', () => {
-      const available = getAvailableConnections();
-      const stats = getPoolStats();
+    it('isPoolWarning is true only when warning is breached and critical is not breached', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          warning: { breached: true },
+          critical: { breached: false },
+        })
+      );
+      expect(isPoolWarning()).toBe(true);
 
-      expect(available).toBeLessThanOrEqual(stats.maxConnections);
-    });
-  });
-
-  describe('getPoolUtilizationPercent()', () => {
-    it('should return percentage 0-100', () => {
-      const percent = getPoolUtilizationPercent();
-
-      expect(typeof percent).toBe('number');
-      expect(percent).toBeGreaterThanOrEqual(0);
-      expect(percent).toBeLessThanOrEqual(100);
-    });
-  });
-
-  describe('suggestTimeout()', () => {
-    it('should suggest timeout for quick profile', () => {
-      const timeout = suggestTimeout('quick');
-
-      expect(typeof timeout).toBe('number');
-      expect(timeout).toBeGreaterThan(0);
-      expect(timeout).toBeGreaterThanOrEqual(2000); // Base timeout
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          warning: { breached: true },
+          critical: { breached: true },
+        })
+      );
+      expect(isPoolWarning()).toBe(false);
     });
 
-    it('should suggest timeout for normal profile', () => {
-      const timeout = suggestTimeout('normal');
+    it('isPoolHealthy returns false when warning is breached, true otherwise', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ warning: { breached: false } })
+      );
+      expect(isPoolHealthy()).toBe(true);
 
-      expect(typeof timeout).toBe('number');
-      expect(timeout).toBeGreaterThanOrEqual(5000); // Base timeout
-    });
-
-    it('should suggest timeout for complex profile', () => {
-      const timeout = suggestTimeout('complex');
-
-      expect(typeof timeout).toBe('number');
-      expect(timeout).toBeGreaterThanOrEqual(10000); // Base timeout
-    });
-
-    it('should suggest timeout for background profile', () => {
-      const timeout = suggestTimeout('background');
-
-      expect(typeof timeout).toBe('number');
-      expect(timeout).toBeGreaterThanOrEqual(15000); // Base timeout
-    });
-
-    it('should increase timeout when pool is loaded', () => {
-      const timeouts = {
-        quick: suggestTimeout('quick'),
-        normal: suggestTimeout('normal'),
-        complex: suggestTimeout('complex'),
-        background: suggestTimeout('background'),
-      };
-
-      // Timeouts should follow profile hierarchy
-      expect(timeouts.quick).toBeLessThan(timeouts.normal);
-      expect(timeouts.normal).toBeLessThan(timeouts.complex);
-      expect(timeouts.complex).toBeLessThan(timeouts.background);
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ warning: { breached: true } })
+      );
+      expect(isPoolHealthy()).toBe(false);
     });
   });
 
-  describe('Configuration validation', () => {
-    it('should have min < max connections', () => {
-      const stats = getPoolStats();
+  describe('simple accessors', () => {
+    it('returns available connections', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ availableConnections: 7 })
+      );
 
-      expect(stats.minConnections).toBeLessThan(stats.maxConnections);
+      expect(getAvailableConnections()).toBe(7);
     });
 
-    it('should have reasonable default values', () => {
-      const stats = getPoolStats();
+    it('returns pool utilization percent', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ utilization: { percent: 42.4 } })
+      );
 
-      // Min should be at least 1
-      expect(stats.minConnections).toBeGreaterThanOrEqual(1);
-
-      // Max should be reasonable (2-30 for most configs)
-      expect(stats.maxConnections).toBeGreaterThan(stats.minConnections);
-      expect(stats.maxConnections).toBeLessThanOrEqual(100);
-    });
-
-    it('should detect correct provider', () => {
-      const stats = getPoolStats();
-
-      expect(['neon', 'standard']).toContain(stats.provider);
+      expect(getPoolUtilizationPercent()).toBe(42.4);
     });
   });
 
-  describe('Threshold logic', () => {
-    it('warning threshold should be less than critical', () => {
-      const stats = getPoolStats();
+  describe('timeout helpers', () => {
+    it('getAdditionalTimeout returns 3000 when utilization is above 80', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ utilization: { percent: 81 } })
+      );
 
-      expect(stats.warning.threshold).toBeLessThan(stats.critical.threshold);
+      expect(getAdditionalTimeout()).toBe(3000);
     });
 
-    it('breached flags should be booleans', () => {
-      const stats = getPoolStats();
+    it('getAdditionalTimeout returns 1000 when utilization is above 60 and at most 80', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ utilization: { percent: 61 } })
+      );
 
-      expect(typeof stats.warning.breached).toBe('boolean');
-      expect(typeof stats.critical.breached).toBe('boolean');
+      expect(getAdditionalTimeout()).toBe(1000);
     });
 
-    it('thresholds should be percentage-based', () => {
-      const stats = getPoolStats();
-      const warningPercent = (stats.warning.threshold / stats.maxConnections) * 100;
-      const criticalPercent = (stats.critical.threshold / stats.maxConnections) * 100;
+    it('getAdditionalTimeout returns 0 when utilization is 60 or less', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ utilization: { percent: 60 } })
+      );
 
-      // Warning typically around 70%, critical around 90%
-      expect(warningPercent).toBeGreaterThanOrEqual(50);
-      expect(warningPercent).toBeLessThanOrEqual(90);
-      expect(criticalPercent).toBeGreaterThanOrEqual(50);
-      expect(criticalPercent).toBeLessThanOrEqual(100);
+      expect(getAdditionalTimeout()).toBe(0);
+    });
+
+    it('suggestTimeout adds adaptive timeout to each profile base timeout', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({ utilization: { percent: 85 } })
+      );
+
+      expect(suggestTimeout('quick')).toBe(5000);
+      expect(suggestTimeout('normal')).toBe(8000);
+      expect(suggestTimeout('complex')).toBe(13000);
+      expect(suggestTimeout('background')).toBe(18000);
+    });
+  });
+
+  describe('context and monitoring', () => {
+    it('enriches context with poolStats field while preserving original fields', () => {
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          totalCount: 9,
+          activeCount: 6,
+          idleCount: 3,
+          waitingCount: 2,
+          minConnections: 1,
+          maxConnections: 10,
+          availableConnections: 1,
+          utilization: { percent: 60, status: 'warning' },
+        })
+      );
+
+      const context = enrichContextWithPoolStats({
+        requestId: 'req-123',
+        scope: 'unit-test',
+      });
+
+      expect(context.requestId).toBe('req-123');
+      expect(context.scope).toBe('unit-test');
+      expect(context.poolStats).toEqual({
+        total: 9,
+        active: 6,
+        idle: 3,
+        waiting: 2,
+        max: 10,
+        min: 1,
+        utilization: '60%',
+        status: 'warning',
+        available: 1,
+      });
+    });
+
+    it('startPoolMonitoring logs debug metrics when there is no alert', () => {
+      vi.useFakeTimers();
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          warning: { breached: false },
+          critical: { breached: false },
+          waitingCount: 0,
+        })
+      );
+
+      const timer = startPoolMonitoring(1000);
+      vi.advanceTimersByTime(1000);
+
+      expect(loggerSpies.debug).toHaveBeenCalledTimes(1);
+      clearInterval(timer);
+    });
+
+    it('startPoolMonitoring does not log debug metrics when an alert is emitted', () => {
+      vi.useFakeTimers();
+      mockedGetPoolStats.mockReturnValue(
+        createPoolStats({
+          critical: { breached: true },
+          warning: { breached: true },
+          utilization: { percent: 97, status: 'critical' },
+        })
+      );
+
+      const timer = startPoolMonitoring(1000);
+      vi.advanceTimersByTime(1000);
+
+      expect(loggerSpies.error).toHaveBeenCalledTimes(1);
+      expect(loggerSpies.debug).not.toHaveBeenCalled();
+      clearInterval(timer);
     });
   });
 });

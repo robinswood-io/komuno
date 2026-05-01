@@ -106,6 +106,15 @@ const ACTIVE_STAGES = [
     icon: RefreshCw,
   },
   {
+    value: 'En réflexion' as ProspectionStage,
+    label: 'En réflexion',
+    color: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    headerClass: 'bg-gradient-to-r from-indigo-500 to-violet-500',
+    accent: 'border-l-indigo-400',
+    avatarBg: 'bg-indigo-100 text-indigo-700',
+    icon: TrendingUp,
+  },
+  {
     value: 'Contractualisation' as ProspectionStage,
     label: 'Contractualisation',
     color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -117,7 +126,7 @@ const ACTIVE_STAGES = [
 ];
 
 // Statuts archivés
-const ARCHIVED_STAGES: ProspectionStage[] = ['Hors cible', 'En réflexion', 'Refusé', 'Signé'];
+const ARCHIVED_STAGES: ProspectionStage[] = ['Hors cible', 'Refusé', 'Signé'];
 
 // Tous les statuts pour les selects
 const ALL_STAGES = [
@@ -125,11 +134,11 @@ const ALL_STAGES = [
   ...ARCHIVED_STAGES,
 ] as ProspectionStage[];
 
-function getStageConfig(status: string | null | undefined) {
+export function getStageConfig(status: string | null | undefined) {
   return ACTIVE_STAGES.find(s => s.value === status) ?? null;
 }
 
-function getStageColor(status: string | null | undefined): string {
+export function getStageColor(status: string | null | undefined): string {
   const config = getStageConfig(status);
   if (config) return config.color;
   if (status && ARCHIVED_STAGES.includes(status as ProspectionStage)) {
@@ -138,7 +147,7 @@ function getStageColor(status: string | null | undefined): string {
   return 'bg-gray-100 text-gray-500 border-gray-200';
 }
 
-function formatDate(dateStr: string | null | undefined): string {
+export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
@@ -654,7 +663,7 @@ export default function ProspectsPage() {
                       {/* Nom */}
                       <TableCell>
                         <button
-                          onClick={() => router.push(`/admin/members/${prospect.email}`)}
+                          onClick={() => router.push(`/admin/members/${encodeURIComponent(prospect.email)}`)}
                           className="text-left hover:underline"
                         >
                           <p className="font-medium">

@@ -9,7 +9,7 @@ import { getPoolStats } from '../../../db';
  */
 @Injectable()
 export class DbMonitoringInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const startTime = Date.now();
     const path = request.path;
@@ -45,4 +45,3 @@ export class DbMonitoringInterceptor implements NestInterceptor {
     );
   }
 }
-

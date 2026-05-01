@@ -71,7 +71,7 @@ COPY --from=builder /app/public ./public
 # Créer le dossier logs et symlink pour @shared (alias vers shared)
 RUN mkdir -p /app/logs /app/node_modules && \
     ln -sf /app/shared /app/node_modules/@shared && \
-    chown -R cjduser:cjd /app
+    chown -R cjduser:cjd /app/logs /app/public /app/.next /app/dist /app/scripts /app/migrations
 
 # Charger le loader ESM pour la résolution des imports sans extension
 COPY --from=builder /app/server/esm-loader.js ./server/esm-loader.js

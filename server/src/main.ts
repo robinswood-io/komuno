@@ -114,14 +114,17 @@ async function bootstrap() {
     }
   });
 
-  // Initialiser MinIO au démarrage
+  // Initialiser MinIO en arrière-plan pour ne pas bloquer l'ouverture du port API
   try {
     const minioService = app.get(MinIOService);
-    await minioService.initialize();
-    logger.info('MinIO service initialized at startup');
+    void minioService
+      .initialize()
+      .then(() => logger.info('MinIO service initialized at startup'))
+      .catch((error) => {
+        logger.error('Failed to initialize MinIO service at startup', { error });
+      });
   } catch (error) {
-    logger.error('Failed to initialize MinIO service at startup', { error });
-    // Ne pas bloquer le démarrage si MinIO échoue
+    logger.error('Failed to schedule MinIO initialization at startup', { error });
   }
   // 6. Démarrer le serveur HTTP
   const port = parseInt(process.env.PORT || '5000', 10);

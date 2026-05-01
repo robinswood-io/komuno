@@ -17,6 +17,19 @@ export interface ApiResponse<T> {
   };
 }
 
+const isApiResponse = <T>(value: unknown): value is ApiResponse<T> => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  if (!('success' in value)) {
+    return false;
+  }
+
+  const response = value as { success?: unknown };
+  return typeof response.success === 'boolean';
+};
+
 /**
  * Intercepteur pour transformer les réponses en format standard
  *
@@ -28,11 +41,11 @@ export interface ApiResponse<T> {
  */
 @Injectable()
 export class TransformResponseInterceptor<T> implements NestInterceptor<T, ApiResponse<T>> {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<ApiResponse<T>> {
+  intercept(_context: ExecutionContext, next: CallHandler<T>): Observable<ApiResponse<T>> {
     return next.handle().pipe(
-      map(data => {
+      map((data: T): ApiResponse<T> => {
         // Si la réponse est déjà au bon format, ne pas transformer
-        if (data && typeof data === 'object' && 'success' in data) {
+        if (isApiResponse<T>(data)) {
           return data;
         }
 

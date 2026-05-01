@@ -211,14 +211,27 @@ class NotificationService {
                     auth: subscription.auth
                 }
             };
+            const safeIcon = typeof payload.icon === 'string' && payload.icon.trim().length > 0
+                ? payload.icon
+                : '/icon-192.svg';
+            const safeBadge = typeof payload.badge === 'string' && payload.badge.trim().length > 0
+                ? payload.badge
+                : '/icon-192.svg';
+            const safeTag = typeof payload.tag === 'string' && payload.tag.trim().length > 0
+                ? payload.tag
+                : 'default';
+            const safeData = typeof payload.data === 'object' && payload.data !== null && !Array.isArray(payload.data)
+                ? payload.data
+                : {};
+            const safeActions = Array.isArray(payload.actions) ? payload.actions : [];
             const notificationPayload = JSON.stringify({
                 title: payload.title,
                 body: payload.body,
-                icon: payload.icon || '/icon-192.svg',
-                badge: payload.badge || '/icon-192.svg',
-                tag: payload.tag || 'default',
-                data: payload.data || {},
-                actions: payload.actions || []
+                icon: safeIcon,
+                badge: safeBadge,
+                tag: safeTag,
+                data: safeData,
+                actions: safeActions
             });
             await web_push_1.default.sendNotification(pushConfig, notificationPayload, {
                 TTL: 24 * 60 * 60, // 24 heures
@@ -339,7 +352,14 @@ class NotificationService {
             return null;
         }
         const maybeStatusCode = error.statusCode;
-        return typeof maybeStatusCode === 'number' ? maybeStatusCode : null;
+        if (typeof maybeStatusCode === 'number') {
+            return maybeStatusCode;
+        }
+        if (typeof maybeStatusCode === 'string') {
+            const parsedStatusCode = Number.parseInt(maybeStatusCode, 10);
+            return Number.isFinite(parsedStatusCode) ? parsedStatusCode : null;
+        }
+        return null;
     }
 }
 exports.NotificationService = NotificationService;

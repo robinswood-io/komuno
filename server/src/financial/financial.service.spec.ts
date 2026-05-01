@@ -3,38 +3,109 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FinancialService } from './financial.service';
 import { StorageService } from '../common/storage/storage.service';
 
+type MockFn = ReturnType<typeof vi.fn>;
+
+type MockStorageInstance = {
+  getBudgets: MockFn;
+  getBudgetById: MockFn;
+  createBudget: MockFn;
+  updateBudget: MockFn;
+  deleteBudget: MockFn;
+  getBudgetStats: MockFn;
+  getExpenses: MockFn;
+  getExpenseById: MockFn;
+  createExpense: MockFn;
+  updateExpense: MockFn;
+  deleteExpense: MockFn;
+  getExpenseStats: MockFn;
+  getFinancialCategories: MockFn;
+  createCategory: MockFn;
+  updateCategory: MockFn;
+  getForecasts: MockFn;
+  createForecast: MockFn;
+  updateForecast: MockFn;
+  generateForecasts: MockFn;
+  getFinancialKPIsExtended: MockFn;
+  getFinancialComparison: MockFn;
+  getFinancialReport: MockFn;
+  getSubscriptions: MockFn;
+  getSubscriptionById: MockFn;
+  createSubscriptionRecord: MockFn;
+  updateSubscription: MockFn;
+  deleteSubscription: MockFn;
+  getSubscriptionStats: MockFn;
+  getRevenues: MockFn;
+  getRevenueById: MockFn;
+  createRevenue: MockFn;
+  updateRevenue: MockFn;
+  deleteRevenue: MockFn;
+  getRevenueStats: MockFn;
+  getDashboardOverview: MockFn;
+  getSubscriptionTypes: MockFn;
+  getSubscriptionTypeById: MockFn;
+  createSubscriptionType: MockFn;
+  updateSubscriptionType: MockFn;
+  deleteSubscriptionType: MockFn;
+  getMembersBySubscriptionType: MockFn;
+  assignSubscriptionToMember: MockFn;
+  revokeSubscription: MockFn;
+  renewSubscription: MockFn;
+};
+
+const createMockStorageInstance = (): MockStorageInstance => ({
+  getBudgets: vi.fn(),
+  getBudgetById: vi.fn(),
+  createBudget: vi.fn(),
+  updateBudget: vi.fn(),
+  deleteBudget: vi.fn(),
+  getBudgetStats: vi.fn(),
+  getExpenses: vi.fn(),
+  getExpenseById: vi.fn(),
+  createExpense: vi.fn(),
+  updateExpense: vi.fn(),
+  deleteExpense: vi.fn(),
+  getExpenseStats: vi.fn(),
+  getFinancialCategories: vi.fn(),
+  createCategory: vi.fn(),
+  updateCategory: vi.fn(),
+  getForecasts: vi.fn(),
+  createForecast: vi.fn(),
+  updateForecast: vi.fn(),
+  generateForecasts: vi.fn(),
+  getFinancialKPIsExtended: vi.fn(),
+  getFinancialComparison: vi.fn(),
+  getFinancialReport: vi.fn(),
+  getSubscriptions: vi.fn(),
+  getSubscriptionById: vi.fn(),
+  createSubscriptionRecord: vi.fn(),
+  updateSubscription: vi.fn(),
+  deleteSubscription: vi.fn(),
+  getSubscriptionStats: vi.fn(),
+  getRevenues: vi.fn(),
+  getRevenueById: vi.fn(),
+  createRevenue: vi.fn(),
+  updateRevenue: vi.fn(),
+  deleteRevenue: vi.fn(),
+  getRevenueStats: vi.fn(),
+  getDashboardOverview: vi.fn(),
+  getSubscriptionTypes: vi.fn(),
+  getSubscriptionTypeById: vi.fn(),
+  createSubscriptionType: vi.fn(),
+  updateSubscriptionType: vi.fn(),
+  deleteSubscriptionType: vi.fn(),
+  getMembersBySubscriptionType: vi.fn(),
+  assignSubscriptionToMember: vi.fn(),
+  revokeSubscription: vi.fn(),
+  renewSubscription: vi.fn(),
+});
+
 describe('FinancialService', () => {
   let service: FinancialService;
   let storageService: StorageService;
 
   beforeEach(() => {
-    // Mock StorageService
-    storageService = {
-      instance: {
-        getBudgets: vi.fn(),
-        getBudgetById: vi.fn(),
-        createBudget: vi.fn(),
-        updateBudget: vi.fn(),
-        deleteBudget: vi.fn(),
-        getBudgetStats: vi.fn(),
-        getExpenses: vi.fn(),
-        getExpenseById: vi.fn(),
-        createExpense: vi.fn(),
-        updateExpense: vi.fn(),
-        deleteExpense: vi.fn(),
-        getExpenseStats: vi.fn(),
-        getFinancialCategories: vi.fn(),
-        createCategory: vi.fn(),
-        updateCategory: vi.fn(),
-        getForecasts: vi.fn(),
-        createForecast: vi.fn(),
-        updateForecast: vi.fn(),
-        generateForecasts: vi.fn(),
-        getFinancialKPIsExtended: vi.fn(),
-        getFinancialComparison: vi.fn(),
-        getFinancialReport: vi.fn(),
-      },
-    } as any;
+    const instance = createMockStorageInstance();
+    storageService = { instance } as unknown as StorageService;
 
     service = new FinancialService(storageService);
   });
@@ -800,6 +871,512 @@ describe('FinancialService', () => {
         expect(result.success).toBe(true);
         expect(result.data.type).toBe('yearly');
       });
+    });
+  });
+
+  describe('Error branches and fallback messages', () => {
+    it('should throw BadRequestException with "Unknown error" when no error object is provided', async () => {
+      vi.mocked(storageService.instance.getBudgets).mockResolvedValue({
+        success: false,
+      });
+
+      await expect(service.getBudgets({ period: 'quarter', year: 2026 })).rejects.toThrow(
+        'Unknown error',
+      );
+    });
+
+    it('should throw NotFoundException with "Unknown error" when no error object is provided', async () => {
+      vi.mocked(storageService.instance.getBudgetById).mockResolvedValue({
+        success: false,
+      });
+
+      await expect(service.getBudgetById('missing-budget')).rejects.toThrow('Unknown error');
+    });
+  });
+
+  describe('Subscriptions', () => {
+    const validSubscription = {
+      memberEmail: 'member@example.com',
+      amountInCents: 15000,
+      startDate: '2026-01-01',
+      endDate: '2026-12-31',
+      subscriptionType: 'yearly',
+      paymentMethod: 'card',
+      status: 'active',
+    };
+
+    it('should get subscriptions with filters', async () => {
+      const options = { year: 2026, status: 'active', memberEmail: 'member@example.com' };
+      vi.mocked(storageService.instance.getSubscriptions).mockResolvedValue({
+        success: true,
+        data: [{ id: 1, ...validSubscription }],
+      });
+
+      const result = await service.getSubscriptions(options);
+      expect(storageService.instance.getSubscriptions).toHaveBeenCalledWith(options);
+      expect(result.success).toBe(true);
+    });
+
+    it('should throw BadRequestException when getSubscriptions fails', async () => {
+      vi.mocked(storageService.instance.getSubscriptions).mockResolvedValue({
+        success: false,
+        error: new Error('subscription read failed'),
+      });
+
+      await expect(service.getSubscriptions()).rejects.toThrow(BadRequestException);
+    });
+
+    it('should get subscription by id', async () => {
+      vi.mocked(storageService.instance.getSubscriptionById).mockResolvedValue({
+        success: true,
+        data: { id: 1, ...validSubscription },
+      });
+
+      const result = await service.getSubscriptionById('1');
+      expect(result.success).toBe(true);
+      expect(result.data.id).toBe(1);
+    });
+
+    it('should throw NotFoundException when getSubscriptionById fails', async () => {
+      vi.mocked(storageService.instance.getSubscriptionById).mockResolvedValue({
+        success: false,
+        error: new Error('not found'),
+      });
+
+      await expect(service.getSubscriptionById('404')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should create subscription for valid payload', async () => {
+      vi.mocked(storageService.instance.createSubscriptionRecord).mockResolvedValue({
+        success: true,
+        data: { id: 2, ...validSubscription },
+      });
+
+      const result = await service.createSubscription(validSubscription);
+      expect(result.success).toBe(true);
+      expect(result.data.id).toBe(2);
+    });
+
+    it('should throw BadRequestException for invalid subscription payload', async () => {
+      await expect(
+        service.createSubscription({
+          memberEmail: 'invalid-email',
+          amountInCents: -1,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should expose runtime parser failure when update subscription schema is unavailable', async () => {
+      vi.mocked(storageService.instance.updateSubscription).mockResolvedValue({
+        success: true,
+        data: { id: 2, status: 'cancelled' },
+      });
+
+      await expect(service.updateSubscription('2', { status: 'cancelled' })).rejects.toThrow(
+        TypeError,
+      );
+    });
+
+    it('should delete subscription', async () => {
+      vi.mocked(storageService.instance.deleteSubscription).mockResolvedValue({
+        success: true,
+      });
+
+      const result = await service.deleteSubscription('2');
+      expect(result).toEqual({ success: true });
+    });
+
+    it('should throw NotFoundException when deleteSubscription fails', async () => {
+      vi.mocked(storageService.instance.deleteSubscription).mockResolvedValue({
+        success: false,
+        error: new Error('missing subscription'),
+      });
+
+      await expect(service.deleteSubscription('404')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should get subscription stats', async () => {
+      vi.mocked(storageService.instance.getSubscriptionStats).mockResolvedValue({
+        success: true,
+        data: { total: 10, active: 7, expired: 2, cancelled: 1 },
+      });
+
+      const result = await service.getSubscriptionStats(2026);
+      expect(result.success).toBe(true);
+      expect(result.data.active).toBe(7);
+    });
+  });
+
+  describe('Revenues and dashboard', () => {
+    const validRevenue = {
+      type: 'donation',
+      description: 'Annual contribution',
+      amountInCents: 50000,
+      revenueDate: '2026-03-01',
+      memberEmail: 'member@example.com',
+      status: 'confirmed',
+      createdBy: 'admin@example.com',
+    };
+
+    it('should get revenues and pass options', async () => {
+      const options = { year: 2026, type: 'donation', categoryId: 'c1' };
+      vi.mocked(storageService.instance.getRevenues).mockResolvedValue({
+        success: true,
+        data: [{ id: 'r1', ...validRevenue }],
+      });
+
+      const result = await service.getRevenues(options);
+      expect(storageService.instance.getRevenues).toHaveBeenCalledWith(options);
+      expect(result.success).toBe(true);
+    });
+
+    it('should throw BadRequestException when getRevenues fails', async () => {
+      vi.mocked(storageService.instance.getRevenues).mockResolvedValue({
+        success: false,
+        error: new Error('failed to read revenues'),
+      });
+
+      await expect(service.getRevenues()).rejects.toThrow(BadRequestException);
+    });
+
+    it('should expose runtime parser failure when create revenue schema is unavailable', async () => {
+      vi.mocked(storageService.instance.createRevenue).mockResolvedValue({
+        success: true,
+        data: { id: 'r1', ...validRevenue },
+      });
+
+      await expect(service.createRevenue(validRevenue)).rejects.toThrow(TypeError);
+    });
+
+    it('should expose runtime parser failure when update revenue schema is unavailable', async () => {
+      vi.mocked(storageService.instance.updateRevenue).mockResolvedValue({
+        success: true,
+        data: { id: 'r1', status: 'cancelled' },
+      });
+
+      await expect(service.updateRevenue('r1', { status: 'cancelled' })).rejects.toThrow(
+        TypeError,
+      );
+    });
+
+    it('should delete revenue', async () => {
+      vi.mocked(storageService.instance.deleteRevenue).mockResolvedValue({
+        success: true,
+      });
+
+      const deleted = await service.deleteRevenue('r1');
+
+      expect(deleted.success).toBe(true);
+    });
+
+    it('should throw NotFoundException for missing revenue', async () => {
+      vi.mocked(storageService.instance.getRevenueById).mockResolvedValue({
+        success: false,
+        error: new Error('missing revenue'),
+      });
+
+      await expect(service.getRevenueById('missing')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should get revenue stats and dashboard overview', async () => {
+      vi.mocked(storageService.instance.getRevenueStats).mockResolvedValue({
+        success: true,
+        data: { total: 500000, confirmed: 420000, pending: 80000 },
+      });
+      vi.mocked(storageService.instance.getDashboardOverview).mockResolvedValue({
+        success: true,
+        data: { revenue: 500000, expenses: 320000, margin: 180000 },
+      });
+
+      const stats = await service.getRevenueStats(2026);
+      const dashboard = await service.getDashboardOverview(2026);
+
+      expect(stats.success).toBe(true);
+      expect(dashboard.success).toBe(true);
+      expect(dashboard.data.margin).toBe(180000);
+    });
+  });
+
+  describe('Subscription types and assignments', () => {
+    it('should call getSubscriptionTypes with default false and explicit true', async () => {
+      vi.mocked(storageService.instance.getSubscriptionTypes).mockResolvedValue({
+        success: true,
+        data: [],
+      });
+
+      await service.getSubscriptionTypes();
+      await service.getSubscriptionTypes(true);
+
+      expect(storageService.instance.getSubscriptionTypes).toHaveBeenNthCalledWith(1, false);
+      expect(storageService.instance.getSubscriptionTypes).toHaveBeenNthCalledWith(2, true);
+    });
+
+    it('should handle subscription type CRUD success paths', async () => {
+      vi.mocked(storageService.instance.getSubscriptionTypeById).mockResolvedValue({
+        success: true,
+        data: { id: 'st1', name: 'Mensuel' },
+      });
+      vi.mocked(storageService.instance.createSubscriptionType).mockResolvedValue({
+        success: true,
+        data: { id: 'st2', name: 'Trimestriel' },
+      });
+      vi.mocked(storageService.instance.updateSubscriptionType).mockResolvedValue({
+        success: true,
+        data: { id: 'st2', isActive: false },
+      });
+      vi.mocked(storageService.instance.deleteSubscriptionType).mockResolvedValue({
+        success: true,
+      });
+
+      const one = await service.getSubscriptionTypeById('st1');
+      const created = await service.createSubscriptionType({
+        name: 'Trimestriel',
+        amountInCents: 3000,
+        durationType: 'quarterly',
+      });
+      const updated = await service.updateSubscriptionType('st2', { isActive: false });
+      const deleted = await service.deleteSubscriptionType('st2');
+
+      expect(one.success).toBe(true);
+      expect(created.success).toBe(true);
+      expect(updated.success).toBe(true);
+      expect(deleted.success).toBe(true);
+    });
+
+    it('should throw correct exception type on subscription type failures', async () => {
+      vi.mocked(storageService.instance.getSubscriptionTypeById).mockResolvedValue({
+        success: false,
+        error: new Error('missing'),
+      });
+      vi.mocked(storageService.instance.deleteSubscriptionType).mockResolvedValue({
+        success: false,
+        error: new Error('delete refused'),
+      });
+
+      await expect(service.getSubscriptionTypeById('missing')).rejects.toThrow(NotFoundException);
+      await expect(service.deleteSubscriptionType('st2')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should return members by subscription type', async () => {
+      vi.mocked(storageService.instance.getMembersBySubscriptionType).mockResolvedValue({
+        success: true,
+        data: [{ email: 'member@example.com' }],
+      });
+
+      const result = await service.getMembersBySubscriptionType('st1');
+      expect(result.success).toBe(true);
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('should handle assign, revoke and renew subscription flows', async () => {
+      vi.mocked(storageService.instance.assignSubscriptionToMember).mockResolvedValue({
+        success: true,
+        data: { id: 10, status: 'active' },
+      });
+      vi.mocked(storageService.instance.revokeSubscription).mockResolvedValue({
+        success: true,
+      });
+      vi.mocked(storageService.instance.renewSubscription).mockResolvedValue({
+        success: true,
+        data: { id: 10, status: 'active', endDate: '2027-12-31' },
+      });
+
+      const assigned = await service.assignSubscriptionToMember({
+        memberEmail: 'member@example.com',
+        memberName: 'Member',
+        subscriptionType: 'yearly',
+        amountInCents: 10000,
+        startDate: '2026-01-01',
+      });
+      const revoked = await service.revokeSubscription('10');
+      const renewed = await service.renewSubscription({
+        subscriptionId: 10,
+        amountInCents: 12000,
+        endDate: '2027-12-31',
+      });
+
+      expect(assigned.success).toBe(true);
+      expect(revoked.success).toBe(true);
+      expect(renewed.success).toBe(true);
+    });
+
+    it('should throw BadRequestException when revoke or renew fails', async () => {
+      vi.mocked(storageService.instance.revokeSubscription).mockResolvedValue({
+        success: false,
+        error: new Error('cannot revoke'),
+      });
+      vi.mocked(storageService.instance.renewSubscription).mockResolvedValue({
+        success: false,
+        error: new Error('cannot renew'),
+      });
+
+      await expect(service.revokeSubscription('99')).rejects.toThrow(BadRequestException);
+      await expect(service.renewSubscription({ subscriptionId: 99 })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('Additional uncovered financial error branches', () => {
+    it('should use "Unknown error" fallback for multiple read/report methods', async () => {
+      vi.mocked(storageService.instance.getBudgetStats).mockResolvedValue({ success: false });
+      vi.mocked(storageService.instance.getExpenses).mockResolvedValue({ success: false });
+      vi.mocked(storageService.instance.getExpenseStats).mockResolvedValue({ success: false });
+      vi.mocked(storageService.instance.getFinancialCategories).mockResolvedValue({ success: false });
+      vi.mocked(storageService.instance.getForecasts).mockResolvedValue({ success: false });
+      vi.mocked(storageService.instance.generateForecasts).mockResolvedValue({ success: false });
+      vi.mocked(storageService.instance.getFinancialKPIsExtended).mockResolvedValue({
+        success: false,
+      });
+      vi.mocked(storageService.instance.getFinancialComparison).mockResolvedValue({
+        success: false,
+      });
+      vi.mocked(storageService.instance.getFinancialReport).mockResolvedValue({ success: false });
+      vi.mocked(storageService.instance.getSubscriptionStats).mockResolvedValue({
+        success: false,
+      });
+      vi.mocked(storageService.instance.getRevenueStats).mockResolvedValue({ success: false });
+      vi.mocked(storageService.instance.getDashboardOverview).mockResolvedValue({
+        success: false,
+      });
+      vi.mocked(storageService.instance.getSubscriptionTypes).mockResolvedValue({
+        success: false,
+      });
+      vi.mocked(storageService.instance.getMembersBySubscriptionType).mockResolvedValue({
+        success: false,
+      });
+      vi.mocked(storageService.instance.assignSubscriptionToMember).mockResolvedValue({
+        success: false,
+      });
+
+      await expect(service.getBudgetStats('quarter', 2026)).rejects.toThrow('Unknown error');
+      await expect(service.getExpenses({ period: 'quarter', year: 2026 })).rejects.toThrow(
+        'Unknown error',
+      );
+      await expect(service.getExpenseStats('quarter', 2026)).rejects.toThrow('Unknown error');
+      await expect(service.getCategories('expense')).rejects.toThrow('Unknown error');
+      await expect(service.getForecasts({ period: 'year', year: 2026 })).rejects.toThrow(
+        'Unknown error',
+      );
+      await expect(service.generateForecasts('year', 2026)).rejects.toThrow('Unknown error');
+      await expect(service.getFinancialKPIsExtended('year', 2026)).rejects.toThrow(
+        'Unknown error',
+      );
+      await expect(service.getFinancialComparison('year', 2025, 'year', 2026)).rejects.toThrow(
+        'Unknown error',
+      );
+      await expect(service.getFinancialReport('yearly', 1, 2026)).rejects.toThrow(
+        'Unknown error',
+      );
+      await expect(service.getSubscriptionStats(2026)).rejects.toThrow('Unknown error');
+      await expect(service.getRevenueStats(2026)).rejects.toThrow('Unknown error');
+      await expect(service.getDashboardOverview(2026)).rejects.toThrow('Unknown error');
+      await expect(service.getSubscriptionTypes()).rejects.toThrow('Unknown error');
+      await expect(service.getMembersBySubscriptionType('st-unknown')).rejects.toThrow(
+        'Unknown error',
+      );
+      await expect(
+        service.assignSubscriptionToMember({
+          memberEmail: 'member@example.com',
+          subscriptionType: 'yearly',
+          amountInCents: 10000,
+          startDate: '2026-01-01',
+        }),
+      ).rejects.toThrow('Unknown error');
+    });
+
+    it('should rethrow non-Zod errors in create/update flows', async () => {
+      const expectedCreateExpenseError = new Error('create-expense-storage-crash');
+      const expectedUpdateExpenseError = new Error('update-expense-storage-crash');
+      const expectedCreateCategoryError = new Error('create-category-storage-crash');
+      const expectedUpdateCategoryError = new Error('update-category-storage-crash');
+      const expectedCreateForecastError = new Error('create-forecast-storage-crash');
+      const expectedUpdateForecastError = new Error('update-forecast-storage-crash');
+      const expectedCreateSubscriptionError = new Error('create-subscription-storage-crash');
+
+      vi.mocked(storageService.instance.createExpense).mockRejectedValue(expectedCreateExpenseError);
+      vi.mocked(storageService.instance.updateExpense).mockRejectedValue(expectedUpdateExpenseError);
+      vi.mocked(storageService.instance.createCategory).mockRejectedValue(expectedCreateCategoryError);
+      vi.mocked(storageService.instance.updateCategory).mockRejectedValue(expectedUpdateCategoryError);
+      vi.mocked(storageService.instance.createForecast).mockRejectedValue(
+        expectedCreateForecastError,
+      );
+      vi.mocked(storageService.instance.updateForecast).mockRejectedValue(
+        expectedUpdateForecastError,
+      );
+      vi.mocked(storageService.instance.createSubscriptionRecord).mockRejectedValue(
+        expectedCreateSubscriptionError,
+      );
+
+      await expect(
+        service.createExpense({
+          category: '550e8400-e29b-41d4-a716-446655440000',
+          description: 'Transport',
+          amountInCents: 4500,
+          expenseDate: '2026-02-10',
+          createdBy: 'admin@example.com',
+        }),
+      ).rejects.toThrow('create-expense-storage-crash');
+
+      await expect(
+        service.updateExpense('expense-1', {
+          description: 'Transport ajusté',
+        }),
+      ).rejects.toThrow('update-expense-storage-crash');
+
+      await expect(
+        service.createCategory({
+          name: 'Frais fixes',
+          type: 'expense',
+        }),
+      ).rejects.toThrow('create-category-storage-crash');
+
+      await expect(
+        service.updateCategory('category-1', {
+          name: 'Frais fixes mis à jour',
+        }),
+      ).rejects.toThrow('update-category-storage-crash');
+
+      await expect(
+        service.createForecast({
+          category: '550e8400-e29b-41d4-a716-446655440000',
+          period: 'year',
+          year: 2027,
+          forecastedAmountInCents: 250000,
+          createdBy: 'admin@example.com',
+        }),
+      ).rejects.toThrow('create-forecast-storage-crash');
+
+      await expect(
+        service.updateForecast('forecast-1', {
+          forecastedAmountInCents: 275000,
+        }),
+      ).rejects.toThrow('update-forecast-storage-crash');
+
+      await expect(
+        service.createSubscription({
+          memberEmail: 'member@example.com',
+          amountInCents: 15000,
+          startDate: '2026-01-01',
+          endDate: '2026-12-31',
+          subscriptionType: 'yearly',
+          paymentMethod: 'card',
+          status: 'active',
+        }),
+      ).rejects.toThrow('create-subscription-storage-crash');
+    });
+
+    it('should throw NotFoundException for subscription type update failure without error payload', async () => {
+      vi.mocked(storageService.instance.updateSubscriptionType).mockResolvedValue({
+        success: false,
+      });
+
+      await expect(service.updateSubscriptionType('st-missing', { name: 'x' })).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.updateSubscriptionType('st-missing', { name: 'x' })).rejects.toThrow(
+        'Unknown error',
+      );
     });
   });
 });

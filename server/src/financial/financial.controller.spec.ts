@@ -31,7 +31,29 @@ describe('FinancialController', () => {
       getFinancialKPIsExtended: vi.fn(),
       getFinancialComparison: vi.fn(),
       getFinancialReport: vi.fn(),
-    } as any;
+      getSubscriptionStats: vi.fn(),
+      getSubscriptions: vi.fn(),
+      getSubscriptionById: vi.fn(),
+      createSubscription: vi.fn(),
+      updateSubscription: vi.fn(),
+      deleteSubscription: vi.fn(),
+      getRevenueStats: vi.fn(),
+      getRevenues: vi.fn(),
+      getRevenueById: vi.fn(),
+      createRevenue: vi.fn(),
+      updateRevenue: vi.fn(),
+      deleteRevenue: vi.fn(),
+      getDashboardOverview: vi.fn(),
+      getSubscriptionTypes: vi.fn(),
+      getSubscriptionTypeById: vi.fn(),
+      createSubscriptionType: vi.fn(),
+      updateSubscriptionType: vi.fn(),
+      deleteSubscriptionType: vi.fn(),
+      getMembersBySubscriptionType: vi.fn(),
+      assignSubscriptionToMember: vi.fn(),
+      revokeSubscription: vi.fn(),
+      renewSubscription: vi.fn(),
+    } as unknown as FinancialService;
 
     controller = new FinancialController(service);
   });
@@ -563,19 +585,16 @@ describe('FinancialController', () => {
         expect(service.generateForecasts).toHaveBeenCalledWith('Q2', 2026);
       });
 
-      it('should validate period and year are provided on generate', async () => {
-        // Valid generate request
-        const body = { period: 'Q2', year: 2026 };
-        const mockForecasts = [{ category: 'events', forecastedAmountInCents: 500000 }];
+      it('should throw BadRequestException when period is missing', async () => {
+        await expect(
+          controller.generateForecasts({ period: '', year: 2026 }),
+        ).rejects.toThrow(BadRequestException);
+      });
 
-        vi.mocked(service.generateForecasts).mockResolvedValue({
-          success: true,
-          data: mockForecasts,
-        });
-
-        const result = await controller.generateForecasts(body);
-        expect(result.success).toBe(true);
-        expect(service.generateForecasts).toHaveBeenCalledWith('Q2', 2026);
+      it('should throw BadRequestException when year is missing', async () => {
+        await expect(
+          controller.generateForecasts({ period: 'Q2', year: 0 }),
+        ).rejects.toThrow(BadRequestException);
       });
     });
   });
@@ -631,15 +650,9 @@ describe('FinancialController', () => {
       });
 
       it('should require all four parameters (period1, year1, period2, year2)', async () => {
-        // Valid call - all parameters provided
-        vi.mocked(service.getFinancialComparison).mockResolvedValue({
-          success: true,
-          data: {},
-        });
-
-        const result = await controller.getFinancialComparison('Q1', '2025', 'Q1', '2026');
-        expect(result.success).toBe(true);
-        expect(service.getFinancialComparison).toHaveBeenCalled();
+        await expect(
+          controller.getFinancialComparison('Q1', '2025', 'Q1'),
+        ).rejects.toThrow(BadRequestException);
       });
 
       it('should parse years to numbers', async () => {
@@ -696,14 +709,15 @@ describe('FinancialController', () => {
       });
 
       it('should validate report type is valid (monthly, quarterly, yearly)', async () => {
-        // Valid monthly report
-        vi.mocked(service.getFinancialReport).mockResolvedValue({
-          success: true,
-          data: { type: 'monthly' },
-        });
+        await expect(
+          controller.getFinancialReport('weekly', '1', '2026'),
+        ).rejects.toThrow(BadRequestException);
+      });
 
-        const result = await controller.getFinancialReport('monthly', '1', '2026');
-        expect(result.success).toBe(true);
+      it('should require period and year', async () => {
+        await expect(
+          controller.getFinancialReport('monthly', undefined, '2026'),
+        ).rejects.toThrow(BadRequestException);
       });
 
       it('should support all valid report types', async () => {
@@ -728,6 +742,143 @@ describe('FinancialController', () => {
         const callArgs = vi.mocked(service.getFinancialReport).mock.calls[0];
         expect(typeof callArgs[1]).toBe('number');
         expect(typeof callArgs[2]).toBe('number');
+      });
+    });
+  });
+
+  describe('Subscriptions - HTTP Routes', () => {
+    describe('GET /subscriptions/stats', () => {
+      it('should parse year and call service', async () => {
+        vi.mocked(service.getSubscriptionStats).mockResolvedValue({
+          success: true,
+          data: { total: 10 },
+        });
+
+        const result = await controller.getSubscriptionStats('2026');
+        expect(result.success).toBe(true);
+        expect(service.getSubscriptionStats).toHaveBeenCalledWith(2026);
+      });
+    });
+
+    describe('GET /subscriptions', () => {
+      it('should build filters and parse year', async () => {
+        vi.mocked(service.getSubscriptions).mockResolvedValue({
+          success: true,
+          data: [],
+        });
+
+        await controller.getSubscriptions('2026', 'active', 'member@example.com');
+        expect(service.getSubscriptions).toHaveBeenCalledWith({
+          year: 2026,
+          status: 'active',
+          memberEmail: 'member@example.com',
+        });
+      });
+    });
+
+    describe('PUT /subscriptions/:id', () => {
+      it('should forward update payload', async () => {
+        vi.mocked(service.updateSubscription).mockResolvedValue({
+          success: true,
+          data: { id: '1', status: 'cancelled' },
+        });
+
+        const result = await controller.updateSubscription('1', { status: 'cancelled' });
+        expect(result.success).toBe(true);
+        expect(service.updateSubscription).toHaveBeenCalledWith('1', { status: 'cancelled' });
+      });
+    });
+
+    describe('POST /subscriptions/:id/renew', () => {
+      it('should add numeric subscriptionId to renew payload', async () => {
+        vi.mocked(service.renewSubscription).mockResolvedValue({
+          success: true,
+          data: { renewed: true },
+        });
+
+        await controller.renewSubscription('42', { paymentMethod: 'bank_transfer' });
+        expect(service.renewSubscription).toHaveBeenCalledWith({
+          paymentMethod: 'bank_transfer',
+          subscriptionId: 42,
+        });
+      });
+    });
+  });
+
+  describe('Revenues and Dashboard - HTTP Routes', () => {
+    describe('GET /revenues/stats', () => {
+      it('should parse year and call service', async () => {
+        vi.mocked(service.getRevenueStats).mockResolvedValue({
+          success: true,
+          data: { total: 100000 },
+        });
+
+        const result = await controller.getRevenueStats('2026');
+        expect(result.success).toBe(true);
+        expect(service.getRevenueStats).toHaveBeenCalledWith(2026);
+      });
+    });
+
+    describe('GET /revenues', () => {
+      it('should pass revenue filters to service', async () => {
+        vi.mocked(service.getRevenues).mockResolvedValue({
+          success: true,
+          data: [],
+        });
+
+        await controller.getRevenues('2026', 'donation', 'cat-1');
+        expect(service.getRevenues).toHaveBeenCalledWith({
+          year: 2026,
+          type: 'donation',
+          categoryId: 'cat-1',
+        });
+      });
+    });
+
+    describe('GET /dashboard/overview', () => {
+      it('should parse year for dashboard overview', async () => {
+        vi.mocked(service.getDashboardOverview).mockResolvedValue({
+          success: true,
+          data: { year: 2026 },
+        });
+
+        const result = await controller.getDashboardOverview('2026');
+        expect(result.success).toBe(true);
+        expect(service.getDashboardOverview).toHaveBeenCalledWith(2026);
+      });
+    });
+  });
+
+  describe('Subscription Types and Assignment - HTTP Routes', () => {
+    describe('GET /subscription-types', () => {
+      it('should convert includeInactive query to boolean', async () => {
+        vi.mocked(service.getSubscriptionTypes).mockResolvedValue({
+          success: true,
+          data: [],
+        });
+
+        await controller.getSubscriptionTypes('true');
+        expect(service.getSubscriptionTypes).toHaveBeenCalledWith(true);
+      });
+    });
+
+    describe('POST /subscriptions/assign', () => {
+      it('should forward assignment payload', async () => {
+        const payload = {
+          memberName: 'Jean Dupont',
+          memberEmail: 'jean.dupont@example.com',
+          subscriptionTypeId: 'type-1',
+          startDate: '2026-01-01',
+        };
+
+        vi.mocked(service.assignSubscriptionToMember).mockResolvedValue({
+          success: true,
+          data: { id: 'sub-1' },
+        });
+
+        const result = await controller.assignSubscription(payload);
+        expect(result.success).toBe(true);
+        expect(service.assignSubscriptionToMember).toHaveBeenCalledWith(payload);
       });
     });
   });

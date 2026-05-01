@@ -68,7 +68,7 @@ export default function AdminDashboardPage() {
     <div className="container py-8 space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Dashboard Admin</h1>
-        <p className="text-muted-foreground">Vue d'ensemble de l'application CJD Amiens</p>
+        <p className="text-muted-foreground">Vue d'ensemble de l'application Réseau Entreprendre Picardie</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

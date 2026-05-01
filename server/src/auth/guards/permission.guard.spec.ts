@@ -1,4 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ForbiddenException } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { hasPermission as schemaHasPermission } from '../../../../shared/schema';
+import { PERMISSION_KEY } from '../decorators/permissions.decorator';
+import { PermissionGuard } from './permission.guard';
+
+vi.mock('../../../../shared/schema', () => ({
+  hasPermission: vi.fn(),
+  ADMIN_ROLES: {
+    SUPER_ADMIN: 'super_admin',
+  },
+}));
 
 // Rôles d'administration
 const ADMIN_ROLES = {
@@ -276,5 +289,121 @@ describe('PermissionGuard', () => {
 
       expect(accessiblePermissions).toEqual(eventsPermissions);
     });
+  });
+});
+
+describe('PermissionGuard canActivate', () => {
+  let guard: PermissionGuard;
+  let reflector: Reflector;
+
+  const buildContext = (
+    handler: () => void,
+    user?: { role: string },
+  ): ExecutionContext => {
+    const getRequest = vi.fn(() => ({ user }));
+    const switchToHttp = vi.fn(() => ({ getRequest }));
+
+    return {
+      getHandler: vi.fn(() => handler),
+      switchToHttp,
+    } as unknown as ExecutionContext;
+  };
+
+  beforeEach(() => {
+    reflector = {
+      get: vi.fn(),
+    } as unknown as Reflector;
+    guard = new PermissionGuard(reflector);
+    vi.mocked(schemaHasPermission).mockReset();
+  });
+
+  it('should allow access when no permission metadata is defined', () => {
+    const handler = () => {};
+    vi.mocked(reflector.get).mockReturnValue(undefined);
+    const context = buildContext(handler, { role: 'ideas_reader' });
+
+    const result = guard.canActivate(context);
+
+    expect(result).toBe(true);
+    expect(reflector.get).toHaveBeenCalledWith(PERMISSION_KEY, handler);
+    expect(schemaHasPermission).not.toHaveBeenCalled();
+  });
+
+  it('should allow access when permission metadata is empty string', () => {
+    const handler = () => {};
+    vi.mocked(reflector.get).mockReturnValue('');
+    const context = buildContext(handler, { role: 'events_reader' });
+
+    const result = guard.canActivate(context);
+
+    expect(result).toBe(true);
+    expect(schemaHasPermission).not.toHaveBeenCalled();
+  });
+
+  it('should throw ForbiddenException when permission is required but user is missing', () => {
+    const handler = () => {};
+    vi.mocked(reflector.get).mockReturnValue('admin.view');
+    const context = buildContext(handler);
+
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(context)).toThrow('Authentication required');
+  });
+
+  it('should call hasPermission with user role and required permission', () => {
+    const handler = () => {};
+    vi.mocked(reflector.get).mockReturnValue('ideas.read');
+    vi.mocked(schemaHasPermission).mockReturnValue(true);
+    const context = buildContext(handler, { role: 'ideas_reader' });
+
+    const result = guard.canActivate(context);
+
+    expect(result).toBe(true);
+    expect(schemaHasPermission).toHaveBeenCalledWith('ideas_reader', 'ideas.read');
+  });
+
+  it('should allow super_admin when permission helper grants access', () => {
+    const handler = () => {};
+    vi.mocked(reflector.get).mockReturnValue('admin.manage');
+    vi.mocked(schemaHasPermission).mockReturnValue(true);
+    const context = buildContext(handler, { role: 'super_admin' });
+
+    const result = guard.canActivate(context);
+
+    expect(result).toBe(true);
+    expect(schemaHasPermission).toHaveBeenCalledWith('super_admin', 'admin.manage');
+  });
+
+  it('should throw ForbiddenException when helper denies access', () => {
+    const handler = () => {};
+    vi.mocked(reflector.get).mockReturnValue('events.write');
+    vi.mocked(schemaHasPermission).mockReturnValue(false);
+    const context = buildContext(handler, { role: 'events_reader' });
+
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(context)).toThrow(
+      "Permission 'events.write' required",
+    );
+  });
+
+  it('should deny a user without requested admin permission', () => {
+    const handler = () => {};
+    vi.mocked(reflector.get).mockReturnValue('admin.manage');
+    vi.mocked(schemaHasPermission).mockReturnValue(false);
+    const context = buildContext(handler, { role: 'ideas_manager' });
+
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+    expect(schemaHasPermission).toHaveBeenCalledWith('ideas_manager', 'admin.manage');
+  });
+
+  it('should evaluate metadata from the current handler branch', () => {
+    const handler = () => {};
+    vi.mocked(reflector.get).mockReturnValue('ideas.delete');
+    vi.mocked(schemaHasPermission).mockReturnValue(true);
+    const context = buildContext(handler, { role: 'ideas_manager' });
+
+    const result = guard.canActivate(context);
+
+    expect(result).toBe(true);
+    expect(reflector.get).toHaveBeenCalledWith(PERMISSION_KEY, handler);
   });
 });

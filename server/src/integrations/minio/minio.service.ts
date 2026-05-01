@@ -31,13 +31,10 @@ export class MinIOService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    // Initialisation optionnelle au démarrage du module
-    // Ne pas bloquer si MinIO n'est pas disponible
-    try {
-      await this.initialize();
-    } catch (error) {
+    // Initialisation optionnelle non bloquante
+    void this.initialize().catch((error) => {
       logger.warn('MinIO initialization failed at module init, will retry on first use', { error });
-    }
+    });
   }
 
   async initialize(): Promise<void> {

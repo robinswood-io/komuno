@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys, type PaginatedResponse } from '@/lib/api/client';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -128,7 +128,7 @@ const BULK_STATUS_OPTIONS = [
  * Fonction helper pour exporter les membres en CSV
  * Génère un fichier CSV avec BOM UTF-8 et séparateur point-virgule
  */
-function exportToCSV(members: Member[]): void {
+export function exportToCSV(members: Member[]): void {
   if (!members || members.length === 0) {
     return;
   }
@@ -227,6 +227,7 @@ export default function AdminMembersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set(['all']));
@@ -623,6 +624,17 @@ export default function AdminMembersPage() {
 
   // Membres uniquement (les prospects sont exclus côté serveur via excludeProspects=true)
   const membersOnly = data?.data ?? [];
+
+  useEffect(() => {
+    const editEmail = searchParams.get('edit');
+    if (!editEmail || membersOnly.length === 0) return;
+
+    const targetMember = membersOnly.find((member) => member.email === editEmail);
+    if (!targetMember) return;
+
+    handleOpenEditDialog(targetMember);
+    router.replace('/admin/members');
+  }, [searchParams, membersOnly, router]);
 
   // Filtrés les membres selon les statuts sélectionnés
   const filteredMembers = membersOnly.filter(member => {

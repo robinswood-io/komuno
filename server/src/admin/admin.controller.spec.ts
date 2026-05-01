@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
-import { AdminController } from './admin.controller';
+import { BadRequestException } from '@nestjs/common';
+import type { Request } from 'express';
+import { frontendErrorSchema } from '@shared/schema';
+import { AdminController, LogsController } from './admin.controller';
 import { AdminService } from './admin.service';
 
 describe('AdminController', () => {
@@ -22,7 +24,10 @@ describe('AdminController', () => {
       getAllIdeas: vi.fn(),
       getAllEvents: vi.fn(),
       updateEventStatus: vi.fn(),
-    } as any;
+      getDevelopmentRequests: vi.fn(),
+      updateDevelopmentRequestStatus: vi.fn(),
+      getErrorLogs: vi.fn(),
+    } as unknown as AdminService;
 
     controller = new AdminController(adminService);
   });
@@ -230,7 +235,7 @@ describe('AdminController', () => {
 
       const mockRequest = {
         user: { email: 'currentuser@example.com' },
-      } as any;
+      } as unknown as { email: string };
 
       await expect(
         controller.updateAdministratorRole(
@@ -251,7 +256,7 @@ describe('AdminController', () => {
       const email = 'admin@example.com';
       const mockRequest = {
         user: { email },
-      } as any;
+      } as unknown as { email: string };
 
       await expect(
         controller.updateAdministratorRole(email, roleData, mockRequest),
@@ -280,7 +285,7 @@ describe('AdminController', () => {
 
       const mockRequest = {
         user: { email: 'currentuser@example.com' },
-      } as any;
+      } as unknown as { email: string };
 
       const result = await controller.updateAdministratorStatus(
         'admin@example.com',
@@ -312,7 +317,7 @@ describe('AdminController', () => {
 
       const mockRequest = {
         user: { email: 'currentuser@example.com' },
-      } as any;
+      } as unknown as { email: string };
 
       const result = await controller.updateAdministratorStatus(
         'admin@example.com',
@@ -336,7 +341,7 @@ describe('AdminController', () => {
       const email = 'admin@example.com';
       const mockRequest = {
         user: { email },
-      } as any;
+      } as unknown as { email: string };
 
       await expect(
         controller.updateAdministratorStatus(email, statusData, mockRequest),
@@ -370,7 +375,7 @@ describe('AdminController', () => {
 
       const mockRequest = {
         user: { email: 'currentuser@example.com' },
-      } as any;
+      } as unknown as { email: string };
 
       const result = await controller.updateAdministratorInfo(
         'admin@example.com',
@@ -391,7 +396,7 @@ describe('AdminController', () => {
 
       const mockRequest = {
         user: { email: 'currentuser@example.com' },
-      } as any;
+      } as unknown as { email: string };
 
       await expect(
         controller.updateAdministratorInfo(
@@ -438,7 +443,7 @@ describe('AdminController', () => {
       const email = 'admin@example.com';
       const mockRequest = {
         user: { email },
-      } as any;
+      } as unknown as { email: string };
 
       await expect(
         controller.deleteAdministrator(email, mockRequest),
@@ -542,6 +547,20 @@ describe('AdminController', () => {
     });
   });
 
+  describe('GET /api/admin/events', () => {
+    it('should parse event query params with defaults and explicit values', async () => {
+      vi.mocked(adminService.getAllEvents)
+        .mockResolvedValueOnce({ success: true })
+        .mockResolvedValueOnce({ success: true });
+
+      await controller.getAllEvents(undefined, undefined);
+      await controller.getAllEvents('3', '15');
+
+      expect(adminService.getAllEvents).toHaveBeenNthCalledWith(1, 1, 20);
+      expect(adminService.getAllEvents).toHaveBeenNthCalledWith(2, 3, 15);
+    });
+  });
+
   // ===== Tests de Sécurité et de Permissions =====
 
   describe('Security & Permissions', () => {
@@ -631,7 +650,7 @@ describe('AdminController', () => {
 
       const mockRequest = {
         user: { email: 'creator@example.com' },
-      } as any;
+      } as unknown as { email: string };
 
       const promise = controller.createAdministrator(
         invalidData,
@@ -660,7 +679,7 @@ describe('AdminController', () => {
 
       const mockRequest = {
         user: { email: 'currentuser@example.com' },
-      } as any;
+      } as unknown as { email: string };
 
       await expect(
         controller.updateAdministratorRole(
@@ -670,5 +689,510 @@ describe('AdminController', () => {
         ),
       ).rejects.toThrow(BadRequestException);
     });
+  });
+});
+
+describe('AdminController - Coverage Additions', () => {
+  let controller: AdminController;
+  let adminService: AdminService;
+
+  beforeEach(() => {
+    adminService = {
+      getAllIdeas: vi.fn(),
+      getVotesByIdea: vi.fn(),
+      getAllEvents: vi.fn(),
+      getEventInscriptions: vi.fn(),
+      createVote: vi.fn(),
+      deleteVote: vi.fn(),
+      getDevelopmentRequests: vi.fn(),
+      createDevelopmentRequest: vi.fn(),
+      updateDevelopmentRequest: vi.fn(),
+      syncDevelopmentRequestWithGitHub: vi.fn(),
+      deleteDevelopmentRequest: vi.fn(),
+      getAdminStats: vi.fn(),
+      getDatabaseHealth: vi.fn(),
+      getPoolStats: vi.fn(),
+      deleteUnsubscription: vi.fn(),
+      updateUnsubscription: vi.fn(),
+      updateFeatureConfig: vi.fn(),
+      updateEmailConfig: vi.fn(),
+      getErrorLogs: vi.fn(),
+      updateEventStatus: vi.fn(),
+      updateDevelopmentRequestStatus: vi.fn(),
+    } as unknown as AdminService;
+    controller = new AdminController(adminService);
+  });
+
+  it('should parse idea query params with defaults and explicit values', async () => {
+    vi.mocked(adminService.getAllIdeas)
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ success: true });
+
+    await controller.getAllIdeas(undefined, undefined, undefined, undefined);
+    await controller.getAllIdeas('2', '10', 'pending', 'true');
+
+    expect(adminService.getAllIdeas).toHaveBeenNthCalledWith(
+      1,
+      1,
+      20,
+      undefined,
+      undefined,
+    );
+    expect(adminService.getAllIdeas).toHaveBeenNthCalledWith(
+      2,
+      2,
+      10,
+      'pending',
+      'true',
+    );
+  });
+
+  it('should passthrough votes listing for nested and alias routes', async () => {
+    const nestedVotes = { success: true, data: [{ id: 'vote-1' }] };
+    const aliasVotes = { success: true, data: [{ id: 'vote-2' }] };
+
+    vi.mocked(adminService.getVotesByIdea)
+      .mockResolvedValueOnce(nestedVotes)
+      .mockResolvedValueOnce(aliasVotes);
+
+    const nestedResult = await controller.getIdeaVotes('idea-1');
+    const aliasResult = await controller.getVotesByIdeaAlias('idea-2');
+
+    expect(adminService.getVotesByIdea).toHaveBeenNthCalledWith(1, 'idea-1');
+    expect(adminService.getVotesByIdea).toHaveBeenNthCalledWith(2, 'idea-2');
+    expect(nestedResult).toEqual(nestedVotes);
+    expect(aliasResult).toEqual(aliasVotes);
+  });
+
+  it('should passthrough event inscriptions for both admin endpoints', async () => {
+    const firstResponse = { success: true, data: [{ id: 'ins-1' }] };
+    const secondResponse = { success: true, data: [{ id: 'ins-2' }] };
+
+    vi.mocked(adminService.getEventInscriptions)
+      .mockResolvedValueOnce(firstResponse)
+      .mockResolvedValueOnce(secondResponse);
+
+    const eventInscriptions = await controller.getEventInscriptions('event-1');
+    const byEvent = await controller.getInscriptionsByEvent('event-2');
+
+    expect(adminService.getEventInscriptions).toHaveBeenNthCalledWith(
+      1,
+      'event-1',
+    );
+    expect(adminService.getEventInscriptions).toHaveBeenNthCalledWith(
+      2,
+      'event-2',
+    );
+    expect(eventInscriptions).toEqual(firstResponse);
+    expect(byEvent).toEqual(secondResponse);
+  });
+
+  it('should passthrough createVote payload and response', async () => {
+    const payload = {
+      ideaId: 'idea-1',
+      voterName: 'Alice',
+      voterEmail: 'alice@example.com',
+    };
+    const serviceResponse = { success: true, data: { id: 'vote-1' } };
+    vi.mocked(adminService.createVote).mockResolvedValue(serviceResponse);
+
+    const result = await controller.createVote(payload);
+
+    expect(adminService.createVote).toHaveBeenCalledWith(payload);
+    expect(result).toEqual(serviceResponse);
+  });
+
+  it('should propagate createVote service errors', async () => {
+    vi.mocked(adminService.createVote).mockRejectedValue(
+      new BadRequestException('Vote already exists'),
+    );
+
+    await expect(
+      controller.createVote({
+        ideaId: 'idea-1',
+        voterName: 'Alice',
+        voterEmail: 'alice@example.com',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should passthrough deleteVote id and response', async () => {
+    const serviceResponse = { success: true, message: 'Vote deleted' };
+    vi.mocked(adminService.deleteVote).mockResolvedValue(serviceResponse);
+
+    const result = await controller.deleteVote('vote-1');
+
+    expect(adminService.deleteVote).toHaveBeenCalledWith('vote-1');
+    expect(result).toEqual(serviceResponse);
+  });
+
+  it('should propagate deleteVote service errors', async () => {
+    vi.mocked(adminService.deleteVote).mockRejectedValue(
+      new BadRequestException('Vote not found'),
+    );
+
+    await expect(controller.deleteVote('vote-missing')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('should passthrough dashboard endpoints to their service methods', async () => {
+    const stats = { users: 10, ideas: 4 };
+    const dbHealth = { status: 'ok' };
+    const poolStats = { total: 5, idle: 3 };
+
+    vi.mocked(adminService.getAdminStats).mockResolvedValue(stats);
+    vi.mocked(adminService.getDatabaseHealth).mockResolvedValue(dbHealth);
+    vi.mocked(adminService.getPoolStats).mockResolvedValue(poolStats);
+
+    const statsResult = await controller.getAdminStats();
+    const healthResult = await controller.getDatabaseHealth();
+    const poolResult = await controller.getPoolStats();
+
+    expect(adminService.getAdminStats).toHaveBeenCalledOnce();
+    expect(adminService.getDatabaseHealth).toHaveBeenCalledOnce();
+    expect(adminService.getPoolStats).toHaveBeenCalledOnce();
+    expect(statsResult).toEqual(stats);
+    expect(healthResult).toEqual(dbHealth);
+    expect(poolResult).toEqual(poolStats);
+  });
+
+  it('should passthrough updateUnsubscription payload and response', async () => {
+    const payload = {
+      name: 'Updated Name',
+      email: 'updated@example.com',
+      comments: 'Updated comment',
+    };
+    const response = { success: true, data: { id: 'unsub-1' } };
+    vi.mocked(adminService.updateUnsubscription).mockResolvedValue(response);
+
+    const result = await controller.updateUnsubscription('unsub-1', payload);
+
+    expect(adminService.updateUnsubscription).toHaveBeenCalledWith(
+      'unsub-1',
+      payload,
+    );
+    expect(result).toEqual(response);
+  });
+
+  it('should propagate deleteUnsubscription service errors', async () => {
+    vi.mocked(adminService.deleteUnsubscription).mockRejectedValue(
+      new BadRequestException('Unsubscription not found'),
+    );
+
+    await expect(controller.deleteUnsubscription('unsub-missing')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('should normalize development request filters before service call', async () => {
+    const list = [{ id: 'dr-1' }];
+    vi.mocked(adminService.getDevelopmentRequests)
+      .mockResolvedValueOnce(list)
+      .mockResolvedValueOnce(list);
+
+    const invalidResult = await controller.getDevelopmentRequests('x', 'y');
+    const validResult = await controller.getDevelopmentRequests('bug', 'open');
+
+    expect(adminService.getDevelopmentRequests).toHaveBeenNthCalledWith(1, {
+      type: undefined,
+      status: undefined,
+    });
+    expect(adminService.getDevelopmentRequests).toHaveBeenNthCalledWith(2, {
+      type: 'bug',
+      status: 'open',
+    });
+    expect(invalidResult).toEqual({ success: true, data: list });
+    expect(validResult).toEqual({ success: true, data: list });
+  });
+
+  it('should parse error logs limit with fallback to 100', async () => {
+    vi.mocked(adminService.getErrorLogs)
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ success: true });
+
+    await controller.getErrorLogs(undefined);
+    await controller.getErrorLogs('25');
+
+    expect(adminService.getErrorLogs).toHaveBeenNthCalledWith(1, 100);
+    expect(adminService.getErrorLogs).toHaveBeenNthCalledWith(2, 25);
+  });
+
+  it('should parse event query params with defaults and explicit values', async () => {
+    vi.mocked(adminService.getAllEvents)
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ success: true });
+
+    await controller.getAllEvents(undefined, undefined);
+    await controller.getAllEvents('3', '15');
+
+    expect(adminService.getAllEvents).toHaveBeenNthCalledWith(1, 1, 20);
+    expect(adminService.getAllEvents).toHaveBeenNthCalledWith(2, 3, 15);
+  });
+
+  it('should forward NaN values when idea pagination params are invalid strings', async () => {
+    vi.mocked(adminService.getAllIdeas).mockResolvedValue({ success: true });
+
+    await controller.getAllIdeas('abc', 'xyz', undefined, undefined);
+
+    expect(adminService.getAllIdeas).toHaveBeenCalledWith(
+      Number.NaN,
+      Number.NaN,
+      undefined,
+      undefined,
+    );
+  });
+
+  it('should forward NaN values when event pagination params are invalid strings', async () => {
+    vi.mocked(adminService.getAllEvents).mockResolvedValue({ success: true });
+
+    await controller.getAllEvents('abc', 'xyz');
+
+    expect(adminService.getAllEvents).toHaveBeenCalledWith(Number.NaN, Number.NaN);
+  });
+
+  it('should forward NaN to error logs service when limit query is invalid', async () => {
+    vi.mocked(adminService.getErrorLogs).mockResolvedValue({ success: true });
+
+    await controller.getErrorLogs('invalid-limit');
+
+    expect(adminService.getErrorLogs).toHaveBeenCalledWith(Number.NaN);
+  });
+
+  it('should return undefined for updateEventStatus endpoint while forwarding service call', async () => {
+    vi.mocked(adminService.updateEventStatus).mockResolvedValue(undefined);
+
+    const result = await controller.updateEventStatus('event-1', {
+      status: 'published',
+    });
+
+    expect(adminService.updateEventStatus).toHaveBeenCalledWith(
+      'event-1',
+      'published',
+    );
+    expect(result).toBeUndefined();
+  });
+
+  it('should use explicit body over rawBody fallback for createDevelopmentRequest', async () => {
+    const created = { id: 'dr-10' };
+    vi.mocked(adminService.createDevelopmentRequest).mockResolvedValue(created);
+
+    const body = {
+      title: 'Créer export',
+      description: 'Ajout export CSV',
+      type: 'feature' as const,
+      priority: 'high' as const,
+    };
+    const req = {
+      rawBody: Buffer.from(
+        JSON.stringify({
+          title: 'Doit être ignoré',
+          description: 'raw',
+          type: 'bug',
+          priority: 'low',
+        }),
+        'utf8',
+      ),
+    } as unknown as Request;
+    const user = { email: 'admin@example.com', firstName: 'Admin' };
+
+    const result = await controller.createDevelopmentRequest(body, req, user);
+
+    expect(adminService.createDevelopmentRequest).toHaveBeenCalledWith(body, user);
+    expect(result).toEqual({ success: true, data: created });
+  });
+
+  it('should keep original body when rawBody cannot be parsed in updateDevelopmentRequest', async () => {
+    const updated = { id: 'dr-11' };
+    vi.mocked(adminService.updateDevelopmentRequest).mockResolvedValue(updated);
+
+    const body = {
+      title: 'Mise à jour',
+      description: 'Texte',
+      type: 'feature' as const,
+      priority: 'medium' as const,
+    };
+    const req = {
+      rawBody: '{invalid-json',
+    } as unknown as Request;
+
+    const result = await controller.updateDevelopmentRequest('dr-11', body, req);
+
+    expect(adminService.updateDevelopmentRequest).toHaveBeenCalledWith('dr-11', body);
+    expect(result).toEqual({ success: true, data: updated });
+  });
+
+  it('should use request rawBody when status body is empty', async () => {
+    const serviceResult = { id: 'dr-2', status: 'done' };
+    vi.mocked(adminService.updateDevelopmentRequestStatus).mockResolvedValue(
+      serviceResult,
+    );
+
+    const req = {
+      rawBody: Buffer.from(JSON.stringify({ status: 'done' }), 'utf8'),
+    } as unknown as Request;
+    const user = { email: 'admin@example.com' };
+
+    const result = await controller.updateDevelopmentRequestStatus(
+      'dr-2',
+      {} as { status?: string },
+      req,
+      user,
+    );
+
+    expect(adminService.updateDevelopmentRequestStatus).toHaveBeenCalledWith(
+      'dr-2',
+      { status: 'done' },
+      user,
+    );
+    expect(result).toEqual({ success: true, data: serviceResult });
+  });
+
+  it('should use rawBody fallback when createDevelopmentRequest body is empty', async () => {
+    const created = { id: 'dr-raw-1' };
+    vi.mocked(adminService.createDevelopmentRequest).mockResolvedValue(created);
+
+    const req = {
+      rawBody: Buffer.from(
+        JSON.stringify({
+          title: 'Issue from raw body',
+          description: 'Body was not parsed by express',
+          type: 'bug',
+          priority: 'high',
+        }),
+        'utf8',
+      ),
+    } as unknown as Request;
+    const user = { email: 'admin@example.com', firstName: 'Admin' };
+
+    const result = await controller.createDevelopmentRequest(
+      {} as { title?: string },
+      req,
+      user,
+    );
+
+    expect(adminService.createDevelopmentRequest).toHaveBeenCalledWith(
+      {
+        title: 'Issue from raw body',
+        description: 'Body was not parsed by express',
+        type: 'bug',
+        priority: 'high',
+      },
+      user,
+    );
+    expect(result).toEqual({ success: true, data: created });
+  });
+
+  it('should propagate service failures for development request sync', async () => {
+    vi.mocked(adminService.syncDevelopmentRequestWithGitHub).mockRejectedValue(
+      new BadRequestException('GitHub sync failed'),
+    );
+
+    await expect(
+      controller.syncDevelopmentRequestWithGitHub('dr-fail-1'),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should propagate service failures for development request deletion', async () => {
+    vi.mocked(adminService.deleteDevelopmentRequest).mockRejectedValue(
+      new BadRequestException('Delete failed'),
+    );
+
+    await expect(controller.deleteDevelopmentRequest('dr-fail-2')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('should propagate service failures for feature and email config updates', async () => {
+    vi.mocked(adminService.updateFeatureConfig).mockRejectedValueOnce(
+      new BadRequestException('Feature update failed'),
+    );
+    vi.mocked(adminService.updateEmailConfig).mockRejectedValueOnce(
+      new BadRequestException('Email config update failed'),
+    );
+
+    await expect(
+      controller.updateFeatureConfig(
+        'notifications',
+        { enabled: true },
+        { email: 'admin@example.com' },
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    await expect(
+      controller.updateEmailConfig(
+        { smtpHost: 'smtp.example.com' },
+        { email: 'admin@example.com' },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should return password reset guidance endpoint message', async () => {
+    const result = await controller.updateAdministratorPassword();
+
+    expect(result).toEqual({
+      message:
+        "Utilisez l'endpoint /api/auth/forgot-password pour réinitialiser le mot de passe.",
+    });
+  });
+});
+
+describe('LogsController', () => {
+  let logsController: LogsController;
+
+  beforeEach(() => {
+    logsController = new LogsController();
+  });
+
+  it('should throw BadRequestException for invalid frontend error payload', async () => {
+    const req = { user: { email: 'admin@example.com' } } as unknown as Request;
+
+    await expect(logsController.logFrontendError({}, req)).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('should return success for valid frontend error payload', async () => {
+    const body = {
+      message: 'TypeError: x is undefined',
+      stack: 'stack',
+      url: 'https://komuno.example/admin',
+      userAgent: 'Mozilla/5.0',
+      timestamp: new Date().toISOString(),
+    };
+    const req = { user: { email: 'admin@example.com' } } as unknown as Request;
+
+    const result = await logsController.logFrontendError(body, req);
+
+    expect(result).toEqual({ success: true });
+  });
+
+  it('should fallback to N/A and anonymous when optional fields are missing', async () => {
+    const body = {
+      message: 'ReferenceError: y is not defined',
+      url: 'https://komuno.example/admin',
+      userAgent: 'Mozilla/5.0',
+      timestamp: new Date().toISOString(),
+    };
+    const req = {} as Request;
+
+    const result = await logsController.logFrontendError(body, req);
+
+    expect(result).toEqual({ success: true });
+  });
+
+  it('should rethrow non-zod parsing errors', async () => {
+    const parseSpy = vi
+      .spyOn(frontendErrorSchema, 'parse')
+      .mockImplementation(() => {
+        throw new Error('Unexpected parser failure');
+      });
+    const req = {} as Request;
+
+    await expect(
+      logsController.logFrontendError({ message: 'x' }, req),
+    ).rejects.toThrow('Unexpected parser failure');
+
+    parseSpy.mockRestore();
   });
 });

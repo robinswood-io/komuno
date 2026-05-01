@@ -98,6 +98,7 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
 
   const resolvedStatus: MemberFormData['status'] = isPipelineStatus(defaultStatus) ? 'proposed' : (defaultStatus ?? 'active');
   const resolvedProspectionStatus: ProspectionStatus | undefined = isPipelineStatus(defaultStatus) ? defaultStatus : undefined;
+  const isProspectMode = Boolean(resolvedProspectionStatus);
 
   // Form state
   const [formData, setFormData] = useState<MemberFormData>({
@@ -255,9 +256,11 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Ajouter un membre</DialogTitle>
+          <DialogTitle>{isProspectMode ? 'Ajouter un prospect' : 'Ajouter un membre'}</DialogTitle>
           <DialogDescription>
-            Créez un nouveau membre dans le système de gestion CRM
+            {isProspectMode
+              ? 'Créez un nouveau prospect dans le pipeline CRM'
+              : 'Créez un nouveau membre dans le système de gestion CRM'}
           </DialogDescription>
         </DialogHeader>
 
@@ -604,12 +607,12 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
                     <SelectItem value="Qualification">Qualification</SelectItem>
                     <SelectItem value="R1">R1</SelectItem>
                     <SelectItem value="R2">R2</SelectItem>
+                    <SelectItem value="En réflexion">En réflexion</SelectItem>
                     <SelectItem value="Contractualisation">Contractualisation</SelectItem>
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel>Archivés</SelectLabel>
                     <SelectItem value="Hors cible">Hors cible</SelectItem>
-                    <SelectItem value="En réflexion">En réflexion</SelectItem>
                     <SelectItem value="Refusé">Refusé</SelectItem>
                     <SelectItem value="Signé">Signé</SelectItem>
                   </SelectGroup>
@@ -657,7 +660,11 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
             {createMutation.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            {createMutation.isPending ? 'Création en cours...' : 'Ajouter le membre'}
+            {createMutation.isPending
+              ? 'Création en cours...'
+              : isProspectMode
+                ? 'Ajouter le prospect'
+                : 'Ajouter le membre'}
           </Button>
         </DialogFooter>
       </DialogContent>
