@@ -1,8 +1,8 @@
 {
-  "version": "2.1.0",
-  "previousVersion": "2.0.0",
-  "releasedAt": "2026-04-12",
-  "summary": "Cette version apporte 21 nouveaute(s), 68 correction(s), 4 amelioration(s).",
-  "commitCount": 109,
+  "version": "2.1.1",
+  "previousVersion": "2.1.0",
+  "releasedAt": "2026-05-01",
+  "summary": "Cette version apporte des ajustements techniques.",
+  "commitCount": 2,
   "changelogUrl": "/changelog"
 }
