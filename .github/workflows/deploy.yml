@@ -62,7 +62,7 @@ jobs:
           SHOULD_BUILD=false
           while IFS= read -r file; do
             case "$file" in
-              app/*|public/*|next.config.*|server/*|migrations/*|shared/*|package.json|bun.lockb|Dockerfile*)
+              app/*|public/*|next.config.*|server/*|migrations/*|shared/*|package.json|bun.lockb|Dockerfile*|docker-compose*.yml|deploy/docker-compose*.yml)
                 SHOULD_BUILD=true
                 break
                 ;;
