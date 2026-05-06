@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.1.6",
+    "version": "2.1.7",
     "releasedAt": "2026-05-06",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Fiabilise deploy REP (réseau externe + healthcheck flexible)"
+        "Déploie aussi les dépendances REP depuis compose"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.7",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Déploie aussi les dépendances REP depuis compose"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.6",
       "releasedAt": "2026-05-06",
@@ -242,6 +258,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T10:17:01.098Z",
+  "generatedAt": "2026-05-06T10:28:37.685Z",
   "source": "conventional-commits"
 }
