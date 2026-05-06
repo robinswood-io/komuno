@@ -1,8 +1,8 @@
 {
-  "version": "2.1.5",
-  "previousVersion": "2.1.4",
+  "version": "2.1.6",
+  "previousVersion": "2.1.5",
   "releasedAt": "2026-05-06",
-  "summary": "Cette version apporte des ajustements techniques.",
+  "summary": "Cette version apporte 1 correction(s).",
   "commitCount": 1,
   "changelogUrl": "/changelog"
 }

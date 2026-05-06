@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.1.5",
+    "version": "2.1.6",
     "releasedAt": "2026-05-06",
-    "summary": "Cette version apporte des ajustements techniques.",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
-      "corrections": [],
+      "corrections": [
+        "Fiabilise deploy REP (réseau externe + healthcheck flexible)"
+      ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Ajoute docker-compose.prod.yml à la racine pour le déploiement REP"
-      ]
+      "maintenance": []
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.6",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Fiabilise deploy REP (réseau externe + healthcheck flexible)"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.5",
       "releasedAt": "2026-05-06",
@@ -226,6 +242,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T10:08:10.723Z",
+  "generatedAt": "2026-05-06T10:17:01.098Z",
   "source": "conventional-commits"
 }
