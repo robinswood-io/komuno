@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.1.5] - 2026-05-06
+
+### En bref
+
+- Cette version apporte des ajustements techniques.
+
+### Maintenance
+
+- Ajoute docker-compose.prod.yml à la racine pour le déploiement REP
+
 ## [2.1.4] - 2026-05-06
 
 ### En bref

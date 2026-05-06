@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.1.4",
+    "version": "2.1.5",
     "releasedAt": "2026-05-06",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte des ajustements techniques.",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
-      "corrections": [
-        "Limite le déploiement REP aux compose de production"
-      ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
-      "maintenance": []
+      "maintenance": [
+        "Ajoute docker-compose.prod.yml à la racine pour le déploiement REP"
+      ]
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.5",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte des ajustements techniques.",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Ajoute docker-compose.prod.yml à la racine pour le déploiement REP"
+        ]
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.4",
       "releasedAt": "2026-05-06",
@@ -210,6 +226,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T10:00:07.305Z",
+  "generatedAt": "2026-05-06T10:08:10.723Z",
   "source": "conventional-commits"
 }
