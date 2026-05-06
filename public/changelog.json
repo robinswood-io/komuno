@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.1.9",
+    "version": "2.1.10",
     "releasedAt": "2026-05-06",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Auto-répare la connexion traefik_public côté REP"
+        "Exposer le port app en prod pour repicardie"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.10",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Exposer le port app en prod pour repicardie"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.9",
       "releasedAt": "2026-05-06",
@@ -290,6 +306,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T11:09:05.756Z",
+  "generatedAt": "2026-05-06T11:21:58.123Z",
   "source": "conventional-commits"
 }
