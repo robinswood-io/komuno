@@ -414,16 +414,17 @@ jobs:
           set -euo pipefail
           cd /docker/apps/komuno
 
-          # Détecter automatiquement le fichier compose disponible
+          # Détecter automatiquement le fichier compose de production disponible
           COMPOSE_FILE=""
-          for f in docker-compose.prod.yml docker-compose.yml compose.yml docker-compose.dev.yml; do
+          for f in docker-compose.prod.yml docker-compose.yml compose.yml; do
             if [ -f "$f" ]; then
               COMPOSE_FILE="$f"
               break
             fi
           done
           if [ -z "$COMPOSE_FILE" ]; then
-            echo "❌ Aucun fichier compose trouvé dans /docker/apps/komuno"
+            echo "❌ Aucun fichier compose de production trouvé dans /docker/apps/komuno"
+            echo "   Fichiers attendus: docker-compose.prod.yml | docker-compose.yml | compose.yml"
             ls -la
             exit 1
           fi
