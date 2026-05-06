@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.1.9] - 2026-05-06
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Auto-répare la connexion traefik_public côté REP
+
 ## [2.1.8] - 2026-05-06
 
 ### En bref

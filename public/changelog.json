@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.1.8",
+    "version": "2.1.9",
     "releasedAt": "2026-05-06",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Assouplit le contrôle de restart au bootstrap REP"
+        "Auto-répare la connexion traefik_public côté REP"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.9",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Auto-répare la connexion traefik_public côté REP"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.8",
       "releasedAt": "2026-05-06",
@@ -274,6 +290,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T10:37:14.987Z",
+  "generatedAt": "2026-05-06T11:09:05.756Z",
   "source": "conventional-commits"
 }
