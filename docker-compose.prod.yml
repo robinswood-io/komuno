@@ -22,7 +22,7 @@ services:
       - NODE_ENV=production
       - NODE_OPTIONS=--max-old-space-size=3072
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
     networks:
       - traefik_public
       - backend
