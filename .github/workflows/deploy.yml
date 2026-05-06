@@ -458,6 +458,15 @@ jobs:
           fi
           echo "🧩 Service détecté: $SERVICE_NAME"
 
+          # Inclure automatiquement les dépendances techniques si elles existent
+          DEPLOY_TARGETS="$SERVICE_NAME"
+          for dep in postgres redis minio; do
+            if echo "$SERVICES" | grep -qx "$dep"; then
+              DEPLOY_TARGETS="$DEPLOY_TARGETS $dep"
+            fi
+          done
+          echo "📦 Services déployés: $DEPLOY_TARGETS"
+
           echo "🔐 Login GHCR..."
           echo "${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" | \
             docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -471,7 +480,7 @@ jobs:
           docker tag  "ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}" komuno:latest
 
           echo "🚀 Déploiement..."
-          docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate "$SERVICE_NAME"
+          docker compose -f "$COMPOSE_FILE" up -d --force-recreate $DEPLOY_TARGETS
           CONTAINER_ID=$(docker compose -f "$COMPOSE_FILE" ps -q "$SERVICE_NAME")
           if [ -z "$CONTAINER_ID" ]; then
             echo "❌ Impossible de récupérer le container pour $SERVICE_NAME"
@@ -517,7 +526,7 @@ jobs:
             if [ -n "$OLD_IMAGE" ]; then
               echo "🔄 Rollback vers $OLD_IMAGE..."
               docker tag "$OLD_IMAGE" komuno:latest
-              docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate "$SERVICE_NAME"
+              docker compose -f "$COMPOSE_FILE" up -d --force-recreate $DEPLOY_TARGETS
               echo "✅ Rollback effectué"
             fi
             exit 1
@@ -558,7 +567,7 @@ jobs:
             docker logs "$CONTAINER_ID" --tail 80 || true
             if [ -n "$OLD_IMAGE" ]; then
               docker tag "$OLD_IMAGE" komuno:latest
-              docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate "$SERVICE_NAME"
+              docker compose -f "$COMPOSE_FILE" up -d --force-recreate $DEPLOY_TARGETS
               echo "✅ Rollback effectué"
             fi
             exit 1
