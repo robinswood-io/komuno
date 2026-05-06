@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.1.11",
+    "version": "2.1.12",
     "releasedAt": "2026-05-06",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte des ajustements techniques.",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
-      "corrections": [
-        "Déclencher deploy sur changements compose"
-      ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
-      "maintenance": []
+      "maintenance": [
+        "Tracer exposition port compose rep"
+      ]
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.12",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte des ajustements techniques.",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Tracer exposition port compose rep"
+        ]
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.11",
       "releasedAt": "2026-05-06",
@@ -322,6 +338,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T11:23:28.234Z",
+  "generatedAt": "2026-05-06T11:29:44.581Z",
   "source": "conventional-commits"
 }
