@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.1.12",
+    "version": "2.1.13",
     "releasedAt": "2026-05-06",
-    "summary": "Cette version apporte des ajustements techniques.",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
-      "corrections": [],
+      "corrections": [
+        "Ajouter smoke test public bloquant pour rep"
+      ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Tracer exposition port compose rep"
-      ]
+      "maintenance": []
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.13",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Ajouter smoke test public bloquant pour rep"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.12",
       "releasedAt": "2026-05-06",
@@ -338,6 +354,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T11:29:44.581Z",
+  "generatedAt": "2026-05-06T13:36:42.280Z",
   "source": "conventional-commits"
 }
