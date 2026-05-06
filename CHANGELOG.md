@@ -4,6 +4,17 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.1.2] - 2026-05-06
+
+### En bref
+
+- Cette version apporte des ajustements techniques.
+
+### Maintenance
+
+- Versionne l'intégralité des artefacts restants
+- Ajout massif de tests unitaires multi-vagues
+
 ## [2.1.1] - 2026-05-01
 
 ### En bref

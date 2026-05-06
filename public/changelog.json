@@ -1,7 +1,7 @@
 {
   "latest": {
-    "version": "2.1.1",
-    "releasedAt": "2026-05-01",
+    "version": "2.1.2",
+    "releasedAt": "2026-05-06",
     "summary": "Cette version apporte des ajustements techniques.",
     "sections": {
       "majeurs": [],
@@ -10,13 +10,30 @@
       "ameliorations": [],
       "securite": [],
       "maintenance": [
-        "Finaliser et nettoyer le repo komuno",
-        "Synchronise la version locale du repo komuno"
+        "Versionne l'intégralité des artefacts restants",
+        "Ajout massif de tests unitaires multi-vagues"
       ]
     },
     "commitCount": 2
   },
   "history": [
+    {
+      "version": "2.1.2",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte des ajustements techniques.",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Versionne l'intégralité des artefacts restants",
+          "Ajout massif de tests unitaires multi-vagues"
+        ]
+      },
+      "commitCount": 2
+    },
     {
       "version": "2.1.1",
       "releasedAt": "2026-05-01",
@@ -162,6 +179,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-01T09:14:36.021Z",
+  "generatedAt": "2026-05-06T07:37:27.544Z",
   "source": "conventional-commits"
 }
