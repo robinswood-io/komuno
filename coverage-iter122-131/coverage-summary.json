@@ -1,0 +1,3 @@
+{"total": {"lines":{"total":143,"covered":107,"skipped":0,"pct":74.82},"statements":{"total":155,"covered":115,"skipped":0,"pct":74.19},"functions":{"total":27,"covered":23,"skipped":0,"pct":85.18},"branches":{"total":90,"covered":59,"skipped":0,"pct":65.55},"branchesTrue":{"total":0,"covered":0,"skipped":0,"pct":"Unknown"}}
+,"/srv/workspace/komuno/server/email-notification-service.js": {"lines":{"total":143,"covered":107,"skipped":0,"pct":74.82},"functions":{"total":27,"covered":23,"skipped":0,"pct":85.18},"statements":{"total":155,"covered":115,"skipped":0,"pct":74.19},"branches":{"total":90,"covered":59,"skipped":0,"pct":65.55}}
+}
