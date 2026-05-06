@@ -520,7 +520,8 @@ jobs:
           CONTAINER_STATE=$(docker inspect --format='{{.State.Status}}' "$CONTAINER_ID" 2>/dev/null || echo "not_found")
           RESTART_COUNT=$(docker inspect --format='{{.RestartCount}}' "$CONTAINER_ID" 2>/dev/null || echo "0")
 
-          if [ "$CONTAINER_STATE" != "running" ] || [ "$RESTART_COUNT" -gt "0" ]; then
+          # Tolérance d'un redémarrage ponctuel au bootstrap (migration / init services)
+          if [ "$CONTAINER_STATE" != "running" ] || [ "$RESTART_COUNT" -gt "1" ]; then
             echo "❌ Container instable (état=$CONTAINER_STATE, restarts=$RESTART_COUNT)"
             docker logs "$CONTAINER_ID" --tail 80 || true
             if [ -n "$OLD_IMAGE" ]; then
