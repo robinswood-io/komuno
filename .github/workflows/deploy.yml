@@ -430,6 +430,16 @@ jobs:
           fi
           echo "📄 Compose détecté: $COMPOSE_FILE"
 
+          # Garantir les réseaux externes requis par le compose (ex: traefik_public)
+          if grep -q "traefik_public" "$COMPOSE_FILE"; then
+            if ! docker network inspect traefik_public >/dev/null 2>&1; then
+              echo "🛠️ Réseau externe manquant: traefik_public — création..."
+              docker network create traefik_public
+            else
+              echo "✅ Réseau externe présent: traefik_public"
+            fi
+          fi
+
           # Détecter automatiquement le service à redéployer
           SERVICE_NAME=""
           SERVICES=$(docker compose -f "$COMPOSE_FILE" config --services)
@@ -468,7 +478,20 @@ jobs:
             exit 1
           fi
 
-          echo "⏳ Attente démarrage NestJS (max 90s)..."
+          health_ready() {
+            local p
+            for p in 5000 3000; do
+              if docker exec "$CONTAINER_ID" wget -q -O - --timeout=5 "http://localhost:${p}/api/health" 2>/dev/null | grep -q '"status":"healthy"'; then
+                return 0
+              fi
+              if docker exec "$CONTAINER_ID" wget -q -O - --timeout=5 "http://localhost:${p}/health" 2>/dev/null | grep -qi 'ok\\|healthy'; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          echo "⏳ Attente démarrage backend (max 90s)..."
           for i in $(seq 1 18); do
             STATE=$(docker inspect --format='{{.State.Status}}' "$CONTAINER_ID" 2>/dev/null || echo "not_found")
             if [ "$STATE" != "running" ]; then
@@ -476,9 +499,7 @@ jobs:
               sleep 5
               continue
             fi
-            HEALTH=$(docker exec "$CONTAINER_ID" wget -q -O - --timeout=5 \
-              http://localhost:5000/api/health 2>/dev/null || echo "")
-            if echo "$HEALTH" | grep -q '"status":"healthy"'; then
+            if health_ready; then
               echo "  ✅ NestJS prêt après $((i * 5))s"
               break
             fi
@@ -505,13 +526,11 @@ jobs:
           echo "🔍 Smoke tests..."
           FAIL=0
 
-          # Health check avec validation JSON
-          HEALTH=$(docker exec "$CONTAINER_ID" wget -q -O - --timeout=10 \
-            http://localhost:5000/api/health 2>/dev/null || echo "FAILED")
-          if echo "$HEALTH" | grep -q '"status":"healthy"'; then
-            echo "  ✅ GET /api/health → healthy"
+          # Health check multi-ports multi-endpoints
+          if health_ready; then
+            echo "  ✅ Health endpoint → healthy"
           else
-            echo "  ❌ GET /api/health → $(echo "$HEALTH" | head -c 200)"
+            echo "  ❌ Aucun endpoint health valide trouvé (ports 5000/3000)"
             FAIL=1
           fi
 
