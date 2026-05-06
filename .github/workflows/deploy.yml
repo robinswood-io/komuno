@@ -438,6 +438,19 @@ jobs:
             else
               echo "✅ Réseau externe présent: traefik_public"
             fi
+
+            # Auto-réparation: connecter le container Traefik à ce réseau si nécessaire
+            TRAEFIK_CONTAINER=$(docker ps --format '{{.Names}}' | grep -E '(^|-)traefik($|-)' | head -n1 || true)
+            if [ -n "${TRAEFIK_CONTAINER:-}" ]; then
+              if ! docker inspect "$TRAEFIK_CONTAINER" --format '{{json .NetworkSettings.Networks}}' | grep -q '"traefik_public"'; then
+                echo "🛠️ Traefik non connecté à traefik_public — connexion de $TRAEFIK_CONTAINER..."
+                docker network connect traefik_public "$TRAEFIK_CONTAINER" || true
+              else
+                echo "✅ Traefik déjà connecté à traefik_public ($TRAEFIK_CONTAINER)"
+              fi
+            else
+              echo "⚠️ Aucun container Traefik détecté sur cet hôte runner"
+            fi
           fi
 
           # Détecter automatiquement le service à redéployer
