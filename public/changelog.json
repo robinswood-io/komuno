@@ -1,22 +1,37 @@
 {
   "latest": {
-    "version": "2.1.2",
+    "version": "2.1.3",
     "releasedAt": "2026-05-06",
-    "summary": "Cette version apporte des ajustements techniques.",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
-      "corrections": [],
+      "corrections": [
+        "Fiabilise le déploiement REP avec détection compose/service"
+      ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Versionne l'intégralité des artefacts restants",
-        "Ajout massif de tests unitaires multi-vagues"
-      ]
+      "maintenance": []
     },
-    "commitCount": 2
+    "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.3",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Fiabilise le déploiement REP avec détection compose/service"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.2",
       "releasedAt": "2026-05-06",
@@ -179,6 +194,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T07:37:27.544Z",
+  "generatedAt": "2026-05-06T08:02:45.942Z",
   "source": "conventional-commits"
 }
