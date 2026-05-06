@@ -104,4 +104,49 @@ describe('LoggingInterceptor', () => {
     expect(errorMessage).toContain('[API] PATCH /api/members/42 - Error in 61ms');
     expect(errorMeta).toEqual({ error: boom });
   });
+
+  it('logs API request without payload when handler emits null', async () => {
+    const interceptor = new LoggingInterceptor();
+    const request: MockRequest = { method: 'GET', path: '/api/no-data' };
+    const response: MockResponse = { statusCode: 204 };
+    const context = createExecutionContext(request, response);
+
+    vi.spyOn(Date, 'now').mockReturnValueOnce(3000).mockReturnValueOnce(3008);
+
+    const next: CallHandler = { handle: () => of(null) };
+
+    await firstValueFrom(interceptor.intercept(context, next));
+
+    expect(loggerMocks.info).toHaveBeenCalledTimes(1);
+    const loggedMessage = loggerMocks.info.mock.calls[0]?.[0];
+    expect(loggedMessage).toContain('GET /api/no-data 204 in 8ms');
+    expect(loggedMessage).not.toContain('::');
+  });
+
+  it('sanitizes nested array/object secrets and truncates long log lines', async () => {
+    const interceptor = new LoggingInterceptor();
+    const request: MockRequest = { method: 'POST', path: '/api/truncation-check' };
+    const response: MockResponse = { statusCode: 200 };
+    const context = createExecutionContext(request, response);
+
+    vi.spyOn(Date, 'now').mockReturnValueOnce(4000).mockReturnValueOnce(4042);
+
+    const payload = {
+      access_token: 'should-not-leak',
+      nested: [{ profile: { 'bearer-token': 'hide-me' } }],
+      description: 'x'.repeat(250),
+    };
+
+    const next: CallHandler = { handle: () => of(payload) };
+
+    await firstValueFrom(interceptor.intercept(context, next));
+
+    expect(loggerMocks.info).toHaveBeenCalledTimes(1);
+    const loggedMessage = loggerMocks.info.mock.calls[0]?.[0] as string;
+    expect(loggedMessage).toContain('[REDACTED]');
+    expect(loggedMessage).not.toContain('should-not-leak');
+    expect(loggedMessage).not.toContain('hide-me');
+    expect(loggedMessage.endsWith('…')).toBe(true);
+    expect(loggedMessage.length).toBe(80);
+  });
 });

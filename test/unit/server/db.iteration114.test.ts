@@ -1,0 +1,40 @@
+import { createRequire } from 'node:module';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanupDbHarness, loadDbJsModule } from './db.iteration-helper';
+
+type DrizzleCallArg = {
+  logger?: false | { logQuery: (query: string, params: unknown) => void };
+};
+
+type DrizzleModule = {
+  drizzle: ReturnType<typeof vi.fn<[DrizzleCallArg], unknown>>;
+};
+
+const cjsRequire = createRequire(import.meta.url);
+
+describe('server/db.js iteration114 neon development logger branch', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanupDbHarness();
+  });
+
+  it('passes a logger object to neon drizzle in development', () => {
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    loadDbJsModule({
+      databaseUrl: 'postgresql://user:pass@cluster.neon.tech/appdb',
+      nodeEnv: 'development',
+    });
+
+    const neonDrizzle = cjsRequire('drizzle-orm/neon-serverless') as DrizzleModule;
+    const arg = neonDrizzle.drizzle.mock.calls[0]?.[0];
+
+    expect(arg?.logger).not.toBe(false);
+    expect(typeof (arg?.logger as { logQuery?: unknown })?.logQuery).toBe('function');
+
+    const logger = arg?.logger as { logQuery: (query: string, params: unknown) => void };
+    logger.logQuery('select * from users', []);
+
+    expect(consoleLogSpy).toHaveBeenCalledWith('[DB Query] select * from users...');
+  });
+});

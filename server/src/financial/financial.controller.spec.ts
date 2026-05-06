@@ -835,6 +835,18 @@ describe('FinancialController', () => {
       });
     });
 
+    describe('DELETE /revenues/:id', () => {
+      it('should delete revenue successfully', async () => {
+        vi.mocked(service.deleteRevenue).mockResolvedValue({
+          success: true,
+        });
+
+        const result = await controller.deleteRevenue('rev-1');
+        expect(result.success).toBe(true);
+        expect(service.deleteRevenue).toHaveBeenCalledWith('rev-1');
+      });
+    });
+
     describe('GET /dashboard/overview', () => {
       it('should parse year for dashboard overview', async () => {
         vi.mocked(service.getDashboardOverview).mockResolvedValue({
@@ -860,6 +872,92 @@ describe('FinancialController', () => {
         await controller.getSubscriptionTypes('true');
         expect(service.getSubscriptionTypes).toHaveBeenCalledWith(true);
       });
+
+      it('should default includeInactive to false for non-true values', async () => {
+        vi.mocked(service.getSubscriptionTypes).mockResolvedValue({
+          success: true,
+          data: [],
+        });
+
+        await controller.getSubscriptionTypes('false');
+        expect(service.getSubscriptionTypes).toHaveBeenCalledWith(false);
+      });
+    });
+
+    describe('GET /subscription-types/:id', () => {
+      it('should retrieve subscription type by id', async () => {
+        vi.mocked(service.getSubscriptionTypeById).mockResolvedValue({
+          success: true,
+          data: { id: 'type-1', name: 'Mensuel' },
+        });
+
+        const result = await controller.getSubscriptionTypeById('type-1');
+        expect(result.success).toBe(true);
+        expect(service.getSubscriptionTypeById).toHaveBeenCalledWith('type-1');
+      });
+    });
+
+    describe('POST /subscription-types', () => {
+      it('should create subscription type', async () => {
+        const payload = {
+          name: 'Annuel Premium',
+          amountInCents: 12000,
+          durationType: 'yearly',
+          isActive: true,
+        };
+
+        vi.mocked(service.createSubscriptionType).mockResolvedValue({
+          success: true,
+          data: { id: 'type-2', ...payload },
+        });
+
+        const result = await controller.createSubscriptionType(payload);
+        expect(result.success).toBe(true);
+        expect(service.createSubscriptionType).toHaveBeenCalledWith(payload);
+      });
+    });
+
+    describe('PUT /subscription-types/:id', () => {
+      it('should update subscription type', async () => {
+        const updates = {
+          name: 'Annuel Premium Plus',
+          amountInCents: 15000,
+        };
+
+        vi.mocked(service.updateSubscriptionType).mockResolvedValue({
+          success: true,
+          data: { id: 'type-2', ...updates },
+        });
+
+        const result = await controller.updateSubscriptionType('type-2', updates);
+        expect(result.success).toBe(true);
+        expect(service.updateSubscriptionType).toHaveBeenCalledWith('type-2', updates);
+      });
+    });
+
+    describe('DELETE /subscription-types/:id', () => {
+      it('should delete subscription type', async () => {
+        vi.mocked(service.deleteSubscriptionType).mockResolvedValue({
+          success: true,
+        });
+
+        const result = await controller.deleteSubscriptionType('type-3');
+        expect(result.success).toBe(true);
+        expect(service.deleteSubscriptionType).toHaveBeenCalledWith('type-3');
+      });
+    });
+
+    describe('GET /subscription-types/:id/members', () => {
+      it('should retrieve members by subscription type', async () => {
+        vi.mocked(service.getMembersBySubscriptionType).mockResolvedValue({
+          success: true,
+          data: [{ id: 1, memberEmail: 'member@example.com' }],
+        });
+
+        const result = await controller.getMembersBySubscriptionType('type-1');
+        expect(result.success).toBe(true);
+        expect(service.getMembersBySubscriptionType).toHaveBeenCalledWith('type-1');
+      });
     });
 
     describe('POST /subscriptions/assign', () => {
@@ -879,6 +977,145 @@ describe('FinancialController', () => {
         const result = await controller.assignSubscription(payload);
         expect(result.success).toBe(true);
         expect(service.assignSubscriptionToMember).toHaveBeenCalledWith(payload);
+      });
+    });
+  });
+
+  describe('Iteration Batch 8 - Additional Branches & Functions', () => {
+    describe('Subscriptions extra coverage', () => {
+      it('should delete subscription successfully', async () => {
+        vi.mocked(service.deleteSubscription).mockResolvedValue({
+          success: true,
+        });
+
+        const result = await controller.deleteSubscription('sub-10');
+        expect(result.success).toBe(true);
+        expect(service.deleteSubscription).toHaveBeenCalledWith('sub-10');
+      });
+
+      it('should revoke subscription successfully', async () => {
+        vi.mocked(service.revokeSubscription).mockResolvedValue({
+          success: true,
+          data: { id: 'sub-11', status: 'cancelled' },
+        });
+
+        const result = await controller.revokeSubscription('sub-11');
+        expect(result.success).toBe(true);
+        expect(service.revokeSubscription).toHaveBeenCalledWith('sub-11');
+      });
+    });
+
+    describe('Revenues extra coverage', () => {
+      it('should call getRevenues with empty options when no filters are provided', async () => {
+        vi.mocked(service.getRevenues).mockResolvedValue({
+          success: true,
+          data: [],
+        });
+
+        await controller.getRevenues();
+        expect(service.getRevenues).toHaveBeenCalledWith({});
+      });
+
+      it('should retrieve revenue by id', async () => {
+        const revenue = {
+          id: 'rev-100',
+          type: 'donation',
+          amountInCents: 20000,
+        };
+        vi.mocked(service.getRevenueById).mockResolvedValue({
+          success: true,
+          data: revenue,
+        });
+
+        const result = await controller.getRevenueById('rev-100');
+        expect(result.success).toBe(true);
+        expect(result.data).toEqual(revenue);
+        expect(service.getRevenueById).toHaveBeenCalledWith('rev-100');
+      });
+
+      it('should propagate not found errors on getRevenueById', async () => {
+        vi.mocked(service.getRevenueById).mockRejectedValue(new NotFoundException());
+
+        await expect(controller.getRevenueById('missing-revenue')).rejects.toThrow(NotFoundException);
+      });
+
+      it('should create revenue successfully', async () => {
+        const payload = {
+          type: 'sponsorship',
+          description: 'Sponsor annuel',
+          amountInCents: 150000,
+          revenueDate: '2026-02-15',
+          createdBy: 'admin@example.com',
+        };
+
+        vi.mocked(service.createRevenue).mockResolvedValue({
+          success: true,
+          data: { id: 'rev-101', ...payload },
+        });
+
+        const result = await controller.createRevenue(payload);
+        expect(result.success).toBe(true);
+        expect(service.createRevenue).toHaveBeenCalledWith(payload);
+      });
+
+      it('should propagate bad request on createRevenue validation errors', async () => {
+        vi.mocked(service.createRevenue).mockRejectedValue(new BadRequestException());
+
+        await expect(controller.createRevenue({ description: '' })).rejects.toThrow(BadRequestException);
+      });
+
+      it('should update revenue successfully', async () => {
+        const updates = {
+          description: 'Sponsor annuel - confirmé',
+          status: 'confirmed',
+        };
+
+        vi.mocked(service.updateRevenue).mockResolvedValue({
+          success: true,
+          data: { id: 'rev-102', ...updates },
+        });
+
+        const result = await controller.updateRevenue('rev-102', updates);
+        expect(result.success).toBe(true);
+        expect(service.updateRevenue).toHaveBeenCalledWith('rev-102', updates);
+      });
+
+      it('should propagate not found errors on updateRevenue', async () => {
+        vi.mocked(service.updateRevenue).mockRejectedValue(new NotFoundException());
+
+        await expect(controller.updateRevenue('missing-rev', {})).rejects.toThrow(NotFoundException);
+      });
+    });
+
+    describe('Year parsing false-branch coverage', () => {
+      it('should pass undefined year to getRevenueStats when no year query is provided', async () => {
+        vi.mocked(service.getRevenueStats).mockResolvedValue({
+          success: true,
+          data: {},
+        });
+
+        await controller.getRevenueStats();
+        expect(service.getRevenueStats).toHaveBeenCalledWith(undefined);
+      });
+
+      it('should pass undefined year to getDashboardOverview when no year query is provided', async () => {
+        vi.mocked(service.getDashboardOverview).mockResolvedValue({
+          success: true,
+          data: {},
+        });
+
+        await controller.getDashboardOverview();
+        expect(service.getDashboardOverview).toHaveBeenCalledWith(undefined);
+      });
+
+      it('should pass undefined year to getSubscriptionStats when no year query is provided', async () => {
+        vi.mocked(service.getSubscriptionStats).mockResolvedValue({
+          success: true,
+          data: {},
+        });
+
+        await controller.getSubscriptionStats();
+        expect(service.getSubscriptionStats).toHaveBeenCalledWith(undefined);
       });
     });
   });
@@ -917,6 +1154,18 @@ describe('FinancialController', () => {
       expect(callArgs).toHaveProperty('period');
       expect(callArgs).not.toHaveProperty('year');
       expect(callArgs).not.toHaveProperty('category');
+    });
+
+    it('should parse subscription id to NaN when renew id is non numeric', async () => {
+      vi.mocked(service.renewSubscription).mockResolvedValue({
+        success: true,
+        data: { renewed: true },
+      });
+
+      await controller.renewSubscription('abc', { paymentMethod: 'cash' });
+      const payload = vi.mocked(service.renewSubscription).mock.calls[0][0] as Record<string, unknown>;
+      expect(Number.isNaN(payload.subscriptionId as number)).toBe(true);
+      expect(payload.paymentMethod).toBe('cash');
     });
   });
 });
