@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.1.3",
+    "version": "2.1.4",
     "releasedAt": "2026-05-06",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Fiabilise le déploiement REP avec détection compose/service"
+        "Limite le déploiement REP aux compose de production"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.4",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Limite le déploiement REP aux compose de production"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.3",
       "releasedAt": "2026-05-06",
@@ -194,6 +210,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T08:02:45.942Z",
+  "generatedAt": "2026-05-06T10:00:07.305Z",
   "source": "conventional-commits"
 }
