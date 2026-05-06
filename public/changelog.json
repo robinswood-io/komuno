@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.1.10",
+    "version": "2.1.11",
     "releasedAt": "2026-05-06",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Exposer le port app en prod pour repicardie"
+        "Déclencher deploy sur changements compose"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.11",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Déclencher deploy sur changements compose"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.10",
       "releasedAt": "2026-05-06",
@@ -306,6 +322,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T11:21:58.123Z",
+  "generatedAt": "2026-05-06T11:23:28.234Z",
   "source": "conventional-commits"
 }
