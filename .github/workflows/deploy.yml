@@ -414,6 +414,21 @@ jobs:
           set -euo pipefail
           cd /docker/apps/komuno
 
+          echo "🧷 Verrouillage des variables de routage REP..."
+          touch .env
+          if grep -q '^DOMAIN=' .env; then
+            sed -i 's#^DOMAIN=.*#DOMAIN=repicardie.fr#' .env
+          else
+            echo 'DOMAIN=repicardie.fr' >> .env
+          fi
+          if grep -q '^APP_NAME=' .env; then
+            sed -i 's#^APP_NAME=.*#APP_NAME=rep-app#' .env
+          else
+            echo 'APP_NAME=rep-app' >> .env
+          fi
+          echo "✅ DOMAIN=$(grep '^DOMAIN=' .env | cut -d= -f2)"
+          echo "✅ APP_NAME=$(grep '^APP_NAME=' .env | cut -d= -f2)"
+
           # Détecter automatiquement le fichier compose de production disponible
           COMPOSE_FILE=""
           for f in docker-compose.prod.yml docker-compose.yml compose.yml; do

@@ -30,7 +30,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik_public"
-      - "traefik.http.routers.${APP_NAME:-app}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.${APP_NAME:-app}.rule=Host(`${DOMAIN}`) || Host(`www.repicardie.fr`)"
       - "traefik.http.routers.${APP_NAME:-app}.entrypoints=websecure"
       - "traefik.http.routers.${APP_NAME:-app}.tls=true"
       - "traefik.http.routers.${APP_NAME:-app}.tls.certresolver=letsencrypt"
