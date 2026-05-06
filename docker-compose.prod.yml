@@ -21,6 +21,7 @@ services:
     environment:
       - NODE_ENV=production
       - NODE_OPTIONS=--max-old-space-size=3072
+    # Port publié pour accès reverse-proxy externe (REP)
     ports:
       - "3000:3000"
     networks:
