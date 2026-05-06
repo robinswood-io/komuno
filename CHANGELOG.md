@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.1.15] - 2026-05-06
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Rendre les smoke tests publics REP stricts (404 interdit)
+
 ## [2.1.14] - 2026-05-06
 
 ### En bref
