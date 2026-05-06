@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.1.13",
+    "version": "2.1.14",
     "releasedAt": "2026-05-06",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Ajouter smoke test public bloquant pour rep"
+        "Fiabiliser routage REP apex+www et verrouiller DOMAIN/APP_NAME"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.1.14",
+      "releasedAt": "2026-05-06",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Fiabiliser routage REP apex+www et verrouiller DOMAIN/APP_NAME"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.1.13",
       "releasedAt": "2026-05-06",
@@ -354,6 +370,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-05-06T13:36:42.280Z",
+  "generatedAt": "2026-05-06T14:04:56.464Z",
   "source": "conventional-commits"
 }
