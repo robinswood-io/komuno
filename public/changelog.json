@@ -1,6 +1,6 @@
 {
   "latest": {
-    "version": "2.2.1",
+    "version": "2.2.2",
     "releasedAt": "2026-06-18",
     "summary": "Cette version apporte des ajustements techniques.",
     "sections": {
@@ -10,12 +10,28 @@
       "ameliorations": [],
       "securite": [],
       "maintenance": [
-        "Retry REP public smoke checks"
+        "Tag REP compose image from digest"
       ]
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.2.2",
+      "releasedAt": "2026-06-18",
+      "summary": "Cette version apporte des ajustements techniques.",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Tag REP compose image from digest"
+        ]
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.2.1",
       "releasedAt": "2026-06-18",
@@ -418,6 +434,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-18T15:27:08.982Z",
+  "generatedAt": "2026-06-18T15:39:21.100Z",
   "source": "conventional-commits"
 }
