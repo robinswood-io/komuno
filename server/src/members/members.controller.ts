@@ -886,3 +886,142 @@ export class AdminMemberContactsController {
   }
 }
 
+/**
+ * Controller Admin Member Groups - Routes admin pour les groupes annuels de membres
+ */
+@ApiTags('members')
+@ApiBearerAuth()
+@Controller('api/admin/member-groups')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+export class AdminMemberGroupsController {
+  constructor(private readonly membersService: MembersService) {}
+
+  @Get()
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Lister les groupes annuels de membres' })
+  @ApiQuery({ name: 'year', required: false, example: 2026 })
+  @ApiQuery({ name: 'type', required: false, enum: ['copil', 'commission', 'bureau', 'working_group', 'other'] })
+  @ApiQuery({ name: 'memberEmail', required: false, example: 'membre@example.com' })
+  @ApiQuery({ name: 'search', required: false, example: 'commission' })
+  @ApiQuery({ name: 'includeInactive', required: false, type: 'boolean' })
+  @ApiResponse({ status: 200, description: 'Groupes annuels avec leurs membres' })
+  async getMemberGroups(
+    @Query('year') year?: string,
+    @Query('type') type?: string,
+    @Query('memberEmail') memberEmail?: string,
+    @Query('search') search?: string,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    return await this.membersService.getMemberGroups({
+      ...(year ? { year: parseInt(year, 10) } : {}),
+      ...(type ? { type } : {}),
+      ...(memberEmail ? { memberEmail } : {}),
+      ...(search ? { search } : {}),
+      includeInactive: includeInactive === 'true',
+    });
+  }
+
+  @Get('summary')
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Vue synthèse: qui est dans quel groupe et fait quoi' })
+  @ApiQuery({ name: 'year', required: false, example: 2026 })
+  @ApiResponse({ status: 200, description: 'Synthèse des affectations par membre' })
+  async getMemberGroupSummary(@Query('year') year?: string) {
+    return await this.membersService.getMemberGroupSummary(year ? parseInt(year, 10) : undefined);
+  }
+
+  @Get(':id')
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Obtenir le détail d’un groupe annuel' })
+  @ApiParam({ name: 'id', description: 'ID du groupe' })
+  @ApiResponse({ status: 200, description: 'Groupe annuel détaillé' })
+  @ApiResponse({ status: 404, description: 'Groupe non trouvé' })
+  async getMemberGroup(@Param('id') id: string) {
+    return await this.membersService.getMemberGroup(id);
+  }
+
+  @Post()
+  @Permissions('admin.edit')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Créer un groupe annuel de membres' })
+  @ApiResponse({ status: 201, description: 'Groupe créé' })
+  async createMemberGroup(@Body() body: unknown, @User() user: { email?: string }) {
+    return await this.membersService.createMemberGroup(body, user.email);
+  }
+
+  @Patch(':id')
+  @Permissions('admin.edit')
+  @ApiOperation({ summary: 'Mettre à jour un groupe annuel de membres' })
+  @ApiParam({ name: 'id', description: 'ID du groupe' })
+  @ApiResponse({ status: 200, description: 'Groupe mis à jour' })
+  async updateMemberGroup(@Param('id') id: string, @Body() body: unknown) {
+    return await this.membersService.updateMemberGroup(id, body);
+  }
+
+  @Delete(':id')
+  @Permissions('admin.manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Supprimer un groupe annuel et ses affectations' })
+  @ApiParam({ name: 'id', description: 'ID du groupe' })
+  @ApiResponse({ status: 204, description: 'Groupe supprimé' })
+  async deleteMemberGroup(@Param('id') id: string) {
+    await this.membersService.deleteMemberGroup(id);
+  }
+
+  @Post(':id/duplicate')
+  @Permissions('admin.edit')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Dupliquer un groupe vers une autre année' })
+  @ApiParam({ name: 'id', description: 'ID du groupe source' })
+  @ApiResponse({ status: 201, description: 'Groupe dupliqué' })
+  async duplicateMemberGroup(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @User() user: { email?: string },
+  ) {
+    return await this.membersService.duplicateMemberGroup(id, body, user.email);
+  }
+
+  @Post(':id/members')
+  @Permissions('admin.edit')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Ajouter un membre à un groupe annuel' })
+  @ApiParam({ name: 'id', description: 'ID du groupe' })
+  @ApiResponse({ status: 201, description: 'Membre ajouté au groupe' })
+  async addMemberToGroup(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @User() user: { email?: string },
+  ) {
+    return await this.membersService.addMemberToGroup(id, body, user.email);
+  }
+
+  @Patch(':id/members/:membershipId')
+  @Permissions('admin.edit')
+  @ApiOperation({ summary: 'Mettre à jour le rôle/la mission d’un membre dans un groupe' })
+  @ApiParam({ name: 'id', description: 'ID du groupe' })
+  @ApiParam({ name: 'membershipId', description: 'ID de l’affectation' })
+  @ApiResponse({ status: 200, description: 'Affectation mise à jour' })
+  async updateMemberGroupMembership(
+    @Param('id') id: string,
+    @Param('membershipId') membershipId: string,
+    @Body() body: unknown,
+  ) {
+    return await this.membersService.updateMemberGroupMembership(id, membershipId, body);
+  }
+
+  @Delete(':id/members/:membershipId')
+  @Permissions('admin.edit')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Retirer un membre d’un groupe annuel' })
+  @ApiParam({ name: 'id', description: 'ID du groupe' })
+  @ApiParam({ name: 'membershipId', description: 'ID de l’affectation' })
+  @ApiResponse({ status: 204, description: 'Membre retiré du groupe' })
+  async removeMemberFromGroup(
+    @Param('id') id: string,
+    @Param('membershipId') membershipId: string,
+  ) {
+    await this.membersService.removeMemberFromGroup(id, membershipId);
+  }
+}
+

@@ -64,6 +64,11 @@ const navItems: (NavItem | NavSection)[] = [
         href: '/admin/members/stats',
         icon: BarChart3,
       },
+      {
+        title: 'Groupes',
+        href: '/admin/members/groups',
+        icon: Boxes,
+      },
     ],
   },
   {

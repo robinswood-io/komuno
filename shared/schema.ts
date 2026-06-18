@@ -598,6 +598,63 @@ export const memberTagAssignments = pgTable("member_tag_assignments", {
   tagIdIdx: index("member_tag_assignments_tag_id_idx").on(table.tagId),
 }));
 
+// Types de groupes membres annuels (instances de gouvernance / animation)
+export const MEMBER_GROUP_TYPES = {
+  COPIL: "copil",
+  COMMISSION: "commission",
+  BUREAU: "bureau",
+  WORKING_GROUP: "working_group",
+  OTHER: "other",
+} as const;
+
+export type MemberGroupType = typeof MEMBER_GROUP_TYPES[keyof typeof MEMBER_GROUP_TYPES];
+
+export const MEMBER_GROUP_TYPE_LABELS: Record<MemberGroupType, string> = {
+  [MEMBER_GROUP_TYPES.COPIL]: "COPIL",
+  [MEMBER_GROUP_TYPES.COMMISSION]: "Commission",
+  [MEMBER_GROUP_TYPES.BUREAU]: "Bureau",
+  [MEMBER_GROUP_TYPES.WORKING_GROUP]: "Groupe de travail",
+  [MEMBER_GROUP_TYPES.OTHER]: "Autre",
+};
+
+// Member groups table - Groupes annuels de membres (COPIL, commissions, bureaux...)
+export const memberGroups = pgTable("member_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // Nom affiché (ex: COPIL, Commission événementiel)
+  type: text("type").notNull().default(MEMBER_GROUP_TYPES.OTHER),
+  year: integer("year").notNull(), // Année de mandat / exercice
+  description: text("description"),
+  color: text("color").default("#3b82f6").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  nameYearUnique: unique("member_groups_name_year_unique").on(table.name, table.year),
+  yearIdx: index("member_groups_year_idx").on(table.year),
+  typeIdx: index("member_groups_type_idx").on(table.type),
+  activeIdx: index("member_groups_active_idx").on(table.isActive),
+}));
+
+// Member group memberships table - Affectations des membres à un groupe annuel
+export const memberGroupMemberships = pgTable("member_group_memberships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").references(() => memberGroups.id, { onDelete: "cascade" }).notNull(),
+  memberEmail: text("member_email").references(() => members.email, { onDelete: "cascade" }).notNull(),
+  role: text("role"), // Rôle dans le groupe (président, référent, membre...)
+  mission: text("mission"), // Ce que la personne fait / porte dans le groupe
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  notes: text("notes"),
+  assignedBy: text("assigned_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  groupMemberUnique: unique("member_group_memberships_group_member_unique").on(table.groupId, table.memberEmail),
+  groupIdIdx: index("member_group_memberships_group_id_idx").on(table.groupId),
+  memberEmailIdx: index("member_group_memberships_member_email_idx").on(table.memberEmail),
+}));
+
 // Member tasks table - Tâches de suivi pour les membres
 export const memberTasks = pgTable("member_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -870,6 +927,22 @@ export const eventSponsorshipsRelations = relations(eventSponsorships, ({ one })
 export const membersRelations = relations(members, ({ many }) => ({
   activities: many(memberActivities),
   subscriptions: many(memberSubscriptions),
+  groupMemberships: many(memberGroupMemberships),
+}));
+
+export const memberGroupsRelations = relations(memberGroups, ({ many }) => ({
+  memberships: many(memberGroupMemberships),
+}));
+
+export const memberGroupMembershipsRelations = relations(memberGroupMemberships, ({ one }) => ({
+  group: one(memberGroups, {
+    fields: [memberGroupMemberships.groupId],
+    references: [memberGroups.id],
+  }),
+  member: one(members, {
+    fields: [memberGroupMemberships.memberEmail],
+    references: [members.email],
+  }),
 }));
 
 export const memberActivitiesRelations = relations(memberActivities, ({ one }) => ({
@@ -1727,6 +1800,41 @@ export const assignMemberTagSchema = z.object({
   assignedBy: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
 });
 
+// Schemas for annual member groups
+const memberGroupTypeValues = Object.values(MEMBER_GROUP_TYPES) as [MemberGroupType, ...MemberGroupType[]];
+
+export const insertMemberGroupSchema = z.object({
+  name: z.string().min(1, "Le nom du groupe est requis").max(120).transform(sanitizeText),
+  type: z.enum(memberGroupTypeValues).default(MEMBER_GROUP_TYPES.OTHER),
+  year: z.number().int().min(2000).max(2100),
+  description: z.string().max(1000).optional().transform(val => val ? sanitizeText(val) : undefined),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "La couleur doit être au format hex (#RRGGBB)").default("#3b82f6"),
+  isActive: z.boolean().default(true),
+  createdBy: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+});
+
+export const updateMemberGroupSchema = insertMemberGroupSchema.partial().extend({
+  year: z.number().int().min(2000).max(2100).optional(),
+});
+
+export const insertMemberGroupMembershipSchema = z.object({
+  groupId: z.string().uuid(),
+  memberEmail: z.string().email().transform(sanitizeText),
+  role: z.string().max(120).optional().transform(val => val ? sanitizeText(val) : undefined),
+  mission: z.string().max(1000).optional().transform(val => val ? sanitizeText(val) : undefined),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  notes: z.string().max(1000).optional().transform(val => val ? sanitizeText(val) : undefined),
+  assignedBy: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+});
+
+export const updateMemberGroupMembershipSchema = insertMemberGroupMembershipSchema.omit({ groupId: true, memberEmail: true }).partial();
+
+export const duplicateMemberGroupSchema = z.object({
+  targetYear: z.number().int().min(2000).max(2100),
+  name: z.string().min(1).max(120).optional().transform(val => val ? sanitizeText(val) : undefined),
+});
+
 // Schemas for member tasks
 export const insertMemberTaskSchema = z.object({
   memberEmail: z.string().email().transform(sanitizeText),
@@ -1910,6 +2018,10 @@ export type MemberTag = typeof memberTags.$inferSelect;
 export type InsertMemberTag = z.infer<typeof insertMemberTagSchema>;
 export type MemberTagAssignment = typeof memberTagAssignments.$inferSelect;
 export type InsertMemberTagAssignment = typeof memberTagAssignments.$inferInsert;
+export type MemberGroup = typeof memberGroups.$inferSelect;
+export type InsertMemberGroup = z.infer<typeof insertMemberGroupSchema>;
+export type MemberGroupMembership = typeof memberGroupMemberships.$inferSelect;
+export type InsertMemberGroupMembership = z.infer<typeof insertMemberGroupMembershipSchema>;
 export type MemberTask = typeof memberTasks.$inferSelect;
 export type InsertMemberTask = z.infer<typeof insertMemberTaskSchema>;
 export type MemberRelation = typeof memberRelations.$inferSelect;

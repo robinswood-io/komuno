@@ -22,6 +22,7 @@ const pathLabels: Record<string, string> = {
   dashboard: 'Tableau de bord',
   members: 'Membres',
   tags: 'Tags',
+  groups: 'Groupes',
   tasks: 'Tâches',
   relations: 'Relations',
   stats: 'Statistiques',

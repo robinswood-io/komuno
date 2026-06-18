@@ -12,6 +12,11 @@ import {
   insertMemberTaskSchema,
   updateMemberTaskSchema,
   insertMemberRelationSchema,
+  insertMemberGroupSchema,
+  updateMemberGroupSchema,
+  insertMemberGroupMembershipSchema,
+  updateMemberGroupMembershipSchema,
+  duplicateMemberGroupSchema,
   insertMemberContactSchema,
   updateMemberContactSchema,
   DuplicateError,
@@ -22,8 +27,8 @@ import { fromZodError } from 'zod-validation-error';
 import { logger } from '../../lib/logger';
 import { emailNotificationService } from '../../email-notification-service';
 import { db } from '../../db';
-import { members, memberTagAssignments, memberSubscriptions, subscriptionTypes } from '../../../shared/schema';
-import { inArray, sql, and, eq } from 'drizzle-orm';
+import { members, memberGroups, memberGroupMemberships, memberTagAssignments, memberSubscriptions, subscriptionTypes } from '../../../shared/schema';
+import { inArray, sql, and, eq, asc, desc, ilike, or } from 'drizzle-orm';
 
 /**
  * Service Members - Gestion des membres/CRM
@@ -757,5 +762,312 @@ export class MembersService {
 
     logger.info('Bulk subscription assignment', { count: assigned, subscriptionTypeId });
     return { success: true, assigned };
+  }
+
+  // ===== Routes admin - Groupes annuels de membres =====
+
+  private handleZodError(error: unknown): never {
+    if (error instanceof ZodError) {
+      throw new BadRequestException(fromZodError(error).toString());
+    }
+    throw error;
+  }
+
+  private async getMembershipsForGroup(groupId: string) {
+    return await db
+      .select({
+        id: memberGroupMemberships.id,
+        groupId: memberGroupMemberships.groupId,
+        memberEmail: memberGroupMemberships.memberEmail,
+        role: memberGroupMemberships.role,
+        mission: memberGroupMemberships.mission,
+        startDate: memberGroupMemberships.startDate,
+        endDate: memberGroupMemberships.endDate,
+        notes: memberGroupMemberships.notes,
+        assignedBy: memberGroupMemberships.assignedBy,
+        createdAt: memberGroupMemberships.createdAt,
+        updatedAt: memberGroupMemberships.updatedAt,
+        firstName: members.firstName,
+        lastName: members.lastName,
+        company: members.company,
+        status: members.status,
+      })
+      .from(memberGroupMemberships)
+      .leftJoin(members, eq(memberGroupMemberships.memberEmail, members.email))
+      .where(eq(memberGroupMemberships.groupId, groupId))
+      .orderBy(asc(members.lastName), asc(members.firstName));
+  }
+
+  async getMemberGroups(options?: {
+    year?: number;
+    type?: string;
+    memberEmail?: string;
+    search?: string;
+    includeInactive?: boolean;
+  }) {
+    const conditions = [] as any[];
+
+    if (!options?.includeInactive) {
+      conditions.push(eq(memberGroups.isActive, true));
+    }
+    if (options?.year) {
+      conditions.push(eq(memberGroups.year, options.year));
+    }
+    if (options?.type && options.type !== 'all') {
+      conditions.push(eq(memberGroups.type, options.type));
+    }
+    if (options?.search?.trim()) {
+      const search = `%${options.search.trim()}%`;
+      conditions.push(or(ilike(memberGroups.name, search), ilike(memberGroups.description, search)));
+    }
+
+    if (options?.memberEmail) {
+      const memberships = await db
+        .select({ groupId: memberGroupMemberships.groupId })
+        .from(memberGroupMemberships)
+        .where(eq(memberGroupMemberships.memberEmail, options.memberEmail));
+      const groupIds = memberships.map((membership) => membership.groupId);
+      if (groupIds.length === 0) {
+        return { success: true, data: [] };
+      }
+      conditions.push(inArray(memberGroups.id, groupIds));
+    }
+
+    const groups = await db
+      .select()
+      .from(memberGroups)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(memberGroups.year), asc(memberGroups.name));
+
+    const data = await Promise.all(groups.map(async (group) => {
+      const memberships = await this.getMembershipsForGroup(group.id);
+      return {
+        ...group,
+        memberCount: memberships.length,
+        memberships,
+      };
+    }));
+
+    return { success: true, data };
+  }
+
+  async getMemberGroup(groupId: string) {
+    const [group] = await db.select().from(memberGroups).where(eq(memberGroups.id, groupId)).limit(1);
+    if (!group) {
+      throw new NotFoundException('Groupe membre non trouvé');
+    }
+
+    const memberships = await this.getMembershipsForGroup(groupId);
+    return {
+      success: true,
+      data: {
+        ...group,
+        memberCount: memberships.length,
+        memberships,
+      },
+    };
+  }
+
+  async createMemberGroup(data: unknown, createdBy?: string) {
+    try {
+      const validatedData = insertMemberGroupSchema.parse({ ...(data as Record<string, unknown>), createdBy });
+      const [created] = await db.insert(memberGroups).values(validatedData).returning();
+      logger.info('Groupe membre créé', { groupId: created.id, name: created.name, year: created.year });
+      return await this.getMemberGroup(created.id);
+    } catch (error) {
+      if ((error as any)?.code === '23505') {
+        throw new ConflictException('Un groupe avec ce nom existe déjà pour cette année');
+      }
+      return this.handleZodError(error);
+    }
+  }
+
+  async updateMemberGroup(groupId: string, data: unknown) {
+    try {
+      const validatedData = updateMemberGroupSchema.parse(data);
+      const [updated] = await db
+        .update(memberGroups)
+        .set({ ...validatedData, updatedAt: sql`NOW()` })
+        .where(eq(memberGroups.id, groupId))
+        .returning();
+
+      if (!updated) {
+        throw new NotFoundException('Groupe membre non trouvé');
+      }
+      return await this.getMemberGroup(updated.id);
+    } catch (error) {
+      if ((error as any)?.code === '23505') {
+        throw new ConflictException('Un groupe avec ce nom existe déjà pour cette année');
+      }
+      return this.handleZodError(error);
+    }
+  }
+
+  async deleteMemberGroup(groupId: string) {
+    const [deleted] = await db
+      .delete(memberGroups)
+      .where(eq(memberGroups.id, groupId))
+      .returning({ id: memberGroups.id });
+
+    if (!deleted) {
+      throw new NotFoundException('Groupe membre non trouvé');
+    }
+
+    logger.info('Groupe membre supprimé', { groupId });
+    return { success: true };
+  }
+
+  async addMemberToGroup(groupId: string, data: unknown, assignedBy?: string) {
+    try {
+      await this.getMemberGroup(groupId);
+      const validatedData = insertMemberGroupMembershipSchema.parse({
+        ...(data as Record<string, unknown>),
+        groupId,
+        assignedBy,
+      });
+
+      const [created] = await db.insert(memberGroupMemberships).values(validatedData).returning();
+      logger.info('Membre ajouté à un groupe annuel', { groupId, memberEmail: created.memberEmail });
+      return { success: true, data: created };
+    } catch (error) {
+      if ((error as any)?.code === '23505') {
+        throw new ConflictException('Ce membre est déjà dans ce groupe');
+      }
+      return this.handleZodError(error);
+    }
+  }
+
+  async updateMemberGroupMembership(groupId: string, membershipId: string, data: unknown) {
+    try {
+      const validatedData = updateMemberGroupMembershipSchema.parse(data);
+      const [updated] = await db
+        .update(memberGroupMemberships)
+        .set({ ...validatedData, updatedAt: sql`NOW()` })
+        .where(and(eq(memberGroupMemberships.id, membershipId), eq(memberGroupMemberships.groupId, groupId)))
+        .returning();
+
+      if (!updated) {
+        throw new NotFoundException('Affectation groupe/membre non trouvée');
+      }
+      return { success: true, data: updated };
+    } catch (error) {
+      return this.handleZodError(error);
+    }
+  }
+
+  async removeMemberFromGroup(groupId: string, membershipId: string) {
+    const [deleted] = await db
+      .delete(memberGroupMemberships)
+      .where(and(eq(memberGroupMemberships.id, membershipId), eq(memberGroupMemberships.groupId, groupId)))
+      .returning({ id: memberGroupMemberships.id });
+
+    if (!deleted) {
+      throw new NotFoundException('Affectation groupe/membre non trouvée');
+    }
+
+    return { success: true };
+  }
+
+  async duplicateMemberGroup(groupId: string, data: unknown, createdBy?: string) {
+    try {
+      const { targetYear, name } = duplicateMemberGroupSchema.parse(data);
+      const source = (await this.getMemberGroup(groupId)).data;
+      const [created] = await db
+        .insert(memberGroups)
+        .values({
+          name: name ?? source.name,
+          type: source.type,
+          year: targetYear,
+          description: source.description,
+          color: source.color,
+          isActive: true,
+          createdBy,
+        })
+        .returning();
+
+      const shiftDate = (value: string | null) => {
+        if (!value) return null;
+        return `${targetYear}${value.slice(4)}`;
+      };
+
+      if (source.memberships.length > 0) {
+        await db.insert(memberGroupMemberships).values(source.memberships.map((membership) => ({
+          groupId: created.id,
+          memberEmail: membership.memberEmail,
+          role: membership.role,
+          mission: membership.mission,
+          startDate: shiftDate(membership.startDate),
+          endDate: shiftDate(membership.endDate),
+          notes: membership.notes,
+          assignedBy: createdBy,
+        })));
+      }
+
+      logger.info('Groupe membre dupliqué', { sourceGroupId: groupId, targetGroupId: created.id, targetYear });
+      return await this.getMemberGroup(created.id);
+    } catch (error) {
+      if ((error as any)?.code === '23505') {
+        throw new ConflictException('Un groupe avec ce nom existe déjà pour cette année');
+      }
+      return this.handleZodError(error);
+    }
+  }
+
+  async getMemberGroupSummary(year?: number) {
+    const conditions = [] as any[];
+    if (year) {
+      conditions.push(eq(memberGroups.year, year));
+    }
+
+    const rows = await db
+      .select({
+        groupId: memberGroups.id,
+        groupName: memberGroups.name,
+        groupType: memberGroups.type,
+        groupYear: memberGroups.year,
+        groupColor: memberGroups.color,
+        membershipId: memberGroupMemberships.id,
+        memberEmail: memberGroupMemberships.memberEmail,
+        role: memberGroupMemberships.role,
+        mission: memberGroupMemberships.mission,
+        firstName: members.firstName,
+        lastName: members.lastName,
+        company: members.company,
+      })
+      .from(memberGroups)
+      .leftJoin(memberGroupMemberships, eq(memberGroups.id, memberGroupMemberships.groupId))
+      .leftJoin(members, eq(memberGroupMemberships.memberEmail, members.email))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(memberGroups.year), asc(memberGroups.name), asc(members.lastName));
+
+    const byMember = new Map<string, any>();
+    for (const row of rows) {
+      if (!row.memberEmail) continue;
+      const existing = byMember.get(row.memberEmail) ?? {
+        memberEmail: row.memberEmail,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        company: row.company,
+        groups: [],
+      };
+      existing.groups.push({
+        id: row.groupId,
+        name: row.groupName,
+        type: row.groupType,
+        year: row.groupYear,
+        color: row.groupColor,
+        role: row.role,
+        mission: row.mission,
+      });
+      byMember.set(row.memberEmail, existing);
+    }
+
+    return {
+      success: true,
+      data: {
+        rows,
+        members: Array.from(byMember.values()),
+      },
+    };
   }
 }
