@@ -504,8 +504,11 @@ jobs:
           echo "Image actuelle: ${OLD_IMAGE:-aucune}"
 
           echo "📥 Pull image par digest (immuable)..."
-          docker pull "ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}"
-          docker tag  "ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}" komuno:latest
+          IMAGE_REF="ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}"
+          COMPOSE_IMAGE="ghcr.io/${{ github.repository }}:latest"
+          docker pull "$IMAGE_REF"
+          docker tag  "$IMAGE_REF" komuno:latest
+          docker tag  "$IMAGE_REF" "$COMPOSE_IMAGE"
 
           echo "🚀 Déploiement..."
           docker compose -f "$COMPOSE_FILE" up -d --force-recreate $DEPLOY_TARGETS
@@ -555,6 +558,7 @@ jobs:
             if [ -n "$OLD_IMAGE" ]; then
               echo "🔄 Rollback vers $OLD_IMAGE..."
               docker tag "$OLD_IMAGE" komuno:latest
+              docker tag "$OLD_IMAGE" "ghcr.io/${{ github.repository }}:latest"
               docker compose -f "$COMPOSE_FILE" up -d --force-recreate $DEPLOY_TARGETS
               echo "✅ Rollback effectué"
             fi
@@ -596,6 +600,7 @@ jobs:
             docker logs "$CONTAINER_ID" --tail 80 || true
             if [ -n "$OLD_IMAGE" ]; then
               docker tag "$OLD_IMAGE" komuno:latest
+              docker tag "$OLD_IMAGE" "ghcr.io/${{ github.repository }}:latest"
               docker compose -f "$COMPOSE_FILE" up -d --force-recreate $DEPLOY_TARGETS
               echo "✅ Rollback effectué"
             fi
@@ -631,6 +636,7 @@ jobs:
             docker logs "$CONTAINER_ID" --tail 80 || true
             if [ -n "$OLD_IMAGE" ]; then
               docker tag "$OLD_IMAGE" komuno:latest
+              docker tag "$OLD_IMAGE" "ghcr.io/${{ github.repository }}:latest"
               docker compose -f "$COMPOSE_FILE" up -d --force-recreate $DEPLOY_TARGETS
               echo "✅ Rollback effectué"
             fi
