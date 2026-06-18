@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.2.1] - 2026-06-18
+
+### En bref
+
+- Cette version apporte des ajustements techniques.
+
+### Maintenance
+
+- Retry REP public smoke checks
+
 ## [2.2.0] - 2026-06-18
 
 ### En bref

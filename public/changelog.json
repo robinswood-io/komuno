@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.2.0",
+    "version": "2.2.1",
     "releasedAt": "2026-06-18",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte des ajustements techniques.",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Add annual member groups"
-      ],
+      "nouveautes": [],
       "corrections": [],
       "ameliorations": [],
       "securite": [],
-      "maintenance": []
+      "maintenance": [
+        "Retry REP public smoke checks"
+      ]
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.2.1",
+      "releasedAt": "2026-06-18",
+      "summary": "Cette version apporte des ajustements techniques.",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Retry REP public smoke checks"
+        ]
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.2.0",
       "releasedAt": "2026-06-18",
@@ -402,6 +418,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-18T13:41:52.692Z",
+  "generatedAt": "2026-06-18T15:27:08.982Z",
   "source": "conventional-commits"
 }
