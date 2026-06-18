@@ -606,18 +606,23 @@ jobs:
           PUBLIC_FAIL=0
 
           check_public() {
-            local name="$1" url="$2" expected="$3"
+            local name="$1" url="$2" expected="$3" attempts="${4:-18}" delay="${5:-5}"
             local status
-            status=$(curl -sS -o /dev/null --max-time 20 -w "%{http_code}" "$url" || echo "000")
-            if [[ ! "$status" =~ $expected ]]; then
-              echo "  ❌ $name → HTTP $status"
-              PUBLIC_FAIL=1
-            else
-              echo "  ✅ $name → HTTP $status"
-            fi
+            for i in $(seq 1 "$attempts"); do
+              status=$(curl -sS -o /dev/null --max-time 20 -w "%{http_code}" "$url" || echo "000")
+              if [[ "$status" =~ $expected ]]; then
+                echo "  ✅ $name → HTTP $status (tentative $i/$attempts)"
+                return 0
+              fi
+              echo "  ⏳ $name → HTTP $status (tentative $i/$attempts), attente Traefik..."
+              sleep "$delay"
+            done
+            echo "  ❌ $name → HTTP $status après $attempts tentatives"
+            PUBLIC_FAIL=1
           }
 
           # Root doit répondre 2xx/3xx ; health doit répondre 200 strict.
+          # Traefik peut prendre quelques dizaines de secondes à recharger les labels après recréation.
           check_public "GET /"             "https://repicardie.fr/"            "^(2|3)[0-9][0-9]$"
           check_public "GET /api/health"   "https://repicardie.fr/api/health"  "^200$"
 
