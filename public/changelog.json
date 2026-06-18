@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.2.2",
+    "version": "2.2.3",
     "releasedAt": "2026-06-18",
-    "summary": "Cette version apporte des ajustements techniques.",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
-      "corrections": [],
+      "corrections": [
+        "Restore CJD public logo assets"
+      ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Tag REP compose image from digest"
-      ]
+      "maintenance": []
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.2.3",
+      "releasedAt": "2026-06-18",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Restore CJD public logo assets"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.2.2",
       "releasedAt": "2026-06-18",
@@ -434,6 +450,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-18T15:39:21.100Z",
+  "generatedAt": "2026-06-18T16:31:18.471Z",
   "source": "conventional-commits"
 }
