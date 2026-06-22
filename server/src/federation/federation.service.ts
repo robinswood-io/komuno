@@ -705,7 +705,8 @@ export class FederationService {
 
   async ingestFederatedEvent(data: unknown, token?: string) {
     try {
-      if (!token) throw new UnauthorizedException('Jeton de fédération manquant');
+      const providedToken = token?.trim();
+      if (!providedToken) throw new UnauthorizedException('Token de fédération manquant');
       const payload = federatedEventPayloadSchema.parse(data);
 
       const [sourceOrganization, targetOrganization] = await Promise.all([
@@ -720,8 +721,8 @@ export class FederationService {
     );
 
     if (!relation.syncEnabled) throw new ForbiddenException('Synchronisation désactivée sur cette relation');
-    if (!this.safeCompareToken(relation.federationToken, token)) {
-      throw new UnauthorizedException('Jeton de fédération invalide');
+    if (!this.safeCompareToken(relation.federationToken, providedToken)) {
+      throw new UnauthorizedException('Token de fédération invalide');
     }
 
     const sourceInstanceUrl = this.normalizeInstanceUrl(payload.sourceInstanceUrl);
