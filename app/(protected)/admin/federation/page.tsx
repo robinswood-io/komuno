@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowDownToLine, ArrowUpFromLine, Building2, Check, GitBranch, Loader2, Network, Plus, Send, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Building2, Check, GitBranch, KeyRound, Loader2, Network, Plus, RotateCw, Send, X } from 'lucide-react';
 
 interface OrganizationNetwork {
   id: string;
@@ -56,6 +56,11 @@ interface OrganizationRelation {
   toOrganizationId: string;
   relationType: string;
   status: string;
+  permissions?: Record<string, unknown>;
+  syncEnabled?: boolean;
+  syncStatus?: string;
+  lastSyncAt?: string | null;
+  hasFederationToken?: boolean;
   fromName?: string;
   toName?: string;
   fromType?: string;
@@ -75,6 +80,13 @@ interface Syndication {
   eventLocation?: string | null;
   sourceName?: string;
   targetName?: string;
+  targetInstanceUrl?: string | null;
+  remoteEventId?: string | null;
+  remoteSyndicationId?: string | null;
+  syncStatus?: string;
+  syncError?: string | null;
+  lastSyncAttemptAt?: string | null;
+  syncAttempts?: number;
   createdAt: string;
 }
 
@@ -148,7 +160,13 @@ export default function AdminFederationPage() {
     domain: '',
     instanceUrl: '',
   });
-  const [newRelation, setNewRelation] = useState({ fromOrganizationId: '', toOrganizationId: '', relationType: 'region_section' });
+  const [newRelation, setNewRelation] = useState({
+    fromOrganizationId: '',
+    toOrganizationId: '',
+    relationType: 'region_section',
+    federationToken: '',
+    syncEnabled: true,
+  });
   const [eventId, setEventId] = useState('');
   const [sourceOrganizationId, setSourceOrganizationId] = useState('');
   const [targetOrganizationId, setTargetOrganizationId] = useState('');
@@ -233,10 +251,12 @@ export default function AdminFederationPage() {
   const createRelationMutation = useMutation({
     mutationFn: () => api.post('/api/admin/federation/relations', {
       ...newRelation,
-      permissions: { events: true, syndication: true },
+      federationToken: newRelation.federationToken || null,
+      permissions: { events: true, syndication: true, interInstanceSync: Boolean(newRelation.federationToken) },
     }),
     onSuccess: () => {
       toast({ title: 'Lien créé', description: 'Le lien mère-fille / partenaire est actif.' });
+      setNewRelation({ fromOrganizationId: '', toOrganizationId: '', relationType: 'region_section', federationToken: '', syncEnabled: true });
       invalidateFederation();
     },
     onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
@@ -275,6 +295,15 @@ export default function AdminFederationPage() {
       invalidateFederation();
     },
     onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  const syncSyndicationMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/api/admin/federation/syndications/${id}/sync`, {}),
+    onSuccess: () => {
+      toast({ title: 'Synchronisation relancée', description: 'Le statut de synchronisation a été mis à jour.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur sync', description: error.message, variant: 'destructive' }),
   });
 
   return (
@@ -416,6 +445,27 @@ export default function AdminFederationPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Jeton inter-instance partagé</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newRelation.federationToken}
+                      onChange={(e) => setNewRelation({ ...newRelation, federationToken: e.target.value })}
+                      placeholder="Même jeton sur les deux instances"
+                      type="password"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setNewRelation({ ...newRelation, federationToken: `komuno_${crypto.randomUUID()}_${crypto.randomUUID()}` })}
+                    >
+                      <KeyRound className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Requis uniquement si les deux organisations vivent sur deux domaines / instances distincts. Le jeton n’est jamais réaffiché après enregistrement.
+                  </p>
+                </div>
                 <Button onClick={() => createRelationMutation.mutate()} disabled={createRelationMutation.isPending || !newRelation.fromOrganizationId || !newRelation.toOrganizationId}>
                   <GitBranch className="h-4 w-4 mr-2" /> Créer le lien
                 </Button>
@@ -456,8 +506,15 @@ export default function AdminFederationPage() {
                       <span className="font-medium">{relation.fromName}</span>
                       <span className="mx-2 text-muted-foreground">→</span>
                       <span className="font-medium">{relation.toName}</span>
+                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline">{relation.relationType}</Badge>
+                        <Badge variant={relation.hasFederationToken ? 'default' : 'outline'}>
+                          {relation.hasFederationToken ? 'Token sync configuré' : 'Sync locale seulement'}
+                        </Badge>
+                        {relation.syncStatus && <Badge variant="outline">Sync {relation.syncStatus}</Badge>}
+                      </div>
                     </div>
-                    <Badge>{relation.relationType}</Badge>
+                    <Badge>{relation.syncEnabled === false ? 'Sync off' : 'Actif'}</Badge>
                   </div>
                 ))}
               </div>
@@ -587,12 +644,13 @@ export default function AdminFederationPage() {
                     <TableHead>Flux</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead>Agenda</TableHead>
+                    <TableHead>Sync</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {syndications.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Aucune demande fédérée.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Aucune demande fédérée.</TableCell></TableRow>
                   ) : syndications.map((syndication) => (
                     <TableRow key={syndication.id}>
                       <TableCell>
@@ -605,12 +663,22 @@ export default function AdminFederationPage() {
                       </TableCell>
                       <TableCell><Badge>{statusLabels[syndication.status] ?? syndication.status}</Badge></TableCell>
                       <TableCell>{syndication.includeInAgenda ? <Badge variant="outline">Inclus</Badge> : <span className="text-muted-foreground">Non</span>}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant={syndication.syncStatus === 'failed' ? 'destructive' : 'outline'}>{syndication.syncStatus ?? 'local'}</Badge>
+                          {syndication.targetInstanceUrl && <span className="text-xs text-muted-foreground truncate max-w-[180px]">{syndication.targetInstanceUrl}</span>}
+                          {syndication.syncError && <span className="text-xs text-destructive truncate max-w-[220px]" title={syndication.syncError}>{syndication.syncError}</span>}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button size="sm" variant="outline" onClick={() => updateSyndicationMutation.mutate({ id: syndication.id, status: 'accepted', includeInAgenda: true })}>
                           <Check className="h-4 w-4 mr-1" /> Accepter
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => updateSyndicationMutation.mutate({ id: syndication.id, status: 'rejected', includeInAgenda: false })}>
                           <X className="h-4 w-4 mr-1" /> Refuser
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => syncSyndicationMutation.mutate(syndication.id)} disabled={syncSyndicationMutation.isPending}>
+                          <RotateCw className="h-4 w-4 mr-1" /> Sync
                         </Button>
                       </TableCell>
                     </TableRow>

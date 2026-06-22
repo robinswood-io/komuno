@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, unique, index, serial, date, jsonb, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, unique, uniqueIndex, index, serial, date, jsonb, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -161,6 +161,15 @@ export const SYNDICATION_STATUS = {
   AUTO_ACCEPTED: "auto_accepted",
 } as const;
 
+export const FEDERATION_SYNC_STATUS = {
+  LOCAL: "local",
+  PENDING: "pending",
+  SYNCED: "synced",
+  FAILED: "failed",
+  RECEIVED: "received",
+  IDLE: "idle",
+} as const;
+
 export const organizationNetworks = pgTable("organization_networks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   slug: text("slug").notNull().unique(),
@@ -203,6 +212,10 @@ export const organizationRelations = pgTable("organization_relations", {
   relationType: text("relation_type").default(ORGANIZATION_RELATION_TYPE.REGION_SECTION).notNull(),
   status: text("status").default("active").notNull(),
   permissions: jsonb("permissions").$type<Record<string, unknown>>().default({}).notNull(),
+  federationToken: text("federation_token"),
+  syncEnabled: boolean("sync_enabled").default(true).notNull(),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncStatus: text("sync_status").default(FEDERATION_SYNC_STATUS.IDLE).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -211,6 +224,8 @@ export const organizationRelations = pgTable("organization_relations", {
   toIdx: index("organization_relations_to_idx").on(table.toOrganizationId),
   typeIdx: index("organization_relations_type_idx").on(table.relationType),
   statusIdx: index("organization_relations_status_idx").on(table.status),
+  syncEnabledIdx: index("organization_relations_sync_enabled_idx").on(table.syncEnabled),
+  syncStatusIdx: index("organization_relations_sync_status_idx").on(table.syncStatus),
 }));
 
 // Events table - Flexible status workflow management  
@@ -250,6 +265,7 @@ export const events = pgTable("events", {
   originOrganizationIdx: index("events_origin_organization_idx").on(table.originOrganizationId),
   federationVisibilityIdx: index("events_federation_visibility_idx").on(table.federationVisibility),
   federationStatusIdx: index("events_federation_status_idx").on(table.federationStatus),
+  sourceInstanceEventUniqueIdx: uniqueIndex("events_source_instance_event_unique_idx").on(table.sourceInstanceUrl, table.sourceEventId),
 }));
 
 export const eventSyndications = pgTable("event_syndications", {
@@ -268,6 +284,13 @@ export const eventSyndications = pgTable("event_syndications", {
   createdBy: text("created_by"),
   reviewedBy: text("reviewed_by"),
   reviewedAt: timestamp("reviewed_at"),
+  targetInstanceUrl: text("target_instance_url"),
+  remoteEventId: varchar("remote_event_id"),
+  remoteSyndicationId: varchar("remote_syndication_id"),
+  syncStatus: text("sync_status").default(FEDERATION_SYNC_STATUS.LOCAL).notNull(),
+  syncError: text("sync_error"),
+  lastSyncAttemptAt: timestamp("last_sync_attempt_at"),
+  syncAttempts: integer("sync_attempts").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -278,6 +301,9 @@ export const eventSyndications = pgTable("event_syndications", {
   directionIdx: index("event_syndications_direction_idx").on(table.direction),
   statusIdx: index("event_syndications_status_idx").on(table.status),
   agendaIdx: index("event_syndications_agenda_idx").on(table.includeInAgenda),
+  syncStatusIdx: index("event_syndications_sync_status_idx").on(table.syncStatus),
+  remoteEventIdx: index("event_syndications_remote_event_idx").on(table.remoteEventId),
+  remoteSyndicationIdx: index("event_syndications_remote_syndication_idx").on(table.remoteSyndicationId),
 }));
 
 // Loan items table - Matériel disponible au prêt
@@ -1180,6 +1206,7 @@ const organizationTypeValues = Object.values(ORGANIZATION_TYPE) as [Organization
 const relationTypeValues = Object.values(ORGANIZATION_RELATION_TYPE) as [typeof ORGANIZATION_RELATION_TYPE[keyof typeof ORGANIZATION_RELATION_TYPE], ...Array<typeof ORGANIZATION_RELATION_TYPE[keyof typeof ORGANIZATION_RELATION_TYPE]>];
 const syndicationDirectionValues = Object.values(SYNDICATION_DIRECTION) as [typeof SYNDICATION_DIRECTION[keyof typeof SYNDICATION_DIRECTION], ...Array<typeof SYNDICATION_DIRECTION[keyof typeof SYNDICATION_DIRECTION]>];
 const syndicationStatusValues = Object.values(SYNDICATION_STATUS) as [typeof SYNDICATION_STATUS[keyof typeof SYNDICATION_STATUS], ...Array<typeof SYNDICATION_STATUS[keyof typeof SYNDICATION_STATUS]>];
+const federationSyncStatusValues = Object.values(FEDERATION_SYNC_STATUS) as [typeof FEDERATION_SYNC_STATUS[keyof typeof FEDERATION_SYNC_STATUS], ...Array<typeof FEDERATION_SYNC_STATUS[keyof typeof FEDERATION_SYNC_STATUS]>];
 
 export const insertOrganizationNetworkSchema = z.object({
   slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/).transform(sanitizeText),
@@ -1210,6 +1237,10 @@ export const insertOrganizationRelationSchema = z.object({
   relationType: z.enum(relationTypeValues).default(ORGANIZATION_RELATION_TYPE.REGION_SECTION),
   status: z.enum(['pending', 'active', 'revoked']).default('active'),
   permissions: z.record(z.string(), z.unknown()).default({}),
+  federationToken: z.string().min(16).max(512).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  syncEnabled: z.boolean().default(true),
+  lastSyncAt: z.string().datetime().optional().nullable(),
+  syncStatus: z.enum(federationSyncStatusValues).default(FEDERATION_SYNC_STATUS.IDLE),
 });
 
 export const updateOrganizationRelationSchema = insertOrganizationRelationSchema.partial().omit({ fromOrganizationId: true, toOrganizationId: true });
@@ -1225,6 +1256,13 @@ export const insertEventSyndicationSchema = z.object({
   localDescriptionOverride: optionalSanitizedText(5000),
   localDateOverride: z.string().datetime().optional().nullable(),
   localRegistrationUrlOverride: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  targetInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  remoteEventId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  remoteSyndicationId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  syncStatus: z.enum(federationSyncStatusValues).default(FEDERATION_SYNC_STATUS.LOCAL),
+  syncError: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  lastSyncAttemptAt: z.string().datetime().optional().nullable(),
+  syncAttempts: z.number().int().min(0).default(0),
   createdBy: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
 });
 
@@ -1235,6 +1273,13 @@ export const updateEventSyndicationSchema = z.object({
   localDescriptionOverride: optionalSanitizedText(5000),
   localDateOverride: z.string().datetime().optional().nullable(),
   localRegistrationUrlOverride: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  targetInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  remoteEventId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  remoteSyndicationId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  syncStatus: z.enum(federationSyncStatusValues).optional(),
+  syncError: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  lastSyncAttemptAt: z.string().datetime().optional().nullable(),
+  syncAttempts: z.number().int().min(0).optional(),
   reviewedBy: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
 });
 

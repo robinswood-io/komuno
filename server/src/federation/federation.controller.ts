@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -137,6 +138,13 @@ export class AdminFederationController {
     return await this.federationService.updateSyndication(id, body, user.email);
   }
 
+  @Post('syndications/:id/sync')
+  @Permissions('events.write')
+  @ApiOperation({ summary: 'Relancer la synchronisation inter-instance d’une syndication' })
+  async syncSyndication(@Param('id') id: string) {
+    return await this.federationService.syncSyndication(id);
+  }
+
   @Post('syndications/:id/revoke')
   @Permissions('events.write')
   @ApiOperation({ summary: 'Révoquer une syndication d’événement' })
@@ -153,5 +161,22 @@ export class AdminFederationController {
   @ApiQuery({ name: 'organizationId', required: false })
   async getFederatedAgenda(@Query('organizationId') organizationId?: string) {
     return await this.federationService.getFederatedAgenda(organizationId);
+  }
+}
+
+@ApiTags('federation-public')
+@Controller('api/federation')
+export class PublicFederationController {
+  constructor(private readonly federationService: FederationService) {}
+
+  @Post('events/ingest')
+  @ApiOperation({ summary: 'Recevoir un événement fédéré depuis une autre instance Komuno' })
+  async ingestFederatedEvent(
+    @Headers('x-komuno-federation-token') token: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const bearerToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+    return await this.federationService.ingestFederatedEvent(body, token || bearerToken);
   }
 }

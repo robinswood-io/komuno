@@ -1,11 +1,14 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import { and, asc, count, desc, eq, inArray, or, sql } from 'drizzle-orm';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
 import { logger } from '../../lib/logger';
 import {
+  EVENT_STATUS,
   FEDERATION_STATUS,
+  FEDERATION_SYNC_STATUS,
   FEDERATION_VISIBILITY,
   ORGANIZATION_RELATION_TYPE,
   SYNDICATION_DIRECTION,
@@ -25,6 +28,58 @@ import {
   updateOrganizationSchema,
 } from '../../../shared/schema';
 
+const federatedOrganizationPayloadSchema = z.object({
+  slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/),
+  name: z.string().min(2).max(200),
+  type: z.string().min(2).max(40),
+  domain: z.string().max(255).optional().nullable(),
+  instanceUrl: z.string().url().optional().nullable(),
+});
+
+const federatedEventPayloadSchema = z.object({
+  protocolVersion: z.literal(1).default(1),
+  direction: z.enum([
+    SYNDICATION_DIRECTION.UPWARD,
+    SYNDICATION_DIRECTION.DOWNWARD,
+    SYNDICATION_DIRECTION.LATERAL,
+  ]),
+  status: z.enum([
+    SYNDICATION_STATUS.DRAFT,
+    SYNDICATION_STATUS.PROPOSED,
+    SYNDICATION_STATUS.ACCEPTED,
+    SYNDICATION_STATUS.REJECTED,
+    SYNDICATION_STATUS.REVOKED,
+    SYNDICATION_STATUS.AUTO_ACCEPTED,
+  ]).default(SYNDICATION_STATUS.PROPOSED),
+  includeInAgenda: z.boolean().default(false),
+  sourceInstanceUrl: z.string().url(),
+  sourceSyndicationId: z.string().max(120).optional().nullable(),
+  sentAt: z.string().datetime().optional(),
+  sourceOrganization: federatedOrganizationPayloadSchema,
+  targetOrganization: federatedOrganizationPayloadSchema,
+  event: z.object({
+    id: z.string().min(1).max(120),
+    title: z.string().min(3).max(200),
+    description: z.string().max(5000).optional().nullable(),
+    date: z.string().datetime(),
+    location: z.string().max(200).optional().nullable(),
+    maxParticipants: z.number().int().min(1).max(1000).optional().nullable(),
+    helloAssoLink: z.string().url().optional().nullable(),
+    enableExternalRedirect: z.boolean().optional(),
+    externalRedirectUrl: z.string().url().optional().nullable(),
+    showInscriptionsCount: z.boolean().optional(),
+    showAvailableSeats: z.boolean().optional(),
+    allowUnsubscribe: z.boolean().optional(),
+    redUnsubscribeButton: z.boolean().optional(),
+    buttonMode: z.enum(['subscribe', 'unsubscribe', 'both', 'custom']).optional(),
+    customButtonText: z.string().max(50).optional().nullable(),
+    status: z.string().max(40).optional(),
+    updatedAt: z.string().datetime().optional().nullable(),
+  }),
+});
+
+type FederatedEventPayload = z.infer<typeof federatedEventPayloadSchema>;
+
 @Injectable()
 export class FederationService {
   private handleZodError(error: unknown): never {
@@ -34,12 +89,63 @@ export class FederationService {
     throw error;
   }
 
-  private normalizeSyndicationDates<T extends { localDateOverride?: string | Date | null }>(data: T) {
+  private safeCompareToken(expected: string | null | undefined, received: string | undefined): boolean {
+    if (!expected || !received) return false;
+    const expectedBuffer = Buffer.from(expected);
+    const receivedBuffer = Buffer.from(received);
+    if (expectedBuffer.length !== receivedBuffer.length) return false;
+    return timingSafeEqual(expectedBuffer, receivedBuffer);
+  }
+
+  private normalizeInstanceUrl(value?: string | null): string | null {
+    if (!value) return null;
+    try {
+      const url = new URL(value.startsWith('http') ? value : `https://${value}`);
+      url.hash = '';
+      url.search = '';
+      return url.toString().replace(/\/$/, '').toLowerCase();
+    } catch {
+      return value.replace(/\/$/, '').toLowerCase();
+    }
+  }
+
+  private getCurrentInstanceUrl(): string | null {
+    return this.normalizeInstanceUrl(
+      process.env.PUBLIC_APP_URL
+      || process.env.NEXT_PUBLIC_APP_URL
+      || process.env.APP_URL
+      || (process.env.DOMAIN ? `https://${process.env.DOMAIN}` : null),
+    );
+  }
+
+  private isRemoteInstance(targetInstanceUrl?: string | null, sourceInstanceUrl?: string | null): boolean {
+    const target = this.normalizeInstanceUrl(targetInstanceUrl);
+    if (!target) return false;
+    const current = this.getCurrentInstanceUrl();
+    if (current && target === current) return false;
+    const source = this.normalizeInstanceUrl(sourceInstanceUrl);
+    if (source && target === source) return false;
+    return true;
+  }
+
+  private normalizeRelationDates<T extends { lastSyncAt?: string | Date | null }>(data: T) {
+    return {
+      ...data,
+      lastSyncAt: typeof data.lastSyncAt === 'string'
+        ? new Date(data.lastSyncAt)
+        : data.lastSyncAt,
+    };
+  }
+
+  private normalizeSyndicationDates<T extends { localDateOverride?: string | Date | null; lastSyncAttemptAt?: string | Date | null }>(data: T) {
     return {
       ...data,
       localDateOverride: typeof data.localDateOverride === 'string'
         ? new Date(data.localDateOverride)
         : data.localDateOverride,
+      lastSyncAttemptAt: typeof data.lastSyncAttemptAt === 'string'
+        ? new Date(data.lastSyncAttemptAt)
+        : data.lastSyncAttemptAt,
     };
   }
 
@@ -53,6 +159,14 @@ export class FederationService {
     const [event] = await db.select().from(events).where(eq(events.id, id)).limit(1);
     if (!event) throw new NotFoundException('Événement introuvable');
     return event;
+  }
+
+  private withoutRelationSecret<T extends { federationToken?: string | null }>(relation: T) {
+    const { federationToken, ...safeRelation } = relation;
+    return {
+      ...safeRelation,
+      hasFederationToken: Boolean(federationToken),
+    };
   }
 
   async getOverview() {
@@ -177,6 +291,10 @@ export class FederationService {
       relationType: organizationRelations.relationType,
       status: organizationRelations.status,
       permissions: organizationRelations.permissions,
+      syncEnabled: organizationRelations.syncEnabled,
+      lastSyncAt: organizationRelations.lastSyncAt,
+      syncStatus: organizationRelations.syncStatus,
+      hasFederationToken: sql<boolean>`${organizationRelations.federationToken} IS NOT NULL`,
       createdAt: organizationRelations.createdAt,
       updatedAt: organizationRelations.updatedAt,
       fromName: sql<string>`from_org.name`,
@@ -194,7 +312,7 @@ export class FederationService {
 
   async createRelation(data: unknown) {
     try {
-      const validated = insertOrganizationRelationSchema.parse(data);
+      const validated = this.normalizeRelationDates(insertOrganizationRelationSchema.parse(data));
       if (validated.fromOrganizationId === validated.toOrganizationId) {
         throw new BadRequestException('Une organisation ne peut pas être liée à elle-même');
       }
@@ -203,7 +321,7 @@ export class FederationService {
         this.getOrganizationOrThrow(validated.toOrganizationId),
       ]);
       const [created] = await db.insert(organizationRelations).values(validated).returning();
-      return { success: true, data: created };
+      return { success: true, data: this.withoutRelationSecret(created) };
     } catch (error) {
       if ((error as any)?.code === '23505') throw new ConflictException('Cette relation existe déjà');
       return this.handleZodError(error);
@@ -212,13 +330,13 @@ export class FederationService {
 
   async updateRelation(id: string, data: unknown) {
     try {
-      const validated = updateOrganizationRelationSchema.parse(data);
+      const validated = this.normalizeRelationDates(updateOrganizationRelationSchema.parse(data));
       const [updated] = await db.update(organizationRelations)
         .set({ ...validated, updatedAt: sql`NOW()` })
         .where(eq(organizationRelations.id, id))
         .returning();
       if (!updated) throw new NotFoundException('Relation introuvable');
-      return { success: true, data: updated };
+      return { success: true, data: this.withoutRelationSecret(updated) };
     } catch (error) {
       return this.handleZodError(error);
     }
@@ -242,6 +360,13 @@ export class FederationService {
       localDateOverride: eventSyndications.localDateOverride,
       localRegistrationUrlOverride: eventSyndications.localRegistrationUrlOverride,
       lastSyncedAt: eventSyndications.lastSyncedAt,
+      targetInstanceUrl: eventSyndications.targetInstanceUrl,
+      remoteEventId: eventSyndications.remoteEventId,
+      remoteSyndicationId: eventSyndications.remoteSyndicationId,
+      syncStatus: eventSyndications.syncStatus,
+      syncError: eventSyndications.syncError,
+      lastSyncAttemptAt: eventSyndications.lastSyncAttemptAt,
+      syncAttempts: eventSyndications.syncAttempts,
       createdBy: eventSyndications.createdBy,
       reviewedBy: eventSyndications.reviewedBy,
       reviewedAt: eventSyndications.reviewedAt,
@@ -309,7 +434,8 @@ export class FederationService {
         }).where(eq(events.id, eventId));
         return [row];
       });
-      return { success: true, data: created };
+      const sync = await this.syncSyndicationBestEffort(created.id);
+      return { success: true, data: created, sync: sync.data };
     } catch (error) {
       if ((error as any)?.code === '23505') throw new ConflictException('Cet événement a déjà été proposé à cette organisation');
       return this.handleZodError(error);
@@ -350,11 +476,332 @@ export class FederationService {
         return inserted;
       });
 
-      return { success: true, data: created };
+      const syncResults = await Promise.all(created.map((row) => this.syncSyndicationBestEffort(row.id)));
+      return { success: true, data: created, sync: syncResults.map((result) => result.data) };
     } catch (error) {
       if ((error as any)?.code === '23505') throw new ConflictException('Cet événement est déjà publié vers au moins une organisation ciblée');
       return this.handleZodError(error);
     }
+  }
+
+  private async getRelationForSyndication(sourceOrganizationId: string, targetOrganizationId: string, direction: string) {
+    if (direction === SYNDICATION_DIRECTION.UPWARD) {
+      return await this.assertRelationAllowed(targetOrganizationId, sourceOrganizationId);
+    }
+    return await this.assertRelationAllowed(sourceOrganizationId, targetOrganizationId);
+  }
+
+  private buildFederatedEventPayload(args: {
+    syndication: typeof eventSyndications.$inferSelect;
+    event: typeof events.$inferSelect;
+    sourceOrganization: typeof organizations.$inferSelect;
+    targetOrganization: typeof organizations.$inferSelect;
+  }): FederatedEventPayload {
+    const sourceInstanceUrl = this.normalizeInstanceUrl(args.sourceOrganization.instanceUrl) || this.getCurrentInstanceUrl();
+    if (!sourceInstanceUrl) {
+      throw new BadRequestException('Impossible de déterminer l’URL de l’instance source');
+    }
+
+    return {
+      protocolVersion: 1,
+      direction: args.syndication.direction as FederatedEventPayload['direction'],
+      status: args.syndication.status as FederatedEventPayload['status'],
+      includeInAgenda: args.syndication.includeInAgenda,
+      sourceInstanceUrl,
+      sourceSyndicationId: args.syndication.id,
+      sentAt: new Date().toISOString(),
+      sourceOrganization: {
+        slug: args.sourceOrganization.slug,
+        name: args.sourceOrganization.name,
+        type: args.sourceOrganization.type,
+        domain: args.sourceOrganization.domain,
+        instanceUrl: args.sourceOrganization.instanceUrl,
+      },
+      targetOrganization: {
+        slug: args.targetOrganization.slug,
+        name: args.targetOrganization.name,
+        type: args.targetOrganization.type,
+        domain: args.targetOrganization.domain,
+        instanceUrl: args.targetOrganization.instanceUrl,
+      },
+      event: {
+        id: args.event.id,
+        title: args.event.title,
+        description: args.event.description,
+        date: args.event.date.toISOString(),
+        location: args.event.location,
+        maxParticipants: args.event.maxParticipants,
+        helloAssoLink: args.event.helloAssoLink,
+        enableExternalRedirect: args.event.enableExternalRedirect,
+        externalRedirectUrl: args.event.externalRedirectUrl,
+        showInscriptionsCount: args.event.showInscriptionsCount,
+        showAvailableSeats: args.event.showAvailableSeats,
+        allowUnsubscribe: args.event.allowUnsubscribe,
+        redUnsubscribeButton: args.event.redUnsubscribeButton,
+        buttonMode: args.event.buttonMode as FederatedEventPayload['event']['buttonMode'],
+        customButtonText: args.event.customButtonText,
+        status: args.event.status,
+        updatedAt: args.event.updatedAt?.toISOString(),
+      },
+    };
+  }
+
+  private async markSyncFailed(syndicationId: string, relationId: string | null, error: string, targetInstanceUrl?: string | null) {
+    const safeError = error.slice(0, 2000);
+    await db.update(eventSyndications).set({
+      syncStatus: FEDERATION_SYNC_STATUS.FAILED,
+      syncError: safeError,
+      targetInstanceUrl: targetInstanceUrl ?? undefined,
+      lastSyncAttemptAt: sql`NOW()`,
+      syncAttempts: sql`${eventSyndications.syncAttempts} + 1`,
+      updatedAt: sql`NOW()`,
+    }).where(eq(eventSyndications.id, syndicationId));
+
+    if (relationId) {
+      await db.update(organizationRelations).set({
+        syncStatus: FEDERATION_SYNC_STATUS.FAILED,
+        updatedAt: sql`NOW()`,
+      }).where(eq(organizationRelations.id, relationId));
+    }
+  }
+
+  async syncSyndication(id: string) {
+    const [syndication] = await db.select().from(eventSyndications).where(eq(eventSyndications.id, id)).limit(1);
+    if (!syndication) throw new NotFoundException('Syndication introuvable');
+
+    const [event, sourceOrganization, targetOrganization] = await Promise.all([
+      this.getEventOrThrow(syndication.eventId),
+      this.getOrganizationOrThrow(syndication.sourceOrganizationId),
+      this.getOrganizationOrThrow(syndication.targetOrganizationId),
+    ]);
+
+    let relation: typeof organizationRelations.$inferSelect;
+    try {
+      relation = await this.getRelationForSyndication(
+        syndication.sourceOrganizationId,
+        syndication.targetOrganizationId,
+        syndication.direction,
+      );
+    } catch (error) {
+      await this.markSyncFailed(syndication.id, null, error instanceof Error ? error.message : 'Relation de fédération introuvable');
+      throw error;
+    }
+
+    const targetInstanceUrl = this.normalizeInstanceUrl(syndication.targetInstanceUrl || targetOrganization.instanceUrl);
+    const sourceInstanceUrl = this.normalizeInstanceUrl(sourceOrganization.instanceUrl) || this.getCurrentInstanceUrl();
+
+    if (!targetInstanceUrl || !this.isRemoteInstance(targetInstanceUrl, sourceInstanceUrl)) {
+      const [updated] = await db.update(eventSyndications).set({
+        syncStatus: FEDERATION_SYNC_STATUS.LOCAL,
+        syncError: null,
+        targetInstanceUrl: targetInstanceUrl ?? null,
+        updatedAt: sql`NOW()`,
+      }).where(eq(eventSyndications.id, syndication.id)).returning();
+      return { success: true, data: { skipped: true, reason: 'local_or_missing_target_instance', syndication: updated } };
+    }
+
+    if (!relation.syncEnabled) {
+      await this.markSyncFailed(syndication.id, relation.id, 'La synchronisation est désactivée sur cette relation', targetInstanceUrl);
+      return { success: false, data: { skipped: true, reason: 'relation_sync_disabled' } };
+    }
+
+    if (!relation.federationToken) {
+      await this.markSyncFailed(syndication.id, relation.id, 'Jeton de fédération manquant sur la relation', targetInstanceUrl);
+      return { success: false, data: { skipped: true, reason: 'missing_federation_token' } };
+    }
+
+    const payload = this.buildFederatedEventPayload({ syndication, event, sourceOrganization, targetOrganization });
+    const endpoint = `${targetInstanceUrl}/api/federation/events/ingest`;
+
+    await db.update(eventSyndications).set({
+      syncStatus: FEDERATION_SYNC_STATUS.PENDING,
+      syncError: null,
+      targetInstanceUrl,
+      lastSyncAttemptAt: sql`NOW()`,
+      updatedAt: sql`NOW()`,
+    }).where(eq(eventSyndications.id, syndication.id));
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Komuno-Federation-Token': relation.federationToken,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      const responseText = await response.text();
+      if (!response.ok) {
+        const errorMessage = `HTTP ${response.status} ${response.statusText}: ${responseText.slice(0, 500)}`;
+        await this.markSyncFailed(syndication.id, relation.id, errorMessage, targetInstanceUrl);
+        return { success: false, data: { endpoint, status: response.status, error: errorMessage } };
+      }
+
+      const responseBody = responseText ? JSON.parse(responseText) : {};
+      const [updated] = await db.update(eventSyndications).set({
+        syncStatus: FEDERATION_SYNC_STATUS.SYNCED,
+        syncError: null,
+        targetInstanceUrl,
+        remoteEventId: responseBody?.data?.eventId ?? responseBody?.eventId ?? null,
+        remoteSyndicationId: responseBody?.data?.syndicationId ?? responseBody?.syndicationId ?? null,
+        lastSyncedAt: sql`NOW()`,
+        lastSyncAttemptAt: sql`NOW()`,
+        syncAttempts: sql`${eventSyndications.syncAttempts} + 1`,
+        updatedAt: sql`NOW()`,
+      }).where(eq(eventSyndications.id, syndication.id)).returning();
+
+      await db.update(organizationRelations).set({
+        syncStatus: FEDERATION_SYNC_STATUS.SYNCED,
+        lastSyncAt: sql`NOW()`,
+        updatedAt: sql`NOW()`,
+      }).where(eq(organizationRelations.id, relation.id));
+
+      return { success: true, data: { endpoint, response: responseBody, syndication: updated } };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue de synchronisation';
+      await this.markSyncFailed(syndication.id, relation.id, errorMessage, targetInstanceUrl);
+      return { success: false, data: { endpoint, error: errorMessage } };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async syncSyndicationBestEffort(id: string) {
+    try {
+      return await this.syncSyndication(id);
+    } catch (error) {
+      logger.warn('[Federation] Synchronisation inter-instance échouée', {
+        syndicationId: id,
+        error: error instanceof Error ? error.message : error,
+      });
+      return { success: false, data: { error: error instanceof Error ? error.message : 'Erreur inconnue' } };
+    }
+  }
+
+  private statusForReceivedEvent(payload: FederatedEventPayload) {
+    if (payload.status === SYNDICATION_STATUS.REVOKED) return EVENT_STATUS.CANCELLED;
+    if (payload.status === SYNDICATION_STATUS.REJECTED) return EVENT_STATUS.DRAFT;
+    if (payload.includeInAgenda || payload.status === SYNDICATION_STATUS.ACCEPTED || payload.status === SYNDICATION_STATUS.AUTO_ACCEPTED) {
+      return Object.values(EVENT_STATUS).includes(payload.event.status as any)
+        ? payload.event.status
+        : EVENT_STATUS.PUBLISHED;
+    }
+    return EVENT_STATUS.DRAFT;
+  }
+
+  private async findOrganizationBySlugOrThrow(slug: string, role: 'source' | 'target') {
+    const [organization] = await db.select().from(organizations).where(and(
+      eq(organizations.slug, slug),
+      eq(organizations.isActive, true),
+    )).limit(1);
+    if (!organization) {
+      throw new BadRequestException(`Organisation ${role} introuvable localement : ${slug}. Créez explicitement l’organisation et sa relation avant toute synchronisation.`);
+    }
+    return organization;
+  }
+
+  async ingestFederatedEvent(data: unknown, token?: string) {
+    const payload = federatedEventPayloadSchema.parse(data);
+    if (!token) throw new UnauthorizedException('Jeton de fédération manquant');
+
+    const [sourceOrganization, targetOrganization] = await Promise.all([
+      this.findOrganizationBySlugOrThrow(payload.sourceOrganization.slug, 'source'),
+      this.findOrganizationBySlugOrThrow(payload.targetOrganization.slug, 'target'),
+    ]);
+
+    const relation = await this.getRelationForSyndication(
+      sourceOrganization.id,
+      targetOrganization.id,
+      payload.direction,
+    );
+
+    if (!relation.syncEnabled) throw new ForbiddenException('Synchronisation désactivée sur cette relation');
+    if (!this.safeCompareToken(relation.federationToken, token)) {
+      throw new UnauthorizedException('Jeton de fédération invalide');
+    }
+
+    const sourceInstanceUrl = this.normalizeInstanceUrl(payload.sourceInstanceUrl);
+    if (!sourceInstanceUrl) throw new BadRequestException('sourceInstanceUrl invalide');
+
+    const eventValues = {
+      title: payload.event.title,
+      description: payload.event.description ?? null,
+      date: new Date(payload.event.date),
+      location: payload.event.location ?? null,
+      maxParticipants: payload.event.maxParticipants ?? null,
+      helloAssoLink: payload.event.helloAssoLink ?? null,
+      enableExternalRedirect: payload.event.enableExternalRedirect ?? false,
+      externalRedirectUrl: payload.event.externalRedirectUrl ?? null,
+      showInscriptionsCount: payload.event.showInscriptionsCount ?? true,
+      showAvailableSeats: payload.event.showAvailableSeats ?? true,
+      allowUnsubscribe: payload.event.allowUnsubscribe ?? false,
+      redUnsubscribeButton: payload.event.redUnsubscribeButton ?? false,
+      buttonMode: payload.event.buttonMode ?? 'subscribe',
+      customButtonText: payload.event.customButtonText ?? null,
+      organizationId: targetOrganization.id,
+      originOrganizationId: sourceOrganization.id,
+      sourceEventId: payload.event.id,
+      sourceInstanceUrl,
+      federationVisibility: FEDERATION_VISIBILITY.SELECTED_ORGANIZATIONS,
+      federationStatus: FEDERATION_STATUS.IMPORTED,
+      isFederatedCopy: true,
+      status: this.statusForReceivedEvent(payload),
+      updatedAt: sql`NOW()`,
+    };
+
+    const [existingEvent] = await db.select().from(events).where(and(
+      eq(events.sourceInstanceUrl, sourceInstanceUrl),
+      eq(events.sourceEventId, payload.event.id),
+    )).limit(1);
+
+    const [localEvent] = existingEvent
+      ? await db.update(events).set(eventValues).where(eq(events.id, existingEvent.id)).returning()
+      : await db.insert(events).values({ ...eventValues, createdAt: sql`NOW()` }).returning();
+
+    const [existingSyndication] = await db.select().from(eventSyndications).where(and(
+      eq(eventSyndications.eventId, localEvent.id),
+      eq(eventSyndications.sourceOrganizationId, sourceOrganization.id),
+      eq(eventSyndications.targetOrganizationId, targetOrganization.id),
+    )).limit(1);
+
+    const syndicationValues = {
+      eventId: localEvent.id,
+      sourceOrganizationId: sourceOrganization.id,
+      targetOrganizationId: targetOrganization.id,
+      direction: payload.direction,
+      status: payload.status,
+      includeInAgenda: payload.includeInAgenda,
+      targetInstanceUrl: this.normalizeInstanceUrl(payload.targetOrganization.instanceUrl) ?? this.getCurrentInstanceUrl(),
+      remoteEventId: payload.event.id,
+      remoteSyndicationId: payload.sourceSyndicationId ?? null,
+      syncStatus: FEDERATION_SYNC_STATUS.RECEIVED,
+      syncError: null,
+      lastSyncedAt: sql`NOW()`,
+      updatedAt: sql`NOW()`,
+    };
+
+    const [localSyndication] = existingSyndication
+      ? await db.update(eventSyndications).set(syndicationValues).where(eq(eventSyndications.id, existingSyndication.id)).returning()
+      : await db.insert(eventSyndications).values({ ...syndicationValues, createdAt: sql`NOW()` }).returning();
+
+    await db.update(organizationRelations).set({
+      syncStatus: FEDERATION_SYNC_STATUS.RECEIVED,
+      lastSyncAt: sql`NOW()`,
+      updatedAt: sql`NOW()`,
+    }).where(eq(organizationRelations.id, relation.id));
+
+    return {
+      success: true,
+      data: {
+        eventId: localEvent.id,
+        syndicationId: localSyndication.id,
+        status: localSyndication.status,
+        createdEvent: !existingEvent,
+      },
+    };
   }
 
   async updateSyndication(id: string, data: unknown, userEmail?: string) {
@@ -384,7 +831,8 @@ export class FederationService {
         }).where(eq(events.id, updated.eventId));
       }
 
-      return { success: true, data: updated };
+      const sync = await this.syncSyndicationBestEffort(updated.id);
+      return { success: true, data: updated, sync: sync.data };
     } catch (error) {
       return this.handleZodError(error);
     }

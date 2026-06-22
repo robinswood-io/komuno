@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { AdminFederationController } from './federation.controller';
+import { AdminFederationController, PublicFederationController } from './federation.controller';
 import { FederationService } from './federation.service';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [AuthModule],
-  controllers: [AdminFederationController],
+  controllers: [AdminFederationController, PublicFederationController],
   providers: [FederationService],
   exports: [FederationService],
 })
