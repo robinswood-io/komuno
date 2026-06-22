@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.3.2",
+    "version": "2.4.0",
     "releasedAt": "2026-06-22",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
-      "corrections": [
-        "Stop implicit CJD organization seeding"
+      "nouveautes": [
+        "Sync events across instances"
       ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.4.0",
+      "releasedAt": "2026-06-22",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Sync events across instances"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.3.2",
       "releasedAt": "2026-06-22",
@@ -514,6 +530,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-22T13:17:19.271Z",
+  "generatedAt": "2026-06-22T13:57:40.097Z",
   "source": "conventional-commits"
 }
