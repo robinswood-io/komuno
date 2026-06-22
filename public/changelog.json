@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.4.1",
+    "version": "2.4.2",
     "releasedAt": "2026-06-22",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Handle invalid ingest payloads"
+        "Validate ingest token before payload"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.4.2",
+      "releasedAt": "2026-06-22",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Validate ingest token before payload"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.4.1",
       "releasedAt": "2026-06-22",
@@ -546,6 +562,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-22T14:08:20.451Z",
+  "generatedAt": "2026-06-22T14:14:21.348Z",
   "source": "conventional-commits"
 }
