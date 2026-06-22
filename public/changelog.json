@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.4.0",
+    "version": "2.4.1",
     "releasedAt": "2026-06-22",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Sync events across instances"
+      "nouveautes": [],
+      "corrections": [
+        "Handle invalid ingest payloads"
       ],
-      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.4.1",
+      "releasedAt": "2026-06-22",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Handle invalid ingest payloads"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.4.0",
       "releasedAt": "2026-06-22",
@@ -530,6 +546,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-22T13:57:40.097Z",
+  "generatedAt": "2026-06-22T14:08:20.451Z",
   "source": "conventional-commits"
 }

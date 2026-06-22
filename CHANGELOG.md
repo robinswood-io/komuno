@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.4.1] - 2026-06-22
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Handle invalid ingest payloads
+
 ## [2.4.0] - 2026-06-22
 
 ### En bref
