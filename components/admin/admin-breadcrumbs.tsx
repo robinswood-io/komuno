@@ -31,6 +31,7 @@ const pathLabels: Record<string, string> = {
   events: 'Événements',
   loans: 'Prêts',
   financial: 'Finance',
+  federation: 'Fédération',
   settings: 'Paramètres',
   crm: 'CRM',
   content: 'Contenu',

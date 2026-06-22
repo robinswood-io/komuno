@@ -159,6 +159,17 @@ export const queryKeys = {
     detail: (id: string) => ['patrons', 'detail', id] as const,
   },
 
+  // Federation / regional network
+  federation: {
+    all: ['federation'] as const,
+    overview: () => ['federation', 'overview'] as const,
+    networks: () => ['federation', 'networks'] as const,
+    organizations: () => ['federation', 'organizations'] as const,
+    relations: () => ['federation', 'relations'] as const,
+    syndications: (params?: Record<string, unknown>) => ['federation', 'syndications', params] as const,
+    agenda: (params?: Record<string, unknown>) => ['federation', 'agenda', params] as const,
+  },
+
   // Financial
   financial: {
     all: ['financial'] as const,

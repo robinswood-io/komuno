@@ -27,6 +27,7 @@ import {
   Bell,
   Wrench,
   Boxes,
+  Network,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -138,6 +139,11 @@ const navItems: (NavItem | NavSection)[] = [
         title: 'Tracking',
         href: '/admin/tracking',
         icon: Activity,
+      },
+      {
+        title: 'Fédération',
+        href: '/admin/federation',
+        icon: Network,
       },
       {
         title: 'Demandes dev',

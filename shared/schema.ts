@@ -113,6 +113,106 @@ export const votes = pgTable("votes", {
   ideaIdIdx: index("votes_idea_id_idx").on(table.ideaId),
 }));
 
+// Federation / organization hierarchy
+export const ORGANIZATION_TYPE = {
+  NETWORK: "network",
+  REGION: "region",
+  SECTION: "section",
+  PARTNER: "partner",
+  EXTERNAL: "external",
+} as const;
+
+export type OrganizationType = typeof ORGANIZATION_TYPE[keyof typeof ORGANIZATION_TYPE];
+
+export const ORGANIZATION_RELATION_TYPE = {
+  REGION_SECTION: "region_section",
+  PARTNER: "partner",
+  SHARED_PROJECT: "shared_project",
+} as const;
+
+export const FEDERATION_VISIBILITY = {
+  LOCAL: "local",
+  PARENT_REGION: "parent_region",
+  CHILD_SECTIONS: "child_sections",
+  NETWORK: "network",
+  SELECTED_ORGANIZATIONS: "selected_organizations",
+} as const;
+
+export const FEDERATION_STATUS = {
+  LOCAL_ONLY: "local_only",
+  PROPOSED_TO_REGION: "proposed_to_region",
+  ACCEPTED_BY_REGION: "accepted_by_region",
+  PUBLISHED_TO_SECTIONS: "published_to_sections",
+  IMPORTED: "imported",
+} as const;
+
+export const SYNDICATION_DIRECTION = {
+  UPWARD: "upward",
+  DOWNWARD: "downward",
+  LATERAL: "lateral",
+} as const;
+
+export const SYNDICATION_STATUS = {
+  DRAFT: "draft",
+  PROPOSED: "proposed",
+  ACCEPTED: "accepted",
+  REJECTED: "rejected",
+  REVOKED: "revoked",
+  AUTO_ACCEPTED: "auto_accepted",
+} as const;
+
+export const organizationNetworks = pgTable("organization_networks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  slugIdx: index("organization_networks_slug_idx").on(table.slug),
+  activeIdx: index("organization_networks_active_idx").on(table.isActive),
+}));
+
+export const organizations = pgTable("organizations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  networkId: varchar("network_id").references(() => organizationNetworks.id, { onDelete: "set null" }),
+  parentOrganizationId: varchar("parent_organization_id").references((): any => organizations.id, { onDelete: "set null" }),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  type: text("type").default(ORGANIZATION_TYPE.SECTION).notNull(),
+  domain: text("domain"),
+  instanceUrl: text("instance_url"),
+  brandingConfigId: integer("branding_config_id"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  slugIdx: index("organizations_slug_idx").on(table.slug),
+  networkIdx: index("organizations_network_idx").on(table.networkId),
+  parentIdx: index("organizations_parent_idx").on(table.parentOrganizationId),
+  typeIdx: index("organizations_type_idx").on(table.type),
+  domainIdx: index("organizations_domain_idx").on(table.domain),
+  activeIdx: index("organizations_active_idx").on(table.isActive),
+}));
+
+export const organizationRelations = pgTable("organization_relations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fromOrganizationId: varchar("from_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  toOrganizationId: varchar("to_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  relationType: text("relation_type").default(ORGANIZATION_RELATION_TYPE.REGION_SECTION).notNull(),
+  status: text("status").default("active").notNull(),
+  permissions: jsonb("permissions").$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  relationUnique: unique("organization_relations_unique").on(table.fromOrganizationId, table.toOrganizationId, table.relationType),
+  fromIdx: index("organization_relations_from_idx").on(table.fromOrganizationId),
+  toIdx: index("organization_relations_to_idx").on(table.toOrganizationId),
+  typeIdx: index("organization_relations_type_idx").on(table.relationType),
+  statusIdx: index("organization_relations_status_idx").on(table.status),
+}));
+
 // Events table - Flexible status workflow management  
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -130,6 +230,14 @@ export const events = pgTable("events", {
   redUnsubscribeButton: boolean("red_unsubscribe_button").default(false).notNull(), // Bouton de désinscription rouge (pour les plénières)
   buttonMode: text("button_mode").default("subscribe").notNull(), // "subscribe", "unsubscribe", "both", ou "custom"
   customButtonText: text("custom_button_text"), // Texte personnalisé pour le bouton quand buttonMode est "custom"
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  originOrganizationId: varchar("origin_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceEventId: varchar("source_event_id"),
+  sourceInstanceUrl: text("source_instance_url"),
+  federationVisibility: text("federation_visibility").default(FEDERATION_VISIBILITY.LOCAL).notNull(),
+  federationStatus: text("federation_status").default(FEDERATION_STATUS.LOCAL_ONLY).notNull(),
+  isFederatedCopy: boolean("is_federated_copy").default(false).notNull(),
+  canonicalEventId: varchar("canonical_event_id"),
   status: text("status").default(EVENT_STATUS.PUBLISHED).notNull(), // draft, published, cancelled, postponed, completed
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -138,6 +246,38 @@ export const events = pgTable("events", {
   statusIdx: index("events_status_idx").on(table.status),
   dateIdx: index("events_date_idx").on(table.date),
   statusDateIdx: index("events_status_date_idx").on(table.status, table.date),
+  organizationIdx: index("events_organization_idx").on(table.organizationId),
+  originOrganizationIdx: index("events_origin_organization_idx").on(table.originOrganizationId),
+  federationVisibilityIdx: index("events_federation_visibility_idx").on(table.federationVisibility),
+  federationStatusIdx: index("events_federation_status_idx").on(table.federationStatus),
+}));
+
+export const eventSyndications = pgTable("event_syndications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  sourceOrganizationId: varchar("source_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  targetOrganizationId: varchar("target_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  direction: text("direction").notNull(),
+  status: text("status").default(SYNDICATION_STATUS.PROPOSED).notNull(),
+  includeInAgenda: boolean("include_in_agenda").default(false).notNull(),
+  localTitleOverride: text("local_title_override"),
+  localDescriptionOverride: text("local_description_override"),
+  localDateOverride: timestamp("local_date_override"),
+  localRegistrationUrlOverride: text("local_registration_url_override"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdBy: text("created_by"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  syndicationUnique: unique("event_syndications_unique").on(table.eventId, table.sourceOrganizationId, table.targetOrganizationId),
+  eventIdx: index("event_syndications_event_idx").on(table.eventId),
+  sourceIdx: index("event_syndications_source_idx").on(table.sourceOrganizationId),
+  targetIdx: index("event_syndications_target_idx").on(table.targetOrganizationId),
+  directionIdx: index("event_syndications_direction_idx").on(table.direction),
+  statusIdx: index("event_syndications_status_idx").on(table.status),
+  agendaIdx: index("event_syndications_agenda_idx").on(table.includeInAgenda),
 }));
 
 // Loan items table - Matériel disponible au prêt
@@ -861,10 +1001,65 @@ export const votesRelations = relations(votes, ({ one }) => ({
   }),
 }));
 
-export const eventsRelations = relations(events, ({ many }) => ({
+export const organizationNetworksRelations = relations(organizationNetworks, ({ many }) => ({
+  organizations: many(organizations),
+}));
+
+export const organizationsRelations = relations(organizations, ({ one, many }) => ({
+  network: one(organizationNetworks, {
+    fields: [organizations.networkId],
+    references: [organizationNetworks.id],
+  }),
+  parent: one(organizations, {
+    fields: [organizations.parentOrganizationId],
+    references: [organizations.id],
+  }),
+  childRelations: many(organizationRelations, { relationName: "fromOrganization" }),
+  parentRelations: many(organizationRelations, { relationName: "toOrganization" }),
+  events: many(events),
+}));
+
+export const organizationRelationsRelations = relations(organizationRelations, ({ one }) => ({
+  fromOrganization: one(organizations, {
+    fields: [organizationRelations.fromOrganizationId],
+    references: [organizations.id],
+    relationName: "fromOrganization",
+  }),
+  toOrganization: one(organizations, {
+    fields: [organizationRelations.toOrganizationId],
+    references: [organizations.id],
+    relationName: "toOrganization",
+  }),
+}));
+
+export const eventsRelations = relations(events, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [events.organizationId],
+    references: [organizations.id],
+  }),
+  originOrganization: one(organizations, {
+    fields: [events.originOrganizationId],
+    references: [organizations.id],
+  }),
   inscriptions: many(inscriptions),
   unsubscriptions: many(unsubscriptions),
   sponsorships: many(eventSponsorships),
+  syndications: many(eventSyndications),
+}));
+
+export const eventSyndicationsRelations = relations(eventSyndications, ({ one }) => ({
+  event: one(events, {
+    fields: [eventSyndications.eventId],
+    references: [events.id],
+  }),
+  sourceOrganization: one(organizations, {
+    fields: [eventSyndications.sourceOrganizationId],
+    references: [organizations.id],
+  }),
+  targetOrganization: one(organizations, {
+    fields: [eventSyndications.targetOrganizationId],
+    references: [organizations.id],
+  }),
 }));
 
 export const inscriptionsRelations = relations(inscriptions, ({ one }) => ({
@@ -977,6 +1172,71 @@ const sanitizeText = (text: string) => text
   .replace(/[<>]/g, '') // Remove potential HTML
   .trim()
   .slice(0, 5000); // Limit length
+
+const optionalSanitizedText = (max: number = 5000) =>
+  z.string().max(max).optional().nullable().transform(val => val ? sanitizeText(val) : undefined);
+
+const organizationTypeValues = Object.values(ORGANIZATION_TYPE) as [OrganizationType, ...OrganizationType[]];
+const relationTypeValues = Object.values(ORGANIZATION_RELATION_TYPE) as [typeof ORGANIZATION_RELATION_TYPE[keyof typeof ORGANIZATION_RELATION_TYPE], ...Array<typeof ORGANIZATION_RELATION_TYPE[keyof typeof ORGANIZATION_RELATION_TYPE]>];
+const syndicationDirectionValues = Object.values(SYNDICATION_DIRECTION) as [typeof SYNDICATION_DIRECTION[keyof typeof SYNDICATION_DIRECTION], ...Array<typeof SYNDICATION_DIRECTION[keyof typeof SYNDICATION_DIRECTION]>];
+const syndicationStatusValues = Object.values(SYNDICATION_STATUS) as [typeof SYNDICATION_STATUS[keyof typeof SYNDICATION_STATUS], ...Array<typeof SYNDICATION_STATUS[keyof typeof SYNDICATION_STATUS]>];
+
+export const insertOrganizationNetworkSchema = z.object({
+  slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/).transform(sanitizeText),
+  name: z.string().min(2).max(200).transform(sanitizeText),
+  description: optionalSanitizedText(1000),
+  isActive: z.boolean().default(true),
+});
+
+export const updateOrganizationNetworkSchema = insertOrganizationNetworkSchema.partial();
+
+export const insertOrganizationSchema = z.object({
+  networkId: z.string().uuid().optional().nullable(),
+  parentOrganizationId: z.string().uuid().optional().nullable(),
+  slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/).transform(sanitizeText),
+  name: z.string().min(2).max(200).transform(sanitizeText),
+  type: z.enum(organizationTypeValues).default(ORGANIZATION_TYPE.SECTION),
+  domain: optionalSanitizedText(255),
+  instanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  brandingConfigId: z.number().int().positive().optional().nullable(),
+  isActive: z.boolean().default(true),
+});
+
+export const updateOrganizationSchema = insertOrganizationSchema.partial();
+
+export const insertOrganizationRelationSchema = z.object({
+  fromOrganizationId: z.string().uuid(),
+  toOrganizationId: z.string().uuid(),
+  relationType: z.enum(relationTypeValues).default(ORGANIZATION_RELATION_TYPE.REGION_SECTION),
+  status: z.enum(['pending', 'active', 'revoked']).default('active'),
+  permissions: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const updateOrganizationRelationSchema = insertOrganizationRelationSchema.partial().omit({ fromOrganizationId: true, toOrganizationId: true });
+
+export const insertEventSyndicationSchema = z.object({
+  eventId: z.string().uuid(),
+  sourceOrganizationId: z.string().uuid(),
+  targetOrganizationId: z.string().uuid(),
+  direction: z.enum(syndicationDirectionValues),
+  status: z.enum(syndicationStatusValues).default(SYNDICATION_STATUS.PROPOSED),
+  includeInAgenda: z.boolean().default(false),
+  localTitleOverride: optionalSanitizedText(200),
+  localDescriptionOverride: optionalSanitizedText(5000),
+  localDateOverride: z.string().datetime().optional().nullable(),
+  localRegistrationUrlOverride: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  createdBy: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+});
+
+export const updateEventSyndicationSchema = z.object({
+  status: z.enum(syndicationStatusValues).optional(),
+  includeInAgenda: z.boolean().optional(),
+  localTitleOverride: optionalSanitizedText(200),
+  localDescriptionOverride: optionalSanitizedText(5000),
+  localDateOverride: z.string().datetime().optional().nullable(),
+  localRegistrationUrlOverride: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  reviewedBy: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+});
 
 // Ultra-secure insert schemas with validation - Pure Zod v4 schema (avoiding drizzle-zod type recursion)
 export const insertAdminSchema = z.object({
@@ -1154,6 +1414,14 @@ export const insertEventSchema = z.object({
     .max(50, "Le texte du bouton personnalisé est trop long (maximum 50 caractères)")
     .optional()
     .transform(val => val ? sanitizeText(val) : undefined),
+  organizationId: z.string().uuid().optional().nullable(),
+  originOrganizationId: z.string().uuid().optional().nullable(),
+  sourceEventId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  sourceInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  federationVisibility: z.enum(['local', 'parent_region', 'child_sections', 'network', 'selected_organizations']).optional(),
+  federationStatus: z.enum(['local_only', 'proposed_to_region', 'accepted_by_region', 'published_to_sections', 'imported']).optional(),
+  isFederatedCopy: z.boolean().optional(),
+  canonicalEventId: z.string().uuid().optional().nullable(),
   status: z.enum(["draft", "published", "cancelled", "archived", "postponed", "completed"]).optional(),
 });
 
@@ -1972,8 +2240,17 @@ export type InsertIdea = z.infer<typeof insertIdeaSchema>;
 export type Vote = typeof votes.$inferSelect;
 export type InsertVote = z.infer<typeof insertVoteSchema>;
 
+export type OrganizationNetwork = typeof organizationNetworks.$inferSelect;
+export type InsertOrganizationNetwork = z.infer<typeof insertOrganizationNetworkSchema>;
+export type Organization = typeof organizations.$inferSelect;
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+export type OrganizationRelation = typeof organizationRelations.$inferSelect;
+export type InsertOrganizationRelation = z.infer<typeof insertOrganizationRelationSchema>;
+
 export type Event = typeof events.$inferSelect;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
+export type EventSyndication = typeof eventSyndications.$inferSelect;
+export type InsertEventSyndication = z.infer<typeof insertEventSyndicationSchema>;
 
 export type LoanItem = typeof loanItems.$inferSelect;
 export type InsertLoanItem = z.infer<typeof insertLoanItemSchema>;

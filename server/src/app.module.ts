@@ -21,6 +21,7 @@ import { PatronsModule } from './patrons/patrons.module';
 import { LoansModule } from './loans/loans.module';
 import { ToolsModule } from './tools/tools.module';
 import { NetworkModule } from './network/network.module';
+import { FederationModule } from './federation/federation.module';
 
 import { FinancialModule } from './financial/financial.module';
 import { TrackingModule } from './tracking/tracking.module';
@@ -69,6 +70,7 @@ const throttlerLimit = isDevelopment ? 10000 : 1000;
     LoansModule,
     ToolsModule,
     NetworkModule,
+    FederationModule,
     FinancialModule,
     TrackingModule,
     FeaturesModule,

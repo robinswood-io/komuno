@@ -1,0 +1,626 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, queryKeys, type PaginatedResponse } from '@/lib/api/client';
+import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowDownToLine, ArrowUpFromLine, Building2, Check, GitBranch, Loader2, Network, Plus, Send, X } from 'lucide-react';
+
+interface OrganizationNetwork {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+}
+
+interface Organization {
+  id: string;
+  networkId?: string | null;
+  parentOrganizationId?: string | null;
+  slug: string;
+  name: string;
+  type: 'network' | 'region' | 'section' | 'partner' | 'external';
+  domain?: string | null;
+  instanceUrl?: string | null;
+  networkName?: string | null;
+  parentName?: string | null;
+  isActive: boolean;
+}
+
+interface OrganizationRelation {
+  id: string;
+  fromOrganizationId: string;
+  toOrganizationId: string;
+  relationType: string;
+  status: string;
+  fromName?: string;
+  toName?: string;
+  fromType?: string;
+  toType?: string;
+}
+
+interface Syndication {
+  id: string;
+  eventId: string;
+  sourceOrganizationId: string;
+  targetOrganizationId: string;
+  direction: 'upward' | 'downward' | 'lateral';
+  status: string;
+  includeInAgenda: boolean;
+  eventTitle?: string;
+  eventDate?: string;
+  eventLocation?: string | null;
+  sourceName?: string;
+  targetName?: string;
+  createdAt: string;
+}
+
+interface EventItem {
+  id: string;
+  title: string;
+  date: string;
+  location?: string;
+  organizationId?: string | null;
+  federationStatus?: string;
+  federationVisibility?: string;
+}
+
+interface OverviewPayload {
+  success: boolean;
+  data: {
+    counts: {
+      networks: number;
+      organizations: number;
+      relations: number;
+      pendingUpward: number;
+      pendingDownward: number;
+      agendaItems: number;
+    };
+    recentSyndications: Syndication[];
+  };
+}
+
+const organizationTypes = [
+  { value: 'region', label: 'Région' },
+  { value: 'section', label: 'Section' },
+  { value: 'partner', label: 'Partenaire' },
+  { value: 'external', label: 'Externe' },
+  { value: 'network', label: 'Réseau' },
+];
+
+const statusLabels: Record<string, string> = {
+  draft: 'Brouillon',
+  proposed: 'Proposé',
+  accepted: 'Accepté',
+  rejected: 'Refusé',
+  revoked: 'Révoqué',
+  auto_accepted: 'Auto-accepté',
+};
+
+function formatDate(value?: string) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80);
+}
+
+export default function AdminFederationPage() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [newNetwork, setNewNetwork] = useState({ slug: 'cjd-hauts-de-france', name: 'CJD Hauts-de-France', description: '' });
+  const [newOrganization, setNewOrganization] = useState({
+    name: '',
+    slug: '',
+    type: 'section',
+    networkId: '',
+    parentOrganizationId: '',
+    domain: '',
+    instanceUrl: '',
+  });
+  const [newRelation, setNewRelation] = useState({ fromOrganizationId: '', toOrganizationId: '', relationType: 'region_section' });
+  const [eventId, setEventId] = useState('');
+  const [sourceOrganizationId, setSourceOrganizationId] = useState('');
+  const [targetOrganizationId, setTargetOrganizationId] = useState('');
+  const [targetOrganizationIds, setTargetOrganizationIds] = useState<string[]>([]);
+  const [syndicationFilter, setSyndicationFilter] = useState('all');
+
+  const { data: overview, isLoading: overviewLoading } = useQuery<OverviewPayload>({
+    queryKey: queryKeys.federation.overview(),
+    queryFn: () => api.get('/api/admin/federation/overview'),
+  });
+
+  const { data: networksResponse } = useQuery<{ success: boolean; data: OrganizationNetwork[] }>({
+    queryKey: queryKeys.federation.networks(),
+    queryFn: () => api.get('/api/admin/federation/networks'),
+  });
+
+  const { data: organizationsResponse } = useQuery<{ success: boolean; data: Organization[] }>({
+    queryKey: queryKeys.federation.organizations(),
+    queryFn: () => api.get('/api/admin/federation/organizations'),
+  });
+
+  const { data: relationsResponse } = useQuery<{ success: boolean; data: OrganizationRelation[] }>({
+    queryKey: queryKeys.federation.relations(),
+    queryFn: () => api.get('/api/admin/federation/relations'),
+  });
+
+  const { data: syndicationsResponse } = useQuery<{ success: boolean; data: Syndication[] }>({
+    queryKey: queryKeys.federation.syndications({ status: syndicationFilter }),
+    queryFn: () => api.get('/api/admin/federation/syndications', syndicationFilter === 'all' ? {} : { status: syndicationFilter }),
+  });
+
+  const { data: eventsResponse } = useQuery<PaginatedResponse<EventItem>>({
+    queryKey: queryKeys.events.list({ page: 1, limit: 100 }),
+    queryFn: () => api.get('/api/admin/events', { page: 1, limit: 100 }),
+  });
+
+  const networks = networksResponse?.data ?? [];
+  const organizations = organizationsResponse?.data ?? [];
+  const relations = relationsResponse?.data ?? [];
+  const syndications = syndicationsResponse?.data ?? [];
+  const events = eventsResponse?.data ?? [];
+  const regions = organizations.filter((org) => org.type === 'region');
+  const sections = organizations.filter((org) => org.type === 'section');
+
+  const selectedEvent = useMemo(() => events.find((event) => event.id === eventId), [events, eventId]);
+  const selectedTargetsLabel = useMemo(() => targetOrganizationIds
+    .map((id) => organizations.find((org) => org.id === id)?.name)
+    .filter(Boolean)
+    .join(', '), [targetOrganizationIds, organizations]);
+
+  const invalidateFederation = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.federation.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.events.all });
+  };
+
+  const createNetworkMutation = useMutation({
+    mutationFn: () => api.post('/api/admin/federation/networks', newNetwork),
+    onSuccess: () => {
+      toast({ title: 'Réseau créé', description: 'Le réseau fédéré a été créé.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  const createOrganizationMutation = useMutation({
+    mutationFn: () => api.post('/api/admin/federation/organizations', {
+      ...newOrganization,
+      slug: newOrganization.slug || slugify(newOrganization.name),
+      networkId: newOrganization.networkId || null,
+      parentOrganizationId: newOrganization.parentOrganizationId || null,
+      domain: newOrganization.domain || null,
+      instanceUrl: newOrganization.instanceUrl || null,
+    }),
+    onSuccess: () => {
+      toast({ title: 'Organisation créée', description: 'L’organisation a été ajoutée au graphe fédéré.' });
+      setNewOrganization({ name: '', slug: '', type: 'section', networkId: '', parentOrganizationId: '', domain: '', instanceUrl: '' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  const createRelationMutation = useMutation({
+    mutationFn: () => api.post('/api/admin/federation/relations', {
+      ...newRelation,
+      permissions: { events: true, syndication: true },
+    }),
+    onSuccess: () => {
+      toast({ title: 'Lien créé', description: 'Le lien mère-fille / partenaire est actif.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  const proposeUpwardMutation = useMutation({
+    mutationFn: () => api.post(`/api/admin/federation/events/${eventId}/propose-upward`, {
+      sourceOrganizationId: sourceOrganizationId || selectedEvent?.organizationId,
+      targetOrganizationId,
+    }),
+    onSuccess: () => {
+      toast({ title: 'Événement proposé', description: 'La région peut maintenant accepter ou refuser cet événement.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  const publishDownwardMutation = useMutation({
+    mutationFn: () => api.post(`/api/admin/federation/events/${eventId}/publish-downward`, {
+      sourceOrganizationId: sourceOrganizationId || selectedEvent?.organizationId,
+      targetOrganizationIds,
+      autoAccept: false,
+    }),
+    onSuccess: () => {
+      toast({ title: 'Événement publié', description: 'Les sections ciblées peuvent maintenant l’agréger.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  const updateSyndicationMutation = useMutation({
+    mutationFn: ({ id, status, includeInAgenda }: { id: string; status: string; includeInAgenda?: boolean }) =>
+      api.patch(`/api/admin/federation/syndications/${id}`, { status, includeInAgenda }),
+    onSuccess: () => {
+      toast({ title: 'Syndication mise à jour', description: 'Le statut fédéré a été enregistré.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Network className="h-8 w-8" />
+          Fédération
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Gérez les réseaux, régions, sections et la redescente / agrégation d’événements entre organisations liées.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+        {[
+          ['Réseaux', overview?.data.counts.networks],
+          ['Organisations', overview?.data.counts.organizations],
+          ['Liens actifs', overview?.data.counts.relations],
+          ['Propositions sections', overview?.data.counts.pendingUpward],
+          ['Publications région', overview?.data.counts.pendingDownward],
+          ['Agenda fédéré', overview?.data.counts.agendaItems],
+        ].map(([label, value]) => (
+          <Card key={label as string}>
+            <CardHeader className="pb-2">
+              <CardDescription>{label}</CardDescription>
+              <CardTitle>{overviewLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : value ?? 0}</CardTitle>
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
+
+      <Tabs defaultValue="organizations" className="space-y-4">
+        <TabsList className="flex flex-wrap h-auto">
+          <TabsTrigger value="organizations">Organisations</TabsTrigger>
+          <TabsTrigger value="events">Flux événements</TabsTrigger>
+          <TabsTrigger value="syndications">Demandes</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="organizations" className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Network className="h-5 w-5" /> Réseau</CardTitle>
+                <CardDescription>Ex: CJD, CJD Hauts-de-France, autre réseau futur.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Nom</Label>
+                  <Input value={newNetwork.name} onChange={(e) => setNewNetwork({ ...newNetwork, name: e.target.value, slug: slugify(e.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Slug</Label>
+                  <Input value={newNetwork.slug} onChange={(e) => setNewNetwork({ ...newNetwork, slug: e.target.value })} />
+                </div>
+                <Textarea value={newNetwork.description} onChange={(e) => setNewNetwork({ ...newNetwork, description: e.target.value })} placeholder="Description" />
+                <Button onClick={() => createNetworkMutation.mutate()} disabled={createNetworkMutation.isPending}>
+                  <Plus className="h-4 w-4 mr-2" /> Créer le réseau
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" /> Organisation</CardTitle>
+                <CardDescription>Région, section, partenaire ou externe explicitement séparé.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Nom</Label>
+                    <Input value={newOrganization.name} onChange={(e) => setNewOrganization({ ...newOrganization, name: e.target.value, slug: slugify(e.target.value) })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Slug</Label>
+                    <Input value={newOrganization.slug} onChange={(e) => setNewOrganization({ ...newOrganization, slug: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select value={newOrganization.type} onValueChange={(value) => setNewOrganization({ ...newOrganization, type: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{organizationTypes.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Réseau</Label>
+                    <Select value={newOrganization.networkId || 'none'} onValueChange={(value) => setNewOrganization({ ...newOrganization, networkId: value === 'none' ? '' : value })}>
+                      <SelectTrigger><SelectValue placeholder="Aucun" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Aucun / externe</SelectItem>
+                        {networks.map((network) => <SelectItem key={network.id} value={network.id}>{network.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Organisation mère</Label>
+                  <Select value={newOrganization.parentOrganizationId || 'none'} onValueChange={(value) => setNewOrganization({ ...newOrganization, parentOrganizationId: value === 'none' ? '' : value })}>
+                    <SelectTrigger><SelectValue placeholder="Aucune" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Aucune</SelectItem>
+                      {organizations.map((org) => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Input value={newOrganization.domain} onChange={(e) => setNewOrganization({ ...newOrganization, domain: e.target.value })} placeholder="domaine.fr" />
+                <Input value={newOrganization.instanceUrl} onChange={(e) => setNewOrganization({ ...newOrganization, instanceUrl: e.target.value })} placeholder="https://instance.fr" />
+                <Button onClick={() => createOrganizationMutation.mutate()} disabled={createOrganizationMutation.isPending || !newOrganization.name.trim()}>
+                  <Plus className="h-4 w-4 mr-2" /> Créer l’organisation
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><GitBranch className="h-5 w-5" /> Lien mère-fille</CardTitle>
+                <CardDescription>La région vers la section, ou un partenariat explicite.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Organisation mère / source</Label>
+                  <Select value={newRelation.fromOrganizationId || 'none'} onValueChange={(value) => setNewRelation({ ...newRelation, fromOrganizationId: value === 'none' ? '' : value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sélectionner</SelectItem>
+                      {organizations.map((org) => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Organisation fille / cible</Label>
+                  <Select value={newRelation.toOrganizationId || 'none'} onValueChange={(value) => setNewRelation({ ...newRelation, toOrganizationId: value === 'none' ? '' : value })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sélectionner</SelectItem>
+                      {organizations.map((org) => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={() => createRelationMutation.mutate()} disabled={createRelationMutation.isPending || !newRelation.fromOrganizationId || !newRelation.toOrganizationId}>
+                  <GitBranch className="h-4 w-4 mr-2" /> Créer le lien
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Organisations connues</CardTitle>
+              <CardDescription>Seules les organisations reliées explicitement peuvent partager des données.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader><TableRow><TableHead>Organisation</TableHead><TableHead>Type</TableHead><TableHead>Réseau</TableHead><TableHead>Parent</TableHead><TableHead>Domaine</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {organizations.map((org) => (
+                    <TableRow key={org.id}>
+                      <TableCell><div className="font-medium">{org.name}</div><div className="text-xs text-muted-foreground">{org.slug}</div></TableCell>
+                      <TableCell><Badge variant="outline">{organizationTypes.find((type) => type.value === org.type)?.label ?? org.type}</Badge></TableCell>
+                      <TableCell>{org.networkName ?? '—'}</TableCell>
+                      <TableCell>{org.parentName ?? '—'}</TableCell>
+                      <TableCell>{org.domain ?? org.instanceUrl ?? '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Liens actifs</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {relations.length === 0 ? <p className="text-sm text-muted-foreground">Aucun lien explicite pour le moment.</p> : relations.map((relation) => (
+                  <div key={relation.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <span className="font-medium">{relation.fromName}</span>
+                      <span className="mx-2 text-muted-foreground">→</span>
+                      <span className="font-medium">{relation.toName}</span>
+                    </div>
+                    <Badge>{relation.relationType}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="events" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Partager un événement</CardTitle>
+              <CardDescription>Flux montant Section → Région, ou descendant Région → Sections.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Événement</Label>
+                  <Select value={eventId || 'none'} onValueChange={(value) => setEventId(value === 'none' ? '' : value)}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner un événement" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sélectionner</SelectItem>
+                      {events.map((event) => <SelectItem key={event.id} value={event.id}>{event.title} — {formatDate(event.date)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Organisation source</Label>
+                  <Select value={sourceOrganizationId || 'auto'} onValueChange={(value) => setSourceOrganizationId(value === 'auto' ? '' : value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Organisation de l’événement</SelectItem>
+                      {organizations.map((org) => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                  {selectedEvent ? (
+                    <>
+                      <div className="font-medium text-foreground">{selectedEvent.title}</div>
+                      <div>{formatDate(selectedEvent.date)}</div>
+                      <div>{selectedEvent.location ?? 'Lieu non renseigné'}</div>
+                    </>
+                  ) : 'Choisissez un événement à fédérer.'}
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg"><ArrowUpFromLine className="h-5 w-5" /> Section → Région</CardTitle>
+                    <CardDescription>Proposer un événement local à une région mère.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Label>Région cible</Label>
+                    <Select value={targetOrganizationId || 'none'} onValueChange={(value) => setTargetOrganizationId(value === 'none' ? '' : value)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sélectionner une région</SelectItem>
+                        {regions.map((org) => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={() => proposeUpwardMutation.mutate()} disabled={!eventId || !targetOrganizationId || proposeUpwardMutation.isPending}>
+                      <Send className="h-4 w-4 mr-2" /> Proposer à la région
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg"><ArrowDownToLine className="h-5 w-5" /> Région → Sections</CardTitle>
+                    <CardDescription>Publier un événement régional vers des sections explicitement liées.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Label>Sections cibles</Label>
+                    <Select value="add" onValueChange={(value) => {
+                      if (value !== 'add' && !targetOrganizationIds.includes(value)) setTargetOrganizationIds([...targetOrganizationIds, value]);
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="Ajouter une section" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="add">Ajouter une section</SelectItem>
+                        {sections.map((org) => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {targetOrganizationIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {targetOrganizationIds.map((id) => (
+                          <Badge key={id} variant="outline" className="gap-1">
+                            {organizations.find((org) => org.id === id)?.name}
+                            <button type="button" onClick={() => setTargetOrganizationIds(targetOrganizationIds.filter((targetId) => targetId !== id))}>×</button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <Button onClick={() => publishDownwardMutation.mutate()} disabled={!eventId || targetOrganizationIds.length === 0 || publishDownwardMutation.isPending}>
+                      <Send className="h-4 w-4 mr-2" /> Publier vers {selectedTargetsLabel || 'les sections'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="syndications" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle>Demandes et publications fédérées</CardTitle>
+                <CardDescription>Acceptation régionale, refus, révocation et inclusion agenda.</CardDescription>
+              </div>
+              <Select value={syndicationFilter} onValueChange={setSyndicationFilter}>
+                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  <SelectItem value="proposed">Proposés</SelectItem>
+                  <SelectItem value="accepted">Acceptés</SelectItem>
+                  <SelectItem value="rejected">Refusés</SelectItem>
+                  <SelectItem value="revoked">Révoqués</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Événement</TableHead>
+                    <TableHead>Flux</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Agenda</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {syndications.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Aucune demande fédérée.</TableCell></TableRow>
+                  ) : syndications.map((syndication) => (
+                    <TableRow key={syndication.id}>
+                      <TableCell>
+                        <div className="font-medium">{syndication.eventTitle}</div>
+                        <div className="text-xs text-muted-foreground">{formatDate(syndication.eventDate)} · {syndication.eventLocation ?? 'Lieu non renseigné'}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{syndication.sourceName} → {syndication.targetName}</div>
+                        <Badge variant="outline">{syndication.direction === 'upward' ? 'Section → Région' : 'Région → Section'}</Badge>
+                      </TableCell>
+                      <TableCell><Badge>{statusLabels[syndication.status] ?? syndication.status}</Badge></TableCell>
+                      <TableCell>{syndication.includeInAgenda ? <Badge variant="outline">Inclus</Badge> : <span className="text-muted-foreground">Non</span>}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button size="sm" variant="outline" onClick={() => updateSyndicationMutation.mutate({ id: syndication.id, status: 'accepted', includeInAgenda: true })}>
+                          <Check className="h-4 w-4 mr-1" /> Accepter
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => updateSyndicationMutation.mutate({ id: syndication.id, status: 'rejected', includeInAgenda: false })}>
+                          <X className="h-4 w-4 mr-1" /> Refuser
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
