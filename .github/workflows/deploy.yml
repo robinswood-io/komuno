@@ -345,10 +345,13 @@ jobs:
               fi
             }
 
-            check_endpoint "GET /api/admin/members"  "http://localhost:5000/api/admin/members"
-            check_endpoint "GET /api/admin/events"   "http://localhost:5000/api/admin/events"
-            check_endpoint "GET /api/admin/ideas"    "http://localhost:5000/api/admin/ideas"
-            check_endpoint "GET /api/patrons"        "http://localhost:5000/api/patrons"
+            check_endpoint "GET /api/admin/members"                  "http://localhost:5000/api/admin/members"
+            check_endpoint "GET /api/admin/events"                   "http://localhost:5000/api/admin/events"
+            check_endpoint "GET /api/admin/ideas"                    "http://localhost:5000/api/admin/ideas"
+            check_endpoint "GET /api/admin/federation/overview"      "http://localhost:5000/api/admin/federation/overview"
+            check_endpoint "GET /api/admin/federation/organizations" "http://localhost:5000/api/admin/federation/organizations"
+            check_endpoint "GET /api/admin/federation/syndications"  "http://localhost:5000/api/admin/federation/syndications"
+            check_endpoint "GET /api/patrons"                        "http://localhost:5000/api/patrons"
 
             if [ "$FAIL" -eq 1 ]; then
               echo "❌ Smoke tests échoués — rollback..."
@@ -590,10 +593,13 @@ jobs:
             fi
           }
 
-          check_endpoint "GET /api/admin/members"  "http://localhost:5000/api/admin/members"
-          check_endpoint "GET /api/admin/events"   "http://localhost:5000/api/admin/events"
-          check_endpoint "GET /api/admin/ideas"    "http://localhost:5000/api/admin/ideas"
-          check_endpoint "GET /api/patrons"        "http://localhost:5000/api/patrons"
+          check_endpoint "GET /api/admin/members"                  "http://localhost:5000/api/admin/members"
+          check_endpoint "GET /api/admin/events"                   "http://localhost:5000/api/admin/events"
+          check_endpoint "GET /api/admin/ideas"                    "http://localhost:5000/api/admin/ideas"
+          check_endpoint "GET /api/admin/federation/overview"      "http://localhost:5000/api/admin/federation/overview"
+          check_endpoint "GET /api/admin/federation/organizations" "http://localhost:5000/api/admin/federation/organizations"
+          check_endpoint "GET /api/admin/federation/syndications"  "http://localhost:5000/api/admin/federation/syndications"
+          check_endpoint "GET /api/patrons"                        "http://localhost:5000/api/patrons"
 
           if [ "$FAIL" -eq 1 ]; then
             echo "❌ Smoke tests échoués — rollback..."
