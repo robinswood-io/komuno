@@ -8,7 +8,6 @@ import {
   FEDERATION_STATUS,
   FEDERATION_VISIBILITY,
   ORGANIZATION_RELATION_TYPE,
-  ORGANIZATION_TYPE,
   SYNDICATION_DIRECTION,
   SYNDICATION_STATUS,
   eventSyndications,
@@ -56,38 +55,7 @@ export class FederationService {
     return event;
   }
 
-  async ensureDefaultCjdOrganization() {
-    let [network] = await db.select().from(organizationNetworks).where(eq(organizationNetworks.slug, 'cjd')).limit(1);
-    if (!network) {
-      [network] = await db.insert(organizationNetworks).values({
-        slug: 'cjd',
-        name: 'CJD',
-        description: 'Réseau fédéré CJD',
-      }).returning();
-    }
-
-    let [organization] = await db.select().from(organizations).where(eq(organizations.slug, 'cjd-amiens')).limit(1);
-    if (!organization) {
-      [organization] = await db.insert(organizations).values({
-        networkId: network.id,
-        slug: 'cjd-amiens',
-        name: 'CJD Amiens',
-        type: ORGANIZATION_TYPE.SECTION,
-        domain: 'cjd80.fr',
-        instanceUrl: 'https://cjd80.fr',
-      }).returning();
-    }
-
-    await db.update(events)
-      .set({ organizationId: organization.id })
-      .where(sql`${events.organizationId} IS NULL`);
-
-    return { network, organization };
-  }
-
   async getOverview() {
-    await this.ensureDefaultCjdOrganization();
-
     const [networkCount] = await db.select({ count: count() }).from(organizationNetworks);
     const [organizationCount] = await db.select({ count: count() }).from(organizations);
     const [relationCount] = await db.select({ count: count() }).from(organizationRelations);
@@ -150,7 +118,6 @@ export class FederationService {
   }
 
   async getOrganizations() {
-    await this.ensureDefaultCjdOrganization();
     const data = await db.select({
       id: organizations.id,
       networkId: organizations.networkId,
