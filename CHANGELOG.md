@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.3.1] - 2026-06-22
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Remove orphan CJD seed from standalone instances
+
 ## [2.3.0] - 2026-06-22
 
 ### En bref

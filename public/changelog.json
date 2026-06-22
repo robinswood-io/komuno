@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.3.0",
+    "version": "2.3.1",
     "releasedAt": "2026-06-22",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Add regional organization module"
+      "nouveautes": [],
+      "corrections": [
+        "Remove orphan CJD seed from standalone instances"
       ],
-      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.3.1",
+      "releasedAt": "2026-06-22",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Remove orphan CJD seed from standalone instances"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.3.0",
       "releasedAt": "2026-06-22",
@@ -482,6 +498,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-22T10:34:46.560Z",
+  "generatedAt": "2026-06-22T12:59:46.974Z",
   "source": "conventional-commits"
 }
