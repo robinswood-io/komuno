@@ -704,10 +704,11 @@ export class FederationService {
   }
 
   async ingestFederatedEvent(data: unknown, token?: string) {
-    const payload = federatedEventPayloadSchema.parse(data);
-    if (!token) throw new UnauthorizedException('Jeton de fédération manquant');
+    try {
+      if (!token) throw new UnauthorizedException('Jeton de fédération manquant');
+      const payload = federatedEventPayloadSchema.parse(data);
 
-    const [sourceOrganization, targetOrganization] = await Promise.all([
+      const [sourceOrganization, targetOrganization] = await Promise.all([
       this.findOrganizationBySlugOrThrow(payload.sourceOrganization.slug, 'source'),
       this.findOrganizationBySlugOrThrow(payload.targetOrganization.slug, 'target'),
     ]);
@@ -793,15 +794,18 @@ export class FederationService {
       updatedAt: sql`NOW()`,
     }).where(eq(organizationRelations.id, relation.id));
 
-    return {
-      success: true,
-      data: {
-        eventId: localEvent.id,
-        syndicationId: localSyndication.id,
-        status: localSyndication.status,
-        createdEvent: !existingEvent,
-      },
-    };
+      return {
+        success: true,
+        data: {
+          eventId: localEvent.id,
+          syndicationId: localSyndication.id,
+          status: localSyndication.status,
+          createdEvent: !existingEvent,
+        },
+      };
+    } catch (error) {
+      return this.handleZodError(error);
+    }
   }
 
   async updateSyndication(id: string, data: unknown, userEmail?: string) {
