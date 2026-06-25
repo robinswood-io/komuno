@@ -611,11 +611,17 @@ export class FederationService {
       return { success: true, data: { skipped: true, reason: 'syndication_rejected_or_revoked', syndication: existing } };
     }
 
+    const sourceFederationStatus = existing && (
+      existing.status === SYNDICATION_STATUS.ACCEPTED
+      || existing.status === SYNDICATION_STATUS.AUTO_ACCEPTED
+      || existing.includeInAgenda
+    ) ? FEDERATION_STATUS.ACCEPTED_BY_REGION : FEDERATION_STATUS.PROPOSED_TO_REGION;
+
     const syndication = await db.transaction(async (tx) => {
       await tx.update(events).set({
         organizationId: event.organizationId ?? childOrganization.id,
         federationVisibility: FEDERATION_VISIBILITY.PARENT_REGION,
-        federationStatus: FEDERATION_STATUS.PROPOSED_TO_REGION,
+        federationStatus: sourceFederationStatus,
         updatedAt: sql`NOW()`,
       }).where(eq(events.id, event.id));
 
