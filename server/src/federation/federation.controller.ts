@@ -93,6 +93,13 @@ export class AdminFederationController {
     return await this.federationService.updateRelation(id, body);
   }
 
+  @Post('sync')
+  @Permissions('admin.manage')
+  @ApiOperation({ summary: 'Déclencher la synchronisation inter-instance des relations et syndications' })
+  async syncFederationNow() {
+    return await this.federationService.syncFederationNow();
+  }
+
   @Get('syndications')
   @Permissions('admin.view')
   @ApiOperation({ summary: 'Lister les propositions / publications d’événements fédérés' })
@@ -168,6 +175,17 @@ export class AdminFederationController {
 @Controller('api/federation')
 export class PublicFederationController {
   constructor(private readonly federationService: FederationService) {}
+
+  @Post('relations/handshake')
+  @ApiOperation({ summary: 'Valider le lien de fédération avec une autre instance Komuno' })
+  async handshakeFederationRelation(
+    @Headers('x-komuno-federation-token') token: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const bearerToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+    return await this.federationService.handshakeFederationRelation(body, token || bearerToken);
+  }
 
   @Post('events/ingest')
   @ApiOperation({ summary: 'Recevoir un événement fédéré depuis une autre instance Komuno' })
