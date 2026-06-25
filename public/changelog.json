@@ -1,23 +1,43 @@
 {
   "latest": {
-    "version": "2.5.0",
+    "version": "2.6.0",
     "releasedAt": "2026-06-25",
-    "summary": "Cette version apporte 1 nouveaute(s), 1 correction(s).",
+    "summary": "Cette version apporte 2 nouveaute(s), 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [
-        "Add public demo mode"
+        "Automate demo updates from GitHub",
+        "Seed Komuno demo environment"
       ],
       "corrections": [
-        "Automate inter-instance sync"
+        "Harden Komuno demo reset deployment"
       ],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
     },
-    "commitCount": 2
+    "commitCount": 3
   },
   "history": [
+    {
+      "version": "2.6.0",
+      "releasedAt": "2026-06-25",
+      "summary": "Cette version apporte 2 nouveaute(s), 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Automate demo updates from GitHub",
+          "Seed Komuno demo environment"
+        ],
+        "corrections": [
+          "Harden Komuno demo reset deployment"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 3
+    },
     {
       "version": "2.5.0",
       "releasedAt": "2026-06-25",
@@ -582,6 +602,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-25T10:18:26.534Z",
+  "generatedAt": "2026-06-25T13:19:37.275Z",
   "source": "conventional-commits"
 }

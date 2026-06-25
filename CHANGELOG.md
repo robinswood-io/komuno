@@ -4,6 +4,21 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.6.0] - 2026-06-25
+
+### En bref
+
+- Cette version apporte 2 nouveaute(s), 1 correction(s).
+
+### Nouveautes
+
+- Automate demo updates from GitHub
+- Seed Komuno demo environment
+
+### Corrections
+
+- Harden Komuno demo reset deployment
+
 ## [2.5.0] - 2026-06-25
 
 ### En bref
