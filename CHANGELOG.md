@@ -4,6 +4,20 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.5.0] - 2026-06-25
+
+### En bref
+
+- Cette version apporte 1 nouveaute(s), 1 correction(s).
+
+### Nouveautes
+
+- Add public demo mode
+
+### Corrections
+
+- Automate inter-instance sync
+
 ## [2.4.2] - 2026-06-22
 
 ### En bref

@@ -1,21 +1,41 @@
 {
   "latest": {
-    "version": "2.4.2",
-    "releasedAt": "2026-06-22",
-    "summary": "Cette version apporte 1 correction(s).",
+    "version": "2.5.0",
+    "releasedAt": "2026-06-25",
+    "summary": "Cette version apporte 1 nouveaute(s), 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
+      "nouveautes": [
+        "Add public demo mode"
+      ],
       "corrections": [
-        "Validate ingest token before payload"
+        "Automate inter-instance sync"
       ],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
     },
-    "commitCount": 1
+    "commitCount": 2
   },
   "history": [
+    {
+      "version": "2.5.0",
+      "releasedAt": "2026-06-25",
+      "summary": "Cette version apporte 1 nouveaute(s), 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add public demo mode"
+        ],
+        "corrections": [
+          "Automate inter-instance sync"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 2
+    },
     {
       "version": "2.4.2",
       "releasedAt": "2026-06-22",
@@ -562,6 +582,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-22T14:14:21.348Z",
+  "generatedAt": "2026-06-25T10:18:26.534Z",
   "source": "conventional-commits"
 }
