@@ -39,7 +39,7 @@ for i in $(seq 1 60); do
 done
 
 docker exec -i komuno-demo-postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < "$SCHEMA_FILE" >> "$LOG_FILE" 2>&1
-$COMPOSE up -d --wait app >> "$LOG_FILE" 2>&1
+$COMPOSE up -d --wait --no-build app >> "$LOG_FILE" 2>&1
 
 if [ -s "$SEED_FILE" ]; then
   docker exec -i komuno-demo-postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < "$SEED_FILE" >> "$LOG_FILE" 2>&1
