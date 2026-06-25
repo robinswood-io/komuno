@@ -1,24 +1,37 @@
 {
   "latest": {
-    "version": "2.6.0",
+    "version": "2.7.0",
     "releasedAt": "2026-06-25",
-    "summary": "Cette version apporte 2 nouveaute(s), 1 correction(s).",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [
-        "Automate demo updates from GitHub",
-        "Seed Komuno demo environment"
+        "Auto-share section events to region admin"
       ],
-      "corrections": [
-        "Harden Komuno demo reset deployment"
-      ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
     },
-    "commitCount": 3
+    "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.7.0",
+      "releasedAt": "2026-06-25",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Auto-share section events to region admin"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.6.0",
       "releasedAt": "2026-06-25",
@@ -602,6 +615,6 @@
       "commitCount": 109
     }
   ],
-  "generatedAt": "2026-06-25T13:19:37.275Z",
+  "generatedAt": "2026-06-25T13:38:48.183Z",
   "source": "conventional-commits"
 }
