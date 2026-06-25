@@ -28,12 +28,12 @@ services:
       minio:
         condition: service_healthy
     networks:
-      - traefik_public
+      - traefik
       - backend
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik_public
-      - traefik.http.routers.komuno-demo.rule=Host(`demo.komuno.fr`)
+      - traefik.docker.network=traefik
+      - traefik.http.routers.komuno-demo.rule=Host(`demo.komuno.org`)
       - traefik.http.routers.komuno-demo.entrypoints=websecure
       - traefik.http.routers.komuno-demo.tls=true
       - traefik.http.routers.komuno-demo.tls.certresolver=letsencrypt
@@ -104,7 +104,7 @@ services:
       retries: 3
 
 networks:
-  traefik_public:
+  traefik:
     external: true
   backend:
     driver: bridge
