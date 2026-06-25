@@ -70,6 +70,16 @@ interface ModulesConfig {
   tools: ModuleConfig;
 }
 
+interface FederationSettingsPayload {
+  canConfigureAutoShare: boolean;
+  autoShareEventsToParent: boolean;
+  reason?: string;
+  relation?: {
+    parentName?: string;
+    childName?: string;
+  };
+}
+
 const MODULE_ICONS = {
   events: Calendar,
   ideas: Lightbulb,
@@ -135,6 +145,12 @@ export default function SettingsPage() {
 
   const canManageAdmins = currentUser?.role === 'super_admin';
 
+  const { data: federationSettingsResponse } = useQuery<ApiResponse<FederationSettingsPayload>>({
+    queryKey: ['federation-settings'],
+    queryFn: () => api.get('/api/admin/federation/settings'),
+    staleTime: 60_000,
+  });
+
   // Modules state — initialisé avec les defaults pour éviter le spinner infini
   const [modules, setModules] = useState<ModulesConfig | null>(() => brandingCore.modules as ModulesConfig);
 
@@ -177,10 +193,30 @@ export default function SettingsPage() {
     notifyOnLoanRequest: true,
   });
 
+  // Federation settings
+  const [federationSettings, setFederationSettings] = useState({
+    canConfigureAutoShare: false,
+    autoShareEventsToParent: false,
+    relationLabel: '',
+  });
+  const [isSavingFederation, setIsSavingFederation] = useState(false);
+
   // Logo upload
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  useEffect(() => {
+    const data = federationSettingsResponse?.data;
+    if (!data) return;
+    setFederationSettings({
+      canConfigureAutoShare: data.canConfigureAutoShare,
+      autoShareEventsToParent: data.autoShareEventsToParent,
+      relationLabel: data.relation?.parentName && data.relation?.childName
+        ? `${data.relation.childName} → ${data.relation.parentName}`
+        : '',
+    });
+  }, [federationSettingsResponse]);
 
   useEffect(() => {
     if (branding) {
@@ -301,6 +337,27 @@ export default function SettingsPage() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveFederation = async () => {
+    setIsSavingFederation(true);
+    try {
+      const response = await api.put<ApiResponse<FederationSettingsPayload>>('/api/admin/federation/settings', {
+        autoShareEventsToParent: federationSettings.autoShareEventsToParent,
+      });
+      const data = response.data;
+      setFederationSettings((prev) => ({
+        ...prev,
+        canConfigureAutoShare: data.canConfigureAutoShare,
+        autoShareEventsToParent: data.autoShareEventsToParent,
+      }));
+      toast({ title: 'Paramètres fédération enregistrés', description: 'Le partage automatique vers la région a été mis à jour.' });
+    } catch (error) {
+      console.error('Erreur sauvegarde fédération:', error);
+      toast({ title: 'Erreur', description: 'Impossible d’enregistrer les paramètres de fédération.', variant: 'destructive' });
+    } finally {
+      setIsSavingFederation(false);
     }
   };
 
@@ -474,7 +531,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className={`grid w-full ${canManageAdmins ? 'grid-cols-6' : 'grid-cols-5'}`}>
+        <TabsList className={`grid w-full ${canManageAdmins ? 'grid-cols-7' : 'grid-cols-6'}`}>
           <TabsTrigger value="general">
             <SettingsIcon className="h-4 w-4 mr-2" />
             Général
@@ -490,6 +547,10 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications">
             <Bell className="h-4 w-4 mr-2" />
             Notifications
+          </TabsTrigger>
+          <TabsTrigger value="federation">
+            <Shield className="h-4 w-4 mr-2" />
+            Fédération
           </TabsTrigger>
           <TabsTrigger value="email">
             <Mail className="h-4 w-4 mr-2" />
@@ -896,6 +957,61 @@ export default function SettingsPage() {
               )}
             </Button>
           </div>
+        </TabsContent>
+
+        {/* Federation Tab */}
+        <TabsContent value="federation" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Fédération régionale</CardTitle>
+              <CardDescription>
+                Contrôlez la remontée automatique des événements de cette section vers son bureau régional.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {!federationSettings.canConfigureAutoShare && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Aucun lien actif section → région n’est configuré pour cette instance. Le partage automatique est indisponible.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {federationSettings.relationLabel && (
+                <div className="text-sm text-muted-foreground">
+                  Lien actif : <span className="font-medium text-foreground">{federationSettings.relationLabel}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-1">
+                  <Label>Remonter automatiquement les événements à la région</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Les événements publiés par la section sont proposés à la région dans sa vue admin dédiée, sans affichage public régional par défaut.
+                  </p>
+                </div>
+                <Switch
+                  checked={federationSettings.autoShareEventsToParent}
+                  disabled={!federationSettings.canConfigureAutoShare || isSavingFederation}
+                  onCheckedChange={(checked) => setFederationSettings({ ...federationSettings, autoShareEventsToParent: checked })}
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={handleSaveFederation} disabled={!federationSettings.canConfigureAutoShare || isSavingFederation}>
+                  {isSavingFederation ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enregistrement...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Enregistrer
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Notifications Tab */}

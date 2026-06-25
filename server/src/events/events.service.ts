@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { StorageService } from '../common/storage/storage.service';
+import { FederationService } from '../federation/federation.service';
 import {
   insertEventSchema,
   createEventWithInscriptionsSchema,
@@ -20,7 +21,18 @@ import { db } from '../../db';
 
 @Injectable()
 export class EventsService {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(
+    private readonly storageService: StorageService,
+    private readonly federationService: FederationService,
+  ) {}
+
+  private async autoShareEventToParentBestEffort(eventId: string, userEmail?: string) {
+    try {
+      await this.federationService.autoShareEventToParent(eventId, userEmail);
+    } catch (error) {
+      logger.warn('Federation auto-share failed', { eventId, error });
+    }
+  }
 
   async getEvents(page: number = 1, limit: number = 20) {
     return await this.storageService.instance.getEvents({ page, limit });
@@ -55,6 +67,7 @@ export class EventsService {
         logger.warn('Event notification failed', { eventId: result.data.id, error: notifError });
       }
 
+      await this.autoShareEventToParentBestEffort(result.data.id, user?.email);
       return result.data;
     } catch (error) {
       if (error instanceof ZodError) {
@@ -99,6 +112,7 @@ export class EventsService {
         logger.warn('Event notification failed', { eventId: result.data.event.id, error: notifError });
       }
 
+      await this.autoShareEventToParentBestEffort(result.data.event.id, user?.email);
       return result.data;
     } catch (error) {
       if (error instanceof ZodError) {
@@ -118,6 +132,7 @@ export class EventsService {
         }
         throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
       }
+      await this.autoShareEventToParentBestEffort(result.data.id);
       return result.data;
     } catch (error) {
       if (error instanceof ZodError) {

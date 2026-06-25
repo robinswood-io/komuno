@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -93,11 +94,26 @@ export class AdminFederationController {
     return await this.federationService.updateRelation(id, body);
   }
 
+  @Get('settings')
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Lire les paramètres de fédération de cette instance' })
+  async getFederationSettings() {
+    return await this.federationService.getFederationSettings();
+  }
+
+  @Put('settings')
+  @Permissions('admin.manage')
+  @ApiOperation({ summary: 'Mettre à jour les paramètres de fédération de cette instance' })
+  async updateFederationSettings(@Body() body: unknown) {
+    return await this.federationService.updateFederationSettings(body);
+  }
+
   @Post('sync')
   @Permissions('admin.manage')
   @ApiOperation({ summary: 'Déclencher la synchronisation inter-instance des relations et syndications' })
-  async syncFederationNow() {
-    return await this.federationService.syncFederationNow();
+  @ApiQuery({ name: 'autoShareBackfill', required: false, description: 'Créer aussi les remontées automatiques pour les événements locaux existants' })
+  async syncFederationNow(@Query('autoShareBackfill') autoShareBackfill?: string) {
+    return await this.federationService.syncFederationNow({ autoShareBackfill: autoShareBackfill === 'true' });
   }
 
   @Get('syndications')
@@ -105,11 +121,19 @@ export class AdminFederationController {
   @ApiOperation({ summary: 'Lister les propositions / publications d’événements fédérés' })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'direction', required: false })
+  @ApiQuery({ name: 'sourceOrganizationId', required: false })
+  @ApiQuery({ name: 'targetOrganizationId', required: false })
+  @ApiQuery({ name: 'syncStatus', required: false })
+  @ApiQuery({ name: 'includeInAgenda', required: false })
   async getSyndications(
     @Query('status') status?: string,
     @Query('direction') direction?: string,
+    @Query('sourceOrganizationId') sourceOrganizationId?: string,
+    @Query('targetOrganizationId') targetOrganizationId?: string,
+    @Query('syncStatus') syncStatus?: string,
+    @Query('includeInAgenda') includeInAgenda?: string,
   ) {
-    return await this.federationService.getSyndications({ status, direction });
+    return await this.federationService.getSyndications({ status, direction, sourceOrganizationId, targetOrganizationId, syncStatus, includeInAgenda });
   }
 
   @Post('events/:eventId/propose-upward')

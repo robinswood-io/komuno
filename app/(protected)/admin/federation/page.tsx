@@ -172,6 +172,10 @@ export default function AdminFederationPage() {
   const [targetOrganizationId, setTargetOrganizationId] = useState('');
   const [targetOrganizationIds, setTargetOrganizationIds] = useState<string[]>([]);
   const [syndicationFilter, setSyndicationFilter] = useState('all');
+  const [syndicationDirectionFilter, setSyndicationDirectionFilter] = useState('all');
+  const [syndicationSourceFilter, setSyndicationSourceFilter] = useState('all');
+  const [syndicationSyncFilter, setSyndicationSyncFilter] = useState('all');
+  const [syndicationAgendaFilter, setSyndicationAgendaFilter] = useState('all');
 
   const { data: overview, isLoading: overviewLoading } = useQuery<OverviewPayload>({
     queryKey: queryKeys.federation.overview(),
@@ -193,9 +197,17 @@ export default function AdminFederationPage() {
     queryFn: () => api.get('/api/admin/federation/relations'),
   });
 
+  const syndicationQueryParams = {
+    status: syndicationFilter,
+    direction: syndicationDirectionFilter,
+    sourceOrganizationId: syndicationSourceFilter,
+    syncStatus: syndicationSyncFilter,
+    includeInAgenda: syndicationAgendaFilter,
+  };
+
   const { data: syndicationsResponse } = useQuery<{ success: boolean; data: Syndication[] }>({
-    queryKey: queryKeys.federation.syndications({ status: syndicationFilter }),
-    queryFn: () => api.get('/api/admin/federation/syndications', syndicationFilter === 'all' ? {} : { status: syndicationFilter }),
+    queryKey: queryKeys.federation.syndications(syndicationQueryParams),
+    queryFn: () => api.get('/api/admin/federation/syndications', syndicationQueryParams),
   });
 
   const { data: eventsResponse } = useQuery<PaginatedResponse<EventItem>>({
@@ -210,6 +222,7 @@ export default function AdminFederationPage() {
   const events = eventsResponse?.data ?? [];
   const regions = organizations.filter((org) => org.type === 'region');
   const sections = organizations.filter((org) => org.type === 'section');
+  const sourceSections = sections;
 
   const selectedEvent = useMemo(() => events.find((event) => event.id === eventId), [events, eventId]);
   const selectedTargetsLabel = useMemo(() => targetOrganizationIds
@@ -252,7 +265,7 @@ export default function AdminFederationPage() {
     mutationFn: () => api.post('/api/admin/federation/relations', {
       ...newRelation,
       federationToken: newRelation.federationToken || null,
-      permissions: { events: true, syndication: true, interInstanceSync: Boolean(newRelation.federationToken) },
+      permissions: { events: true, syndication: true, interInstanceSync: Boolean(newRelation.federationToken), autoShareEventsToParent: true },
     }),
     onSuccess: () => {
       toast({ title: 'Lien créé', description: 'Le lien mère-fille / partenaire est actif.' });
@@ -340,7 +353,7 @@ export default function AdminFederationPage() {
         <TabsList className="flex flex-wrap h-auto">
           <TabsTrigger value="organizations">Organisations</TabsTrigger>
           <TabsTrigger value="events">Flux événements</TabsTrigger>
-          <TabsTrigger value="syndications">Demandes</TabsTrigger>
+          <TabsTrigger value="syndications">Vue région / demandes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="organizations" className="space-y-4">
@@ -622,19 +635,59 @@ export default function AdminFederationPage() {
           <Card>
             <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <CardTitle>Demandes et publications fédérées</CardTitle>
-                <CardDescription>Acceptation régionale, refus, révocation et inclusion agenda.</CardDescription>
+                <CardTitle>Vue région — événements remontés par les sections</CardTitle>
+                <CardDescription>
+                  Ces événements restent admin-only par défaut : ils ne sont pas affichés sur le front public régional.
+                </CardDescription>
               </div>
-              <Select value={syndicationFilter} onValueChange={setSyndicationFilter}>
-                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous</SelectItem>
-                  <SelectItem value="proposed">Proposés</SelectItem>
-                  <SelectItem value="accepted">Acceptés</SelectItem>
-                  <SelectItem value="rejected">Refusés</SelectItem>
-                  <SelectItem value="revoked">Révoqués</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                <Select value={syndicationFilter} onValueChange={setSyndicationFilter}>
+                  <SelectTrigger><SelectValue placeholder="Statut" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous statuts</SelectItem>
+                    <SelectItem value="proposed">Proposés</SelectItem>
+                    <SelectItem value="accepted">Acceptés</SelectItem>
+                    <SelectItem value="rejected">Refusés</SelectItem>
+                    <SelectItem value="revoked">Révoqués</SelectItem>
+                    <SelectItem value="auto_accepted">Auto-acceptés</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={syndicationDirectionFilter} onValueChange={setSyndicationDirectionFilter}>
+                  <SelectTrigger><SelectValue placeholder="Flux" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous flux</SelectItem>
+                    <SelectItem value="upward">Sections → Région</SelectItem>
+                    <SelectItem value="downward">Région → Sections</SelectItem>
+                    <SelectItem value="lateral">Latéral</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={syndicationSourceFilter} onValueChange={setSyndicationSourceFilter}>
+                  <SelectTrigger><SelectValue placeholder="Section" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes sections</SelectItem>
+                    {sourceSections.map((section) => <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={syndicationSyncFilter} onValueChange={setSyndicationSyncFilter}>
+                  <SelectTrigger><SelectValue placeholder="Sync" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toute sync</SelectItem>
+                    <SelectItem value="received">Reçu</SelectItem>
+                    <SelectItem value="synced">Synchronisé</SelectItem>
+                    <SelectItem value="pending">En attente</SelectItem>
+                    <SelectItem value="failed">Échec</SelectItem>
+                    <SelectItem value="local">Local</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={syndicationAgendaFilter} onValueChange={setSyndicationAgendaFilter}>
+                  <SelectTrigger><SelectValue placeholder="Agenda" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tout agenda</SelectItem>
+                    <SelectItem value="false">Admin-only</SelectItem>
+                    <SelectItem value="true">Inclus agenda</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>

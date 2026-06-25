@@ -12,6 +12,7 @@ import {
   FEDERATION_SYNC_STATUS,
   FEDERATION_VISIBILITY,
   ORGANIZATION_RELATION_TYPE,
+  ORGANIZATION_TYPE,
   SYNDICATION_DIRECTION,
   SYNDICATION_STATUS,
   eventSyndications,
@@ -94,6 +95,12 @@ const federatedRelationHandshakeSchema = z.object({
 
 type FederatedRelationHandshakePayload = z.infer<typeof federatedRelationHandshakeSchema>;
 
+const federationSettingsSchema = z.object({
+  autoShareEventsToParent: z.boolean(),
+});
+
+const AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION = 'autoShareEventsToParent';
+
 @Injectable()
 export class FederationService {
   private federationSyncRunning = false;
@@ -157,6 +164,64 @@ export class FederationService {
     ].filter((url): url is string => Boolean(url));
 
     return candidates.find((url) => url !== current) ?? null;
+  }
+
+  private hostFromUrl(value?: string | null): string | null {
+    const normalized = this.normalizeInstanceUrl(value);
+    if (!normalized) return null;
+    try {
+      return new URL(normalized).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  }
+
+  private isOrganizationOnCurrentInstance(organization: typeof organizations.$inferSelect): boolean {
+    const currentUrl = this.getCurrentInstanceUrl();
+    const currentHost = this.hostFromUrl(currentUrl);
+    const organizationUrl = this.normalizeInstanceUrl(organization.instanceUrl || (organization.domain ? `https://${organization.domain}` : null));
+    const organizationHost = this.hostFromUrl(organizationUrl);
+    const domain = organization.domain?.toLowerCase().replace(/^www\./, '') ?? null;
+
+    if (currentUrl && organizationUrl && currentUrl === organizationUrl) return true;
+    if (currentHost && organizationHost && currentHost.replace(/^www\./, '') === organizationHost.replace(/^www\./, '')) return true;
+    if (currentHost && domain && currentHost.replace(/^www\./, '') === domain) return true;
+    return false;
+  }
+
+  private relationPermissions(relation: Pick<typeof organizationRelations.$inferSelect, 'permissions'>): Record<string, unknown> {
+    return (relation.permissions ?? {}) as Record<string, unknown>;
+  }
+
+  private isAutoShareEventsToParentEnabled(relation: Pick<typeof organizationRelations.$inferSelect, 'permissions'>): boolean {
+    const permissions = this.relationPermissions(relation);
+    return permissions.events !== false
+      && permissions.syndication !== false
+      && permissions[AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION] !== false;
+  }
+
+  private async getCurrentSectionParentRelation() {
+    const activeRelations = await db.select().from(organizationRelations).where(and(
+      eq(organizationRelations.relationType, ORGANIZATION_RELATION_TYPE.REGION_SECTION),
+      eq(organizationRelations.status, 'active'),
+    ));
+
+    for (const relation of activeRelations) {
+      const [parentOrganization, childOrganization] = await Promise.all([
+        this.getOrganizationOrThrow(relation.fromOrganizationId),
+        this.getOrganizationOrThrow(relation.toOrganizationId),
+      ]);
+
+      if (
+        parentOrganization.type === ORGANIZATION_TYPE.REGION
+        && childOrganization.type === ORGANIZATION_TYPE.SECTION
+        && this.isOrganizationOnCurrentInstance(childOrganization)
+      ) {
+        return { relation, parentOrganization, childOrganization };
+      }
+    }
+
+    return null;
   }
 
   private normalizeRelationDates<T extends { lastSyncAt?: string | Date | null }>(data: T) {
@@ -341,6 +406,67 @@ export class FederationService {
     return { success: true, data };
   }
 
+  async getFederationSettings() {
+    const currentRelation = await this.getCurrentSectionParentRelation();
+    if (!currentRelation) {
+      return {
+        success: true,
+        data: {
+          canConfigureAutoShare: false,
+          autoShareEventsToParent: false,
+          reason: 'no_current_section_parent_relation',
+        },
+      };
+    }
+
+    const { relation, parentOrganization, childOrganization } = currentRelation;
+    return {
+      success: true,
+      data: {
+        canConfigureAutoShare: true,
+        autoShareEventsToParent: this.isAutoShareEventsToParentEnabled(relation),
+        relation: {
+          ...this.withoutRelationSecret(relation),
+          parentName: parentOrganization.name,
+          childName: childOrganization.name,
+          parentSlug: parentOrganization.slug,
+          childSlug: childOrganization.slug,
+        },
+      },
+    };
+  }
+
+  async updateFederationSettings(data: unknown) {
+    try {
+      const validated = federationSettingsSchema.parse(data);
+      const currentRelation = await this.getCurrentSectionParentRelation();
+      if (!currentRelation) {
+        throw new BadRequestException('Aucun lien mère-fille actif ne correspond à cette instance section');
+      }
+
+      const permissions = {
+        ...this.relationPermissions(currentRelation.relation),
+        [AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION]: validated.autoShareEventsToParent,
+      };
+
+      const [updated] = await db.update(organizationRelations).set({
+        permissions,
+        updatedAt: sql`NOW()`,
+      }).where(eq(organizationRelations.id, currentRelation.relation.id)).returning();
+
+      return {
+        success: true,
+        data: {
+          canConfigureAutoShare: true,
+          autoShareEventsToParent: this.isAutoShareEventsToParentEnabled(updated),
+          relation: this.withoutRelationSecret(updated),
+        },
+      };
+    } catch (error) {
+      return this.handleZodError(error);
+    }
+  }
+
   async createRelation(data: unknown) {
     try {
       const validated = this.normalizeRelationDates(insertOrganizationRelationSchema.parse(data));
@@ -351,7 +477,11 @@ export class FederationService {
         this.getOrganizationOrThrow(validated.fromOrganizationId),
         this.getOrganizationOrThrow(validated.toOrganizationId),
       ]);
-      const [created] = await db.insert(organizationRelations).values(validated).returning();
+      const permissions = {
+        ...((validated.permissions ?? {}) as Record<string, unknown>),
+        [AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION]: (validated.permissions as Record<string, unknown> | undefined)?.[AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION] ?? true,
+      };
+      const [created] = await db.insert(organizationRelations).values({ ...validated, permissions }).returning();
       return { success: true, data: this.withoutRelationSecret(created) };
     } catch (error) {
       if ((error as any)?.code === '23505') throw new ConflictException('Cette relation existe déjà');
@@ -373,10 +503,23 @@ export class FederationService {
     }
   }
 
-  async getSyndications(options?: { status?: string; direction?: string; limit?: number }) {
+  async getSyndications(options?: {
+    status?: string;
+    direction?: string;
+    sourceOrganizationId?: string;
+    targetOrganizationId?: string;
+    syncStatus?: string;
+    includeInAgenda?: string;
+    limit?: number;
+  }) {
     const conditions = [] as any[];
     if (options?.status && options.status !== 'all') conditions.push(eq(eventSyndications.status, options.status));
     if (options?.direction && options.direction !== 'all') conditions.push(eq(eventSyndications.direction, options.direction));
+    if (options?.sourceOrganizationId && options.sourceOrganizationId !== 'all') conditions.push(eq(eventSyndications.sourceOrganizationId, options.sourceOrganizationId));
+    if (options?.targetOrganizationId && options.targetOrganizationId !== 'all') conditions.push(eq(eventSyndications.targetOrganizationId, options.targetOrganizationId));
+    if (options?.syncStatus && options.syncStatus !== 'all') conditions.push(eq(eventSyndications.syncStatus, options.syncStatus));
+    if (options?.includeInAgenda === 'true') conditions.push(eq(eventSyndications.includeInAgenda, true));
+    if (options?.includeInAgenda === 'false') conditions.push(eq(eventSyndications.includeInAgenda, false));
 
     const data = await db.select({
       id: eventSyndications.id,
@@ -432,6 +575,78 @@ export class FederationService {
       throw new BadRequestException('Aucune relation active ne permet cette fédération entre ces organisations');
     }
     return relation;
+  }
+
+  async autoShareEventToParent(eventId: string, userEmail?: string) {
+    const event = await this.getEventOrThrow(eventId);
+    if (event.isFederatedCopy || event.sourceInstanceUrl || event.sourceEventId) {
+      return { success: true, data: { skipped: true, reason: 'federated_copy' } };
+    }
+
+    const currentRelation = await this.getCurrentSectionParentRelation();
+    if (!currentRelation) {
+      return { success: true, data: { skipped: true, reason: 'no_current_section_parent_relation' } };
+    }
+
+    const { relation, parentOrganization, childOrganization } = currentRelation;
+    if (!this.isAutoShareEventsToParentEnabled(relation)) {
+      return { success: true, data: { skipped: true, reason: 'auto_share_disabled' } };
+    }
+
+    if (event.organizationId && event.organizationId !== childOrganization.id) {
+      return { success: true, data: { skipped: true, reason: 'event_not_owned_by_current_section' } };
+    }
+
+    const [existing] = await db.select().from(eventSyndications).where(and(
+      eq(eventSyndications.eventId, event.id),
+      eq(eventSyndications.sourceOrganizationId, childOrganization.id),
+      eq(eventSyndications.targetOrganizationId, parentOrganization.id),
+    )).limit(1);
+
+    if (!existing && event.status !== EVENT_STATUS.PUBLISHED) {
+      return { success: true, data: { skipped: true, reason: 'event_not_published' } };
+    }
+
+    if (existing?.status === SYNDICATION_STATUS.REJECTED || existing?.status === SYNDICATION_STATUS.REVOKED) {
+      return { success: true, data: { skipped: true, reason: 'syndication_rejected_or_revoked', syndication: existing } };
+    }
+
+    const syndication = await db.transaction(async (tx) => {
+      await tx.update(events).set({
+        organizationId: event.organizationId ?? childOrganization.id,
+        federationVisibility: FEDERATION_VISIBILITY.PARENT_REGION,
+        federationStatus: FEDERATION_STATUS.PROPOSED_TO_REGION,
+        updatedAt: sql`NOW()`,
+      }).where(eq(events.id, event.id));
+
+      if (existing) {
+        const [updated] = await tx.update(eventSyndications).set({
+          status: existing.status,
+          includeInAgenda: existing.includeInAgenda,
+          syncStatus: FEDERATION_SYNC_STATUS.PENDING,
+          syncError: null,
+          targetInstanceUrl: this.normalizeInstanceUrl(parentOrganization.instanceUrl) ?? null,
+          updatedAt: sql`NOW()`,
+        }).where(eq(eventSyndications.id, existing.id)).returning();
+        return updated;
+      }
+
+      const [created] = await tx.insert(eventSyndications).values({
+        eventId: event.id,
+        sourceOrganizationId: childOrganization.id,
+        targetOrganizationId: parentOrganization.id,
+        direction: SYNDICATION_DIRECTION.UPWARD,
+        status: SYNDICATION_STATUS.PROPOSED,
+        includeInAgenda: false,
+        createdBy: userEmail ?? 'auto-share',
+        targetInstanceUrl: this.normalizeInstanceUrl(parentOrganization.instanceUrl) ?? null,
+        syncStatus: FEDERATION_SYNC_STATUS.PENDING,
+      }).returning();
+      return created;
+    });
+
+    const sync = await this.syncSyndicationBestEffort(syndication.id);
+    return { success: true, data: { syndication, sync: sync.data } };
   }
 
   async proposeEventUpward(eventId: string, data: unknown, userEmail?: string) {
@@ -832,6 +1047,31 @@ export class FederationService {
     return results.map((result) => result.data);
   }
 
+  private async autoShareEligibleEventsToParent() {
+    const currentRelation = await this.getCurrentSectionParentRelation();
+    if (!currentRelation || !this.isAutoShareEventsToParentEnabled(currentRelation.relation)) return [];
+
+    const localEvents = await db.select({ id: events.id })
+      .from(events)
+      .where(and(
+        sql`${events.date} > NOW()`,
+        eq(events.status, EVENT_STATUS.PUBLISHED),
+        eq(events.isFederatedCopy, false),
+        or(
+          eq(events.organizationId, currentRelation.childOrganization.id),
+          sql`${events.organizationId} IS NULL`,
+        ),
+      ))
+      .orderBy(asc(events.date))
+      .limit(100);
+
+    const results = [];
+    for (const event of localEvents) {
+      results.push(await this.autoShareEventToParent(event.id, 'auto-share-cron'));
+    }
+    return results.map((result) => result.data);
+  }
+
   private async retryPendingSyndications() {
     const syndications = await db.select({ id: eventSyndications.id })
       .from(eventSyndications)
@@ -852,16 +1092,16 @@ export class FederationService {
     return results.map((result) => result.data);
   }
 
-  async syncFederationNow() {
-    const [relations, syndications] = await Promise.all([
-      this.syncActiveRelationHandshakes(),
-      this.retryPendingSyndications(),
-    ]);
+  async syncFederationNow(options?: { autoShareBackfill?: boolean }) {
+    const relations = await this.syncActiveRelationHandshakes();
+    const autoShared = options?.autoShareBackfill ? await this.autoShareEligibleEventsToParent() : [];
+    const syndications = await this.retryPendingSyndications();
 
     return {
       success: true,
       data: {
         relations,
+        autoShared,
         syndications,
         syncedAt: new Date().toISOString(),
       },
@@ -878,6 +1118,7 @@ export class FederationService {
       const result = await this.syncFederationNow();
       logger.info('[Federation] Synchronisation planifiée terminée', {
         relations: result.data.relations.length,
+        autoShared: result.data.autoShared.length,
         syndications: result.data.syndications.length,
       });
     } catch (error) {

@@ -990,11 +990,17 @@ export class DatabaseStorage implements IStorage {
       const limit = Math.min(100, Math.max(1, options?.limit || 20));
       const offset = (page - 1) * limit;
 
+      const publicEventsCondition = and(
+        sql`${events.date} > NOW()`,
+        eq(events.status, EVENT_STATUS.PUBLISHED),
+        eq(events.isFederatedCopy, false),
+      );
+
       // Count total
       const [countResult] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(events)
-        .where(sql`${events.date} > NOW()`);
+        .where(publicEventsCondition);
 
       // Get paginated results
       const result = await db
@@ -1030,7 +1036,7 @@ export class DatabaseStorage implements IStorage {
         })
         .from(events)
         .leftJoin(inscriptions, eq(events.id, inscriptions.eventId))
-        .where(sql`${events.date} > NOW()`)
+        .where(publicEventsCondition)
         .groupBy(events.id)
         .orderBy(events.date)
         .limit(limit)
