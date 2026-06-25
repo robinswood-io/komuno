@@ -9,6 +9,7 @@ COMPOSE="docker compose -p $PROJECT_NAME -f docker-compose.demo.yml --env-file .
 LOG_FILE="${KOMUNO_DEMO_RESET_LOG:-$SCRIPT_DIR/reset-demo.log}"
 LOCK_DIR="/tmp/komuno-demo-reset.lock"
 SCHEMA_FILE="${KOMUNO_DEMO_SCHEMA_FILE:-$SCRIPT_DIR/schema.sql}"
+SEED_FILE="${KOMUNO_DEMO_SEED_FILE:-$SCRIPT_DIR/seed-demo.sql}"
 
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   echo "$(date -Is) reset already running" >> "$LOG_FILE"
@@ -39,5 +40,9 @@ done
 
 docker exec -i komuno-demo-postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < "$SCHEMA_FILE" >> "$LOG_FILE" 2>&1
 $COMPOSE up -d --wait app >> "$LOG_FILE" 2>&1
+
+if [ -s "$SEED_FILE" ]; then
+  docker exec -i komuno-demo-postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1' < "$SEED_FILE" >> "$LOG_FILE" 2>&1
+fi
 
 echo "$(date -Is) reset done" >> "$LOG_FILE"
