@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    image: komuno-demo:latest
+    container_name: komuno-demo-app
+    restart: unless-stopped
+    env_file:
+      - .env.demo
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=3072
+      KOMUNO_DEMO_MODE: "true"
+      KOMUNO_DEMO_ADMIN_EMAIL: demo@komuno.fr
+      DATABASE_URL: postgresql://${DB_USER:-komuno_demo}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-komuno_demo}
+      DATABASE_URL_SUPERUSER: postgresql://${DB_USER:-komuno_demo}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-komuno_demo}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - traefik_public
+      - backend
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik_public
+      - traefik.http.routers.komuno-demo.rule=Host(`demo.komuno.fr`)
+      - traefik.http.routers.komuno-demo.entrypoints=websecure
+      - traefik.http.routers.komuno-demo.tls=true
+      - traefik.http.routers.komuno-demo.tls.certresolver=letsencrypt
+      - traefik.http.services.komuno-demo.loadbalancer.server.port=3000
+      - traefik.http.routers.komuno-demo.middlewares=komuno-demo-headers@docker
+      - traefik.http.middlewares.komuno-demo-headers.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: komuno-demo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-komuno_demo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-komuno_demo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-komuno_demo} -d ${DB_NAME:-komuno_demo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: komuno-demo-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: komuno-demo-minio
+    restart: unless-stopped
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  traefik_public:
+    external: true
+  backend:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

@@ -25,6 +25,7 @@ import { JwtAuthGuard } from './guards/auth.guard';
 import { z } from 'zod';
 import passport from 'passport';
 import type { Admin } from '@shared/schema';
+import { getDemoAdminUser, isDemoModeEnabled } from './demo-user';
 
 // Schémas de validation
 const loginSchema = z.object({
@@ -274,6 +275,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Obtenir les informations de l\'utilisateur connecté' })
   @ApiResponse({ status: 200, description: 'Utilisateur connecté ou null si non authentifié' })
   getCurrentUser(@Req() req: Request) {
+    if (isDemoModeEnabled()) {
+      return this.authService.getUserWithoutPassword(getDemoAdminUser());
+    }
+
     const user = (req as any).user as Admin | undefined;
     const isAuthenticated = typeof (req as any).isAuthenticated === 'function'
       ? (req as any).isAuthenticated()

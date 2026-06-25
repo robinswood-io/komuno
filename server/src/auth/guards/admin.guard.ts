@@ -1,5 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ADMIN_ROLES } from '../../../../shared/schema';
+import { attachDemoUser, isDemoModeEnabled } from '../demo-user';
 
 /**
  * Guard pour vérifier que l'utilisateur est un administrateur
@@ -9,6 +10,12 @@ import { ADMIN_ROLES } from '../../../../shared/schema';
 export class AdminGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
+
+    if (isDemoModeEnabled()) {
+      attachDemoUser(request);
+      return true;
+    }
+
     const user = request.user;
 
     // Vérifier l'authentification

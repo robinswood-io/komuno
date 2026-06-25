@@ -1,0 +1,16 @@
+FROM ghcr.io/robinswood-io/komuno:latest
+
+USER root
+
+COPY dist/server/src/auth/demo-user.js /app/dist/server/src/auth/demo-user.js
+COPY dist/server/src/auth/auth.controller.js /app/dist/server/src/auth/auth.controller.js
+COPY dist/server/src/auth/guards/auth.guard.js /app/dist/server/src/auth/guards/auth.guard.js
+COPY dist/server/src/auth/guards/admin.guard.js /app/dist/server/src/auth/guards/admin.guard.js
+
+RUN chown cjduser:cjd \
+  /app/dist/server/src/auth/demo-user.js \
+  /app/dist/server/src/auth/auth.controller.js \
+  /app/dist/server/src/auth/guards/auth.guard.js \
+  /app/dist/server/src/auth/guards/admin.guard.js
+
+USER cjduser

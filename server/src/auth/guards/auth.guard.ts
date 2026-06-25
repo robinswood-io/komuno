@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { Request } from 'express';
 import { logger } from '../../../lib/logger';
+import { attachDemoUser, isDemoModeEnabled } from '../demo-user';
 
 /**
  * Guard basé sur la session pour vérifier qu'un utilisateur est authentifié
@@ -10,6 +11,11 @@ import { logger } from '../../../lib/logger';
 export class JwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
+
+    if (isDemoModeEnabled()) {
+      attachDemoUser(request as unknown as Record<string, any>);
+      return true;
+    }
 
     // Passport attache `isAuthenticated` quand les sessions sont activées
     const isAuthenticated = typeof request.isAuthenticated === 'function'
