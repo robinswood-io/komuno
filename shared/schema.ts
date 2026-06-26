@@ -80,6 +80,26 @@ export const LOAN_STATUS = {
   UNAVAILABLE: "unavailable"
 } as const;
 
+export const SURVEY_FORM_STATUS = {
+  DRAFT: "draft",
+  PUBLISHED: "published",
+  CLOSED: "closed",
+} as const;
+
+export const SURVEY_QUESTION_TYPE = {
+  TEXT: "text",
+  TEXTAREA: "textarea",
+  EMAIL: "email",
+  PHONE: "phone",
+  NUMBER: "number",
+  DATE: "date",
+  SELECT: "select",
+  RADIO: "radio",
+  MULTISELECT: "multiselect",
+  CHECKBOX: "checkbox",
+  RATING: "rating",
+} as const;
+
 // Ideas table - Flexible status workflow management
 export const ideas = pgTable("ideas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -304,6 +324,57 @@ export const eventSyndications = pgTable("event_syndications", {
   syncStatusIdx: index("event_syndications_sync_status_idx").on(table.syncStatus),
   remoteEventIdx: index("event_syndications_remote_event_idx").on(table.remoteEventId),
   remoteSyndicationIdx: index("event_syndications_remote_syndication_idx").on(table.remoteSyndicationId),
+}));
+
+export const surveyForms = pgTable("survey_forms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").default(SURVEY_FORM_STATUS.DRAFT).notNull(),
+  collectRespondentInfo: boolean("collect_respondent_info").default(false).notNull(),
+  allowMultipleSubmissions: boolean("allow_multiple_submissions").default(true).notNull(),
+  successMessage: text("success_message"),
+  createdBy: text("created_by"),
+  publishedAt: timestamp("published_at"),
+  closedAt: timestamp("closed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  slugIdx: index("survey_forms_slug_idx").on(table.slug),
+  statusIdx: index("survey_forms_status_idx").on(table.status),
+  createdAtIdx: index("survey_forms_created_at_idx").on(table.createdAt),
+}));
+
+export const surveyQuestions = pgTable("survey_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").references(() => surveyForms.id, { onDelete: "cascade" }).notNull(),
+  label: text("label").notNull(),
+  description: text("description"),
+  type: text("type").default(SURVEY_QUESTION_TYPE.TEXT).notNull(),
+  required: boolean("required").default(false).notNull(),
+  options: jsonb("options").default(sql`'[]'::jsonb`).notNull(),
+  validation: jsonb("validation").default(sql`'{}'::jsonb`).notNull(),
+  orderIndex: integer("order_index").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  formIdx: index("survey_questions_form_idx").on(table.formId),
+  formOrderIdx: index("survey_questions_form_order_idx").on(table.formId, table.orderIndex),
+}));
+
+export const surveyResponses = pgTable("survey_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").references(() => surveyForms.id, { onDelete: "cascade" }).notNull(),
+  respondentName: text("respondent_name"),
+  respondentEmail: text("respondent_email"),
+  answers: jsonb("answers").default(sql`'{}'::jsonb`).notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  formIdx: index("survey_responses_form_idx").on(table.formId),
+  submittedAtIdx: index("survey_responses_submitted_at_idx").on(table.submittedAt),
+  answersIdx: index("survey_responses_answers_gin_idx").using("gin", table.answers),
 }));
 
 // Loan items table - Matériel disponible au prêt
@@ -1470,6 +1541,43 @@ export const insertEventSchema = z.object({
   status: z.enum(["draft", "published", "cancelled", "archived", "postponed", "completed"]).optional(),
 });
 
+export const surveyQuestionOptionSchema = z.object({
+  label: z.string().min(1).max(200).transform(sanitizeText),
+  value: z.string().min(1).max(200).optional().transform(val => val ? sanitizeText(val) : undefined),
+});
+
+export const surveyQuestionSchema = z.object({
+  id: z.string().uuid().optional(),
+  label: z.string().min(2, "Le libellé de question doit contenir au moins 2 caractères").max(500).transform(sanitizeText),
+  description: z.string().max(1000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  type: z.enum(["text", "textarea", "email", "phone", "number", "date", "select", "radio", "multiselect", "checkbox", "rating"]),
+  required: z.boolean().default(false),
+  options: z.array(surveyQuestionOptionSchema).default([]),
+  validation: z.record(z.string(), z.unknown()).default({}),
+  orderIndex: z.number().int().min(0).optional(),
+});
+
+export const insertSurveyFormSchema = z.object({
+  title: z.string().min(3, "Le titre du formulaire doit contenir au moins 3 caractères").max(200).transform(sanitizeText),
+  slug: z.string().min(3).max(120).regex(/^[a-z0-9-]+$/).optional(),
+  description: z.string().max(3000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  status: z.enum(["draft", "published", "closed"]).default("draft"),
+  collectRespondentInfo: z.boolean().default(false),
+  allowMultipleSubmissions: z.boolean().default(true),
+  successMessage: z.string().max(1000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  questions: z.array(surveyQuestionSchema).default([]),
+});
+
+export const updateSurveyFormSchema = insertSurveyFormSchema.partial().extend({
+  questions: z.array(surveyQuestionSchema).optional(),
+});
+
+export const submitSurveyResponseSchema = z.object({
+  respondentName: z.string().max(200).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  respondentEmail: z.string().email("Adresse email invalide").optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  answers: z.record(z.string(), z.unknown()).default({}),
+});
+
 // Pure Zod v4 schema
 export const insertInscriptionSchema = z.object({
   eventId: z.string()
@@ -2296,6 +2404,13 @@ export type Event = typeof events.$inferSelect;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type EventSyndication = typeof eventSyndications.$inferSelect;
 export type InsertEventSyndication = z.infer<typeof insertEventSyndicationSchema>;
+
+export type SurveyForm = typeof surveyForms.$inferSelect;
+export type SurveyQuestion = typeof surveyQuestions.$inferSelect;
+export type SurveyResponse = typeof surveyResponses.$inferSelect;
+export type InsertSurveyForm = z.infer<typeof insertSurveyFormSchema>;
+export type UpdateSurveyForm = z.infer<typeof updateSurveyFormSchema>;
+export type SubmitSurveyResponse = z.infer<typeof submitSurveyResponseSchema>;
 
 export type LoanItem = typeof loanItems.$inferSelect;
 export type InsertLoanItem = z.infer<typeof insertLoanItemSchema>;

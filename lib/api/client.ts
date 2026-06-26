@@ -159,6 +159,16 @@ export const queryKeys = {
     detail: (id: string) => ['patrons', 'detail', id] as const,
   },
 
+  // Forms / surveys
+  forms: {
+    all: ['forms'] as const,
+    list: (params?: Record<string, unknown>) => ['forms', 'list', params] as const,
+    detail: (id: string) => ['forms', 'detail', id] as const,
+    responses: (id: string) => ['forms', 'responses', id] as const,
+    stats: (id: string) => ['forms', 'stats', id] as const,
+    public: (slug: string) => ['forms', 'public', slug] as const,
+  },
+
   // Federation / regional network
   federation: {
     all: ['federation'] as const,

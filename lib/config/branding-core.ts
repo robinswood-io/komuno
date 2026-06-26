@@ -33,6 +33,11 @@ export const brandingCore = {
       label: "Idées",
       description: "Boîte à idées collaborative",
     },
+    forms: {
+      enabled: true,
+      label: "Formulaires",
+      description: "Sondages, questionnaires et collecte de réponses structurées",
+    },
     loans: {
       enabled: true,
       label: "Prêts",

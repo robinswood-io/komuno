@@ -28,6 +28,7 @@ import {
   Wrench,
   Boxes,
   Network,
+  FileQuestion,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -109,6 +110,11 @@ const navItems: (NavItem | NavSection)[] = [
         title: 'Événements',
         href: '/admin/events',
         icon: Calendar,
+      },
+      {
+        title: 'Formulaires',
+        href: '/admin/forms',
+        icon: FileQuestion,
       },
       {
         title: 'Idées',

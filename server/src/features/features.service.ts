@@ -20,6 +20,7 @@ export class FeaturesService {
     { featureKey: 'patrons', enabled: true },
     { featureKey: 'financial', enabled: true },
     { featureKey: 'tracking', enabled: true },
+    { featureKey: 'forms', enabled: true },
     { featureKey: 'members', enabled: true },
     { featureKey: 'crm', enabled: false },
   ];

@@ -29,6 +29,7 @@ const pathLabels: Record<string, string> = {
   patrons: 'Mécènes',
   ideas: 'Idées',
   events: 'Événements',
+  forms: 'Formulaires',
   loans: 'Prêts',
   financial: 'Finance',
   federation: 'Fédération',

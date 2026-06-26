@@ -44,6 +44,7 @@ import {
   XCircle,
   Send,
   Server,
+  FileQuestion,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -66,6 +67,7 @@ interface ModuleConfig {
 interface ModulesConfig {
   events: ModuleConfig;
   ideas: ModuleConfig;
+  forms: ModuleConfig;
   loans: ModuleConfig;
   tools: ModuleConfig;
 }
@@ -83,6 +85,7 @@ interface FederationSettingsPayload {
 const MODULE_ICONS = {
   events: Calendar,
   ideas: Lightbulb,
+  forms: FileQuestion,
   loans: Package,
   tools: Wrench,
 };
@@ -220,7 +223,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (branding) {
-      setModules((branding.modules as ModulesConfig) ?? (brandingCore.modules as ModulesConfig));
+      setModules({
+        ...(brandingCore.modules as ModulesConfig),
+        ...((branding.modules as Partial<ModulesConfig> | undefined) ?? {}),
+      });
       setGeneralSettings({
         appName: branding.app?.name || '',
         organizationName: branding.organization?.name || '',
