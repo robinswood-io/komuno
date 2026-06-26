@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.7.1",
-    "releasedAt": "2026-06-25",
-    "summary": "Cette version apporte 1 correction(s).",
+    "version": "2.8.0",
+    "releasedAt": "2026-06-26",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
-      "corrections": [
-        "Preserve accepted auto-share status"
+      "nouveautes": [
+        "Add surveys and structured responses"
       ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.8.0",
+      "releasedAt": "2026-06-26",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add surveys and structured responses"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.7.1",
       "releasedAt": "2026-06-25",
@@ -485,25 +501,8 @@
         ]
       },
       "commitCount": 2
-    },
-    {
-      "version": "2.1.1",
-      "releasedAt": "2026-05-01",
-      "summary": "Cette version apporte des ajustements techniques.",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": [
-          "Finaliser et nettoyer le repo komuno",
-          "Synchronise la version locale du repo komuno"
-        ]
-      },
-      "commitCount": 2
     }
   ],
-  "generatedAt": "2026-06-25T14:00:26.527Z",
+  "generatedAt": "2026-06-26T17:45:22.985Z",
   "source": "conventional-commits"
 }
