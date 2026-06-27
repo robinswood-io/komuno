@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
-import { Copy, ExternalLink, FileQuestion, Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { Copy, CopyPlus, Download, ExternalLink, FileQuestion, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { api, queryKeys, type ApiResponse } from '@/lib/api/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -208,11 +208,33 @@ export default function AdminFormsPage() {
     },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (formId: string) => api.post<ApiResponse<SurveyFormDetail>>(`/api/admin/forms/${formId}/duplicate`),
+    onSuccess: async (response) => {
+      toast({ title: 'Formulaire dupliqué', description: 'La copie est créée en brouillon.' });
+      setSelectedFormId(response.data.id);
+      await invalidateForms();
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (formId: string) => api.delete(`/api/admin/forms/${formId}`),
     onSuccess: async () => {
       toast({ title: 'Formulaire supprimé' });
       setSelectedFormId(null);
+      await invalidateForms();
+    },
+  });
+
+  const deleteResponseMutation = useMutation({
+    mutationFn: (responseId: string) => api.delete(`/api/admin/forms/${activeFormId}/responses/${responseId}`),
+    onSuccess: async () => {
+      toast({ title: 'Réponse supprimée' });
+      if (activeFormId) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.forms.responses(activeFormId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.forms.stats(activeFormId) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.forms.detail(activeFormId) });
+      }
       await invalidateForms();
     },
   });
@@ -266,6 +288,11 @@ export default function AdminFormsPage() {
     if (!publicUrl) return;
     await navigator.clipboard.writeText(publicUrl);
     toast({ title: 'Lien copié', description: publicUrl });
+  };
+
+  const downloadCsv = () => {
+    if (!activeFormId) return;
+    window.open(`/api/admin/forms/${activeFormId}/responses.csv`, '_blank');
   };
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -364,6 +391,9 @@ export default function AdminFormsPage() {
                       <Button variant="outline" asChild disabled={selectedForm.status !== 'published'}>
                         <a href={selectedForm.publicUrl} target="_blank" rel="noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Voir</a>
                       </Button>
+                      <Button variant="outline" onClick={() => duplicateMutation.mutate(selectedForm.id)} disabled={duplicateMutation.isPending}>
+                        <CopyPlus className="mr-2 h-4 w-4" /> Dupliquer
+                      </Button>
                       <Button onClick={openEditDialog}><Save className="mr-2 h-4 w-4" /> Modifier</Button>
                       <Button variant="destructive" onClick={() => deleteMutation.mutate(selectedForm.id)} disabled={deleteMutation.isPending}>
                         <Trash2 className="mr-2 h-4 w-4" /> Supprimer
@@ -456,22 +486,41 @@ export default function AdminFormsPage() {
                 <TabsContent value="responses">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Réponses structurées</CardTitle>
-                      <CardDescription>Chaque colonne correspond à une question du formulaire.</CardDescription>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <CardTitle>Réponses structurées</CardTitle>
+                          <CardDescription>Chaque colonne correspond à une question du formulaire.</CardDescription>
+                        </div>
+                        <Button variant="outline" onClick={downloadCsv} disabled={!responses?.rows.length}>
+                          <Download className="mr-2 h-4 w-4" /> Export CSV
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
                             {(responses?.columns ?? []).map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {(responses?.rows ?? []).length === 0 ? (
-                            <TableRow><TableCell colSpan={Math.max(1, responses?.columns.length ?? 1)} className="text-center text-muted-foreground">Aucune réponse.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={Math.max(2, (responses?.columns.length ?? 1) + 1)} className="text-center text-muted-foreground">Aucune réponse.</TableCell></TableRow>
                           ) : responses?.rows.map((row) => (
                             <TableRow key={String(row.id)}>
                               {responses.columns.map((column) => <TableCell key={column.key}>{formatValue(row[column.key])}</TableCell>)}
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => deleteResponseMutation.mutate(String(row.id))}
+                                  disabled={deleteResponseMutation.isPending}
+                                  aria-label="Supprimer la réponse"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

@@ -7,8 +7,10 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { FormsService } from './forms.service';
@@ -55,6 +57,14 @@ export class FormsController {
     return await this.formsService.updateForm(id, body);
   }
 
+  @Post(':id/duplicate')
+  @Permissions('admin.manage')
+  @ApiOperation({ summary: 'Dupliquer un formulaire en brouillon' })
+  @ApiParam({ name: 'id' })
+  async duplicateForm(@Param('id') id: string, @User() user: { email?: string }) {
+    return await this.formsService.duplicateForm(id, user.email);
+  }
+
   @Delete(':id')
   @Permissions('admin.manage')
   @ApiOperation({ summary: 'Supprimer un formulaire / sondage et ses réponses' })
@@ -63,12 +73,32 @@ export class FormsController {
     return await this.formsService.deleteForm(id);
   }
 
+  @Get(':id/responses.csv')
+  @Permissions('admin.view')
+  @ApiOperation({ summary: 'Exporter les réponses d’un formulaire en CSV' })
+  @ApiParam({ name: 'id' })
+  async exportResponsesCsv(@Param('id') id: string, @Res({ passthrough: true }) response: Response) {
+    const result = await this.formsService.getResponsesCsv(id);
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    response.setHeader('Content-Disposition', `attachment; filename="${result.data.filename}"`);
+    return result.data.content;
+  }
+
   @Get(':id/responses')
   @Permissions('admin.view')
   @ApiOperation({ summary: 'Lister les réponses structurées d’un formulaire' })
   @ApiParam({ name: 'id' })
   async getResponses(@Param('id') id: string) {
     return await this.formsService.getResponses(id);
+  }
+
+  @Delete(':id/responses/:responseId')
+  @Permissions('admin.manage')
+  @ApiOperation({ summary: 'Supprimer une réponse de formulaire' })
+  @ApiParam({ name: 'id' })
+  @ApiParam({ name: 'responseId' })
+  async deleteResponse(@Param('id') id: string, @Param('responseId') responseId: string) {
+    return await this.formsService.deleteResponse(id, responseId);
   }
 
   @Get(':id/stats')

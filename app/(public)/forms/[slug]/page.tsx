@@ -78,10 +78,12 @@ export default function PublicSurveyFormPage() {
 
   const requiredMissing = useMemo(() => {
     if (!form) return false;
-    if (form.collectRespondentInfo && !respondentEmail) return true;
+    const respondentEmailRequired = form.collectRespondentInfo || !form.allowMultipleSubmissions;
+    if (respondentEmailRequired && !respondentEmail) return true;
     return form.questions.some((question) => {
       if (!question.required) return false;
       const value = answers[question.id];
+      if (question.type === 'checkbox') return value !== true;
       return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
     });
   }, [answers, form, respondentEmail]);
@@ -190,15 +192,18 @@ export default function PublicSurveyFormPage() {
           {form.description && <CardDescription className="whitespace-pre-wrap text-base">{form.description}</CardDescription>}
         </CardHeader>
         <CardContent className="space-y-8">
-          {form.collectRespondentInfo && (
+          {(form.collectRespondentInfo || !form.allowMultipleSubmissions) && (
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Nom</Label>
-                <Input value={respondentName} onChange={(event) => setRespondentName(event.target.value)} />
-              </div>
+              {form.collectRespondentInfo && (
+                <div className="space-y-2">
+                  <Label>Nom</Label>
+                  <Input value={respondentName} onChange={(event) => setRespondentName(event.target.value)} />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Email <span className="text-destructive">*</span></Label>
                 <Input type="email" value={respondentEmail} onChange={(event) => setRespondentEmail(event.target.value)} required />
+                {!form.allowMultipleSubmissions && <p className="text-xs text-muted-foreground">Utilisé uniquement pour éviter les réponses multiples.</p>}
               </div>
             </div>
           )}

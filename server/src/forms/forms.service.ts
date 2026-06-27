@@ -18,6 +18,7 @@ import {
 
 type QuestionOption = { label: string; value: string };
 type AnswerMap = Record<string, unknown>;
+type SurveyQuestionInput = NonNullable<z.infer<typeof updateSurveyFormSchema>['questions']>[number];
 
 const optionTypes = new Set<string>([
   SURVEY_QUESTION_TYPE.SELECT,
@@ -62,6 +63,37 @@ export class FormsService {
       .filter((option): option is QuestionOption => Boolean(option));
   }
 
+  private assertQuestionsCanBeSaved(status: string | undefined, questions: SurveyQuestionInput[] | undefined) {
+    if (status === SURVEY_FORM_STATUS.PUBLISHED && questions !== undefined && questions.length === 0) {
+      throw new BadRequestException('Un formulaire publié doit contenir au moins une question');
+    }
+
+    for (const question of questions ?? []) {
+      const options = this.normalizeOptions(question.options);
+      if (optionTypes.has(question.type) && options.length === 0) {
+        throw new BadRequestException(`La question « ${question.label} » doit contenir au moins une option`);
+      }
+      const values = options.map((option) => option.value);
+      if (new Set(values).size !== values.length) {
+        throw new BadRequestException(`La question « ${question.label} » contient des options en doublon`);
+      }
+    }
+  }
+
+  private questionValues(formId: string, questions: SurveyQuestionInput[]) {
+    return questions.map((question, index) => ({
+      ...(question.id ? { id: question.id } : {}),
+      formId,
+      label: question.label,
+      description: question.description ?? null,
+      type: question.type,
+      required: question.required,
+      options: this.normalizeOptions(question.options),
+      validation: question.validation ?? {},
+      orderIndex: question.orderIndex ?? index,
+    }));
+  }
+
   private async ensureUniqueSlug(baseSlug: string, currentFormId?: string): Promise<string> {
     const normalized = this.slugify(baseSlug);
     let candidate = normalized;
@@ -84,22 +116,15 @@ export class FormsService {
     return await db.select().from(surveyQuestions).where(eq(surveyQuestions.formId, formId)).orderBy(asc(surveyQuestions.orderIndex), asc(surveyQuestions.createdAt));
   }
 
-  private async replaceQuestions(formId: string, questions: z.infer<typeof updateSurveyFormSchema>['questions']) {
-    if (!questions) return;
-
-    await db.delete(surveyQuestions).where(eq(surveyQuestions.formId, formId));
-    if (questions.length === 0) return;
-
-    await db.insert(surveyQuestions).values(questions.map((question, index) => ({
-      formId,
-      label: question.label,
-      description: question.description ?? null,
-      type: question.type,
-      required: question.required,
-      options: this.normalizeOptions(question.options),
-      validation: question.validation ?? {},
-      orderIndex: question.orderIndex ?? index,
-    })));
+  private formatAnswerForDisplay(question: SurveyQuestion, value: unknown): unknown {
+    if (this.isEmptyAnswer(value)) return null;
+    if (question.type === SURVEY_QUESTION_TYPE.MULTISELECT && Array.isArray(value)) {
+      return value.map((item) => this.labelForOption(question, String(item)));
+    }
+    if (question.type === SURVEY_QUESTION_TYPE.SELECT || question.type === SURVEY_QUESTION_TYPE.RADIO) {
+      return this.labelForOption(question, String(value));
+    }
+    return value;
   }
 
   async listForms(options?: { status?: string }) {
@@ -131,6 +156,7 @@ export class FormsService {
   async createForm(data: unknown, userEmail?: string) {
     try {
       const validated = insertSurveyFormSchema.parse(data);
+      this.assertQuestionsCanBeSaved(validated.status, validated.questions);
       const slug = await this.ensureUniqueSlug(validated.slug ?? validated.title);
       const now = new Date();
 
@@ -149,16 +175,7 @@ export class FormsService {
         }).returning();
 
         if (validated.questions.length > 0) {
-          await tx.insert(surveyQuestions).values(validated.questions.map((question, index) => ({
-            formId: form.id,
-            label: question.label,
-            description: question.description ?? null,
-            type: question.type,
-            required: question.required,
-            options: this.normalizeOptions(question.options),
-            validation: question.validation ?? {},
-            orderIndex: question.orderIndex ?? index,
-          })));
+          await tx.insert(surveyQuestions).values(this.questionValues(form.id, validated.questions));
         }
 
         return form;
@@ -193,6 +210,13 @@ export class FormsService {
     try {
       const current = await this.getFormOrThrow(id);
       const validated = updateSurveyFormSchema.parse(data);
+      if ((validated.status ?? current.status) === SURVEY_FORM_STATUS.PUBLISHED && validated.questions === undefined) {
+        const existingQuestions = await this.getQuestions(id);
+        if (existingQuestions.length === 0) {
+          throw new BadRequestException('Un formulaire publié doit contenir au moins une question');
+        }
+      }
+      this.assertQuestionsCanBeSaved(validated.status ?? current.status, validated.questions);
       const patch: Record<string, unknown> = { updatedAt: sql`NOW()` };
 
       if (validated.title !== undefined) patch.title = validated.title;
@@ -212,16 +236,7 @@ export class FormsService {
         if (validated.questions) {
           await tx.delete(surveyQuestions).where(eq(surveyQuestions.formId, id));
           if (validated.questions.length > 0) {
-            await tx.insert(surveyQuestions).values(validated.questions.map((question, index) => ({
-              formId: id,
-              label: question.label,
-              description: question.description ?? null,
-              type: question.type,
-              required: question.required,
-              options: this.normalizeOptions(question.options),
-              validation: question.validation ?? {},
-              orderIndex: question.orderIndex ?? index,
-            })));
+            await tx.insert(surveyQuestions).values(this.questionValues(id, validated.questions));
           }
         }
       });
@@ -237,6 +252,42 @@ export class FormsService {
     const form = await this.getFormOrThrow(id);
     await db.delete(surveyForms).where(eq(surveyForms.id, form.id));
     return { success: true, data: { id: form.id, deleted: true } };
+  }
+
+  async duplicateForm(id: string, userEmail?: string) {
+    const form = await this.getFormOrThrow(id);
+    const questions = await this.getQuestions(form.id);
+    const slug = await this.ensureUniqueSlug(`${form.slug}-copie`);
+
+    const duplicated = await db.transaction(async (tx) => {
+      const [copy] = await tx.insert(surveyForms).values({
+        slug,
+        title: `${form.title} — copie`,
+        description: form.description,
+        status: SURVEY_FORM_STATUS.DRAFT,
+        collectRespondentInfo: form.collectRespondentInfo,
+        allowMultipleSubmissions: form.allowMultipleSubmissions,
+        successMessage: form.successMessage,
+        createdBy: userEmail ?? form.createdBy,
+      }).returning();
+
+      if (questions.length > 0) {
+        await tx.insert(surveyQuestions).values(questions.map((question, index) => ({
+          formId: copy.id,
+          label: question.label,
+          description: question.description,
+          type: question.type,
+          required: question.required,
+          options: question.options,
+          validation: question.validation,
+          orderIndex: question.orderIndex ?? index,
+        })));
+      }
+
+      return copy;
+    });
+
+    return await this.getForm(duplicated.id);
   }
 
   async getPublicForm(slug: string) {
@@ -327,6 +378,22 @@ export class FormsService {
         throw new BadRequestException('Email répondant requis pour ce formulaire');
       }
 
+      if (!form.allowMultipleSubmissions) {
+        if (!validated.respondentEmail) {
+          throw new BadRequestException('Email répondant requis lorsque les réponses multiples sont désactivées');
+        }
+        const [existing] = await db.select({ id: surveyResponses.id })
+          .from(surveyResponses)
+          .where(and(
+            eq(surveyResponses.formId, form.id),
+            eq(surveyResponses.respondentEmail, validated.respondentEmail),
+          ))
+          .limit(1);
+        if (existing) {
+          throw new ConflictException('Une réponse existe déjà pour cette adresse email');
+        }
+      }
+
       const [response] = await db.insert(surveyResponses).values({
         formId: form.id,
         respondentName: validated.respondentName ?? null,
@@ -368,11 +435,40 @@ export class FormsService {
         submittedAt: response.submittedAt,
         respondentName: response.respondentName,
         respondentEmail: response.respondentEmail,
-        ...Object.fromEntries(questions.map((question) => [question.id, answers[question.id] ?? null])),
+        ...Object.fromEntries(questions.map((question) => [question.id, this.formatAnswerForDisplay(question, answers[question.id])])),
       };
     });
 
     return { success: true, data: { form, questions, columns, rows } };
+  }
+
+  private csvEscape(value: unknown): string {
+    if (value === null || value === undefined) return '';
+    const raw = Array.isArray(value) ? value.join(', ') : String(value);
+    return /[";\n\r]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
+  }
+
+  async getResponsesCsv(formId: string) {
+    const responses = await this.getResponses(formId);
+    const { form, columns, rows } = responses.data;
+    const header = columns.map((column) => this.csvEscape(column.label)).join(';');
+    const body = rows.map((row) => columns.map((column) => this.csvEscape((row as Record<string, unknown>)[column.key])).join(';'));
+    return {
+      success: true,
+      data: {
+        filename: `${this.slugify(form.title)}-reponses.csv`,
+        content: [header, ...body].join('\n'),
+      },
+    };
+  }
+
+  async deleteResponse(formId: string, responseId: string) {
+    await this.getFormOrThrow(formId);
+    const [deleted] = await db.delete(surveyResponses)
+      .where(and(eq(surveyResponses.formId, formId), eq(surveyResponses.id, responseId)))
+      .returning({ id: surveyResponses.id });
+    if (!deleted) throw new NotFoundException('Réponse introuvable');
+    return { success: true, data: { id: deleted.id, deleted: true } };
   }
 
   private labelForOption(question: SurveyQuestion, value: string): string {
