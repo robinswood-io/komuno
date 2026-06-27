@@ -1,12 +1,12 @@
 {
   "latest": {
-    "version": "2.8.0",
-    "releasedAt": "2026-06-26",
+    "version": "2.9.0",
+    "releasedAt": "2026-06-27",
     "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [
-        "Add surveys and structured responses"
+        "Harden survey responses workflow"
       ],
       "corrections": [],
       "ameliorations": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.9.0",
+      "releasedAt": "2026-06-27",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Harden survey responses workflow"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.8.0",
       "releasedAt": "2026-06-26",
@@ -484,25 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.2",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte des ajustements techniques.",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": [
-          "Versionne l'intégralité des artefacts restants",
-          "Ajout massif de tests unitaires multi-vagues"
-        ]
-      },
-      "commitCount": 2
     }
   ],
-  "generatedAt": "2026-06-26T17:45:22.985Z",
+  "generatedAt": "2026-06-27T18:52:56.852Z",
   "source": "conventional-commits"
 }
