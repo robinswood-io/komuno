@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.10.2",
+    "version": "2.10.3",
     "releasedAt": "2026-06-28",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Use default ssh port for hdf deploy"
+        "Run hdf deploy on self-hosted runner"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.10.3",
+      "releasedAt": "2026-06-28",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Run hdf deploy on self-hosted runner"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.10.2",
       "releasedAt": "2026-06-28",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.6",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Fiabilise deploy REP (réseau externe + healthcheck flexible)"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-28T08:12:12.603Z",
+  "generatedAt": "2026-06-28T08:15:40.983Z",
   "source": "conventional-commits"
 }
