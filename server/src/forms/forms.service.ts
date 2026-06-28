@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
@@ -19,6 +20,7 @@ import {
 type QuestionOption = { label: string; value: string };
 type AnswerMap = Record<string, unknown>;
 type SurveyQuestionInput = NonNullable<z.infer<typeof updateSurveyFormSchema>['questions']>[number];
+type SurveyQuestionSnapshot = Pick<SurveyQuestion, 'id' | 'label' | 'description' | 'type' | 'required' | 'options' | 'orderIndex'>;
 
 const optionTypes = new Set<string>([
   SURVEY_QUESTION_TYPE.SELECT,
@@ -28,6 +30,8 @@ const optionTypes = new Set<string>([
 
 @Injectable()
 export class FormsService {
+  private readonly logger = new Logger(FormsService.name);
+
   private handleZodError(error: unknown): never {
     if (error instanceof ZodError) {
       throw new BadRequestException(fromZodError(error).toString());
@@ -116,6 +120,56 @@ export class FormsService {
     return await db.select().from(surveyQuestions).where(eq(surveyQuestions.formId, formId)).orderBy(asc(surveyQuestions.orderIndex), asc(surveyQuestions.createdAt));
   }
 
+  private normalizeDate(value: string | Date | null | undefined): Date | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private isExpired(form: Pick<typeof surveyForms.$inferSelect, 'expiresAt'>): boolean {
+    const expiresAt = this.normalizeDate(form.expiresAt);
+    return Boolean(expiresAt && expiresAt.getTime() <= Date.now());
+  }
+
+  private snapshotQuestions(questions: SurveyQuestion[]): SurveyQuestionSnapshot[] {
+    return questions.map((question) => ({
+      id: question.id,
+      label: question.label,
+      description: question.description,
+      type: question.type,
+      required: question.required,
+      options: question.options,
+      orderIndex: question.orderIndex,
+    }));
+  }
+
+  private buildFormSnapshot(form: Pick<typeof surveyForms.$inferSelect, 'id' | 'slug' | 'title' | 'version'>, questions: SurveyQuestion[]) {
+    return {
+      formId: form.id,
+      slug: form.slug,
+      title: form.title,
+      version: form.version,
+      capturedAt: new Date().toISOString(),
+      questions: this.snapshotQuestions(questions),
+    };
+  }
+
+  private questionCatalog(currentQuestions: SurveyQuestion[], responses: SurveyResponse[] = []): SurveyQuestion[] {
+    const byId = new Map<string, SurveyQuestion>();
+    for (const question of currentQuestions) byId.set(question.id, question);
+
+    for (const response of responses) {
+      const snapshot = response.formSnapshot as { questions?: SurveyQuestion[] } | null;
+      for (const question of snapshot?.questions ?? []) {
+        if (question?.id && !byId.has(question.id)) {
+          byId.set(question.id, question as SurveyQuestion);
+        }
+      }
+    }
+
+    return Array.from(byId.values()).sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+  }
+
   private formatAnswerForDisplay(question: SurveyQuestion, value: unknown): unknown {
     if (this.isEmptyAnswer(value)) return null;
     if (question.type === SURVEY_QUESTION_TYPE.MULTISELECT && Array.isArray(value)) {
@@ -166,9 +220,21 @@ export class FormsService {
           title: validated.title,
           description: validated.description ?? null,
           status: validated.status,
+          organizationId: validated.organizationId ?? null,
+          originOrganizationId: validated.originOrganizationId ?? null,
+          sourceFormId: validated.sourceFormId ?? null,
+          sourceInstanceUrl: validated.sourceInstanceUrl ?? null,
+          federationVisibility: validated.federationVisibility ?? 'local',
+          federationStatus: validated.federationStatus ?? 'local_only',
+          isFederatedCopy: validated.isFederatedCopy ?? false,
+          canonicalFormId: validated.canonicalFormId ?? null,
           collectRespondentInfo: validated.collectRespondentInfo,
           allowMultipleSubmissions: validated.allowMultipleSubmissions,
           successMessage: validated.successMessage ?? null,
+          requireConsent: validated.requireConsent,
+          consentText: validated.consentText ?? null,
+          retentionDays: validated.retentionDays ?? null,
+          expiresAt: this.normalizeDate(validated.expiresAt),
           createdBy: userEmail ?? null,
           publishedAt: validated.status === SURVEY_FORM_STATUS.PUBLISHED ? now : null,
           closedAt: validated.status === SURVEY_FORM_STATUS.CLOSED ? now : null,
@@ -221,9 +287,22 @@ export class FormsService {
 
       if (validated.title !== undefined) patch.title = validated.title;
       if (validated.description !== undefined) patch.description = validated.description ?? null;
+      if (validated.organizationId !== undefined) patch.organizationId = validated.organizationId ?? null;
+      if (validated.originOrganizationId !== undefined) patch.originOrganizationId = validated.originOrganizationId ?? null;
+      if (validated.sourceFormId !== undefined) patch.sourceFormId = validated.sourceFormId ?? null;
+      if (validated.sourceInstanceUrl !== undefined) patch.sourceInstanceUrl = validated.sourceInstanceUrl ?? null;
+      if (validated.federationVisibility !== undefined) patch.federationVisibility = validated.federationVisibility;
+      if (validated.federationStatus !== undefined) patch.federationStatus = validated.federationStatus;
+      if (validated.isFederatedCopy !== undefined) patch.isFederatedCopy = validated.isFederatedCopy;
+      if (validated.canonicalFormId !== undefined) patch.canonicalFormId = validated.canonicalFormId ?? null;
       if (validated.collectRespondentInfo !== undefined) patch.collectRespondentInfo = validated.collectRespondentInfo;
       if (validated.allowMultipleSubmissions !== undefined) patch.allowMultipleSubmissions = validated.allowMultipleSubmissions;
       if (validated.successMessage !== undefined) patch.successMessage = validated.successMessage ?? null;
+      if (validated.requireConsent !== undefined) patch.requireConsent = validated.requireConsent;
+      if (validated.consentText !== undefined) patch.consentText = validated.consentText ?? null;
+      if (validated.retentionDays !== undefined) patch.retentionDays = validated.retentionDays ?? null;
+      if (validated.expiresAt !== undefined) patch.expiresAt = this.normalizeDate(validated.expiresAt);
+      if (validated.questions !== undefined) patch.version = sql`${surveyForms.version} + 1`;
       if (validated.slug !== undefined) patch.slug = await this.ensureUniqueSlug(validated.slug, id);
       if (validated.status !== undefined) {
         patch.status = validated.status;
@@ -265,9 +344,19 @@ export class FormsService {
         title: `${form.title} — copie`,
         description: form.description,
         status: SURVEY_FORM_STATUS.DRAFT,
+        organizationId: form.organizationId,
+        originOrganizationId: form.originOrganizationId,
+        federationVisibility: 'local',
+        federationStatus: 'local_only',
+        isFederatedCopy: false,
+        canonicalFormId: null,
         collectRespondentInfo: form.collectRespondentInfo,
         allowMultipleSubmissions: form.allowMultipleSubmissions,
         successMessage: form.successMessage,
+        requireConsent: form.requireConsent,
+        consentText: form.consentText,
+        retentionDays: form.retentionDays,
+        expiresAt: form.expiresAt,
         createdBy: userEmail ?? form.createdBy,
       }).returning();
 
@@ -296,7 +385,7 @@ export class FormsService {
       eq(surveyForms.status, SURVEY_FORM_STATUS.PUBLISHED),
     )).limit(1);
 
-    if (!form) throw new NotFoundException('Formulaire introuvable ou non publié');
+    if (!form || this.isExpired(form)) throw new NotFoundException('Formulaire introuvable, expiré ou non publié');
     const questions = await this.getQuestions(form.id);
 
     return {
@@ -306,9 +395,13 @@ export class FormsService {
         slug: form.slug,
         title: form.title,
         description: form.description,
+        version: form.version,
         collectRespondentInfo: form.collectRespondentInfo,
         allowMultipleSubmissions: form.allowMultipleSubmissions,
         successMessage: form.successMessage,
+        requireConsent: form.requireConsent,
+        consentText: form.consentText,
+        expiresAt: form.expiresAt,
         questions,
       },
     };
@@ -378,6 +471,10 @@ export class FormsService {
         throw new BadRequestException('Email répondant requis pour ce formulaire');
       }
 
+      if (form.requireConsent && !validated.consentAccepted) {
+        throw new BadRequestException('Le consentement est requis pour répondre à ce formulaire');
+      }
+
       if (!form.allowMultipleSubmissions) {
         if (!validated.respondentEmail) {
           throw new BadRequestException('Email répondant requis lorsque les réponses multiples sont désactivées');
@@ -396,9 +493,12 @@ export class FormsService {
 
       const [response] = await db.insert(surveyResponses).values({
         formId: form.id,
+        formVersion: form.version,
         respondentName: validated.respondentName ?? null,
         respondentEmail: validated.respondentEmail ?? null,
         answers: sanitizedAnswers,
+        formSnapshot: this.buildFormSnapshot(form, questions),
+        consentAccepted: Boolean(validated.consentAccepted),
       }).returning();
 
       return {
@@ -416,15 +516,18 @@ export class FormsService {
 
   async getResponses(formId: string) {
     const form = await this.getFormOrThrow(formId);
-    const questions = await this.getQuestions(form.id);
+    const currentQuestions = await this.getQuestions(form.id);
     const responses = await db.select().from(surveyResponses).where(eq(surveyResponses.formId, form.id)).orderBy(desc(surveyResponses.submittedAt));
+    const questions = this.questionCatalog(currentQuestions, responses);
 
     const columns = [
       { key: 'submittedAt', label: 'Date de réponse', type: 'date' },
-      ...(form.collectRespondentInfo ? [
+      { key: 'formVersion', label: 'Version formulaire', type: 'number' },
+      ...(form.collectRespondentInfo || !form.allowMultipleSubmissions ? [
         { key: 'respondentName', label: 'Nom', type: 'text' },
         { key: 'respondentEmail', label: 'Email', type: 'text' },
       ] : []),
+      ...(form.requireConsent ? [{ key: 'consentAccepted', label: 'Consentement', type: 'boolean' }] : []),
       ...questions.map((question) => ({ key: question.id, label: question.label, type: question.type })),
     ];
 
@@ -433,8 +536,10 @@ export class FormsService {
       return {
         id: response.id,
         submittedAt: response.submittedAt,
+        formVersion: response.formVersion,
         respondentName: response.respondentName,
         respondentEmail: response.respondentEmail,
+        consentAccepted: response.consentAccepted,
         ...Object.fromEntries(questions.map((question) => [question.id, this.formatAnswerForDisplay(question, answers[question.id])])),
       };
     });
@@ -444,7 +549,8 @@ export class FormsService {
 
   private csvEscape(value: unknown): string {
     if (value === null || value === undefined) return '';
-    const raw = Array.isArray(value) ? value.join(', ') : String(value);
+    const rawValue = Array.isArray(value) ? value.join(', ') : String(value);
+    const raw = /^[=+\-@]/.test(rawValue) ? `'${rawValue}` : rawValue;
     return /[";\n\r]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
   }
 
@@ -538,10 +644,48 @@ export class FormsService {
     };
   }
 
+  async runMaintenance() {
+    const closedForms = await db.update(surveyForms)
+      .set({ status: SURVEY_FORM_STATUS.CLOSED, closedAt: sql`NOW()`, updatedAt: sql`NOW()` })
+      .where(and(
+        eq(surveyForms.status, SURVEY_FORM_STATUS.PUBLISHED),
+        sql`${surveyForms.expiresAt} IS NOT NULL`,
+        sql`${surveyForms.expiresAt} <= NOW()`,
+      ))
+      .returning({ id: surveyForms.id });
+
+    const deletedResponses = await db.execute(sql`
+      DELETE FROM survey_responses sr
+      USING survey_forms sf
+      WHERE sr.form_id = sf.id
+        AND sf.retention_days IS NOT NULL
+        AND sr.submitted_at < NOW() - (sf.retention_days || ' days')::interval
+    `);
+
+    return {
+      success: true,
+      data: {
+        closedExpiredForms: closedForms.length,
+        purgedResponses: (deletedResponses as any)?.rowCount ?? 0,
+      },
+    };
+  }
+
+  @Cron('0 3 * * *', { name: 'forms-maintenance', timeZone: 'Europe/Paris' })
+  async runFormsMaintenanceCron() {
+    try {
+      const result = await this.runMaintenance();
+      this.logger.log(`Maintenance formulaires terminée: ${JSON.stringify(result.data)}`);
+    } catch (error) {
+      this.logger.error('Maintenance formulaires échouée', error as Error);
+    }
+  }
+
   async getStats(formId: string) {
     const form = await this.getFormOrThrow(formId);
-    const questions = await this.getQuestions(form.id);
+    const currentQuestions = await this.getQuestions(form.id);
     const responses = await db.select().from(surveyResponses).where(eq(surveyResponses.formId, form.id)).orderBy(asc(surveyResponses.submittedAt));
+    const questions = this.questionCatalog(currentQuestions, responses);
 
     const byDayMap = new Map<string, number>();
     for (const response of responses) {

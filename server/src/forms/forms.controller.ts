@@ -27,7 +27,7 @@ export class FormsController {
   constructor(private readonly formsService: FormsService) {}
 
   @Get()
-  @Permissions('admin.view')
+  @Permissions('forms.view')
   @ApiOperation({ summary: 'Lister les formulaires / sondages' })
   @ApiQuery({ name: 'status', required: false })
   async listForms(@Query('status') status?: string) {
@@ -35,14 +35,21 @@ export class FormsController {
   }
 
   @Post()
-  @Permissions('admin.manage')
+  @Permissions('forms.write')
   @ApiOperation({ summary: 'Créer un formulaire / sondage' })
   async createForm(@Body() body: unknown, @User() user: { email?: string }) {
     return await this.formsService.createForm(body, user.email);
   }
 
+  @Post('maintenance/run')
+  @Permissions('forms.manage')
+  @ApiOperation({ summary: 'Lancer la maintenance formulaires (expiration / rétention)' })
+  async runMaintenance() {
+    return await this.formsService.runMaintenance();
+  }
+
   @Get(':id')
-  @Permissions('admin.view')
+  @Permissions('forms.view')
   @ApiOperation({ summary: 'Détail d’un formulaire / sondage' })
   @ApiParam({ name: 'id' })
   async getForm(@Param('id') id: string) {
@@ -50,7 +57,7 @@ export class FormsController {
   }
 
   @Put(':id')
-  @Permissions('admin.manage')
+  @Permissions('forms.write')
   @ApiOperation({ summary: 'Modifier un formulaire / sondage' })
   @ApiParam({ name: 'id' })
   async updateForm(@Param('id') id: string, @Body() body: unknown) {
@@ -58,7 +65,7 @@ export class FormsController {
   }
 
   @Post(':id/duplicate')
-  @Permissions('admin.manage')
+  @Permissions('forms.write')
   @ApiOperation({ summary: 'Dupliquer un formulaire en brouillon' })
   @ApiParam({ name: 'id' })
   async duplicateForm(@Param('id') id: string, @User() user: { email?: string }) {
@@ -66,7 +73,7 @@ export class FormsController {
   }
 
   @Delete(':id')
-  @Permissions('admin.manage')
+  @Permissions('forms.delete')
   @ApiOperation({ summary: 'Supprimer un formulaire / sondage et ses réponses' })
   @ApiParam({ name: 'id' })
   async deleteForm(@Param('id') id: string) {
@@ -74,7 +81,7 @@ export class FormsController {
   }
 
   @Get(':id/responses.csv')
-  @Permissions('admin.view')
+  @Permissions('forms.export')
   @ApiOperation({ summary: 'Exporter les réponses d’un formulaire en CSV' })
   @ApiParam({ name: 'id' })
   async exportResponsesCsv(@Param('id') id: string, @Res({ passthrough: true }) response: Response) {
@@ -85,7 +92,7 @@ export class FormsController {
   }
 
   @Get(':id/responses')
-  @Permissions('admin.view')
+  @Permissions('forms.view')
   @ApiOperation({ summary: 'Lister les réponses structurées d’un formulaire' })
   @ApiParam({ name: 'id' })
   async getResponses(@Param('id') id: string) {
@@ -93,7 +100,7 @@ export class FormsController {
   }
 
   @Delete(':id/responses/:responseId')
-  @Permissions('admin.manage')
+  @Permissions('forms.delete')
   @ApiOperation({ summary: 'Supprimer une réponse de formulaire' })
   @ApiParam({ name: 'id' })
   @ApiParam({ name: 'responseId' })
@@ -102,7 +109,7 @@ export class FormsController {
   }
 
   @Get(':id/stats')
-  @Permissions('admin.view')
+  @Permissions('forms.view')
   @ApiOperation({ summary: 'Statistiques et agrégations graphiques d’un formulaire' })
   @ApiParam({ name: 'id' })
   async getStats(@Param('id') id: string) {

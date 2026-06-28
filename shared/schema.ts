@@ -332,17 +332,37 @@ export const surveyForms = pgTable("survey_forms", {
   title: text("title").notNull(),
   description: text("description"),
   status: text("status").default(SURVEY_FORM_STATUS.DRAFT).notNull(),
+  version: integer("version").default(1).notNull(),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  originOrganizationId: varchar("origin_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceFormId: varchar("source_form_id"),
+  sourceInstanceUrl: text("source_instance_url"),
+  federationVisibility: text("federation_visibility").default(FEDERATION_VISIBILITY.LOCAL).notNull(),
+  federationStatus: text("federation_status").default(FEDERATION_STATUS.LOCAL_ONLY).notNull(),
+  isFederatedCopy: boolean("is_federated_copy").default(false).notNull(),
+  canonicalFormId: varchar("canonical_form_id"),
   collectRespondentInfo: boolean("collect_respondent_info").default(false).notNull(),
   allowMultipleSubmissions: boolean("allow_multiple_submissions").default(true).notNull(),
   successMessage: text("success_message"),
+  requireConsent: boolean("require_consent").default(false).notNull(),
+  consentText: text("consent_text"),
+  retentionDays: integer("retention_days"),
   createdBy: text("created_by"),
   publishedAt: timestamp("published_at"),
   closedAt: timestamp("closed_at"),
+  expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   slugIdx: index("survey_forms_slug_idx").on(table.slug),
   statusIdx: index("survey_forms_status_idx").on(table.status),
+  expiresAtIdx: index("survey_forms_expires_at_idx").on(table.expiresAt),
+  statusExpiresIdx: index("survey_forms_status_expires_idx").on(table.status, table.expiresAt),
+  organizationIdx: index("survey_forms_organization_idx").on(table.organizationId),
+  originOrganizationIdx: index("survey_forms_origin_organization_idx").on(table.originOrganizationId),
+  federationVisibilityIdx: index("survey_forms_federation_visibility_idx").on(table.federationVisibility),
+  federationStatusIdx: index("survey_forms_federation_status_idx").on(table.federationStatus),
+  sourceInstanceFormUniqueIdx: uniqueIndex("survey_forms_source_instance_form_unique_idx").on(table.sourceInstanceUrl, table.sourceFormId),
   createdAtIdx: index("survey_forms_created_at_idx").on(table.createdAt),
 }));
 
@@ -366,15 +386,20 @@ export const surveyQuestions = pgTable("survey_questions", {
 export const surveyResponses = pgTable("survey_responses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   formId: varchar("form_id").references(() => surveyForms.id, { onDelete: "cascade" }).notNull(),
+  formVersion: integer("form_version").default(1).notNull(),
   respondentName: text("respondent_name"),
   respondentEmail: text("respondent_email"),
   answers: jsonb("answers").default(sql`'{}'::jsonb`).notNull(),
+  formSnapshot: jsonb("form_snapshot").default(sql`'{}'::jsonb`).notNull(),
+  consentAccepted: boolean("consent_accepted").default(false).notNull(),
   submittedAt: timestamp("submitted_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   formIdx: index("survey_responses_form_idx").on(table.formId),
+  formVersionIdx: index("survey_responses_form_version_idx").on(table.formId, table.formVersion),
   submittedAtIdx: index("survey_responses_submitted_at_idx").on(table.submittedAt),
   answersIdx: index("survey_responses_answers_gin_idx").using("gin", table.answers),
+  snapshotIdx: index("survey_responses_form_snapshot_gin_idx").using("gin", table.formSnapshot),
 }));
 
 // Loan items table - Matériel disponible au prêt
@@ -1565,6 +1590,18 @@ export const insertSurveyFormSchema = z.object({
   collectRespondentInfo: z.boolean().default(false),
   allowMultipleSubmissions: z.boolean().default(true),
   successMessage: z.string().max(1000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  expiresAt: z.string().datetime().optional().nullable(),
+  organizationId: z.string().uuid().optional().nullable(),
+  originOrganizationId: z.string().uuid().optional().nullable(),
+  sourceFormId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  sourceInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  federationVisibility: z.enum(['local', 'parent_region', 'child_sections', 'network', 'selected_organizations']).optional(),
+  federationStatus: z.enum(['local_only', 'proposed_to_region', 'accepted_by_region', 'published_to_sections', 'imported']).optional(),
+  isFederatedCopy: z.boolean().optional(),
+  canonicalFormId: z.string().uuid().optional().nullable(),
+  requireConsent: z.boolean().default(false),
+  consentText: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  retentionDays: z.number().int().min(1).max(3650).optional().nullable(),
   questions: z.array(surveyQuestionSchema).default([]),
 });
 
@@ -1576,6 +1613,7 @@ export const submitSurveyResponseSchema = z.object({
   respondentName: z.string().max(200).optional().nullable().transform(val => val ? sanitizeText(val) : val),
   respondentEmail: z.string().email("Adresse email invalide").optional().nullable().transform(val => val ? sanitizeText(val) : val),
   answers: z.record(z.string(), z.unknown()).default({}),
+  consentAccepted: z.boolean().optional().default(false),
 });
 
 // Pure Zod v4 schema
@@ -2548,6 +2586,14 @@ export const hasPermission = (userRole: string, permission: string): boolean => 
     case 'events.delete':
     case 'events.manage':
       return userRole === ADMIN_ROLES.EVENTS_MANAGER;
+    case 'forms.view':
+    case 'forms.read':
+      return ([ADMIN_ROLES.IDEAS_READER, ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_READER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
+    case 'forms.write':
+    case 'forms.delete':
+    case 'forms.export':
+    case 'forms.manage':
+      return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
     case 'admin.view':
       // Tous les admins peuvent voir les membres
       return true;
@@ -2585,13 +2631,13 @@ export const getRolePermissions = (role: string): string[] => {
     case ADMIN_ROLES.SUPER_ADMIN:
       return ['Toutes les permissions', 'Gestion des administrateurs'];
     case ADMIN_ROLES.IDEAS_READER:
-      return ['Consultation des idées'];
+      return ['Consultation des idées', 'Consultation des formulaires'];
     case ADMIN_ROLES.IDEAS_MANAGER:
-      return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes'];
+      return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes', 'Gestion des formulaires'];
     case ADMIN_ROLES.EVENTS_READER:
-      return ['Consultation des événements'];
+      return ['Consultation des événements', 'Consultation des formulaires'];
     case ADMIN_ROLES.EVENTS_MANAGER:
-      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences'];
+      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences', 'Gestion des formulaires'];
     default:
       return [];
   }

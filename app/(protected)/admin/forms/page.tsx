@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
-import { Copy, CopyPlus, Download, ExternalLink, FileQuestion, Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, CopyPlus, Download, ExternalLink, FileQuestion, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { api, queryKeys, type ApiResponse } from '@/lib/api/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -40,9 +40,14 @@ interface SurveyFormSummary {
   title: string;
   description?: string | null;
   status: FormStatus;
+  version: number;
   collectRespondentInfo: boolean;
   allowMultipleSubmissions: boolean;
   successMessage?: string | null;
+  expiresAt?: string | null;
+  requireConsent: boolean;
+  consentText?: string | null;
+  retentionDays?: number | null;
   createdAt?: string;
   updatedAt?: string;
   responseCount: number;
@@ -87,14 +92,89 @@ const questionTypes: { value: QuestionType; label: string; needsOptions?: boolea
 
 const optionQuestionTypes = new Set<QuestionType>(['select', 'radio', 'multiselect']);
 
-const emptyForm: Omit<SurveyFormDetail, 'id' | 'createdAt' | 'updatedAt' | 'responseCount' | 'questionCount' | 'publicUrl'> = {
+type EditableForm = Omit<SurveyFormDetail, 'id' | 'createdAt' | 'updatedAt' | 'responseCount' | 'questionCount' | 'publicUrl'>;
+
+const formTemplates: Record<string, { label: string; form: EditableForm }> = {
+  satisfaction: {
+    label: 'Satisfaction événement',
+    form: {
+      title: 'Satisfaction événement',
+      slug: 'satisfaction-evenement',
+      description: 'Merci de nous aider à améliorer nos prochains événements.',
+      status: 'draft',
+      version: 1,
+      collectRespondentInfo: false,
+      allowMultipleSubmissions: false,
+      successMessage: 'Merci pour votre retour.',
+      expiresAt: null,
+      requireConsent: true,
+      consentText: 'J’accepte que mes réponses soient collectées pour améliorer les événements.',
+      retentionDays: 365,
+      questions: [
+        { label: 'Note globale de l’événement', type: 'rating', required: true, options: [], orderIndex: 0 },
+        { label: 'Ce que vous avez le plus apprécié', type: 'textarea', required: false, options: [], orderIndex: 1 },
+        { label: 'Une amélioration prioritaire', type: 'textarea', required: false, options: [], orderIndex: 2 },
+      ],
+    },
+  },
+  vote: {
+    label: 'Vote interne',
+    form: {
+      title: 'Vote interne',
+      slug: 'vote-interne',
+      description: 'Questionnaire de vote réservé aux membres concernés.',
+      status: 'draft',
+      version: 1,
+      collectRespondentInfo: true,
+      allowMultipleSubmissions: false,
+      successMessage: 'Votre vote a bien été enregistré.',
+      expiresAt: null,
+      requireConsent: true,
+      consentText: 'Je confirme l’exactitude de mon vote et accepte son traitement dans le cadre de cette consultation.',
+      retentionDays: 365,
+      questions: [
+        { label: 'Votre choix', type: 'radio', required: true, options: [{ label: 'Option A', value: 'option-a' }, { label: 'Option B', value: 'option-b' }, { label: 'Abstention', value: 'abstention' }], orderIndex: 0 },
+        { label: 'Commentaire optionnel', type: 'textarea', required: false, options: [], orderIndex: 1 },
+      ],
+    },
+  },
+  diagnostic: {
+    label: 'Diagnostic membre',
+    form: {
+      title: 'Diagnostic membre',
+      slug: 'diagnostic-membre',
+      description: 'Recueil structuré des besoins, attentes et priorités d’un membre.',
+      status: 'draft',
+      version: 1,
+      collectRespondentInfo: true,
+      allowMultipleSubmissions: false,
+      successMessage: 'Merci, vos réponses ont bien été enregistrées.',
+      expiresAt: null,
+      requireConsent: true,
+      consentText: 'J’accepte que mes réponses soient utilisées pour préparer un accompagnement personnalisé.',
+      retentionDays: 730,
+      questions: [
+        { label: 'Sujet prioritaire du moment', type: 'select', required: true, options: [{ label: 'Croissance', value: 'croissance' }, { label: 'RH', value: 'rh' }, { label: 'Organisation', value: 'organisation' }, { label: 'Finance', value: 'finance' }, { label: 'Autre', value: 'autre' }], orderIndex: 0 },
+        { label: 'Décrivez votre besoin', type: 'textarea', required: true, options: [], orderIndex: 1 },
+        { label: 'Niveau d’urgence', type: 'rating', required: false, options: [], orderIndex: 2 },
+      ],
+    },
+  },
+};
+
+const emptyForm: EditableForm = {
   title: '',
   slug: '',
   description: '',
   status: 'draft',
+  version: 1,
   collectRespondentInfo: false,
   allowMultipleSubmissions: true,
   successMessage: 'Merci, votre réponse a bien été enregistrée.',
+  expiresAt: null,
+  requireConsent: false,
+  consentText: 'J’accepte que mes réponses soient collectées et traitées dans le cadre de ce formulaire.',
+  retentionDays: null,
   questions: [
     { label: 'Votre avis général', type: 'textarea', required: true, options: [], orderIndex: 0 },
     { label: 'Note globale', type: 'rating', required: false, options: [], orderIndex: 1 },
@@ -142,6 +222,7 @@ export default function AdminFormsPage() {
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<typeof emptyForm>({ ...emptyForm, questions: [...emptyForm.questions] });
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('satisfaction');
 
   const formsQuery = useQuery<ApiResponse<SurveyFormSummary[]>>({
     queryKey: queryKeys.forms.list({ status: statusFilter }),
@@ -239,9 +320,21 @@ export default function AdminFormsPage() {
     },
   });
 
+  const cloneEditableForm = (form: EditableForm): EditableForm => ({
+    ...form,
+    questions: form.questions.map((question) => ({ ...question, options: [...(question.options ?? [])] })),
+  });
+
   const openCreateDialog = () => {
-    setEditingForm({ ...emptyForm, questions: emptyForm.questions.map((question) => ({ ...question })) });
+    setEditingForm(cloneEditableForm(emptyForm));
     setIsDialogOpen(true);
+  };
+
+  const applyTemplate = (templateKey: string) => {
+    const template = formTemplates[templateKey];
+    if (!template) return;
+    setSelectedTemplate(templateKey);
+    setEditingForm(cloneEditableForm(template.form));
   };
 
   const openEditDialog = () => {
@@ -251,9 +344,14 @@ export default function AdminFormsPage() {
       slug: selectedForm.slug,
       description: selectedForm.description ?? '',
       status: selectedForm.status,
+      version: selectedForm.version,
       collectRespondentInfo: selectedForm.collectRespondentInfo,
       allowMultipleSubmissions: selectedForm.allowMultipleSubmissions,
       successMessage: selectedForm.successMessage ?? '',
+      expiresAt: selectedForm.expiresAt ?? null,
+      requireConsent: selectedForm.requireConsent,
+      consentText: selectedForm.consentText ?? '',
+      retentionDays: selectedForm.retentionDays ?? null,
       questions: selectedForm.questions.map((question, index) => ({
         ...question,
         options: Array.isArray(question.options) ? question.options : [],
@@ -278,10 +376,32 @@ export default function AdminFormsPage() {
   };
 
   const removeQuestion = (index: number) => {
+    if (!window.confirm('Supprimer cette question ? Les réponses déjà collectées restent conservées grâce au snapshot, mais la question disparaîtra du formulaire courant.')) return;
     setEditingForm((current) => ({
       ...current,
       questions: current.questions.filter((_, questionIndex) => questionIndex !== index).map((question, orderIndex) => ({ ...question, orderIndex })),
     }));
+  };
+
+  const moveQuestion = (index: number, direction: -1 | 1) => {
+    setEditingForm((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.questions.length) return current;
+      const questions = [...current.questions];
+      [questions[index], questions[nextIndex]] = [questions[nextIndex], questions[index]];
+      return { ...current, questions: questions.map((question, orderIndex) => ({ ...question, orderIndex })) };
+    });
+  };
+
+  const deleteSelectedForm = () => {
+    if (!selectedForm) return;
+    if (!window.confirm(`Supprimer définitivement le formulaire « ${selectedForm.title} » et ses réponses ?`)) return;
+    deleteMutation.mutate(selectedForm.id);
+  };
+
+  const deleteResponse = (responseId: string) => {
+    if (!window.confirm('Supprimer définitivement cette réponse ?')) return;
+    deleteResponseMutation.mutate(responseId);
   };
 
   const copyPublicUrl = async () => {
@@ -381,7 +501,10 @@ export default function AdminFormsPage() {
                         <span>·</span>
                         <span>{selectedForm.responseCount} réponse(s)</span>
                         <span>·</span>
+                        <span>Version {selectedForm.version}</span>
+                        <span>·</span>
                         <span>Slug: {selectedForm.slug}</span>
+                        {selectedForm.expiresAt && <><span>·</span><span>Expire le {new Date(selectedForm.expiresAt).toLocaleString('fr-FR')}</span></>}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -395,7 +518,7 @@ export default function AdminFormsPage() {
                         <CopyPlus className="mr-2 h-4 w-4" /> Dupliquer
                       </Button>
                       <Button onClick={openEditDialog}><Save className="mr-2 h-4 w-4" /> Modifier</Button>
-                      <Button variant="destructive" onClick={() => deleteMutation.mutate(selectedForm.id)} disabled={deleteMutation.isPending}>
+                      <Button variant="destructive" onClick={deleteSelectedForm} disabled={deleteMutation.isPending}>
                         <Trash2 className="mr-2 h-4 w-4" /> Supprimer
                       </Button>
                     </div>
@@ -421,8 +544,19 @@ export default function AdminFormsPage() {
                       <CardContent className="text-sm">{stats?.lastResponseAt ? new Date(stats.lastResponseAt).toLocaleString('fr-FR') : '—'}</CardContent>
                     </Card>
                     <Card>
-                      <CardHeader className="pb-2"><CardTitle className="text-sm">Lien public</CardTitle></CardHeader>
-                      <CardContent className="truncate text-sm">{selectedForm.status === 'published' ? publicUrl : 'Non publié'}</CardContent>
+                      <CardHeader className="pb-2"><CardTitle className="text-sm">Lien public / QR code</CardTitle></CardHeader>
+                      <CardContent className="space-y-3 text-sm">
+                        {selectedForm.status === 'published' ? (
+                          <>
+                            <div className="truncate">{publicUrl}</div>
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(publicUrl)}`}
+                              alt="QR code du formulaire"
+                              className="h-28 w-28 rounded border bg-white p-1"
+                            />
+                          </>
+                        ) : 'Non publié'}
+                      </CardContent>
                     </Card>
                   </div>
 
@@ -514,7 +648,7 @@ export default function AdminFormsPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => deleteResponseMutation.mutate(String(row.id))}
+                                  onClick={() => deleteResponse(String(row.id))}
                                   disabled={deleteResponseMutation.isPending}
                                   aria-label="Supprimer la réponse"
                                 >
@@ -556,6 +690,17 @@ export default function AdminFormsPage() {
           </DialogHeader>
 
           <div className="grid gap-4 md:grid-cols-2">
+            {!(activeFormId && selectedForm) && (
+              <div className="space-y-2 md:col-span-2">
+                <Label>Modèle rapide</Label>
+                <Select value={selectedTemplate} onValueChange={applyTemplate}>
+                  <SelectTrigger><SelectValue placeholder="Choisir un modèle" /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(formTemplates).map(([key, template]) => <SelectItem key={key} value={key}>{template.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Titre</Label>
               <Input value={editingForm.title} onChange={(event) => setEditingForm({ ...editingForm, title: event.target.value, slug: editingForm.slug || slugify(event.target.value) })} />
@@ -583,6 +728,25 @@ export default function AdminFormsPage() {
               <Label>Message de confirmation</Label>
               <Input value={editingForm.successMessage ?? ''} onChange={(event) => setEditingForm({ ...editingForm, successMessage: event.target.value })} />
             </div>
+            <div className="space-y-2">
+              <Label>Date de fermeture automatique</Label>
+              <Input
+                type="datetime-local"
+                value={editingForm.expiresAt ? new Date(editingForm.expiresAt).toISOString().slice(0, 16) : ''}
+                onChange={(event) => setEditingForm({ ...editingForm, expiresAt: event.target.value ? new Date(event.target.value).toISOString() : null })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Rétention des réponses (jours)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={3650}
+                value={editingForm.retentionDays ?? ''}
+                onChange={(event) => setEditingForm({ ...editingForm, retentionDays: event.target.value ? Number(event.target.value) : null })}
+                placeholder="Ex: 365"
+              />
+            </div>
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div><Label>Collecter nom/email</Label><p className="text-xs text-muted-foreground">Ajoute les champs répondant.</p></div>
               <Switch checked={editingForm.collectRespondentInfo} onCheckedChange={(checked) => setEditingForm({ ...editingForm, collectRespondentInfo: checked })} />
@@ -590,6 +754,14 @@ export default function AdminFormsPage() {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div><Label>Réponses multiples</Label><p className="text-xs text-muted-foreground">Autorise plusieurs soumissions.</p></div>
               <Switch checked={editingForm.allowMultipleSubmissions} onCheckedChange={(checked) => setEditingForm({ ...editingForm, allowMultipleSubmissions: checked })} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div><Label>Consentement RGPD</Label><p className="text-xs text-muted-foreground">Exige une acceptation avant l’envoi.</p></div>
+              <Switch checked={editingForm.requireConsent} onCheckedChange={(checked) => setEditingForm({ ...editingForm, requireConsent: checked })} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Texte de consentement</Label>
+              <Textarea value={editingForm.consentText ?? ''} onChange={(event) => setEditingForm({ ...editingForm, consentText: event.target.value })} />
             </div>
           </div>
 
@@ -610,7 +782,11 @@ export default function AdminFormsPage() {
                       </SelectContent>
                     </Select>
                     <div className="flex items-center gap-2 rounded-md border px-3"><Switch checked={question.required} onCheckedChange={(checked) => updateQuestion(index, { required: checked })} /><span className="text-sm">Obligatoire</span></div>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeQuestion(index)}><Trash2 className="h-4 w-4" /></Button>
+                    <div className="flex gap-1">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => moveQuestion(index, -1)} disabled={index === 0} aria-label="Monter la question"><ArrowUp className="h-4 w-4" /></Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => moveQuestion(index, 1)} disabled={index === editingForm.questions.length - 1} aria-label="Descendre la question"><ArrowDown className="h-4 w-4" /></Button>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeQuestion(index)} aria-label="Supprimer la question"><Trash2 className="h-4 w-4" /></Button>
+                    </div>
                   </div>
                   <Textarea value={question.description ?? ''} onChange={(event) => updateQuestion(index, { description: event.target.value })} placeholder="Aide / description optionnelle" />
                   {optionQuestionTypes.has(question.type) && (
@@ -633,6 +809,32 @@ export default function AdminFormsPage() {
               </Card>
             ))}
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Aperçu avant publication</CardTitle>
+              <CardDescription>Vue rapide du rendu public et des champs obligatoires.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <div className="text-lg font-semibold">{editingForm.title || 'Titre du formulaire'}</div>
+                {editingForm.description && <p className="text-sm text-muted-foreground">{editingForm.description}</p>}
+              </div>
+              {editingForm.questions.map((question, index) => (
+                <div key={index} className="rounded-lg border p-3">
+                  <div className="font-medium">{index + 1}. {question.label || 'Question sans titre'} {question.required && <span className="text-destructive">*</span>}</div>
+                  {question.description && <div className="text-xs text-muted-foreground">{question.description}</div>}
+                  <div className="mt-2 text-xs text-muted-foreground">Type : {questionTypes.find((type) => type.value === question.type)?.label ?? question.type}</div>
+                  {optionQuestionTypes.has(question.type) && question.options.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {question.options.map((option) => <Badge key={option.value} variant="secondary">{option.label}</Badge>)}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {editingForm.requireConsent && <div className="rounded-lg border p-3 text-sm">☑ {editingForm.consentText || 'Consentement requis'}</div>}
+            </CardContent>
+          </Card>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Annuler</Button>

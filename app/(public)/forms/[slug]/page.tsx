@@ -33,6 +33,9 @@ interface PublicForm {
   collectRespondentInfo: boolean;
   allowMultipleSubmissions: boolean;
   successMessage?: string | null;
+  requireConsent: boolean;
+  consentText?: string | null;
+  expiresAt?: string | null;
   questions: SurveyQuestion[];
 }
 
@@ -47,6 +50,7 @@ export default function PublicSurveyFormPage() {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [respondentName, setRespondentName] = useState('');
   const [respondentEmail, setRespondentEmail] = useState('');
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -63,6 +67,7 @@ export default function PublicSurveyFormPage() {
       respondentName: respondentName || undefined,
       respondentEmail: respondentEmail || undefined,
       answers,
+      consentAccepted,
     }),
     onSuccess: (response) => {
       setSubmittedMessage(response.data.successMessage || 'Merci, votre réponse a bien été enregistrée.');
@@ -70,6 +75,7 @@ export default function PublicSurveyFormPage() {
       setAnswers({});
       setRespondentName('');
       setRespondentEmail('');
+      setConsentAccepted(false);
     },
     onError: (error) => {
       setSubmitError(error instanceof Error ? error.message : 'Impossible d’enregistrer votre réponse.');
@@ -80,13 +86,14 @@ export default function PublicSurveyFormPage() {
     if (!form) return false;
     const respondentEmailRequired = form.collectRespondentInfo || !form.allowMultipleSubmissions;
     if (respondentEmailRequired && !respondentEmail) return true;
+    if (form.requireConsent && !consentAccepted) return true;
     return form.questions.some((question) => {
       if (!question.required) return false;
       const value = answers[question.id];
       if (question.type === 'checkbox') return value !== true;
       return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
     });
-  }, [answers, form, respondentEmail]);
+  }, [answers, consentAccepted, form, respondentEmail]);
 
   const setAnswer = (questionId: string, value: unknown) => setAnswers((current) => ({ ...current, [questionId]: value }));
 
@@ -217,6 +224,13 @@ export default function PublicSurveyFormPage() {
               {renderQuestion(question)}
             </div>
           ))}
+
+          {form.requireConsent && (
+            <label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
+              <Checkbox checked={consentAccepted} onCheckedChange={(checked) => setConsentAccepted(checked === true)} />
+              <span>{form.consentText || 'J’accepte que mes réponses soient collectées et traitées dans le cadre de ce formulaire.'} <span className="text-destructive">*</span></span>
+            </label>
+          )}
 
           {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
 

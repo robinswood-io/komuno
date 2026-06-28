@@ -17,7 +17,9 @@ on:
         options:
           - cjd80
           - rep
+          - hdf
           - both
+          - all
       force_build:
         description: 'Forcer le rebuild même sans changements'
         required: false
@@ -193,7 +195,7 @@ jobs:
           echo "Tables créées:"
           echo "$TABLES" | sed 's/^/  /'
 
-          CRITICAL="members admins"
+          CRITICAL="members admins organizations organization_relations survey_forms survey_questions survey_responses"
           FAIL=0
           for table in $CRITICAL; do
             if echo "$TABLES" | grep -qx "$table"; then
@@ -245,7 +247,7 @@ jobs:
       (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
       (github.event_name == 'push' ||
        (github.event_name == 'workflow_dispatch' &&
-        (github.event.inputs.environment == 'cjd80' || github.event.inputs.environment == 'both')))
+        (github.event.inputs.environment == 'cjd80' || github.event.inputs.environment == 'both' || github.event.inputs.environment == 'all')))
 
     environment:
       name: cjd80
@@ -391,7 +393,7 @@ jobs:
       (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
       (github.event_name == 'push' ||
        (github.event_name == 'workflow_dispatch' &&
-        (github.event.inputs.environment == 'rep' || github.event.inputs.environment == 'both')))
+        (github.event.inputs.environment == 'rep' || github.event.inputs.environment == 'both' || github.event.inputs.environment == 'all')))
 
     environment:
       name: rep
@@ -659,5 +661,184 @@ jobs:
           echo "| Champ | Valeur |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| URL | https://repicardie.fr |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Digest | \`${{ needs.build.outputs.image-digest }}\` |" >> $GITHUB_STEP_SUMMARY
+
+  # ===================================
+  # Job 5: Deploy HDF (cjd-hdf.fr)
+  # ===================================
+  deploy-hdf:
+    name: Deploy HDF (cjd-hdf.fr)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [detect-changes, build, validate-migrations]
+    if: |
+      always() &&
+      (needs.validate-migrations.result == 'success' || needs.validate-migrations.result == 'skipped') &&
+      (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.environment == 'hdf' || github.event.inputs.environment == 'all')))
+
+    environment:
+      name: hdf
+      url: https://cjd-hdf.fr
+
+    steps:
+      - name: Skip (aucun changement)
+        if: needs.detect-changes.outputs.should_build == 'false'
+        run: echo "⏭️ Aucun changement détecté — déploiement ignoré"
+
+      - name: Build branded image and deploy HDF
+        if: needs.detect-changes.outputs.should_build == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            bash -seuo pipefail <<'REMOTE_SCRIPT'
+            cd /docker/apps/cjd-hdf
+
+            echo "🔐 Login GHCR..."
+            echo "${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" | \
+              docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            SHORT_SHA="${{ github.sha }}"
+            SHORT_SHA="${SHORT_SHA:0:12}"
+            IMAGE_REF="ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}"
+            BASE_TAG="ghcr.io/${{ github.repository }}:latest"
+            HDF_IMAGE="cjd-hdf:${SHORT_SHA}-hdf-branding"
+            HDF_LATEST="cjd-hdf:latest-hdf-branding"
+            OLD_IMAGE=$(docker inspect cjd-hdf-app --format='{{.Config.Image}}' 2>/dev/null || echo "")
+            echo "Image HDF actuelle: ${OLD_IMAGE:-aucune}"
+
+            echo "📥 Pull image applicative par digest (immuable)..."
+            docker pull "$IMAGE_REF"
+            docker tag "$IMAGE_REF" "$BASE_TAG"
+
+            echo "🎨 Build image branding HDF..."
+            docker build --pull=false -t "$HDF_IMAGE" -t "$HDF_LATEST" -f branding-image/Dockerfile branding-image
+
+            if ! docker run --rm --entrypoint sh "$HDF_IMAGE" -lc "grep -R \"CJD Hauts de France\" -n /app/.next /app/public >/dev/null 2>&1"; then
+              echo "❌ L'image HDF ne contient pas la marque attendue"
+              exit 1
+            fi
+
+            BACKUP="docker-compose.yml.bak-ci-hdf-${SHORT_SHA}-$(date +%Y%m%d%H%M%S)"
+            cp docker-compose.yml "$BACKUP"
+            sed -i "s#image: cjd-hdf:.*#image: ${HDF_IMAGE}#" docker-compose.yml
+
+            rollback() {
+              echo "🔄 Rollback HDF..."
+              if [ -n "${OLD_IMAGE:-}" ]; then
+                sed -i "s#image: cjd-hdf:.*#image: ${OLD_IMAGE}#" docker-compose.yml || true
+              elif [ -f "$BACKUP" ]; then
+                cp "$BACKUP" docker-compose.yml || true
+              fi
+              docker compose up -d --no-deps --force-recreate app || true
+            }
+
+            echo "🚀 Déploiement HDF..."
+            docker compose up -d --no-deps --force-recreate app
+
+            echo "⏳ Attente démarrage backend (max 90s)..."
+            for i in $(seq 1 18); do
+              STATE=$(docker inspect --format='{{.State.Status}}' cjd-hdf-app 2>/dev/null || echo "not_found")
+              if [ "$STATE" != "running" ]; then
+                echo "  ⏳ Tentative $i/18 — container état: $STATE"
+                sleep 5
+                continue
+              fi
+              HEALTH=$(docker exec cjd-hdf-app wget -q -O - --timeout=5 \
+                http://localhost:5000/api/health 2>/dev/null || echo "")
+              if echo "$HEALTH" | grep -q '"status":"healthy"'; then
+                echo "  ✅ Backend HDF prêt après $((i * 5))s"
+                break
+              fi
+              echo "  ⏳ Tentative $i/18 — backend pas encore prêt..."
+              sleep 5
+            done
+
+            CONTAINER_STATE=$(docker inspect --format='{{.State.Status}}' cjd-hdf-app 2>/dev/null || echo "not_found")
+            RESTART_COUNT=$(docker inspect --format='{{.RestartCount}}' cjd-hdf-app 2>/dev/null || echo "0")
+            if [ "$CONTAINER_STATE" != "running" ] || [ "$RESTART_COUNT" -gt "1" ]; then
+              echo "❌ Container HDF instable (état=$CONTAINER_STATE, restarts=$RESTART_COUNT)"
+              docker logs cjd-hdf-app --tail 100 || true
+              rollback
+              exit 1
+            fi
+
+            echo "🔍 Smoke tests backend..."
+            FAIL=0
+            check_endpoint() {
+              local name="$1" url="$2"
+              local status
+              status=$(docker exec cjd-hdf-app wget -S -O /dev/null --timeout=10 "$url" 2>&1 \
+                | grep "HTTP/" | tail -1 | awk '{print $2}' || echo "000")
+              if [ "${status:0:1}" = "5" ] || [ "$status" = "000" ]; then
+                echo "  ❌ $name → HTTP $status"
+                FAIL=1
+              else
+                echo "  ✅ $name → HTTP $status"
+              fi
+            }
+
+            check_endpoint "GET /api/health"                       "http://localhost:5000/api/health"
+            check_endpoint "GET /api/admin/federation/overview"    "http://localhost:5000/api/admin/federation/overview"
+            check_endpoint "GET /api/admin/forms"                  "http://localhost:5000/api/admin/forms"
+
+            echo "🌐 Smoke tests publics + branding..."
+            check_public() {
+              local name="$1" url="$2" expected="$3" attempts="${4:-18}" delay="${5:-5}"
+              local status
+              for i in $(seq 1 "$attempts"); do
+                status=$(curl -sS -o /tmp/hdf-public-check.html --max-time 20 -w "%{http_code}" "$url" || echo "000")
+                if [[ "$status" =~ $expected ]]; then
+                  echo "  ✅ $name → HTTP $status (tentative $i/$attempts)"
+                  return 0
+                fi
+                echo "  ⏳ $name → HTTP $status (tentative $i/$attempts), attente Traefik..."
+                sleep "$delay"
+              done
+              echo "  ❌ $name → HTTP $status après $attempts tentatives"
+              FAIL=1
+            }
+
+            check_public "GET /"           "https://cjd-hdf.fr/"           "^(2|3)[0-9][0-9]$"
+            check_public "GET /api/health" "https://cjd-hdf.fr/api/health" "^200$"
+
+            HOME_HTML=$(curl -fsSL --max-time 20 https://cjd-hdf.fr/ || echo "")
+            if echo "$HOME_HTML" | grep -E "CJD Amiens|Boîte à Kiffs|Boite à Kiff|Kiff" >/dev/null; then
+              echo "❌ Régression branding HDF détectée"
+              rollback
+              exit 1
+            fi
+            if ! echo "$HOME_HTML" | grep -q "CJD Hauts de France"; then
+              echo "❌ Marque HDF non détectée sur la page publique"
+              rollback
+              exit 1
+            fi
+            echo "  ✅ Branding HDF public validé"
+
+            if [ "$FAIL" -eq 1 ]; then
+              echo "❌ Smoke tests HDF échoués — rollback..."
+              docker logs cjd-hdf-app --tail 100 || true
+              rollback
+              exit 1
+            fi
+
+            echo "✅ Déploiement HDF réussi!"
+            docker image prune -f || true
+            REMOTE_SCRIPT
+
+      - name: Deployment summary
+        if: needs.detect-changes.outputs.should_build == 'true'
+        run: |
+          echo "## Déploiement HDF réussi" >> $GITHUB_STEP_SUMMARY
+          echo "| Champ | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | https://cjd-hdf.fr |" >> $GITHUB_STEP_SUMMARY
           echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Digest | \`${{ needs.build.outputs.image-digest }}\` |" >> $GITHUB_STEP_SUMMARY
