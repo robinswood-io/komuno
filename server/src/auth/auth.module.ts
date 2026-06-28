@@ -16,7 +16,7 @@ import { logger } from '../../lib/logger';
 const authMode = 'local';
 const devLoginEnabled = process.env.ENABLE_DEV_LOGIN === 'true' && process.env.NODE_ENV !== 'production';
 
-logger.info('[AuthModule] Mode authentification: LOCAL (@robinswood/auth-unified)');
+logger.info('[AuthModule] Mode authentification: LOCAL (Passport session)');
 if (devLoginEnabled) {
   logger.warn('[AuthModule] ⚠️  DEV LOGIN ENABLED - Password bypass active for development');
 }

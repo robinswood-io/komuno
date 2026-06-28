@@ -5,7 +5,7 @@ import { attachDemoUser, isDemoModeEnabled } from '../demo-user';
 
 /**
  * Guard basé sur la session pour vérifier qu'un utilisateur est authentifié
- * Fonctionne avec l'authentification locale via @robinswood/auth-unified
+ * Fonctionne avec l'authentification locale Passport/session.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
