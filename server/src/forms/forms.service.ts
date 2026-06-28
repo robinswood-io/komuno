@@ -1,12 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
-import { z, ZodError } from 'zod';
+import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
 import {
   SURVEY_FORM_STATUS,
-  SURVEY_QUESTION_TYPE,
   insertSurveyFormSchema,
   submitSurveyResponseSchema,
   surveyForms,
@@ -16,17 +15,24 @@ import {
   type SurveyQuestion,
   type SurveyResponse,
 } from '../../../shared/schema';
-
-type QuestionOption = { label: string; value: string };
-type AnswerMap = Record<string, unknown>;
-type SurveyQuestionInput = NonNullable<z.infer<typeof updateSurveyFormSchema>['questions']>[number];
-type SurveyQuestionSnapshot = Pick<SurveyQuestion, 'id' | 'label' | 'description' | 'type' | 'required' | 'options' | 'orderIndex'>;
-
-const optionTypes = new Set<string>([
-  SURVEY_QUESTION_TYPE.SELECT,
-  SURVEY_QUESTION_TYPE.RADIO,
-  SURVEY_QUESTION_TYPE.MULTISELECT,
-]);
+import {
+  assertSurveyQuestionsCanBeSaved,
+  buildSurveyFormSnapshot,
+  csvEscapeSurveyValue,
+  formatSurveyAnswerForDisplay,
+  isSurveyFormExpired,
+  normalizeSurveyDate,
+  normalizeSurveyOptions,
+  questionCatalogWithSnapshots,
+  slugifySurveyValue,
+  snapshotSurveyQuestions,
+  summarizeSurveyQuestion,
+  validateSurveyAnswer,
+  type AnswerMap,
+  type QuestionOption,
+  type SurveyQuestionInput,
+  type SurveyQuestionSnapshot,
+} from './forms.utils';
 
 @Injectable()
 export class FormsService {
@@ -40,48 +46,15 @@ export class FormsService {
   }
 
   private slugify(value: string): string {
-    return value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 100) || 'formulaire';
+    return slugifySurveyValue(value);
   }
 
   private normalizeOptions(options: unknown): QuestionOption[] {
-    if (!Array.isArray(options)) return [];
-    return options
-      .map((option) => {
-        if (typeof option === 'string') {
-          const label = option.trim();
-          return label ? { label, value: this.slugify(label) } : null;
-        }
-        if (typeof option !== 'object' || option === null) return null;
-        const record = option as Record<string, unknown>;
-        const label = String(record.label ?? record.value ?? '').trim();
-        if (!label) return null;
-        const value = String(record.value ?? this.slugify(label)).trim() || this.slugify(label);
-        return { label, value };
-      })
-      .filter((option): option is QuestionOption => Boolean(option));
+    return normalizeSurveyOptions(options);
   }
 
   private assertQuestionsCanBeSaved(status: string | undefined, questions: SurveyQuestionInput[] | undefined) {
-    if (status === SURVEY_FORM_STATUS.PUBLISHED && questions !== undefined && questions.length === 0) {
-      throw new BadRequestException('Un formulaire publié doit contenir au moins une question');
-    }
-
-    for (const question of questions ?? []) {
-      const options = this.normalizeOptions(question.options);
-      if (optionTypes.has(question.type) && options.length === 0) {
-        throw new BadRequestException(`La question « ${question.label} » doit contenir au moins une option`);
-      }
-      const values = options.map((option) => option.value);
-      if (new Set(values).size !== values.length) {
-        throw new BadRequestException(`La question « ${question.label} » contient des options en doublon`);
-      }
-    }
+    return assertSurveyQuestionsCanBeSaved(status, questions);
   }
 
   private questionValues(formId: string, questions: SurveyQuestionInput[]) {
@@ -121,64 +94,27 @@ export class FormsService {
   }
 
   private normalizeDate(value: string | Date | null | undefined): Date | null {
-    if (!value) return null;
-    const date = value instanceof Date ? value : new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
+    return normalizeSurveyDate(value);
   }
 
   private isExpired(form: Pick<typeof surveyForms.$inferSelect, 'expiresAt'>): boolean {
-    const expiresAt = this.normalizeDate(form.expiresAt);
-    return Boolean(expiresAt && expiresAt.getTime() <= Date.now());
+    return isSurveyFormExpired(form);
   }
 
   private snapshotQuestions(questions: SurveyQuestion[]): SurveyQuestionSnapshot[] {
-    return questions.map((question) => ({
-      id: question.id,
-      label: question.label,
-      description: question.description,
-      type: question.type,
-      required: question.required,
-      options: question.options,
-      orderIndex: question.orderIndex,
-    }));
+    return snapshotSurveyQuestions(questions);
   }
 
   private buildFormSnapshot(form: Pick<typeof surveyForms.$inferSelect, 'id' | 'slug' | 'title' | 'version'>, questions: SurveyQuestion[]) {
-    return {
-      formId: form.id,
-      slug: form.slug,
-      title: form.title,
-      version: form.version,
-      capturedAt: new Date().toISOString(),
-      questions: this.snapshotQuestions(questions),
-    };
+    return buildSurveyFormSnapshot(form, questions);
   }
 
   private questionCatalog(currentQuestions: SurveyQuestion[], responses: SurveyResponse[] = []): SurveyQuestion[] {
-    const byId = new Map<string, SurveyQuestion>();
-    for (const question of currentQuestions) byId.set(question.id, question);
-
-    for (const response of responses) {
-      const snapshot = response.formSnapshot as { questions?: SurveyQuestion[] } | null;
-      for (const question of snapshot?.questions ?? []) {
-        if (question?.id && !byId.has(question.id)) {
-          byId.set(question.id, question as SurveyQuestion);
-        }
-      }
-    }
-
-    return Array.from(byId.values()).sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+    return questionCatalogWithSnapshots(currentQuestions, responses);
   }
 
   private formatAnswerForDisplay(question: SurveyQuestion, value: unknown): unknown {
-    if (this.isEmptyAnswer(value)) return null;
-    if (question.type === SURVEY_QUESTION_TYPE.MULTISELECT && Array.isArray(value)) {
-      return value.map((item) => this.labelForOption(question, String(item)));
-    }
-    if (question.type === SURVEY_QUESTION_TYPE.SELECT || question.type === SURVEY_QUESTION_TYPE.RADIO) {
-      return this.labelForOption(question, String(value));
-    }
-    return value;
+    return formatSurveyAnswerForDisplay(question, value);
   }
 
   async listForms(options?: { status?: string }) {
@@ -407,50 +343,8 @@ export class FormsService {
     };
   }
 
-  private isEmptyAnswer(value: unknown): boolean {
-    return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
-  }
-
   private validateAnswer(question: SurveyQuestion, value: unknown) {
-    if (question.required && this.isEmptyAnswer(value)) {
-      throw new BadRequestException(`La question « ${question.label} » est obligatoire`);
-    }
-    if (this.isEmptyAnswer(value)) return undefined;
-
-    const options = this.normalizeOptions(question.options);
-    const allowed = new Set(options.map((option) => option.value));
-
-    switch (question.type) {
-      case SURVEY_QUESTION_TYPE.EMAIL:
-        if (!z.string().email().safeParse(value).success) throw new BadRequestException(`La réponse à « ${question.label} » doit être un email valide`);
-        return String(value).trim();
-      case SURVEY_QUESTION_TYPE.NUMBER: {
-        const number = typeof value === 'number' ? value : Number(value);
-        if (Number.isNaN(number)) throw new BadRequestException(`La réponse à « ${question.label} » doit être un nombre`);
-        return number;
-      }
-      case SURVEY_QUESTION_TYPE.RATING: {
-        const rating = typeof value === 'number' ? value : Number(value);
-        if (!Number.isFinite(rating) || rating < 1 || rating > 5) throw new BadRequestException(`La note « ${question.label} » doit être comprise entre 1 et 5`);
-        return rating;
-      }
-      case SURVEY_QUESTION_TYPE.CHECKBOX:
-        return Boolean(value);
-      case SURVEY_QUESTION_TYPE.MULTISELECT: {
-        if (!Array.isArray(value)) throw new BadRequestException(`La réponse à « ${question.label} » doit être une liste`);
-        const values = value.map(String);
-        if (allowed.size && values.some((answer) => !allowed.has(answer))) throw new BadRequestException(`Une réponse à « ${question.label} » n’est pas autorisée`);
-        return values;
-      }
-      case SURVEY_QUESTION_TYPE.SELECT:
-      case SURVEY_QUESTION_TYPE.RADIO: {
-        const answer = String(value);
-        if (allowed.size && !allowed.has(answer)) throw new BadRequestException(`La réponse à « ${question.label} » n’est pas autorisée`);
-        return answer;
-      }
-      default:
-        return String(value).trim();
-    }
+    return validateSurveyAnswer(question, value);
   }
 
   async submitResponse(slug: string, data: unknown) {
@@ -548,10 +442,7 @@ export class FormsService {
   }
 
   private csvEscape(value: unknown): string {
-    if (value === null || value === undefined) return '';
-    const rawValue = Array.isArray(value) ? value.join(', ') : String(value);
-    const raw = /^[=+\-@]/.test(rawValue) ? `'${rawValue}` : rawValue;
-    return /[";\n\r]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
+    return csvEscapeSurveyValue(value);
   }
 
   async getResponsesCsv(formId: string) {
@@ -577,71 +468,8 @@ export class FormsService {
     return { success: true, data: { id: deleted.id, deleted: true } };
   }
 
-  private labelForOption(question: SurveyQuestion, value: string): string {
-    const option = this.normalizeOptions(question.options).find((item) => item.value === value);
-    return option?.label ?? value;
-  }
-
   private summarizeQuestion(question: SurveyQuestion, responses: SurveyResponse[]) {
-    const answers = responses.map((response) => (response.answers as AnswerMap)[question.id]).filter((value) => !this.isEmptyAnswer(value));
-    const totalAnswered = answers.length;
-
-    if (optionTypes.has(question.type)) {
-      const counts = new Map<string, number>();
-      for (const answer of answers) {
-        const values = Array.isArray(answer) ? answer.map(String) : [String(answer)];
-        for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-      }
-      const options = Array.from(counts.entries()).map(([value, count]) => ({
-        value,
-        label: this.labelForOption(question, value),
-        count,
-        percent: totalAnswered ? Math.round((count / totalAnswered) * 1000) / 10 : 0,
-      })).sort((a, b) => b.count - a.count);
-      return { questionId: question.id, label: question.label, type: question.type, chartType: 'bar', totalAnswered, options };
-    }
-
-    if (question.type === SURVEY_QUESTION_TYPE.CHECKBOX) {
-      const yes = answers.filter(Boolean).length;
-      const no = totalAnswered - yes;
-      return {
-        questionId: question.id,
-        label: question.label,
-        type: question.type,
-        chartType: 'pie',
-        totalAnswered,
-        options: [
-          { value: 'true', label: 'Oui', count: yes, percent: totalAnswered ? Math.round((yes / totalAnswered) * 1000) / 10 : 0 },
-          { value: 'false', label: 'Non', count: no, percent: totalAnswered ? Math.round((no / totalAnswered) * 1000) / 10 : 0 },
-        ],
-      };
-    }
-
-    if (question.type === SURVEY_QUESTION_TYPE.NUMBER || question.type === SURVEY_QUESTION_TYPE.RATING) {
-      const values = answers.map(Number).filter(Number.isFinite);
-      const average = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-      return {
-        questionId: question.id,
-        label: question.label,
-        type: question.type,
-        chartType: 'number',
-        totalAnswered: values.length,
-        numeric: {
-          average: Math.round(average * 100) / 100,
-          min: values.length ? Math.min(...values) : null,
-          max: values.length ? Math.max(...values) : null,
-        },
-      };
-    }
-
-    return {
-      questionId: question.id,
-      label: question.label,
-      type: question.type,
-      chartType: 'text',
-      totalAnswered,
-      samples: answers.slice(0, 8).map(String),
-    };
+    return summarizeSurveyQuestion(question, responses);
   }
 
   async runMaintenance() {

@@ -1,6 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { timingSafeEqual } from 'crypto';
 import { and, asc, count, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
@@ -29,6 +28,18 @@ import {
   updateOrganizationRelationSchema,
   updateOrganizationSchema,
 } from '../../../shared/schema';
+import {
+  AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION,
+  federationRelationPermissions,
+  getCurrentFederationInstanceUrl,
+  hostFromFederationUrl,
+  isAutoShareEventsToParentEnabledForRelation,
+  isFederationOrganizationOnInstance,
+  isRemoteFederationInstance,
+  normalizeFederationInstanceUrl,
+  safeCompareFederationToken,
+  withoutFederationRelationSecret,
+} from './federation.utils';
 
 const federatedOrganizationPayloadSchema = z.object({
   slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/),
@@ -99,7 +110,6 @@ const federationSettingsSchema = z.object({
   autoShareEventsToParent: z.boolean(),
 });
 
-const AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION = 'autoShareEventsToParent';
 
 @Injectable()
 export class FederationService {
@@ -113,42 +123,19 @@ export class FederationService {
   }
 
   private safeCompareToken(expected: string | null | undefined, received: string | undefined): boolean {
-    if (!expected || !received) return false;
-    const expectedBuffer = Buffer.from(expected);
-    const receivedBuffer = Buffer.from(received);
-    if (expectedBuffer.length !== receivedBuffer.length) return false;
-    return timingSafeEqual(expectedBuffer, receivedBuffer);
+    return safeCompareFederationToken(expected, received);
   }
 
   private normalizeInstanceUrl(value?: string | null): string | null {
-    if (!value) return null;
-    try {
-      const url = new URL(value.startsWith('http') ? value : `https://${value}`);
-      url.hash = '';
-      url.search = '';
-      return url.toString().replace(/\/$/, '').toLowerCase();
-    } catch {
-      return value.replace(/\/$/, '').toLowerCase();
-    }
+    return normalizeFederationInstanceUrl(value);
   }
 
   private getCurrentInstanceUrl(): string | null {
-    return this.normalizeInstanceUrl(
-      process.env.PUBLIC_APP_URL
-      || process.env.NEXT_PUBLIC_APP_URL
-      || process.env.APP_URL
-      || (process.env.DOMAIN ? `https://${process.env.DOMAIN}` : null),
-    );
+    return getCurrentFederationInstanceUrl();
   }
 
   private isRemoteInstance(targetInstanceUrl?: string | null, sourceInstanceUrl?: string | null): boolean {
-    const target = this.normalizeInstanceUrl(targetInstanceUrl);
-    if (!target) return false;
-    const current = this.getCurrentInstanceUrl();
-    if (current && target === current) return false;
-    const source = this.normalizeInstanceUrl(sourceInstanceUrl);
-    if (source && target === source) return false;
-    return true;
+    return isRemoteFederationInstance(targetInstanceUrl, sourceInstanceUrl, this.getCurrentInstanceUrl());
   }
 
   private getRemoteInstanceUrlForRelation(
@@ -167,37 +154,19 @@ export class FederationService {
   }
 
   private hostFromUrl(value?: string | null): string | null {
-    const normalized = this.normalizeInstanceUrl(value);
-    if (!normalized) return null;
-    try {
-      return new URL(normalized).hostname.toLowerCase();
-    } catch {
-      return null;
-    }
+    return hostFromFederationUrl(value);
   }
 
   private isOrganizationOnCurrentInstance(organization: typeof organizations.$inferSelect): boolean {
-    const currentUrl = this.getCurrentInstanceUrl();
-    const currentHost = this.hostFromUrl(currentUrl);
-    const organizationUrl = this.normalizeInstanceUrl(organization.instanceUrl || (organization.domain ? `https://${organization.domain}` : null));
-    const organizationHost = this.hostFromUrl(organizationUrl);
-    const domain = organization.domain?.toLowerCase().replace(/^www\./, '') ?? null;
-
-    if (currentUrl && organizationUrl && currentUrl === organizationUrl) return true;
-    if (currentHost && organizationHost && currentHost.replace(/^www\./, '') === organizationHost.replace(/^www\./, '')) return true;
-    if (currentHost && domain && currentHost.replace(/^www\./, '') === domain) return true;
-    return false;
+    return isFederationOrganizationOnInstance(organization, this.getCurrentInstanceUrl());
   }
 
   private relationPermissions(relation: Pick<typeof organizationRelations.$inferSelect, 'permissions'>): Record<string, unknown> {
-    return (relation.permissions ?? {}) as Record<string, unknown>;
+    return federationRelationPermissions(relation);
   }
 
   private isAutoShareEventsToParentEnabled(relation: Pick<typeof organizationRelations.$inferSelect, 'permissions'>): boolean {
-    const permissions = this.relationPermissions(relation);
-    return permissions.events !== false
-      && permissions.syndication !== false
-      && permissions[AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION] !== false;
+    return isAutoShareEventsToParentEnabledForRelation(relation);
   }
 
   private async getCurrentSectionParentRelation() {
@@ -258,11 +227,7 @@ export class FederationService {
   }
 
   private withoutRelationSecret<T extends { federationToken?: string | null }>(relation: T) {
-    const { federationToken, ...safeRelation } = relation;
-    return {
-      ...safeRelation,
-      hasFederationToken: Boolean(federationToken),
-    };
+    return withoutFederationRelationSecret(relation);
   }
 
   async getOverview() {

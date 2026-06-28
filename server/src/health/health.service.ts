@@ -34,10 +34,10 @@ const packageVersion = readPackageVersion();
 
 function resolveAppVersion(): string {
   const candidates = [
-    process.env.GIT_TAG,
     process.env.APP_VERSION,
     process.env.npm_package_version,
     packageVersion,
+    process.env.GIT_TAG,
   ];
 
   for (const value of candidates) {
@@ -49,6 +49,40 @@ function resolveAppVersion(): string {
   }
 
   return '0.0.0';
+}
+
+function isLikelyGitSha(value: string): boolean {
+  return /^[0-9a-f]{7,40}$/i.test(value.trim());
+}
+
+function resolveBuildRevision(): string | null {
+  const candidates = [
+    process.env.GIT_COMMIT,
+    process.env.GITHUB_SHA,
+    process.env.SOURCE_COMMIT,
+    process.env.APP_REVISION,
+    process.env.VERCEL_GIT_COMMIT_SHA,
+    process.env.GIT_TAG,
+  ];
+
+  for (const value of candidates) {
+    if (!value) continue;
+    const cleaned = value.trim();
+    if (isLikelyGitSha(cleaned)) return cleaned;
+  }
+
+  return null;
+}
+
+function resolveReleaseInfo() {
+  const version = resolveAppVersion();
+  const revision = resolveBuildRevision();
+  return {
+    version,
+    release: `v${version}`,
+    revision,
+    shortRevision: revision?.slice(0, 12) ?? null,
+  };
 }
 
 @Injectable()
@@ -64,11 +98,13 @@ export class HealthService {
       await this.db.execute(sql`SELECT 1 as test`);
       const dbResponseTime = Date.now() - dbStartTime;
 
+      const releaseInfo = resolveReleaseInfo();
+
       return {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        version: resolveAppVersion(),
+        ...releaseInfo,
         environment: process.env.NODE_ENV || 'development',
         database: {
           connected: true,
@@ -154,11 +190,13 @@ export class HealthService {
         };
       }
 
+      const releaseInfo = resolveReleaseInfo();
+
       return {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        version: resolveAppVersion(),
+        ...releaseInfo,
         environment: process.env.NODE_ENV || 'development',
         database: {
           connected: true,
@@ -239,9 +277,8 @@ export class HealthService {
 
   getVersion() {
     try {
-      const version = resolveAppVersion();
       return {
-        version,
+        ...resolveReleaseInfo(),
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || 'development',
       };
@@ -255,12 +292,14 @@ export class HealthService {
   }
 
   async getAllStatus(): Promise<StatusResponse> {
-    const results: StatusResponse = {
+    const releaseInfo = resolveReleaseInfo();
+    const results: StatusResponse & ReturnType<typeof resolveReleaseInfo> = {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       overallStatus: 'healthy',
       checks: {},
+      ...releaseInfo,
     };
 
     // 1. Application status
