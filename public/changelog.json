@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.10.0",
+    "version": "2.10.1",
     "releasedAt": "2026-06-28",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Harden surveys v2"
+      "nouveautes": [],
+      "corrections": [
+        "Target prod host for hdf deploy"
       ],
-      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.10.1",
+      "releasedAt": "2026-06-28",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Target prod host for hdf deploy"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.10.0",
       "releasedAt": "2026-06-28",
@@ -484,24 +500,8 @@
         ]
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.4",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Limite le déploiement REP aux compose de production"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-28T07:54:38.558Z",
+  "generatedAt": "2026-06-28T08:03:56.795Z",
   "source": "conventional-commits"
 }

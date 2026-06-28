@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.10.1] - 2026-06-28
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Target prod host for hdf deploy
+
 ## [2.10.0] - 2026-06-28
 
 ### En bref
