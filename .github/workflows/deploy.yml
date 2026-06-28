@@ -693,10 +693,12 @@ jobs:
         if: needs.detect-changes.outputs.should_build == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
+          # HDF est hébergé sur le VPS prod, distinct du VPS CJD80.
+          # Secrets dédiés recommandés: PROD_HOST/PROD_USER/PROD_SSH_KEY/PROD_PORT.
+          host: ${{ secrets.PROD_HOST || '92.222.101.25' }}
+          username: ${{ secrets.PROD_USER || secrets.VPS_USER }}
+          key: ${{ secrets.PROD_SSH_KEY || secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.PROD_PORT || secrets.VPS_PORT }}
           script: |
             bash -seuo pipefail <<'REMOTE_SCRIPT'
             cd /docker/apps/cjd-hdf
