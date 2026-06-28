@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.11.1",
+    "version": "2.11.2",
     "releasedAt": "2026-06-28",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Encrypt outbound relation tokens"
+        "Harden app surface and dependencies"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.11.2",
+      "releasedAt": "2026-06-28",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Harden app surface and dependencies"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.11.1",
       "releasedAt": "2026-06-28",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.10",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Exposer le port app en prod pour repicardie"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-28T19:16:39.242Z",
+  "generatedAt": "2026-06-28T22:40:13.090Z",
   "source": "conventional-commits"
 }
