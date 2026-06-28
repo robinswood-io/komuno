@@ -458,12 +458,14 @@ const organizationRelations = (0, import_pg_core.pgTable)("organization_relation
   relationType: (0, import_pg_core.text)("relation_type").default(ORGANIZATION_RELATION_TYPE.REGION_SECTION).notNull(),
   status: (0, import_pg_core.text)("status").default("active").notNull(),
   permissions: (0, import_pg_core.jsonb)("permissions").$type().default({}).notNull(),
-  // federationToken is kept only for legacy outbound sync until explicit rotation.
-  // New rotations store only hash/fingerprint and return the raw token once.
+  // federationToken is legacy only and auto-migrated to federationTokenEncrypted.
   federationToken: (0, import_pg_core.text)("federation_token"),
   federationTokenHash: (0, import_pg_core.text)("federation_token_hash"),
   federationTokenFingerprint: (0, import_pg_core.text)("federation_token_fingerprint"),
   federationTokenRotatedAt: (0, import_pg_core.timestamp)("federation_token_rotated_at"),
+  federationTokenEncrypted: (0, import_pg_core.text)("federation_token_encrypted"),
+  federationTokenEncryptionKeyId: (0, import_pg_core.text)("federation_token_encryption_key_id"),
+  federationTokenEncryptedAt: (0, import_pg_core.timestamp)("federation_token_encrypted_at"),
   syncEnabled: (0, import_pg_core.boolean)("sync_enabled").default(true).notNull(),
   lastSyncAt: (0, import_pg_core.timestamp)("last_sync_at"),
   syncStatus: (0, import_pg_core.text)("sync_status").default(FEDERATION_SYNC_STATUS.IDLE).notNull(),
@@ -477,7 +479,8 @@ const organizationRelations = (0, import_pg_core.pgTable)("organization_relation
   statusIdx: (0, import_pg_core.index)("organization_relations_status_idx").on(table.status),
   syncEnabledIdx: (0, import_pg_core.index)("organization_relations_sync_enabled_idx").on(table.syncEnabled),
   syncStatusIdx: (0, import_pg_core.index)("organization_relations_sync_status_idx").on(table.syncStatus),
-  tokenHashIdx: (0, import_pg_core.index)("organization_relations_token_hash_idx").on(table.federationTokenHash)
+  tokenHashIdx: (0, import_pg_core.index)("organization_relations_token_hash_idx").on(table.federationTokenHash),
+  tokenEncryptedIdx: (0, import_pg_core.index)("organization_relations_token_encrypted_idx").on(table.federationTokenEncryptedAt)
 }));
 const businessAuditLogs = (0, import_pg_core.pgTable)("business_audit_logs", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),

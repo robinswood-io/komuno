@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  decryptFederationToken,
+  encryptFederationToken,
   federationTokenFingerprintFromHash,
   hashFederationToken,
   isAutoShareEventsToParentEnabledForRelation,
@@ -33,6 +35,18 @@ describe('Fédération — invariants de sécurité sans DB', () => {
     expect(safeCompareFederationRelationSecret({ federationToken: 'legacy-clear', federationTokenHash: hash }, token)).toBe(true);
     expect(safeCompareFederationRelationSecret({ federationToken: 'legacy-clear', federationTokenHash: hash }, 'legacy-clear')).toBe(false);
     expect(safeCompareFederationRelationSecret({ federationToken: 'legacy-clear', federationTokenHash: null }, 'legacy-clear')).toBe(true);
+  });
+
+  it('chiffre les tokens sortants hors DB et les déchiffre uniquement avec la clé applicative', () => {
+    const env = { FEDERATION_TOKEN_ENCRYPTION_KEY: 'x'.repeat(48) } as NodeJS.ProcessEnv;
+    const token = 'komuno_shared_secret_for_outbound_sync';
+    const encrypted = encryptFederationToken(token, env);
+
+    expect(encrypted).not.toBeNull();
+    expect(encrypted?.encrypted).not.toContain(token);
+    expect(encrypted?.keyId).toHaveLength(12);
+    expect(decryptFederationToken(encrypted!.encrypted, env)).toBe(token);
+    expect(decryptFederationToken(encrypted!.encrypted, { FEDERATION_TOKEN_ENCRYPTION_KEY: 'y'.repeat(48) } as NodeJS.ProcessEnv)).toBeNull();
   });
 
   it('normalise les URLs d’instance sans inférer de relation métier', () => {
@@ -68,7 +82,14 @@ describe('Fédération — invariants de sécurité sans DB', () => {
       federationToken: 'super-secret-token',
     });
 
-    expect(safe).toEqual({ id: 'relation-1', status: 'active', hasFederationToken: true, federationTokenFingerprint: expect.any(String) });
+    expect(safe).toEqual({
+      id: 'relation-1',
+      status: 'active',
+      hasFederationToken: true,
+      hasOutboundFederationToken: true,
+      federationTokenFingerprint: expect.any(String),
+      federationTokenEncryptedAt: null,
+    });
     expect(safe.federationTokenFingerprint).toHaveLength(12);
     expect(Object.prototype.hasOwnProperty.call(safe, 'federationToken')).toBe(false);
   });
@@ -86,5 +107,22 @@ describe('Fédération — invariants de sécurité sans DB', () => {
     expect(safe.federationTokenFingerprint).toBe(tokenHash.slice(0, 12).toUpperCase());
     expect(Object.prototype.hasOwnProperty.call(safe, 'federationToken')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(safe, 'federationTokenHash')).toBe(false);
+  });
+
+  it('ne renvoie jamais le ciphertext du vault dans les objets exposés aux admins', () => {
+    const tokenHash = hashFederationToken('encrypted-secret');
+    const safe = withoutFederationRelationSecret({
+      id: 'relation-3',
+      federationToken: null,
+      federationTokenHash: tokenHash,
+      federationTokenEncrypted: 'v1:iv:tag:ciphertext',
+      federationTokenEncryptionKeyId: 'ABCDEF123456',
+      federationTokenEncryptedAt: new Date('2026-06-28T19:06:00.000Z'),
+    });
+
+    expect(safe.hasFederationToken).toBe(true);
+    expect(safe.hasOutboundFederationToken).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(safe, 'federationTokenEncrypted')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(safe, 'federationTokenEncryptionKeyId')).toBe(false);
   });
 });

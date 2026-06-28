@@ -232,12 +232,14 @@ export const organizationRelations = pgTable("organization_relations", {
   relationType: text("relation_type").default(ORGANIZATION_RELATION_TYPE.REGION_SECTION).notNull(),
   status: text("status").default("active").notNull(),
   permissions: jsonb("permissions").$type<Record<string, unknown>>().default({}).notNull(),
-  // federationToken is kept only for legacy outbound sync until explicit rotation.
-  // New rotations store only hash/fingerprint and return the raw token once.
+  // federationToken is legacy only and auto-migrated to federationTokenEncrypted.
   federationToken: text("federation_token"),
   federationTokenHash: text("federation_token_hash"),
   federationTokenFingerprint: text("federation_token_fingerprint"),
   federationTokenRotatedAt: timestamp("federation_token_rotated_at"),
+  federationTokenEncrypted: text("federation_token_encrypted"),
+  federationTokenEncryptionKeyId: text("federation_token_encryption_key_id"),
+  federationTokenEncryptedAt: timestamp("federation_token_encrypted_at"),
   syncEnabled: boolean("sync_enabled").default(true).notNull(),
   lastSyncAt: timestamp("last_sync_at"),
   syncStatus: text("sync_status").default(FEDERATION_SYNC_STATUS.IDLE).notNull(),
@@ -252,6 +254,7 @@ export const organizationRelations = pgTable("organization_relations", {
   syncEnabledIdx: index("organization_relations_sync_enabled_idx").on(table.syncEnabled),
   syncStatusIdx: index("organization_relations_sync_status_idx").on(table.syncStatus),
   tokenHashIdx: index("organization_relations_token_hash_idx").on(table.federationTokenHash),
+  tokenEncryptedIdx: index("organization_relations_token_encrypted_idx").on(table.federationTokenEncryptedAt),
 }));
 
 export const businessAuditLogs = pgTable("business_audit_logs", {

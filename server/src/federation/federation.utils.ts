@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from 'crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'crypto';
 
 export const AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION = 'autoShareEventsToParent';
 
@@ -38,6 +38,63 @@ export function safeCompareFederationRelationSecret(
 ): boolean {
   if (relation.federationTokenHash) return safeCompareFederationTokenHash(relation.federationTokenHash, received);
   return safeCompareFederationToken(relation.federationToken, received);
+}
+
+const FEDERATION_TOKEN_ENCRYPTION_AAD = Buffer.from('komuno:federation-token:v1');
+const FEDERATION_TOKEN_ENCRYPTION_VERSION = 'v1';
+
+export function getFederationTokenEncryptionMaterial(env: NodeJS.ProcessEnv = process.env): { key: Buffer; keyId: string; source: string } | null {
+  const candidates: Array<[string, string | undefined]> = [
+    ['FEDERATION_TOKEN_ENCRYPTION_KEY', env.FEDERATION_TOKEN_ENCRYPTION_KEY],
+    ['SESSION_SECRET', env.SESSION_SECRET],
+    ['JWT_SECRET', env.JWT_SECRET],
+    ['AUTH_SECRET', env.AUTH_SECRET],
+    ['NEXTAUTH_SECRET', env.NEXTAUTH_SECRET],
+  ];
+
+  const candidate = candidates.find(([, value]) => value && value.length >= 32);
+  if (!candidate) return null;
+  const [source, value] = candidate as [string, string];
+  const key = createHash('sha256').update(`komuno-federation-token:${value}`, 'utf8').digest();
+  const keyId = createHash('sha256').update(`komuno-federation-key-id:${value}`, 'utf8').digest('hex').slice(0, 12).toUpperCase();
+  return { key, keyId, source };
+}
+
+export function encryptFederationToken(token: string, env: NodeJS.ProcessEnv = process.env): { encrypted: string; keyId: string } | null {
+  const material = getFederationTokenEncryptionMaterial(env);
+  if (!material) return null;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', material.key, iv);
+  cipher.setAAD(FEDERATION_TOKEN_ENCRYPTION_AAD);
+  const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return {
+    encrypted: [
+      FEDERATION_TOKEN_ENCRYPTION_VERSION,
+      iv.toString('base64url'),
+      authTag.toString('base64url'),
+      encrypted.toString('base64url'),
+    ].join(':'),
+    keyId: material.keyId,
+  };
+}
+
+export function decryptFederationToken(encryptedToken: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  try {
+    const material = getFederationTokenEncryptionMaterial(env);
+    if (!material) return null;
+    const [version, ivPart, tagPart, encryptedPart] = encryptedToken.split(':');
+    if (version !== FEDERATION_TOKEN_ENCRYPTION_VERSION || !ivPart || !tagPart || !encryptedPart) return null;
+    const decipher = createDecipheriv('aes-256-gcm', material.key, Buffer.from(ivPart, 'base64url'));
+    decipher.setAAD(FEDERATION_TOKEN_ENCRYPTION_AAD);
+    decipher.setAuthTag(Buffer.from(tagPart, 'base64url'));
+    return Buffer.concat([
+      decipher.update(Buffer.from(encryptedPart, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8');
+  } catch {
+    return null;
+  }
 }
 
 export function normalizeFederationInstanceUrl(value?: string | null): string | null {
@@ -117,11 +174,16 @@ export function withoutFederationRelationSecret<T extends {
   federationTokenHash?: string | null;
   federationTokenFingerprint?: string | null;
   federationTokenRotatedAt?: Date | string | null;
+  federationTokenEncrypted?: string | null;
+  federationTokenEncryptionKeyId?: string | null;
+  federationTokenEncryptedAt?: Date | string | null;
 }>(relation: T) {
-  const { federationToken, federationTokenHash, ...safeRelation } = relation;
+  const { federationToken, federationTokenHash, federationTokenEncrypted, federationTokenEncryptionKeyId, ...safeRelation } = relation;
   return {
     ...safeRelation,
     hasFederationToken: Boolean(federationToken || federationTokenHash),
+    hasOutboundFederationToken: Boolean(federationToken || federationTokenEncrypted),
     federationTokenFingerprint: relation.federationTokenFingerprint ?? federationTokenFingerprintFromHash(federationTokenHash) ?? federationTokenFingerprint(federationToken),
+    federationTokenEncryptedAt: relation.federationTokenEncryptedAt ?? null,
   };
 }

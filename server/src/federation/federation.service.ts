@@ -38,9 +38,10 @@ import {
 } from '../../../shared/schema';
 import {
   AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION,
+  decryptFederationToken,
+  encryptFederationToken,
   federationRelationPermissions,
   federationTokenFingerprintFromHash,
-  generateFederationToken,
   getCurrentFederationInstanceUrl,
   hashFederationToken,
   hostFromFederationUrl,
@@ -215,7 +216,7 @@ export class FederationService {
     return safeCompareFederationRelationSecret(relation, received);
   }
 
-  private relationTokenPatch(token: string | null | undefined, options?: { storeOutboundSecret?: boolean }) {
+  private relationTokenPatch(token: string | null | undefined) {
     if (token === undefined) return {};
     if (token === null || token.trim() === '') {
       return {
@@ -223,15 +224,25 @@ export class FederationService {
         federationTokenHash: null,
         federationTokenFingerprint: null,
         federationTokenRotatedAt: sql`NOW()`,
+        federationTokenEncrypted: null,
+        federationTokenEncryptionKeyId: null,
+        federationTokenEncryptedAt: null,
       };
     }
     const normalized = token.trim();
     const hash = hashFederationToken(normalized);
+    const encrypted = encryptFederationToken(normalized);
+    if (!encrypted) {
+      throw new BadRequestException('Clé de chiffrement des jetons de fédération indisponible. Configurez FEDERATION_TOKEN_ENCRYPTION_KEY ou SESSION_SECRET.');
+    }
     return {
-      federationToken: options?.storeOutboundSecret === false ? null : normalized,
+      federationToken: null,
       federationTokenHash: hash,
       federationTokenFingerprint: federationTokenFingerprintFromHash(hash),
       federationTokenRotatedAt: sql`NOW()`,
+      federationTokenEncrypted: encrypted.encrypted,
+      federationTokenEncryptionKeyId: encrypted.keyId,
+      federationTokenEncryptedAt: sql`NOW()`,
     };
   }
 
@@ -391,7 +402,63 @@ export class FederationService {
     };
   }
 
-  private withoutRelationSecret<T extends { federationToken?: string | null; federationTokenHash?: string | null }>(relation: T) {
+  private async resolveOutboundFederationToken(relation: Pick<typeof organizationRelations.$inferSelect,
+    'id'
+    | 'federationToken'
+    | 'federationTokenHash'
+    | 'federationTokenFingerprint'
+    | 'federationTokenEncrypted'
+    | 'federationTokenEncryptionKeyId'
+  >): Promise<string | null> {
+    if (relation.federationTokenEncrypted) {
+      const decrypted = decryptFederationToken(relation.federationTokenEncrypted);
+      if (!decrypted) {
+        logger.warn('[Federation] Jeton sortant chiffré indéchiffrable', {
+          relationId: relation.id,
+          keyId: relation.federationTokenEncryptionKeyId,
+        });
+        return null;
+      }
+      return decrypted;
+    }
+
+    if (!relation.federationToken) return null;
+
+    const encrypted = encryptFederationToken(relation.federationToken);
+    if (!encrypted) return relation.federationToken;
+
+    const hash = relation.federationTokenHash ?? hashFederationToken(relation.federationToken);
+    await db.update(organizationRelations).set({
+      federationToken: null,
+      federationTokenHash: hash,
+      federationTokenFingerprint: relation.federationTokenFingerprint ?? federationTokenFingerprintFromHash(hash),
+      federationTokenEncrypted: encrypted.encrypted,
+      federationTokenEncryptionKeyId: encrypted.keyId,
+      federationTokenEncryptedAt: sql`NOW()`,
+      updatedAt: sql`NOW()`,
+    }).where(eq(organizationRelations.id, relation.id));
+
+    this.audit({
+      actorEmail: null,
+      action: 'federation.token.encrypt_legacy',
+      entityType: 'organization_relation',
+      entityId: relation.id,
+      relationId: relation.id,
+      metadata: {
+        tokenFingerprint: relation.federationTokenFingerprint ?? federationTokenFingerprintFromHash(hash),
+        keyId: encrypted.keyId,
+      },
+    });
+
+    return relation.federationToken;
+  }
+
+  private withoutRelationSecret<T extends {
+    federationToken?: string | null;
+    federationTokenHash?: string | null;
+    federationTokenEncrypted?: string | null;
+    federationTokenEncryptionKeyId?: string | null;
+  }>(relation: T) {
     return withoutFederationRelationSecret(relation);
   }
 
@@ -521,8 +588,10 @@ export class FederationService {
       lastSyncAt: organizationRelations.lastSyncAt,
       syncStatus: organizationRelations.syncStatus,
       hasFederationToken: sql<boolean>`(${organizationRelations.federationToken} IS NOT NULL OR ${organizationRelations.federationTokenHash} IS NOT NULL)`,
+      hasOutboundFederationToken: sql<boolean>`(${organizationRelations.federationToken} IS NOT NULL OR ${organizationRelations.federationTokenEncrypted} IS NOT NULL)`,
       federationTokenFingerprint: organizationRelations.federationTokenFingerprint,
       federationTokenRotatedAt: organizationRelations.federationTokenRotatedAt,
+      federationTokenEncryptedAt: organizationRelations.federationTokenEncryptedAt,
       createdAt: organizationRelations.createdAt,
       updatedAt: organizationRelations.updatedAt,
       fromName: sql<string>`from_org.name`,
@@ -681,21 +750,20 @@ export class FederationService {
     }
   }
 
-  async rotateRelationToken(id: string, userEmail?: string) {
+  async rotateRelationToken(id: string, data: unknown, userEmail?: string) {
     const [current] = await db.select().from(organizationRelations).where(eq(organizationRelations.id, id)).limit(1);
     if (!current) throw new NotFoundException('Relation introuvable');
 
-    const token = generateFederationToken();
-    const hash = hashFederationToken(token);
-    const fingerprint = federationTokenFingerprintFromHash(hash);
+    const body = (data ?? {}) as { federationToken?: string };
+    const token = body.federationToken?.trim();
+    if (!token || token.length < 16 || token.length > 512) {
+      throw new BadRequestException('Un nouveau jeton de 16 à 512 caractères est requis. Il sera chiffré et ne sera pas ré-affiché.');
+    }
 
+    const patch = this.relationTokenPatch(token);
     const [updated] = await db.update(organizationRelations)
       .set({
-        // Ne pas persister le secret brut : il est renvoyé une seule fois à l’admin.
-        federationToken: null,
-        federationTokenHash: hash,
-        federationTokenFingerprint: fingerprint,
-        federationTokenRotatedAt: sql`NOW()`,
+        ...patch,
         syncStatus: FEDERATION_SYNC_STATUS.IDLE,
         updatedAt: sql`NOW()`,
       })
@@ -704,12 +772,14 @@ export class FederationService {
 
     this.audit({
       actorEmail: userEmail ?? null,
-      action: 'federation.token.rotate',
+      action: 'federation.token.replace',
       entityType: 'organization_relation',
       entityId: updated.id,
       relationId: updated.id,
       metadata: {
-        tokenFingerprint: fingerprint,
+        tokenFingerprint: updated.federationTokenFingerprint,
+        tokenLength: token.length,
+        encrypted: Boolean(updated.federationTokenEncrypted),
         fromOrganizationId: updated.fromOrganizationId,
         toOrganizationId: updated.toOrganizationId,
         relationType: updated.relationType,
@@ -721,9 +791,9 @@ export class FederationService {
       data: {
         relation: this.withoutRelationSecret(updated),
         tokenLength: token.length,
-        tokenFingerprint: fingerprint,
+        tokenFingerprint: updated.federationTokenFingerprint,
         tokenDisplayed: false,
-        warning: 'Le jeton brut n’est jamais renvoyé. Coordonnez la rotation via un canal secret automatisé et vérifiez uniquement longueur/fingerprint.',
+        warning: 'Jeton remplacé et stocké chiffré. Le secret brut n’est jamais renvoyé ; vérifiez uniquement longueur/fingerprint.',
       },
     };
   }
@@ -1194,9 +1264,10 @@ export class FederationService {
       return { success: false, data: { skipped: true, reason: 'relation_sync_disabled' } };
     }
 
-    if (!relation.federationToken) {
-      await this.markSyncFailed(syndication.id, relation.id, 'Jeton de fédération manquant sur la relation', targetInstanceUrl);
-      return { success: false, data: { skipped: true, reason: 'missing_federation_token' } };
+    const outboundToken = await this.resolveOutboundFederationToken(relation);
+    if (!outboundToken) {
+      await this.markSyncFailed(syndication.id, relation.id, 'Jeton de fédération sortant manquant ou indéchiffrable sur la relation', targetInstanceUrl);
+      return { success: false, data: { skipped: true, reason: 'missing_outbound_federation_token' } };
     }
 
     const payload = this.buildFederatedEventPayload({ syndication, event, sourceOrganization, targetOrganization });
@@ -1217,7 +1288,7 @@ export class FederationService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Komuno-Federation-Token': relation.federationToken,
+          'X-Komuno-Federation-Token': outboundToken,
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -1531,8 +1602,9 @@ export class FederationService {
       return { success: false, data: { skipped: true, reason: 'relation_sync_disabled' } };
     }
 
-    if (!relation.federationToken) {
-      await this.markFormSyncFailed(syndication.id, relation.id, 'Jeton de fédération sortant manquant sur la relation', targetInstanceUrl);
+    const outboundToken = await this.resolveOutboundFederationToken(relation);
+    if (!outboundToken) {
+      await this.markFormSyncFailed(syndication.id, relation.id, 'Jeton de fédération sortant manquant ou indéchiffrable sur la relation', targetInstanceUrl);
       return { success: false, data: { skipped: true, reason: 'missing_outbound_federation_token' } };
     }
 
@@ -1561,7 +1633,7 @@ export class FederationService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Komuno-Federation-Token': relation.federationToken,
+          'X-Komuno-Federation-Token': outboundToken,
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -1678,9 +1750,10 @@ export class FederationService {
       return { success: true, data: { skipped: true, reason: 'relation_sync_disabled', relationId } };
     }
 
-    if (!relation.federationToken) {
-      await this.markRelationSyncFailed(relation.id, 'Jeton de fédération manquant sur la relation');
-      return { success: false, data: { skipped: true, reason: 'missing_federation_token', relationId } };
+    const outboundToken = await this.resolveOutboundFederationToken(relation);
+    if (!outboundToken) {
+      await this.markRelationSyncFailed(relation.id, 'Jeton de fédération sortant manquant ou indéchiffrable sur la relation');
+      return { success: false, data: { skipped: true, reason: 'missing_outbound_federation_token', relationId } };
     }
 
     const remoteInstanceUrl = this.getRemoteInstanceUrlForRelation(fromOrganization, toOrganization);
@@ -1717,7 +1790,7 @@ export class FederationService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Komuno-Federation-Token': relation.federationToken,
+          'X-Komuno-Federation-Token': outboundToken,
         },
         body: JSON.stringify(payload),
         signal: controller.signal,

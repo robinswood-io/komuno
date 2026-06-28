@@ -61,8 +61,10 @@ interface OrganizationRelation {
   syncStatus?: string;
   lastSyncAt?: string | null;
   hasFederationToken?: boolean;
+  hasOutboundFederationToken?: boolean;
   federationTokenFingerprint?: string | null;
   federationTokenRotatedAt?: string | null;
+  federationTokenEncryptedAt?: string | null;
   fromName?: string;
   toName?: string;
   fromType?: string;
@@ -220,6 +222,7 @@ export default function AdminFederationPage() {
   const [includeFormResponses, setIncludeFormResponses] = useState(false);
   const [formSyndicationFilter, setFormSyndicationFilter] = useState('all');
   const [rotatedTokenInfo, setRotatedTokenInfo] = useState<{ relationId: string; fingerprint?: string | null; tokenLength?: number } | null>(null);
+  const [relationTokenDrafts, setRelationTokenDrafts] = useState<Record<string, string>>({});
 
   const { data: overview, isLoading: overviewLoading } = useQuery<OverviewPayload>({
     queryKey: queryKeys.federation.overview(),
@@ -383,10 +386,13 @@ export default function AdminFederationPage() {
   });
 
   const rotateRelationTokenMutation = useMutation({
-    mutationFn: (id: string) => api.post<{ data?: { tokenLength?: number; tokenFingerprint?: string | null; relation?: { id: string } } }>(`/api/admin/federation/relations/${id}/rotate-token`, {}),
+    mutationFn: (id: string) => api.post<{ data?: { tokenLength?: number; tokenFingerprint?: string | null; relation?: { id: string } } }>(`/api/admin/federation/relations/${id}/rotate-token`, { federationToken: relationTokenDrafts[id] }),
     onSuccess: (response: { data?: { tokenLength?: number; tokenFingerprint?: string | null; relation?: { id: string } } }) => {
       const relationId = response.data?.relation?.id;
-      if (relationId) setRotatedTokenInfo({ relationId, fingerprint: response.data?.tokenFingerprint, tokenLength: response.data?.tokenLength });
+      if (relationId) {
+        setRotatedTokenInfo({ relationId, fingerprint: response.data?.tokenFingerprint, tokenLength: response.data?.tokenLength });
+        setRelationTokenDrafts((current) => ({ ...current, [relationId]: '' }));
+      }
       toast({ title: 'Jeton régénéré', description: `Fingerprint ${response.data?.tokenFingerprint ?? '—'} · longueur ${response.data?.tokenLength ?? '—'}. Le secret brut n’est pas affiché.` });
       invalidateFederation();
     },
@@ -581,23 +587,14 @@ export default function AdminFederationPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Jeton inter-instance partagé</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={newRelation.federationToken}
-                      onChange={(e) => setNewRelation({ ...newRelation, federationToken: e.target.value })}
-                      placeholder="Même jeton sur les deux instances"
-                      type="password"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setNewRelation({ ...newRelation, federationToken: `komuno_${crypto.randomUUID()}_${crypto.randomUUID()}` })}
-                    >
-                      <KeyRound className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Input
+                    value={newRelation.federationToken}
+                    onChange={(e) => setNewRelation({ ...newRelation, federationToken: e.target.value })}
+                    placeholder="Jeton déjà partagé avec l’autre instance"
+                    type="password"
+                  />
                   <p className="text-xs text-muted-foreground">
-                    Requis uniquement si les deux organisations vivent sur deux domaines / instances distincts. Le jeton n’est jamais réaffiché après enregistrement.
+                    Requis uniquement si les deux organisations vivent sur deux domaines / instances distincts. Le jeton est stocké chiffré et n’est jamais réaffiché ; vérifiez ensuite longueur/fingerprint.
                   </p>
                 </div>
                 <Button onClick={() => createRelationMutation.mutate()} disabled={createRelationMutation.isPending || !newRelation.fromOrganizationId || !newRelation.toOrganizationId}>
@@ -643,11 +640,15 @@ export default function AdminFederationPage() {
                       <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
                         <Badge variant="outline">{relation.relationType}</Badge>
                         <Badge variant={relation.hasFederationToken ? 'default' : 'outline'}>
-                          {relation.hasFederationToken ? 'Token sync configuré' : 'Sync locale seulement'}
+                          {relation.hasFederationToken ? 'Token entrant configuré' : 'Sync locale seulement'}
+                        </Badge>
+                        <Badge variant={relation.hasOutboundFederationToken ? 'default' : 'outline'}>
+                          {relation.hasOutboundFederationToken ? 'Sortant chiffré/legacy OK' : 'Sortant absent'}
                         </Badge>
                         {relation.syncStatus && <Badge variant="outline">Sync {relation.syncStatus}</Badge>}
                         {relation.federationTokenFingerprint && <Badge variant="outline">FP {relation.federationTokenFingerprint}</Badge>}
                         {relation.federationTokenRotatedAt && <span>Rotation {formatDate(relation.federationTokenRotatedAt)}</span>}
+                        {relation.federationTokenEncryptedAt && <span>Vault {formatDate(relation.federationTokenEncryptedAt)}</span>}
                       </div>
                       {rotatedTokenInfo?.relationId === relation.id && (
                         <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
@@ -657,10 +658,27 @@ export default function AdminFederationPage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => rotateRelationTokenMutation.mutate(relation.id)} disabled={rotateRelationTokenMutation.isPending}>
-                        <KeyRound className="h-4 w-4 mr-1" /> Régénérer
-                      </Button>
+                    <div className="flex min-w-[280px] flex-col items-end gap-2">
+                      <div className="flex w-full gap-2">
+                        <Input
+                          className="font-mono"
+                          type="password"
+                          placeholder="Nouveau jeton partagé"
+                          value={relationTokenDrafts[relation.id] ?? ''}
+                          onChange={(event) => setRelationTokenDrafts((current) => ({ ...current, [relation.id]: event.target.value }))}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => rotateRelationTokenMutation.mutate(relation.id)}
+                          disabled={rotateRelationTokenMutation.isPending || !(relationTokenDrafts[relation.id] ?? '').trim()}
+                        >
+                          <KeyRound className="h-4 w-4 mr-1" /> Remplacer
+                        </Button>
+                      </div>
+                      <p className="max-w-[360px] text-right text-xs text-muted-foreground">
+                        Le jeton saisi est stocké chiffré et n’est jamais ré-affiché. Vérifiez ensuite longueur/fingerprint sur les deux instances.
+                      </p>
                       <Badge>{relation.syncEnabled === false ? 'Sync off' : 'Actif'}</Badge>
                     </div>
                   </div>

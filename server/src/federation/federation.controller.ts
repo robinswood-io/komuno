@@ -96,9 +96,9 @@ export class AdminFederationController {
 
   @Post('relations/:id/rotate-token')
   @Permissions('admin.manage')
-  @ApiOperation({ summary: 'Régénérer le jeton de fédération de la relation (affiché une seule fois)' })
-  async rotateRelationToken(@Param('id') id: string, @User() user: { email?: string }) {
-    return await this.federationService.rotateRelationToken(id, user.email);
+  @ApiOperation({ summary: 'Remplacer le jeton de fédération de la relation (stocké chiffré, jamais ré-affiché)' })
+  async rotateRelationToken(@Param('id') id: string, @Body() body: unknown, @User() user: { email?: string }) {
+    return await this.federationService.rotateRelationToken(id, body, user.email);
   }
 
   @Get('settings')
