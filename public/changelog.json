@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.11.2",
+    "version": "2.11.3",
     "releasedAt": "2026-06-28",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Harden app surface and dependencies"
+        "Remove unused private auth package"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.11.3",
+      "releasedAt": "2026-06-28",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Remove unused private auth package"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.11.2",
       "releasedAt": "2026-06-28",
@@ -484,24 +500,8 @@
         ]
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.11",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Déclencher deploy sur changements compose"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-28T22:40:13.090Z",
+  "generatedAt": "2026-06-28T22:48:15.633Z",
   "source": "conventional-commits"
 }
