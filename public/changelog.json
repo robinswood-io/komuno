@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.10.4",
+    "version": "2.11.0",
     "releasedAt": "2026-06-28",
-    "summary": "Cette version apporte des ajustements techniques.",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
+      "nouveautes": [
+        "Secure tokens and federate forms"
+      ],
       "corrections": [],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Add federation safety coverage"
-      ]
+      "maintenance": []
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.11.0",
+      "releasedAt": "2026-06-28",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Secure tokens and federate forms"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.10.4",
       "releasedAt": "2026-06-28",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.8",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Assouplit le contrôle de restart au bootstrap REP"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-28T09:34:54.891Z",
+  "generatedAt": "2026-06-28T12:49:43.181Z",
   "source": "conventional-commits"
 }
