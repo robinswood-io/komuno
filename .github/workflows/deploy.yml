@@ -195,7 +195,7 @@ jobs:
           echo "Tables créées:"
           echo "$TABLES" | sed 's/^/  /'
 
-          CRITICAL="members admins organizations organization_relations survey_forms survey_questions survey_responses"
+          CRITICAL="members admins organizations organization_relations business_audit_logs survey_forms survey_questions survey_responses survey_form_syndications survey_form_response_summaries"
           FAIL=0
           for table in $CRITICAL; do
             if echo "$TABLES" | grep -qx "$table"; then

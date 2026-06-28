@@ -44,8 +44,8 @@ export class FormsController {
   @Post('maintenance/run')
   @Permissions('forms.manage')
   @ApiOperation({ summary: 'Lancer la maintenance formulaires (expiration / rétention)' })
-  async runMaintenance() {
-    return await this.formsService.runMaintenance();
+  async runMaintenance(@User() user: { email?: string }) {
+    return await this.formsService.runMaintenance(user.email);
   }
 
   @Get(':id')
@@ -60,8 +60,8 @@ export class FormsController {
   @Permissions('forms.write')
   @ApiOperation({ summary: 'Modifier un formulaire / sondage' })
   @ApiParam({ name: 'id' })
-  async updateForm(@Param('id') id: string, @Body() body: unknown) {
-    return await this.formsService.updateForm(id, body);
+  async updateForm(@Param('id') id: string, @Body() body: unknown, @User() user: { email?: string }) {
+    return await this.formsService.updateForm(id, body, user.email);
   }
 
   @Post(':id/duplicate')
@@ -76,16 +76,16 @@ export class FormsController {
   @Permissions('forms.delete')
   @ApiOperation({ summary: 'Supprimer un formulaire / sondage et ses réponses' })
   @ApiParam({ name: 'id' })
-  async deleteForm(@Param('id') id: string) {
-    return await this.formsService.deleteForm(id);
+  async deleteForm(@Param('id') id: string, @User() user: { email?: string }) {
+    return await this.formsService.deleteForm(id, user.email);
   }
 
   @Get(':id/responses.csv')
   @Permissions('forms.export')
   @ApiOperation({ summary: 'Exporter les réponses d’un formulaire en CSV' })
   @ApiParam({ name: 'id' })
-  async exportResponsesCsv(@Param('id') id: string, @Res({ passthrough: true }) response: Response) {
-    const result = await this.formsService.getResponsesCsv(id);
+  async exportResponsesCsv(@Param('id') id: string, @Res({ passthrough: true }) response: Response, @User() user: { email?: string }) {
+    const result = await this.formsService.getResponsesCsv(id, user.email);
     response.setHeader('Content-Type', 'text/csv; charset=utf-8');
     response.setHeader('Content-Disposition', `attachment; filename="${result.data.filename}"`);
     return result.data.content;
@@ -104,8 +104,8 @@ export class FormsController {
   @ApiOperation({ summary: 'Supprimer une réponse de formulaire' })
   @ApiParam({ name: 'id' })
   @ApiParam({ name: 'responseId' })
-  async deleteResponse(@Param('id') id: string, @Param('responseId') responseId: string) {
-    return await this.formsService.deleteResponse(id, responseId);
+  async deleteResponse(@Param('id') id: string, @Param('responseId') responseId: string, @User() user: { email?: string }) {
+    return await this.formsService.deleteResponse(id, responseId, user.email);
   }
 
   @Get(':id/stats')

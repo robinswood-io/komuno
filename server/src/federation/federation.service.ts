@@ -12,6 +12,7 @@ import {
   FEDERATION_VISIBILITY,
   ORGANIZATION_RELATION_TYPE,
   ORGANIZATION_TYPE,
+  SURVEY_FORM_STATUS,
   SYNDICATION_DIRECTION,
   SYNDICATION_STATUS,
   eventSyndications,
@@ -20,26 +21,39 @@ import {
   insertOrganizationNetworkSchema,
   insertOrganizationRelationSchema,
   insertOrganizationSchema,
+  insertSurveyFormSyndicationSchema,
   organizationNetworks,
   organizationRelations,
   organizations,
+  surveyFormResponseSummaries,
+  surveyFormSyndications,
+  surveyForms,
+  surveyQuestions,
+  surveyResponses,
   updateEventSyndicationSchema,
   updateOrganizationNetworkSchema,
   updateOrganizationRelationSchema,
   updateOrganizationSchema,
+  updateSurveyFormSyndicationSchema,
 } from '../../../shared/schema';
 import {
   AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION,
   federationRelationPermissions,
+  federationTokenFingerprintFromHash,
+  generateFederationToken,
   getCurrentFederationInstanceUrl,
+  hashFederationToken,
   hostFromFederationUrl,
   isAutoShareEventsToParentEnabledForRelation,
   isFederationOrganizationOnInstance,
   isRemoteFederationInstance,
   normalizeFederationInstanceUrl,
+  safeCompareFederationRelationSecret,
   safeCompareFederationToken,
   withoutFederationRelationSecret,
 } from './federation.utils';
+import { AuditService } from '../audit/audit.service';
+import { questionCatalogWithSnapshots, summarizeSurveyQuestion } from '../forms/forms.utils';
 
 const federatedOrganizationPayloadSchema = z.object({
   slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/),
@@ -93,6 +107,68 @@ const federatedEventPayloadSchema = z.object({
 
 type FederatedEventPayload = z.infer<typeof federatedEventPayloadSchema>;
 
+const federatedSurveyQuestionPayloadSchema = z.object({
+  id: z.string().min(1).max(120),
+  label: z.string().min(2).max(500),
+  description: z.string().max(1000).optional().nullable(),
+  type: z.enum(['text', 'textarea', 'email', 'phone', 'number', 'date', 'select', 'radio', 'multiselect', 'checkbox', 'rating']),
+  required: z.boolean().default(false),
+  options: z.array(z.object({
+    label: z.string().min(1).max(200),
+    value: z.string().min(1).max(200),
+  })).default([]),
+  validation: z.record(z.string(), z.unknown()).default({}),
+  orderIndex: z.number().int().min(0).default(0),
+});
+
+const federatedFormPayloadSchema = z.object({
+  protocolVersion: z.literal(1).default(1),
+  direction: z.enum([
+    SYNDICATION_DIRECTION.UPWARD,
+    SYNDICATION_DIRECTION.DOWNWARD,
+    SYNDICATION_DIRECTION.LATERAL,
+  ]),
+  status: z.enum([
+    SYNDICATION_STATUS.DRAFT,
+    SYNDICATION_STATUS.PROPOSED,
+    SYNDICATION_STATUS.ACCEPTED,
+    SYNDICATION_STATUS.REJECTED,
+    SYNDICATION_STATUS.REVOKED,
+    SYNDICATION_STATUS.AUTO_ACCEPTED,
+  ]).default(SYNDICATION_STATUS.PROPOSED),
+  includeResponses: z.boolean().default(false),
+  collectResponsesLocally: z.boolean().default(true),
+  sourceInstanceUrl: z.string().url(),
+  sourceSyndicationId: z.string().max(120).optional().nullable(),
+  sentAt: z.string().datetime().optional(),
+  sourceOrganization: federatedOrganizationPayloadSchema,
+  targetOrganization: federatedOrganizationPayloadSchema,
+  responseSummary: z.object({
+    responseCount: z.number().int().min(0).default(0),
+    lastResponseAt: z.string().datetime().optional().nullable(),
+    responsesByDay: z.array(z.record(z.string(), z.unknown())).default([]),
+    questionSummaries: z.array(z.record(z.string(), z.unknown())).default([]),
+  }).optional().nullable(),
+  form: z.object({
+    id: z.string().min(1).max(120),
+    slug: z.string().min(3).max(120).regex(/^[a-z0-9-]+$/),
+    title: z.string().min(3).max(200),
+    description: z.string().max(3000).optional().nullable(),
+    status: z.enum([SURVEY_FORM_STATUS.DRAFT, SURVEY_FORM_STATUS.PUBLISHED, SURVEY_FORM_STATUS.CLOSED]).default(SURVEY_FORM_STATUS.DRAFT),
+    version: z.number().int().min(1).default(1),
+    collectRespondentInfo: z.boolean().default(false),
+    allowMultipleSubmissions: z.boolean().default(true),
+    successMessage: z.string().max(1000).optional().nullable(),
+    requireConsent: z.boolean().default(false),
+    consentText: z.string().max(2000).optional().nullable(),
+    retentionDays: z.number().int().min(1).max(3650).optional().nullable(),
+    expiresAt: z.string().datetime().optional().nullable(),
+    questions: z.array(federatedSurveyQuestionPayloadSchema).default([]),
+  }),
+});
+
+type FederatedFormPayload = z.infer<typeof federatedFormPayloadSchema>;
+
 const federatedRelationHandshakeSchema = z.object({
   protocolVersion: z.literal(1).default(1),
   senderInstanceUrl: z.string().url().optional().nullable(),
@@ -115,6 +191,12 @@ const federationSettingsSchema = z.object({
 export class FederationService {
   private federationSyncRunning = false;
 
+  constructor(private readonly auditService?: AuditService) {}
+
+  private audit(input: Parameters<AuditService['record']>[0]) {
+    void this.auditService?.record(input);
+  }
+
   private handleZodError(error: unknown): never {
     if (error instanceof ZodError) {
       throw new BadRequestException(fromZodError(error).toString());
@@ -124,6 +206,33 @@ export class FederationService {
 
   private safeCompareToken(expected: string | null | undefined, received: string | undefined): boolean {
     return safeCompareFederationToken(expected, received);
+  }
+
+  private safeCompareRelationToken(
+    relation: Pick<typeof organizationRelations.$inferSelect, 'federationToken' | 'federationTokenHash'>,
+    received: string | undefined,
+  ): boolean {
+    return safeCompareFederationRelationSecret(relation, received);
+  }
+
+  private relationTokenPatch(token: string | null | undefined, options?: { storeOutboundSecret?: boolean }) {
+    if (token === undefined) return {};
+    if (token === null || token.trim() === '') {
+      return {
+        federationToken: null,
+        federationTokenHash: null,
+        federationTokenFingerprint: null,
+        federationTokenRotatedAt: sql`NOW()`,
+      };
+    }
+    const normalized = token.trim();
+    const hash = hashFederationToken(normalized);
+    return {
+      federationToken: options?.storeOutboundSecret === false ? null : normalized,
+      federationTokenHash: hash,
+      federationTokenFingerprint: federationTokenFingerprintFromHash(hash),
+      federationTokenRotatedAt: sql`NOW()`,
+    };
   }
 
   private normalizeInstanceUrl(value?: string | null): string | null {
@@ -214,6 +323,15 @@ export class FederationService {
     };
   }
 
+  private normalizeFormSyndicationDates<T extends { lastSyncAttemptAt?: string | Date | null }>(data: T) {
+    return {
+      ...data,
+      lastSyncAttemptAt: typeof data.lastSyncAttemptAt === 'string'
+        ? new Date(data.lastSyncAttemptAt)
+        : data.lastSyncAttemptAt,
+    };
+  }
+
   private async getOrganizationOrThrow(id: string) {
     const [organization] = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
     if (!organization) throw new NotFoundException('Organisation introuvable');
@@ -226,7 +344,54 @@ export class FederationService {
     return event;
   }
 
-  private withoutRelationSecret<T extends { federationToken?: string | null }>(relation: T) {
+  private async getFormOrThrow(id: string) {
+    const [form] = await db.select().from(surveyForms).where(eq(surveyForms.id, id)).limit(1);
+    if (!form) throw new NotFoundException('Formulaire introuvable');
+    return form;
+  }
+
+  private async getFormQuestions(formId: string) {
+    return await db.select().from(surveyQuestions).where(eq(surveyQuestions.formId, formId)).orderBy(asc(surveyQuestions.orderIndex), asc(surveyQuestions.createdAt));
+  }
+
+  private async ensureUniqueFederatedFormSlug(baseSlug: string, currentFormId?: string): Promise<string> {
+    const normalized = baseSlug.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100) || 'formulaire-federe';
+    let candidate = normalized;
+    let suffix = 2;
+
+    while (true) {
+      const [existing] = await db.select({ id: surveyForms.id }).from(surveyForms).where(eq(surveyForms.slug, candidate)).limit(1);
+      if (!existing || existing.id === currentFormId) return candidate;
+      candidate = `${normalized}-${suffix++}`.slice(0, 120);
+    }
+  }
+
+  private async buildLocalFormResponseSummary(formId: string) {
+    const questions = await this.getFormQuestions(formId);
+    const responses = await db.select().from(surveyResponses).where(eq(surveyResponses.formId, formId)).orderBy(asc(surveyResponses.submittedAt));
+    const questionCatalog = questionCatalogWithSnapshots(questions, responses);
+    const byDayMap = new Map<string, number>();
+    for (const response of responses) {
+      const day = new Date(response.submittedAt).toISOString().slice(0, 10);
+      byDayMap.set(day, (byDayMap.get(day) ?? 0) + 1);
+    }
+
+    const questionSummaries = questionCatalog.map((question) => {
+      const summary = summarizeSurveyQuestion(question, responses) as Record<string, unknown>;
+      // Ne pas fédérer les exemples de réponses libres : ils peuvent contenir de la donnée personnelle.
+      if (summary.chartType === 'text') delete summary.samples;
+      return summary;
+    });
+
+    return {
+      responseCount: responses.length,
+      lastResponseAt: responses[responses.length - 1]?.submittedAt?.toISOString() ?? null,
+      responsesByDay: Array.from(byDayMap.entries()).map(([date, count]) => ({ date, count })),
+      questionSummaries,
+    };
+  }
+
+  private withoutRelationSecret<T extends { federationToken?: string | null; federationTokenHash?: string | null }>(relation: T) {
     return withoutFederationRelationSecret(relation);
   }
 
@@ -355,7 +520,9 @@ export class FederationService {
       syncEnabled: organizationRelations.syncEnabled,
       lastSyncAt: organizationRelations.lastSyncAt,
       syncStatus: organizationRelations.syncStatus,
-      hasFederationToken: sql<boolean>`${organizationRelations.federationToken} IS NOT NULL`,
+      hasFederationToken: sql<boolean>`(${organizationRelations.federationToken} IS NOT NULL OR ${organizationRelations.federationTokenHash} IS NOT NULL)`,
+      federationTokenFingerprint: organizationRelations.federationTokenFingerprint,
+      federationTokenRotatedAt: organizationRelations.federationTokenRotatedAt,
       createdAt: organizationRelations.createdAt,
       updatedAt: organizationRelations.updatedAt,
       fromName: sql<string>`from_org.name`,
@@ -401,7 +568,7 @@ export class FederationService {
     };
   }
 
-  async updateFederationSettings(data: unknown) {
+  async updateFederationSettings(data: unknown, userEmail?: string) {
     try {
       const validated = federationSettingsSchema.parse(data);
       const currentRelation = await this.getCurrentSectionParentRelation();
@@ -419,6 +586,15 @@ export class FederationService {
         updatedAt: sql`NOW()`,
       }).where(eq(organizationRelations.id, currentRelation.relation.id)).returning();
 
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: 'federation.settings.update',
+        entityType: 'organization_relation',
+        entityId: updated.id,
+        relationId: updated.id,
+        metadata: { autoShareEventsToParent: validated.autoShareEventsToParent },
+      });
+
       return {
         success: true,
         data: {
@@ -432,7 +608,7 @@ export class FederationService {
     }
   }
 
-  async createRelation(data: unknown) {
+  async createRelation(data: unknown, userEmail?: string) {
     try {
       const validated = this.normalizeRelationDates(insertOrganizationRelationSchema.parse(data));
       if (validated.fromOrganizationId === validated.toOrganizationId) {
@@ -446,7 +622,27 @@ export class FederationService {
         ...((validated.permissions ?? {}) as Record<string, unknown>),
         [AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION]: (validated.permissions as Record<string, unknown> | undefined)?.[AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION] ?? true,
       };
-      const [created] = await db.insert(organizationRelations).values({ ...validated, permissions }).returning();
+      const { federationToken, ...relationData } = validated;
+      const [created] = await db.insert(organizationRelations).values({
+        ...relationData,
+        ...this.relationTokenPatch(federationToken),
+        permissions,
+      }).returning();
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: 'federation.relation.create',
+        entityType: 'organization_relation',
+        entityId: created.id,
+        relationId: created.id,
+        metadata: {
+          fromOrganizationId: created.fromOrganizationId,
+          toOrganizationId: created.toOrganizationId,
+          relationType: created.relationType,
+          syncEnabled: created.syncEnabled,
+          tokenRotated: Boolean(federationToken),
+          tokenFingerprint: created.federationTokenFingerprint,
+        },
+      });
       return { success: true, data: this.withoutRelationSecret(created) };
     } catch (error) {
       if ((error as any)?.code === '23505') throw new ConflictException('Cette relation existe déjà');
@@ -454,18 +650,82 @@ export class FederationService {
     }
   }
 
-  async updateRelation(id: string, data: unknown) {
+  async updateRelation(id: string, data: unknown, userEmail?: string) {
     try {
       const validated = this.normalizeRelationDates(updateOrganizationRelationSchema.parse(data));
+      const { federationToken, ...relationPatch } = validated;
       const [updated] = await db.update(organizationRelations)
-        .set({ ...validated, updatedAt: sql`NOW()` })
+        .set({
+          ...relationPatch,
+          ...this.relationTokenPatch(federationToken),
+          updatedAt: sql`NOW()`,
+        })
         .where(eq(organizationRelations.id, id))
         .returning();
       if (!updated) throw new NotFoundException('Relation introuvable');
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: federationToken !== undefined ? 'federation.relation.update_token' : 'federation.relation.update',
+        entityType: 'organization_relation',
+        entityId: updated.id,
+        relationId: updated.id,
+        metadata: {
+          changedFields: Object.keys(relationPatch).filter((key) => key !== 'federationToken'),
+          tokenRotated: federationToken !== undefined,
+          tokenFingerprint: updated.federationTokenFingerprint,
+        },
+      });
       return { success: true, data: this.withoutRelationSecret(updated) };
     } catch (error) {
       return this.handleZodError(error);
     }
+  }
+
+  async rotateRelationToken(id: string, userEmail?: string) {
+    const [current] = await db.select().from(organizationRelations).where(eq(organizationRelations.id, id)).limit(1);
+    if (!current) throw new NotFoundException('Relation introuvable');
+
+    const token = generateFederationToken();
+    const hash = hashFederationToken(token);
+    const fingerprint = federationTokenFingerprintFromHash(hash);
+
+    const [updated] = await db.update(organizationRelations)
+      .set({
+        // Ne pas persister le secret brut : il est renvoyé une seule fois à l’admin.
+        federationToken: null,
+        federationTokenHash: hash,
+        federationTokenFingerprint: fingerprint,
+        federationTokenRotatedAt: sql`NOW()`,
+        syncStatus: FEDERATION_SYNC_STATUS.IDLE,
+        updatedAt: sql`NOW()`,
+      })
+      .where(eq(organizationRelations.id, id))
+      .returning();
+
+    this.audit({
+      actorEmail: userEmail ?? null,
+      action: 'federation.token.rotate',
+      entityType: 'organization_relation',
+      entityId: updated.id,
+      relationId: updated.id,
+      metadata: {
+        tokenFingerprint: fingerprint,
+        fromOrganizationId: updated.fromOrganizationId,
+        toOrganizationId: updated.toOrganizationId,
+        relationType: updated.relationType,
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        relation: this.withoutRelationSecret(updated),
+        tokenLength: token.length,
+        tokenFingerprint: fingerprint,
+        tokenDisplayed: false,
+        warning: 'Le jeton brut n’est jamais renvoyé. Coordonnez la rotation via un canal secret automatisé et vérifiez uniquement longueur/fingerprint.',
+      },
+    };
   }
 
   async getSyndications(options?: {
@@ -616,6 +876,15 @@ export class FederationService {
       return created;
     });
 
+    this.audit({
+      actorEmail: userEmail ?? null,
+      action: 'federation.events.auto_share_to_parent',
+      entityType: 'event_syndication',
+      entityId: syndication.id,
+      organizationId: childOrganization.id,
+      relationId: relation.id,
+      metadata: { eventId: event.id, targetOrganizationId: parentOrganization.id, existing: Boolean(existing) },
+    });
     const sync = await this.syncSyndicationBestEffort(syndication.id);
     return { success: true, data: { syndication, sync: sync.data } };
   }
@@ -650,6 +919,14 @@ export class FederationService {
           updatedAt: sql`NOW()`,
         }).where(eq(events.id, eventId));
         return [row];
+      });
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: 'federation.events.propose_upward',
+        entityType: 'event_syndication',
+        entityId: created.id,
+        organizationId: sourceOrganizationId,
+        metadata: { eventId, targetOrganizationId },
       });
       const sync = await this.syncSyndicationBestEffort(created.id);
       return { success: true, data: created, sync: sync.data };
@@ -693,6 +970,14 @@ export class FederationService {
         return inserted;
       });
 
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: 'federation.events.publish_downward',
+        entityType: 'event',
+        entityId: eventId,
+        organizationId: sourceOrganizationId,
+        metadata: { targetOrganizationIds, createdSyndicationIds: created.map((row) => row.id), autoAccept: Boolean(body.autoAccept) },
+      });
       const syncResults = await Promise.all(created.map((row) => this.syncSyndicationBestEffort(row.id)));
       return { success: true, data: created, sync: syncResults.map((result) => result.data) };
     } catch (error) {
@@ -763,6 +1048,74 @@ export class FederationService {
     };
   }
 
+  private buildFederatedFormPayload(args: {
+    syndication: typeof surveyFormSyndications.$inferSelect;
+    form: typeof surveyForms.$inferSelect;
+    questions: Array<typeof surveyQuestions.$inferSelect>;
+    sourceOrganization: typeof organizations.$inferSelect;
+    targetOrganization: typeof organizations.$inferSelect;
+    responseSummary?: FederatedFormPayload['responseSummary'];
+  }): FederatedFormPayload {
+    const sourceInstanceUrl = this.normalizeInstanceUrl(args.sourceOrganization.instanceUrl) || this.getCurrentInstanceUrl();
+    if (!sourceInstanceUrl) {
+      throw new BadRequestException('Impossible de déterminer l’URL de l’instance source');
+    }
+
+    return {
+      protocolVersion: 1,
+      direction: args.syndication.direction as FederatedFormPayload['direction'],
+      status: args.syndication.status as FederatedFormPayload['status'],
+      includeResponses: args.syndication.includeResponses,
+      collectResponsesLocally: args.syndication.collectResponsesLocally,
+      responseSummary: args.syndication.includeResponses ? (args.responseSummary ?? null) : null,
+      sourceInstanceUrl,
+      sourceSyndicationId: args.syndication.id,
+      sentAt: new Date().toISOString(),
+      sourceOrganization: {
+        slug: args.sourceOrganization.slug,
+        name: args.sourceOrganization.name,
+        type: args.sourceOrganization.type,
+        domain: args.sourceOrganization.domain,
+        instanceUrl: args.sourceOrganization.instanceUrl,
+      },
+      targetOrganization: {
+        slug: args.targetOrganization.slug,
+        name: args.targetOrganization.name,
+        type: args.targetOrganization.type,
+        domain: args.targetOrganization.domain,
+        instanceUrl: args.targetOrganization.instanceUrl,
+      },
+      form: {
+        id: args.form.id,
+        slug: args.form.slug,
+        title: args.form.title,
+        description: args.form.description,
+        status: args.form.status as FederatedFormPayload['form']['status'],
+        version: args.form.version,
+        collectRespondentInfo: args.form.collectRespondentInfo,
+        allowMultipleSubmissions: args.form.allowMultipleSubmissions,
+        successMessage: args.form.successMessage,
+        requireConsent: args.form.requireConsent,
+        consentText: args.form.consentText,
+        retentionDays: args.form.retentionDays,
+        expiresAt: args.form.expiresAt?.toISOString() ?? null,
+        questions: args.questions.map((question) => ({
+          id: question.id,
+          label: question.label,
+          description: question.description,
+          type: question.type as FederatedFormPayload['form']['questions'][number]['type'],
+          required: question.required,
+          options: ((question.options ?? []) as Array<{ label?: string; value?: string }>).map((option) => ({
+            label: String(option.label ?? option.value ?? ''),
+            value: String(option.value ?? option.label ?? ''),
+          })).filter((option) => option.label && option.value),
+          validation: (question.validation ?? {}) as Record<string, unknown>,
+          orderIndex: question.orderIndex,
+        })),
+      },
+    };
+  }
+
   private async markSyncFailed(syndicationId: string, relationId: string | null, error: string, targetInstanceUrl?: string | null) {
     const safeError = error.slice(0, 2000);
     await db.update(eventSyndications).set({
@@ -773,6 +1126,25 @@ export class FederationService {
       syncAttempts: sql`${eventSyndications.syncAttempts} + 1`,
       updatedAt: sql`NOW()`,
     }).where(eq(eventSyndications.id, syndicationId));
+
+    if (relationId) {
+      await db.update(organizationRelations).set({
+        syncStatus: FEDERATION_SYNC_STATUS.FAILED,
+        updatedAt: sql`NOW()`,
+      }).where(eq(organizationRelations.id, relationId));
+    }
+  }
+
+  private async markFormSyncFailed(syndicationId: string, relationId: string | null, error: string, targetInstanceUrl?: string | null) {
+    const safeError = error.slice(0, 2000);
+    await db.update(surveyFormSyndications).set({
+      syncStatus: FEDERATION_SYNC_STATUS.FAILED,
+      syncError: safeError,
+      targetInstanceUrl: targetInstanceUrl ?? undefined,
+      lastSyncAttemptAt: sql`NOW()`,
+      syncAttempts: sql`${surveyFormSyndications.syncAttempts} + 1`,
+      updatedAt: sql`NOW()`,
+    }).where(eq(surveyFormSyndications.id, syndicationId));
 
     if (relationId) {
       await db.update(organizationRelations).set({
@@ -876,6 +1248,16 @@ export class FederationService {
         updatedAt: sql`NOW()`,
       }).where(eq(organizationRelations.id, relation.id));
 
+      this.audit({
+        actorEmail: null,
+        action: 'federation.events.sync',
+        entityType: 'event_syndication',
+        entityId: updated.id,
+        organizationId: updated.targetOrganizationId,
+        relationId: relation.id,
+        metadata: { endpoint, remoteEventId: updated.remoteEventId, status: updated.status },
+      });
+
       return { success: true, data: { endpoint, response: responseBody, syndication: updated } };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue de synchronisation';
@@ -896,6 +1278,379 @@ export class FederationService {
       });
       return { success: false, data: { error: error instanceof Error ? error.message : 'Erreur inconnue' } };
     }
+  }
+
+  async getFormSyndications(options?: {
+    status?: string;
+    direction?: string;
+    sourceOrganizationId?: string;
+    targetOrganizationId?: string;
+    syncStatus?: string;
+    limit?: number;
+  }) {
+    const conditions = [] as any[];
+    if (options?.status && options.status !== 'all') conditions.push(eq(surveyFormSyndications.status, options.status));
+    if (options?.direction && options.direction !== 'all') conditions.push(eq(surveyFormSyndications.direction, options.direction));
+    if (options?.sourceOrganizationId && options.sourceOrganizationId !== 'all') conditions.push(eq(surveyFormSyndications.sourceOrganizationId, options.sourceOrganizationId));
+    if (options?.targetOrganizationId && options.targetOrganizationId !== 'all') conditions.push(eq(surveyFormSyndications.targetOrganizationId, options.targetOrganizationId));
+    if (options?.syncStatus && options.syncStatus !== 'all') conditions.push(eq(surveyFormSyndications.syncStatus, options.syncStatus));
+
+    const data = await db.select({
+      id: surveyFormSyndications.id,
+      formId: surveyFormSyndications.formId,
+      sourceOrganizationId: surveyFormSyndications.sourceOrganizationId,
+      targetOrganizationId: surveyFormSyndications.targetOrganizationId,
+      direction: surveyFormSyndications.direction,
+      status: surveyFormSyndications.status,
+      includeResponses: surveyFormSyndications.includeResponses,
+      collectResponsesLocally: surveyFormSyndications.collectResponsesLocally,
+      localTitleOverride: surveyFormSyndications.localTitleOverride,
+      localDescriptionOverride: surveyFormSyndications.localDescriptionOverride,
+      lastSyncedAt: surveyFormSyndications.lastSyncedAt,
+      targetInstanceUrl: surveyFormSyndications.targetInstanceUrl,
+      remoteFormId: surveyFormSyndications.remoteFormId,
+      remoteSyndicationId: surveyFormSyndications.remoteSyndicationId,
+      syncStatus: surveyFormSyndications.syncStatus,
+      syncError: surveyFormSyndications.syncError,
+      lastSyncAttemptAt: surveyFormSyndications.lastSyncAttemptAt,
+      syncAttempts: surveyFormSyndications.syncAttempts,
+      createdBy: surveyFormSyndications.createdBy,
+      reviewedBy: surveyFormSyndications.reviewedBy,
+      reviewedAt: surveyFormSyndications.reviewedAt,
+      createdAt: surveyFormSyndications.createdAt,
+      updatedAt: surveyFormSyndications.updatedAt,
+      formTitle: surveyForms.title,
+      formSlug: surveyForms.slug,
+      formStatus: surveyForms.status,
+      formVersion: surveyForms.version,
+      sourceName: sql<string>`source_org.name`,
+      sourceType: sql<string>`source_org.type`,
+      targetName: sql<string>`target_org.name`,
+      targetType: sql<string>`target_org.type`,
+      responseCount: sql<number>`COALESCE(summary.response_count, 0)::int`,
+      lastResponseAt: sql<Date | null>`summary.last_response_at`,
+    })
+      .from(surveyFormSyndications)
+      .leftJoin(surveyForms, eq(surveyFormSyndications.formId, surveyForms.id))
+      .leftJoin(sql`organizations AS source_org`, sql`${surveyFormSyndications.sourceOrganizationId} = source_org.id`)
+      .leftJoin(sql`organizations AS target_org`, sql`${surveyFormSyndications.targetOrganizationId} = target_org.id`)
+      .leftJoin(sql`survey_form_response_summaries AS summary`, sql`${surveyFormSyndications.id} = summary.syndication_id`)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(surveyFormSyndications.createdAt))
+      .limit(options?.limit ?? 100);
+
+    return { success: true, data };
+  }
+
+  async proposeFormUpward(formId: string, data: unknown, userEmail?: string) {
+    try {
+      const form = await this.getFormOrThrow(formId);
+      const body = data as { sourceOrganizationId?: string; targetOrganizationId?: string; includeResponses?: boolean };
+      const sourceOrganizationId = body.sourceOrganizationId || form.organizationId;
+      const targetOrganizationId = body.targetOrganizationId;
+      if (!sourceOrganizationId || !targetOrganizationId) {
+        throw new BadRequestException('sourceOrganizationId et targetOrganizationId sont requis');
+      }
+      await this.assertRelationAllowed(targetOrganizationId, sourceOrganizationId);
+
+      const validated = insertSurveyFormSyndicationSchema.parse({
+        formId,
+        sourceOrganizationId,
+        targetOrganizationId,
+        direction: SYNDICATION_DIRECTION.UPWARD,
+        status: SYNDICATION_STATUS.PROPOSED,
+        includeResponses: Boolean(body.includeResponses),
+        collectResponsesLocally: true,
+        createdBy: userEmail,
+      });
+
+      const [created] = await db.transaction(async (tx) => {
+        const [row] = await tx.insert(surveyFormSyndications).values(this.normalizeFormSyndicationDates(validated)).returning();
+        await tx.update(surveyForms).set({
+          federationVisibility: FEDERATION_VISIBILITY.PARENT_REGION,
+          federationStatus: FEDERATION_STATUS.PROPOSED_TO_REGION,
+          originOrganizationId: sourceOrganizationId,
+          updatedAt: sql`NOW()`,
+        }).where(eq(surveyForms.id, formId));
+        return [row];
+      });
+
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: 'forms.federation.propose_upward',
+        entityType: 'survey_form_syndication',
+        entityId: created.id,
+        organizationId: sourceOrganizationId,
+        metadata: { formId, targetOrganizationId, includeResponses: created.includeResponses },
+      });
+
+      const sync = await this.syncFormSyndicationBestEffort(created.id);
+      return { success: true, data: created, sync: sync.data };
+    } catch (error) {
+      if ((error as any)?.code === '23505') throw new ConflictException('Ce formulaire a déjà été proposé à cette organisation');
+      return this.handleZodError(error);
+    }
+  }
+
+  async publishFormDownward(formId: string, data: unknown, userEmail?: string) {
+    try {
+      const form = await this.getFormOrThrow(formId);
+      const body = data as { sourceOrganizationId?: string; targetOrganizationIds?: string[]; autoAccept?: boolean; includeResponses?: boolean };
+      const sourceOrganizationId = body.sourceOrganizationId || form.organizationId;
+      const targetOrganizationIds = Array.isArray(body.targetOrganizationIds) ? body.targetOrganizationIds : [];
+      if (!sourceOrganizationId || targetOrganizationIds.length === 0) {
+        throw new BadRequestException('sourceOrganizationId et targetOrganizationIds sont requis');
+      }
+
+      for (const targetId of targetOrganizationIds) {
+        await this.assertRelationAllowed(sourceOrganizationId, targetId);
+      }
+
+      const rows = targetOrganizationIds.map((targetOrganizationId) => this.normalizeFormSyndicationDates(insertSurveyFormSyndicationSchema.parse({
+        formId,
+        sourceOrganizationId,
+        targetOrganizationId,
+        direction: SYNDICATION_DIRECTION.DOWNWARD,
+        status: body.autoAccept ? SYNDICATION_STATUS.AUTO_ACCEPTED : SYNDICATION_STATUS.PROPOSED,
+        includeResponses: Boolean(body.includeResponses),
+        collectResponsesLocally: true,
+        createdBy: userEmail,
+      })));
+
+      const created = await db.transaction(async (tx) => {
+        const inserted = await tx.insert(surveyFormSyndications).values(rows).returning();
+        await tx.update(surveyForms).set({
+          federationVisibility: FEDERATION_VISIBILITY.CHILD_SECTIONS,
+          federationStatus: FEDERATION_STATUS.PUBLISHED_TO_SECTIONS,
+          originOrganizationId: sourceOrganizationId,
+          updatedAt: sql`NOW()`,
+        }).where(eq(surveyForms.id, formId));
+        return inserted;
+      });
+
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: 'forms.federation.publish_downward',
+        entityType: 'survey_form',
+        entityId: formId,
+        organizationId: sourceOrganizationId,
+        metadata: { targetOrganizationIds, createdSyndicationIds: created.map((row) => row.id), includeResponses: Boolean(body.includeResponses) },
+      });
+
+      const syncResults = await Promise.all(created.map((row) => this.syncFormSyndicationBestEffort(row.id)));
+      return { success: true, data: created, sync: syncResults.map((result) => result.data) };
+    } catch (error) {
+      if ((error as any)?.code === '23505') throw new ConflictException('Ce formulaire est déjà publié vers au moins une organisation ciblée');
+      return this.handleZodError(error);
+    }
+  }
+
+  async updateFormSyndication(id: string, data: unknown, userEmail?: string) {
+    try {
+      const validated = updateSurveyFormSyndicationSchema.parse({ ...(data as Record<string, unknown>), reviewedBy: userEmail });
+      const status = validated.status;
+      const [updated] = await db.update(surveyFormSyndications)
+        .set({
+          ...this.normalizeFormSyndicationDates(validated),
+          ...(status ? { reviewedAt: sql`NOW()` } : {}),
+          updatedAt: sql`NOW()`,
+          lastSyncedAt: sql`NOW()`,
+        })
+        .where(eq(surveyFormSyndications.id, id))
+        .returning();
+
+      if (!updated) throw new NotFoundException('Syndication formulaire introuvable');
+
+      if (status === SYNDICATION_STATUS.ACCEPTED || status === SYNDICATION_STATUS.AUTO_ACCEPTED) {
+        await db.update(surveyForms).set({
+          federationStatus: updated.direction === SYNDICATION_DIRECTION.UPWARD
+            ? FEDERATION_STATUS.ACCEPTED_BY_REGION
+            : FEDERATION_STATUS.PUBLISHED_TO_SECTIONS,
+          updatedAt: sql`NOW()`,
+        }).where(eq(surveyForms.id, updated.formId));
+      }
+
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: 'forms.federation.syndication.update',
+        entityType: 'survey_form_syndication',
+        entityId: updated.id,
+        organizationId: updated.targetOrganizationId,
+        metadata: { status: updated.status, includeResponses: updated.includeResponses, collectResponsesLocally: updated.collectResponsesLocally },
+      });
+
+      const sync = await this.syncFormSyndicationBestEffort(updated.id);
+      return { success: true, data: updated, sync: sync.data };
+    } catch (error) {
+      return this.handleZodError(error);
+    }
+  }
+
+  async revokeFormSyndication(id: string, userEmail?: string) {
+    return await this.updateFormSyndication(id, { status: SYNDICATION_STATUS.REVOKED }, userEmail);
+  }
+
+  async syncFormSyndication(id: string) {
+    const [syndication] = await db.select().from(surveyFormSyndications).where(eq(surveyFormSyndications.id, id)).limit(1);
+    if (!syndication) throw new NotFoundException('Syndication formulaire introuvable');
+
+    const [form, questions, sourceOrganization, targetOrganization] = await Promise.all([
+      this.getFormOrThrow(syndication.formId),
+      this.getFormQuestions(syndication.formId),
+      this.getOrganizationOrThrow(syndication.sourceOrganizationId),
+      this.getOrganizationOrThrow(syndication.targetOrganizationId),
+    ]);
+
+    let relation: typeof organizationRelations.$inferSelect;
+    try {
+      relation = await this.getRelationForSyndication(
+        syndication.sourceOrganizationId,
+        syndication.targetOrganizationId,
+        syndication.direction,
+      );
+    } catch (error) {
+      await this.markFormSyncFailed(syndication.id, null, error instanceof Error ? error.message : 'Relation de fédération introuvable');
+      throw error;
+    }
+
+    const targetInstanceUrl = this.normalizeInstanceUrl(syndication.targetInstanceUrl || targetOrganization.instanceUrl);
+    const sourceInstanceUrl = this.normalizeInstanceUrl(sourceOrganization.instanceUrl) || this.getCurrentInstanceUrl();
+
+    if (!targetInstanceUrl || !this.isRemoteInstance(targetInstanceUrl, sourceInstanceUrl)) {
+      const [updated] = await db.update(surveyFormSyndications).set({
+        syncStatus: FEDERATION_SYNC_STATUS.LOCAL,
+        syncError: null,
+        targetInstanceUrl: targetInstanceUrl ?? null,
+        updatedAt: sql`NOW()`,
+      }).where(eq(surveyFormSyndications.id, syndication.id)).returning();
+      return { success: true, data: { skipped: true, reason: 'local_or_missing_target_instance', syndication: updated } };
+    }
+
+    if (!relation.syncEnabled) {
+      await this.markFormSyncFailed(syndication.id, relation.id, 'La synchronisation est désactivée sur cette relation', targetInstanceUrl);
+      return { success: false, data: { skipped: true, reason: 'relation_sync_disabled' } };
+    }
+
+    if (!relation.federationToken) {
+      await this.markFormSyncFailed(syndication.id, relation.id, 'Jeton de fédération sortant manquant sur la relation', targetInstanceUrl);
+      return { success: false, data: { skipped: true, reason: 'missing_outbound_federation_token' } };
+    }
+
+    const payload = this.buildFederatedFormPayload({
+      syndication,
+      form,
+      questions,
+      sourceOrganization,
+      targetOrganization,
+      responseSummary: syndication.includeResponses ? await this.buildLocalFormResponseSummary(form.id) : null,
+    });
+    const endpoint = `${targetInstanceUrl}/api/federation/forms/ingest`;
+
+    await db.update(surveyFormSyndications).set({
+      syncStatus: FEDERATION_SYNC_STATUS.PENDING,
+      syncError: null,
+      targetInstanceUrl,
+      lastSyncAttemptAt: sql`NOW()`,
+      updatedAt: sql`NOW()`,
+    }).where(eq(surveyFormSyndications.id, syndication.id));
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Komuno-Federation-Token': relation.federationToken,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      const responseText = await response.text();
+      if (!response.ok) {
+        const errorMessage = `HTTP ${response.status} ${response.statusText}: ${responseText.slice(0, 500)}`;
+        await this.markFormSyncFailed(syndication.id, relation.id, errorMessage, targetInstanceUrl);
+        return { success: false, data: { endpoint, status: response.status, error: errorMessage } };
+      }
+
+      const responseBody = responseText ? JSON.parse(responseText) : {};
+      const [updated] = await db.update(surveyFormSyndications).set({
+        syncStatus: FEDERATION_SYNC_STATUS.SYNCED,
+        syncError: null,
+        targetInstanceUrl,
+        remoteFormId: responseBody?.data?.formId ?? responseBody?.formId ?? null,
+        remoteSyndicationId: responseBody?.data?.syndicationId ?? responseBody?.syndicationId ?? null,
+        lastSyncedAt: sql`NOW()`,
+        lastSyncAttemptAt: sql`NOW()`,
+        syncAttempts: sql`${surveyFormSyndications.syncAttempts} + 1`,
+        updatedAt: sql`NOW()`,
+      }).where(eq(surveyFormSyndications.id, syndication.id)).returning();
+
+      await db.update(organizationRelations).set({
+        syncStatus: FEDERATION_SYNC_STATUS.SYNCED,
+        lastSyncAt: sql`NOW()`,
+        updatedAt: sql`NOW()`,
+      }).where(eq(organizationRelations.id, relation.id));
+
+      this.audit({
+        actorEmail: null,
+        action: 'forms.federation.sync',
+        entityType: 'survey_form_syndication',
+        entityId: updated.id,
+        organizationId: updated.targetOrganizationId,
+        relationId: relation.id,
+        metadata: { endpoint, remoteFormId: updated.remoteFormId, includeResponses: updated.includeResponses },
+      });
+
+      return { success: true, data: { endpoint, response: responseBody, syndication: updated } };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue de synchronisation formulaire';
+      await this.markFormSyncFailed(syndication.id, relation.id, errorMessage, targetInstanceUrl);
+      return { success: false, data: { endpoint, error: errorMessage } };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async syncFormSyndicationBestEffort(id: string) {
+    try {
+      return await this.syncFormSyndication(id);
+    } catch (error) {
+      logger.warn('[Federation] Synchronisation formulaire inter-instance échouée', {
+        syndicationId: id,
+        error: error instanceof Error ? error.message : error,
+      });
+      return { success: false, data: { error: error instanceof Error ? error.message : 'Erreur inconnue' } };
+    }
+  }
+
+  async getFederatedFormResponseSummary(formId: string) {
+    await this.getFormOrThrow(formId);
+    const localSummary = await this.buildLocalFormResponseSummary(formId);
+    const remoteSummaries = await db.select({
+      id: surveyFormResponseSummaries.id,
+      syndicationId: surveyFormResponseSummaries.syndicationId,
+      formId: surveyFormResponseSummaries.formId,
+      remoteFormId: surveyFormResponseSummaries.remoteFormId,
+      sourceOrganizationId: surveyFormResponseSummaries.sourceOrganizationId,
+      targetOrganizationId: surveyFormResponseSummaries.targetOrganizationId,
+      sourceInstanceUrl: surveyFormResponseSummaries.sourceInstanceUrl,
+      responseCount: surveyFormResponseSummaries.responseCount,
+      lastResponseAt: surveyFormResponseSummaries.lastResponseAt,
+      responsesByDay: surveyFormResponseSummaries.responsesByDay,
+      questionSummaries: surveyFormResponseSummaries.questionSummaries,
+      metadata: surveyFormResponseSummaries.metadata,
+      updatedAt: surveyFormResponseSummaries.updatedAt,
+      sourceName: sql<string>`source_org.name`,
+      targetName: sql<string>`target_org.name`,
+    })
+      .from(surveyFormResponseSummaries)
+      .leftJoin(sql`organizations AS source_org`, sql`${surveyFormResponseSummaries.sourceOrganizationId} = source_org.id`)
+      .leftJoin(sql`organizations AS target_org`, sql`${surveyFormResponseSummaries.targetOrganizationId} = target_org.id`)
+      .where(eq(surveyFormResponseSummaries.formId, formId))
+      .orderBy(desc(surveyFormResponseSummaries.updatedAt));
+
+    return { success: true, data: { formId, localSummary, remoteSummaries } };
   }
 
   private async markRelationSyncFailed(relationId: string, error: string) {
@@ -1018,7 +1773,7 @@ export class FederationService {
     return results.map((result) => result.data);
   }
 
-  private async autoShareEligibleEventsToParent() {
+  private async autoShareEligibleEventsToParent(userEmail?: string) {
     const currentRelation = await this.getCurrentSectionParentRelation();
     if (!currentRelation || !this.isAutoShareEventsToParentEnabled(currentRelation.relation)) return [];
 
@@ -1038,7 +1793,7 @@ export class FederationService {
 
     const results = [];
     for (const event of localEvents) {
-      results.push(await this.autoShareEventToParent(event.id, 'auto-share-cron'));
+      results.push(await this.autoShareEventToParent(event.id, userEmail ?? 'auto-share-cron'));
     }
     return results.map((result) => result.data);
   }
@@ -1063,19 +1818,55 @@ export class FederationService {
     return results.map((result) => result.data);
   }
 
-  async syncFederationNow(options?: { autoShareBackfill?: boolean }) {
+  private async retryPendingFormSyndications() {
+    const syndications = await db.select({ id: surveyFormSyndications.id })
+      .from(surveyFormSyndications)
+      .where(and(
+        inArray(surveyFormSyndications.syncStatus, [
+          FEDERATION_SYNC_STATUS.PENDING,
+          FEDERATION_SYNC_STATUS.FAILED,
+        ]),
+        sql`${surveyFormSyndications.syncAttempts} < 10`,
+      ))
+      .orderBy(asc(surveyFormSyndications.updatedAt))
+      .limit(25);
+
+    const results = [];
+    for (const syndication of syndications) {
+      results.push(await this.syncFormSyndicationBestEffort(syndication.id));
+    }
+    return results.map((result) => result.data);
+  }
+
+  async syncFederationNow(options?: { autoShareBackfill?: boolean; actorEmail?: string }) {
     const relations = await this.syncActiveRelationHandshakes();
-    const autoShared = options?.autoShareBackfill ? await this.autoShareEligibleEventsToParent() : [];
+    const autoShared = options?.autoShareBackfill ? await this.autoShareEligibleEventsToParent(options.actorEmail) : [];
     const syndications = await this.retryPendingSyndications();
+    const formSyndications = await this.retryPendingFormSyndications();
+    const data = {
+      relations,
+      autoShared,
+      syndications,
+      formSyndications,
+      syncedAt: new Date().toISOString(),
+    };
+
+    this.audit({
+      actorEmail: options?.actorEmail ?? null,
+      action: options?.autoShareBackfill ? 'federation.sync.backfill' : 'federation.sync.run',
+      entityType: 'federation',
+      metadata: {
+        relations: relations.length,
+        autoShared: autoShared.length,
+        syndications: syndications.length,
+        formSyndications: formSyndications.length,
+        autoShareBackfill: Boolean(options?.autoShareBackfill),
+      },
+    });
 
     return {
       success: true,
-      data: {
-        relations,
-        autoShared,
-        syndications,
-        syncedAt: new Date().toISOString(),
-      },
+      data,
     };
   }
 
@@ -1091,6 +1882,7 @@ export class FederationService {
         relations: result.data.relations.length,
         autoShared: result.data.autoShared.length,
         syndications: result.data.syndications.length,
+        formSyndications: result.data.formSyndications.length,
       });
     } catch (error) {
       logger.warn('[Federation] Synchronisation planifiée échouée', {
@@ -1159,7 +1951,7 @@ export class FederationService {
         throw new BadRequestException('Relation de fédération active introuvable pour ce handshake');
       }
       if (!relation.syncEnabled) throw new ForbiddenException('Synchronisation désactivée sur cette relation');
-      if (!this.safeCompareToken(relation.federationToken, providedToken)) {
+      if (!this.safeCompareRelationToken(relation, providedToken)) {
         throw new UnauthorizedException('Token de fédération invalide');
       }
 
@@ -1199,7 +1991,7 @@ export class FederationService {
     );
 
     if (!relation.syncEnabled) throw new ForbiddenException('Synchronisation désactivée sur cette relation');
-    if (!this.safeCompareToken(relation.federationToken, providedToken)) {
+    if (!this.safeCompareRelationToken(relation, providedToken)) {
       throw new UnauthorizedException('Token de fédération invalide');
     }
 
@@ -1287,6 +2079,197 @@ export class FederationService {
     }
   }
 
+  private statusForReceivedForm(payload: FederatedFormPayload) {
+    if (payload.status === SYNDICATION_STATUS.REVOKED) return SURVEY_FORM_STATUS.CLOSED;
+    if (
+      (payload.status === SYNDICATION_STATUS.ACCEPTED || payload.status === SYNDICATION_STATUS.AUTO_ACCEPTED)
+      && payload.form.status === SURVEY_FORM_STATUS.PUBLISHED
+    ) {
+      return SURVEY_FORM_STATUS.PUBLISHED;
+    }
+    return SURVEY_FORM_STATUS.DRAFT;
+  }
+
+  async ingestFederatedForm(data: unknown, token?: string) {
+    try {
+      const providedToken = token?.trim();
+      if (!providedToken) throw new UnauthorizedException('Token de fédération manquant');
+      const payload = federatedFormPayloadSchema.parse(data);
+
+      const [sourceOrganization, targetOrganization] = await Promise.all([
+        this.findOrganizationBySlugOrThrow(payload.sourceOrganization.slug, 'source'),
+        this.findOrganizationBySlugOrThrow(payload.targetOrganization.slug, 'target'),
+      ]);
+
+      const relation = await this.getRelationForSyndication(
+        sourceOrganization.id,
+        targetOrganization.id,
+        payload.direction,
+      );
+
+      if (!relation.syncEnabled) throw new ForbiddenException('Synchronisation désactivée sur cette relation');
+      if (!this.safeCompareRelationToken(relation, providedToken)) {
+        throw new UnauthorizedException('Token de fédération invalide');
+      }
+
+      const sourceInstanceUrl = this.normalizeInstanceUrl(payload.sourceInstanceUrl);
+      if (!sourceInstanceUrl) throw new BadRequestException('sourceInstanceUrl invalide');
+
+      const [existingForm] = await db.select().from(surveyForms).where(and(
+        eq(surveyForms.sourceInstanceUrl, sourceInstanceUrl),
+        eq(surveyForms.sourceFormId, payload.form.id),
+      )).limit(1);
+
+      const localSlug = existingForm?.slug ?? await this.ensureUniqueFederatedFormSlug(payload.form.slug);
+      const receivedStatus = this.statusForReceivedForm(payload);
+      const expiresAt = payload.form.expiresAt ? new Date(payload.form.expiresAt) : null;
+      const formValues = {
+        slug: localSlug,
+        title: payload.form.title,
+        description: payload.form.description ?? null,
+        status: receivedStatus,
+        version: payload.form.version,
+        organizationId: targetOrganization.id,
+        originOrganizationId: sourceOrganization.id,
+        sourceFormId: payload.form.id,
+        sourceInstanceUrl,
+        federationVisibility: FEDERATION_VISIBILITY.SELECTED_ORGANIZATIONS,
+        federationStatus: FEDERATION_STATUS.IMPORTED,
+        isFederatedCopy: true,
+        canonicalFormId: null,
+        collectRespondentInfo: payload.form.collectRespondentInfo,
+        allowMultipleSubmissions: payload.form.allowMultipleSubmissions,
+        successMessage: payload.form.successMessage ?? null,
+        requireConsent: payload.form.requireConsent,
+        consentText: payload.form.consentText ?? null,
+        retentionDays: payload.form.retentionDays ?? null,
+        expiresAt,
+        publishedAt: receivedStatus === SURVEY_FORM_STATUS.PUBLISHED ? sql`NOW()` : null,
+        closedAt: receivedStatus === SURVEY_FORM_STATUS.CLOSED ? sql`NOW()` : null,
+        updatedAt: sql`NOW()`,
+      };
+
+      const [localForm, localSyndication] = await db.transaction(async (tx) => {
+        const [form] = existingForm
+          ? await tx.update(surveyForms).set(formValues).where(eq(surveyForms.id, existingForm.id)).returning()
+          : await tx.insert(surveyForms).values({ ...formValues, createdAt: sql`NOW()` }).returning();
+
+        await tx.delete(surveyQuestions).where(eq(surveyQuestions.formId, form.id));
+        if (payload.form.questions.length > 0) {
+          await tx.insert(surveyQuestions).values(payload.form.questions.map((question, index) => ({
+            id: question.id,
+            formId: form.id,
+            label: question.label,
+            description: question.description ?? null,
+            type: question.type,
+            required: question.required,
+            options: question.options,
+            validation: question.validation,
+            orderIndex: question.orderIndex ?? index,
+          })));
+        }
+
+        const [existingSyndication] = await tx.select().from(surveyFormSyndications).where(and(
+          eq(surveyFormSyndications.formId, form.id),
+          eq(surveyFormSyndications.sourceOrganizationId, sourceOrganization.id),
+          eq(surveyFormSyndications.targetOrganizationId, targetOrganization.id),
+        )).limit(1);
+
+        const syndicationValues = {
+          formId: form.id,
+          sourceOrganizationId: sourceOrganization.id,
+          targetOrganizationId: targetOrganization.id,
+          direction: payload.direction,
+          status: payload.status,
+          includeResponses: payload.includeResponses,
+          collectResponsesLocally: payload.collectResponsesLocally,
+          targetInstanceUrl: this.normalizeInstanceUrl(payload.targetOrganization.instanceUrl) ?? this.getCurrentInstanceUrl(),
+          remoteFormId: payload.form.id,
+          remoteSyndicationId: payload.sourceSyndicationId ?? null,
+          syncStatus: FEDERATION_SYNC_STATUS.RECEIVED,
+          syncError: null,
+          lastSyncedAt: sql`NOW()`,
+          updatedAt: sql`NOW()`,
+        };
+
+        const [syndication] = existingSyndication
+          ? await tx.update(surveyFormSyndications).set(syndicationValues).where(eq(surveyFormSyndications.id, existingSyndication.id)).returning()
+          : await tx.insert(surveyFormSyndications).values({ ...syndicationValues, createdAt: sql`NOW()` }).returning();
+
+        if (payload.includeResponses && payload.responseSummary) {
+          const [existingSummary] = await tx.select().from(surveyFormResponseSummaries).where(and(
+            eq(surveyFormResponseSummaries.sourceInstanceUrl, sourceInstanceUrl),
+            eq(surveyFormResponseSummaries.remoteFormId, payload.form.id),
+            eq(surveyFormResponseSummaries.targetOrganizationId, targetOrganization.id),
+          )).limit(1);
+
+          const summaryValues = {
+            syndicationId: syndication.id,
+            formId: form.id,
+            remoteFormId: payload.form.id,
+            sourceOrganizationId: sourceOrganization.id,
+            targetOrganizationId: targetOrganization.id,
+            sourceInstanceUrl,
+            responseCount: payload.responseSummary.responseCount,
+            lastResponseAt: payload.responseSummary.lastResponseAt ? new Date(payload.responseSummary.lastResponseAt) : null,
+            responsesByDay: payload.responseSummary.responsesByDay,
+            questionSummaries: payload.responseSummary.questionSummaries,
+            metadata: {
+              direction: payload.direction,
+              status: payload.status,
+              receivedAt: new Date().toISOString(),
+            },
+            updatedAt: sql`NOW()`,
+          };
+
+          if (existingSummary) {
+            await tx.update(surveyFormResponseSummaries).set(summaryValues).where(eq(surveyFormResponseSummaries.id, existingSummary.id));
+          } else {
+            await tx.insert(surveyFormResponseSummaries).values({ ...summaryValues, createdAt: sql`NOW()` });
+          }
+        }
+
+        return [form, syndication];
+      });
+
+      await db.update(organizationRelations).set({
+        syncStatus: FEDERATION_SYNC_STATUS.RECEIVED,
+        lastSyncAt: sql`NOW()`,
+        updatedAt: sql`NOW()`,
+      }).where(eq(organizationRelations.id, relation.id));
+
+      this.audit({
+        actorEmail: null,
+        action: 'forms.federation.ingest',
+        entityType: 'survey_form',
+        entityId: localForm.id,
+        organizationId: targetOrganization.id,
+        relationId: relation.id,
+        metadata: {
+          sourceFormId: payload.form.id,
+          sourceInstanceUrl,
+          syndicationId: localSyndication.id,
+          status: localSyndication.status,
+          includeResponses: payload.includeResponses,
+          createdForm: !existingForm,
+        },
+      });
+
+      return {
+        success: true,
+        data: {
+          formId: localForm.id,
+          syndicationId: localSyndication.id,
+          status: localSyndication.status,
+          createdForm: !existingForm,
+          receivedResponsesSummary: Boolean(payload.includeResponses && payload.responseSummary),
+        },
+      };
+    } catch (error) {
+      return this.handleZodError(error);
+    }
+  }
+
   async updateSyndication(id: string, data: unknown, userEmail?: string) {
     try {
       const validated = updateEventSyndicationSchema.parse({ ...(data as Record<string, unknown>), reviewedBy: userEmail });
@@ -1313,6 +2296,15 @@ export class FederationService {
           updatedAt: sql`NOW()`,
         }).where(eq(events.id, updated.eventId));
       }
+
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: 'federation.events.syndication.update',
+        entityType: 'event_syndication',
+        entityId: updated.id,
+        organizationId: updated.targetOrganizationId,
+        metadata: { status: updated.status, includeInAgenda: updated.includeInAgenda, eventId: updated.eventId },
+      });
 
       const sync = await this.syncSyndicationBestEffort(updated.id);
       return { success: true, data: updated, sync: sync.data };

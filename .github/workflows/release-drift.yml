@@ -1,0 +1,30 @@
+name: Release Drift Monitor
+
+on:
+  schedule:
+    - cron: '20 7,12,16,18 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'URLs à comparer, séparées par des virgules'
+        required: false
+        default: 'https://cjd80.fr,https://cjd-hdf.fr,https://repicardie.fr'
+
+jobs:
+  release-drift:
+    name: Compare production releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check release drift
+        env:
+          RELEASE_DRIFT_URLS: ${{ github.event.inputs.urls || 'https://cjd80.fr,https://cjd-hdf.fr,https://repicardie.fr' }}
+        run: node scripts/check-release-drift.mjs

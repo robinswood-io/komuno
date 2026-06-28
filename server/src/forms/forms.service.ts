@@ -4,6 +4,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
+import { AuditService } from '../audit/audit.service';
 import {
   SURVEY_FORM_STATUS,
   insertSurveyFormSchema,
@@ -37,6 +38,12 @@ import {
 @Injectable()
 export class FormsService {
   private readonly logger = new Logger(FormsService.name);
+
+  constructor(private readonly auditService?: AuditService) {}
+
+  private audit(input: Parameters<AuditService['record']>[0]) {
+    void this.auditService?.record(input);
+  }
 
   private handleZodError(error: unknown): never {
     if (error instanceof ZodError) {
@@ -183,6 +190,14 @@ export class FormsService {
         return form;
       });
 
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: validated.status === SURVEY_FORM_STATUS.PUBLISHED ? 'forms.publish' : 'forms.create',
+        entityType: 'survey_form',
+        entityId: created.id,
+        organizationId: created.organizationId,
+        metadata: { status: created.status, questionCount: validated.questions.length, version: created.version },
+      });
       return await this.getForm(created.id);
     } catch (error) {
       if ((error as any)?.code === '23505') throw new ConflictException('Un formulaire avec ce slug existe déjà');
@@ -208,7 +223,7 @@ export class FormsService {
     };
   }
 
-  async updateForm(id: string, data: unknown) {
+  async updateForm(id: string, data: unknown, userEmail?: string) {
     try {
       const current = await this.getFormOrThrow(id);
       const validated = updateSurveyFormSchema.parse(data);
@@ -256,16 +271,38 @@ export class FormsService {
         }
       });
 
-      return await this.getForm(id);
+      const updatedForm = await this.getForm(id);
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: validated.status === SURVEY_FORM_STATUS.PUBLISHED ? 'forms.publish' : 'forms.update',
+        entityType: 'survey_form',
+        entityId: id,
+        organizationId: updatedForm.data.organizationId,
+        metadata: {
+          changedFields: Object.keys(validated),
+          status: updatedForm.data.status,
+          version: updatedForm.data.version,
+          questionCount: updatedForm.data.questions.length,
+        },
+      });
+      return updatedForm;
     } catch (error) {
       if ((error as any)?.code === '23505') throw new ConflictException('Un formulaire avec ce slug existe déjà');
       return this.handleZodError(error);
     }
   }
 
-  async deleteForm(id: string) {
+  async deleteForm(id: string, userEmail?: string) {
     const form = await this.getFormOrThrow(id);
     await db.delete(surveyForms).where(eq(surveyForms.id, form.id));
+    this.audit({
+      actorEmail: userEmail ?? null,
+      action: 'forms.delete',
+      entityType: 'survey_form',
+      entityId: form.id,
+      organizationId: form.organizationId,
+      metadata: { title: form.title, slug: form.slug, status: form.status, version: form.version },
+    });
     return { success: true, data: { id: form.id, deleted: true } };
   }
 
@@ -312,6 +349,14 @@ export class FormsService {
       return copy;
     });
 
+    this.audit({
+      actorEmail: userEmail ?? null,
+      action: 'forms.duplicate',
+      entityType: 'survey_form',
+      entityId: duplicated.id,
+      organizationId: duplicated.organizationId,
+      metadata: { sourceFormId: form.id, sourceSlug: form.slug, slug: duplicated.slug },
+    });
     return await this.getForm(duplicated.id);
   }
 
@@ -445,26 +490,44 @@ export class FormsService {
     return csvEscapeSurveyValue(value);
   }
 
-  async getResponsesCsv(formId: string) {
+  async getResponsesCsv(formId: string, userEmail?: string) {
     const responses = await this.getResponses(formId);
     const { form, columns, rows } = responses.data;
     const header = columns.map((column) => this.csvEscape(column.label)).join(';');
     const body = rows.map((row) => columns.map((column) => this.csvEscape((row as Record<string, unknown>)[column.key])).join(';'));
+    const filename = `${this.slugify(form.title)}-reponses.csv`;
+    this.audit({
+      actorEmail: userEmail ?? null,
+      action: 'forms.responses.export_csv',
+      entityType: 'survey_form',
+      entityId: form.id,
+      organizationId: form.organizationId,
+      metadata: { filename, responseCount: rows.length, columnCount: columns.length },
+    });
     return {
       success: true,
       data: {
-        filename: `${this.slugify(form.title)}-reponses.csv`,
+        filename,
         content: [header, ...body].join('\n'),
       },
     };
   }
 
-  async deleteResponse(formId: string, responseId: string) {
+  async deleteResponse(formId: string, responseId: string, userEmail?: string) {
     await this.getFormOrThrow(formId);
     const [deleted] = await db.delete(surveyResponses)
       .where(and(eq(surveyResponses.formId, formId), eq(surveyResponses.id, responseId)))
       .returning({ id: surveyResponses.id });
     if (!deleted) throw new NotFoundException('Réponse introuvable');
+    const form = await this.getFormOrThrow(formId);
+    this.audit({
+      actorEmail: userEmail ?? null,
+      action: 'forms.responses.delete',
+      entityType: 'survey_response',
+      entityId: deleted.id,
+      organizationId: form.organizationId,
+      metadata: { formId },
+    });
     return { success: true, data: { id: deleted.id, deleted: true } };
   }
 
@@ -472,7 +535,7 @@ export class FormsService {
     return summarizeSurveyQuestion(question, responses);
   }
 
-  async runMaintenance() {
+  async runMaintenance(userEmail?: string) {
     const closedForms = await db.update(surveyForms)
       .set({ status: SURVEY_FORM_STATUS.CLOSED, closedAt: sql`NOW()`, updatedAt: sql`NOW()` })
       .where(and(
@@ -490,12 +553,19 @@ export class FormsService {
         AND sr.submitted_at < NOW() - (sf.retention_days || ' days')::interval
     `);
 
+    const data = {
+      closedExpiredForms: closedForms.length,
+      purgedResponses: (deletedResponses as any)?.rowCount ?? 0,
+    };
+    this.audit({
+      actorEmail: userEmail ?? null,
+      action: 'forms.maintenance.run',
+      entityType: 'survey_form',
+      metadata: data,
+    });
     return {
       success: true,
-      data: {
-        closedExpiredForms: closedForms.length,
-        purgedResponses: (deletedResponses as any)?.rowCount ?? 0,
-      },
+      data,
     };
   }
 

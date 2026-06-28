@@ -23,6 +23,7 @@ import { ToolsModule } from './tools/tools.module';
 import { NetworkModule } from './network/network.module';
 import { FederationModule } from './federation/federation.module';
 import { FormsModule } from './forms/forms.module';
+import { AuditModule } from './audit/audit.module';
 
 import { FinancialModule } from './financial/financial.module';
 import { TrackingModule } from './tracking/tracking.module';
@@ -73,6 +74,7 @@ const throttlerLimit = isDevelopment ? 10000 : 1000;
     NetworkModule,
     FederationModule,
     FormsModule,
+    AuditModule,
     FinancialModule,
     TrackingModule,
     FeaturesModule,

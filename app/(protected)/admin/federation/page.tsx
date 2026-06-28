@@ -61,6 +61,8 @@ interface OrganizationRelation {
   syncStatus?: string;
   lastSyncAt?: string | null;
   hasFederationToken?: boolean;
+  federationTokenFingerprint?: string | null;
+  federationTokenRotatedAt?: string | null;
   fromName?: string;
   toName?: string;
   fromType?: string;
@@ -98,6 +100,41 @@ interface EventItem {
   organizationId?: string | null;
   federationStatus?: string;
   federationVisibility?: string;
+}
+
+interface FormItem {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  version: number;
+  organizationId?: string | null;
+  responseCount?: number;
+  questionCount?: number;
+}
+
+interface FormSyndication {
+  id: string;
+  formId: string;
+  sourceOrganizationId: string;
+  targetOrganizationId: string;
+  direction: 'upward' | 'downward' | 'lateral';
+  status: string;
+  includeResponses: boolean;
+  collectResponsesLocally: boolean;
+  formTitle?: string;
+  formSlug?: string;
+  formStatus?: string;
+  formVersion?: number;
+  sourceName?: string;
+  targetName?: string;
+  targetInstanceUrl?: string | null;
+  remoteFormId?: string | null;
+  syncStatus?: string;
+  syncError?: string | null;
+  responseCount?: number;
+  lastResponseAt?: string | null;
+  createdAt: string;
 }
 
 interface OverviewPayload {
@@ -176,6 +213,13 @@ export default function AdminFederationPage() {
   const [syndicationSourceFilter, setSyndicationSourceFilter] = useState('all');
   const [syndicationSyncFilter, setSyndicationSyncFilter] = useState('all');
   const [syndicationAgendaFilter, setSyndicationAgendaFilter] = useState('all');
+  const [formId, setFormId] = useState('');
+  const [formSourceOrganizationId, setFormSourceOrganizationId] = useState('');
+  const [formTargetOrganizationId, setFormTargetOrganizationId] = useState('');
+  const [formTargetOrganizationIds, setFormTargetOrganizationIds] = useState<string[]>([]);
+  const [includeFormResponses, setIncludeFormResponses] = useState(false);
+  const [formSyndicationFilter, setFormSyndicationFilter] = useState('all');
+  const [rotatedTokenInfo, setRotatedTokenInfo] = useState<{ relationId: string; fingerprint?: string | null; tokenLength?: number } | null>(null);
 
   const { data: overview, isLoading: overviewLoading } = useQuery<OverviewPayload>({
     queryKey: queryKeys.federation.overview(),
@@ -215,24 +259,43 @@ export default function AdminFederationPage() {
     queryFn: () => api.get('/api/admin/events', { page: 1, limit: 100 }),
   });
 
+  const { data: formsResponse } = useQuery<{ success: boolean; data: FormItem[] }>({
+    queryKey: queryKeys.forms.list({ status: 'all' }),
+    queryFn: () => api.get('/api/admin/forms', { status: 'all' }),
+  });
+
+  const formSyndicationQueryParams = { status: formSyndicationFilter };
+  const { data: formSyndicationsResponse } = useQuery<{ success: boolean; data: FormSyndication[] }>({
+    queryKey: queryKeys.federation.formSyndications(formSyndicationQueryParams),
+    queryFn: () => api.get('/api/admin/federation/forms/syndications', formSyndicationQueryParams),
+  });
+
   const networks = networksResponse?.data ?? [];
   const organizations = organizationsResponse?.data ?? [];
   const relations = relationsResponse?.data ?? [];
   const syndications = syndicationsResponse?.data ?? [];
   const events = eventsResponse?.data ?? [];
+  const forms = formsResponse?.data ?? [];
+  const formSyndications = formSyndicationsResponse?.data ?? [];
   const regions = organizations.filter((org) => org.type === 'region');
   const sections = organizations.filter((org) => org.type === 'section');
   const sourceSections = sections;
 
   const selectedEvent = useMemo(() => events.find((event) => event.id === eventId), [events, eventId]);
+  const selectedForm = useMemo(() => forms.find((form) => form.id === formId), [forms, formId]);
   const selectedTargetsLabel = useMemo(() => targetOrganizationIds
     .map((id) => organizations.find((org) => org.id === id)?.name)
     .filter(Boolean)
     .join(', '), [targetOrganizationIds, organizations]);
+  const selectedFormTargetsLabel = useMemo(() => formTargetOrganizationIds
+    .map((id) => organizations.find((org) => org.id === id)?.name)
+    .filter(Boolean)
+    .join(', '), [formTargetOrganizationIds, organizations]);
 
   const invalidateFederation = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.federation.all });
     queryClient.invalidateQueries({ queryKey: queryKeys.events.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.forms.all });
   };
 
   const createNetworkMutation = useMutation({
@@ -319,6 +382,63 @@ export default function AdminFederationPage() {
     onError: (error: Error) => toast({ title: 'Erreur sync', description: error.message, variant: 'destructive' }),
   });
 
+  const rotateRelationTokenMutation = useMutation({
+    mutationFn: (id: string) => api.post<{ data?: { tokenLength?: number; tokenFingerprint?: string | null; relation?: { id: string } } }>(`/api/admin/federation/relations/${id}/rotate-token`, {}),
+    onSuccess: (response: { data?: { tokenLength?: number; tokenFingerprint?: string | null; relation?: { id: string } } }) => {
+      const relationId = response.data?.relation?.id;
+      if (relationId) setRotatedTokenInfo({ relationId, fingerprint: response.data?.tokenFingerprint, tokenLength: response.data?.tokenLength });
+      toast({ title: 'Jeton régénéré', description: `Fingerprint ${response.data?.tokenFingerprint ?? '—'} · longueur ${response.data?.tokenLength ?? '—'}. Le secret brut n’est pas affiché.` });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur rotation', description: error.message, variant: 'destructive' }),
+  });
+
+  const proposeFormUpwardMutation = useMutation({
+    mutationFn: () => api.post(`/api/admin/federation/forms/${formId}/propose-upward`, {
+      sourceOrganizationId: formSourceOrganizationId || selectedForm?.organizationId,
+      targetOrganizationId: formTargetOrganizationId,
+      includeResponses: includeFormResponses,
+    }),
+    onSuccess: () => {
+      toast({ title: 'Formulaire proposé', description: 'La région peut maintenant accepter ou refuser ce formulaire.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  const publishFormDownwardMutation = useMutation({
+    mutationFn: () => api.post(`/api/admin/federation/forms/${formId}/publish-downward`, {
+      sourceOrganizationId: formSourceOrganizationId || selectedForm?.organizationId,
+      targetOrganizationIds: formTargetOrganizationIds,
+      autoAccept: false,
+      includeResponses: includeFormResponses,
+    }),
+    onSuccess: () => {
+      toast({ title: 'Formulaire publié', description: 'Les sections ciblées peuvent maintenant le recevoir.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  const updateFormSyndicationMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.patch(`/api/admin/federation/forms/syndications/${id}`, { status }),
+    onSuccess: () => {
+      toast({ title: 'Syndication formulaire mise à jour', description: 'Le statut fédéré a été enregistré.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur', description: error.message, variant: 'destructive' }),
+  });
+
+  const syncFormSyndicationMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/api/admin/federation/forms/syndications/${id}/sync`, {}),
+    onSuccess: () => {
+      toast({ title: 'Synchronisation formulaire relancée', description: 'Le statut de synchronisation a été mis à jour.' });
+      invalidateFederation();
+    },
+    onError: (error: Error) => toast({ title: 'Erreur sync', description: error.message, variant: 'destructive' }),
+  });
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div>
@@ -353,6 +473,7 @@ export default function AdminFederationPage() {
         <TabsList className="flex flex-wrap h-auto">
           <TabsTrigger value="organizations">Organisations</TabsTrigger>
           <TabsTrigger value="events">Flux événements</TabsTrigger>
+          <TabsTrigger value="forms">Flux formulaires</TabsTrigger>
           <TabsTrigger value="syndications">Vue région / demandes</TabsTrigger>
         </TabsList>
 
@@ -525,9 +646,23 @@ export default function AdminFederationPage() {
                           {relation.hasFederationToken ? 'Token sync configuré' : 'Sync locale seulement'}
                         </Badge>
                         {relation.syncStatus && <Badge variant="outline">Sync {relation.syncStatus}</Badge>}
+                        {relation.federationTokenFingerprint && <Badge variant="outline">FP {relation.federationTokenFingerprint}</Badge>}
+                        {relation.federationTokenRotatedAt && <span>Rotation {formatDate(relation.federationTokenRotatedAt)}</span>}
                       </div>
+                      {rotatedTokenInfo?.relationId === relation.id && (
+                        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                          <div className="font-medium">Rotation effectuée sans afficher le secret brut</div>
+                          <div>Fingerprint : <span className="font-mono">{rotatedTokenInfo.fingerprint ?? '—'}</span></div>
+                          <div>Longueur : {rotatedTokenInfo.tokenLength ?? '—'} caractères</div>
+                        </div>
+                      )}
                     </div>
-                    <Badge>{relation.syncEnabled === false ? 'Sync off' : 'Actif'}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => rotateRelationTokenMutation.mutate(relation.id)} disabled={rotateRelationTokenMutation.isPending}>
+                        <KeyRound className="h-4 w-4 mr-1" /> Régénérer
+                      </Button>
+                      <Badge>{relation.syncEnabled === false ? 'Sync off' : 'Actif'}</Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -627,6 +762,194 @@ export default function AdminFederationPage() {
                   </CardContent>
                 </Card>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="forms" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Partager un formulaire / sondage</CardTitle>
+              <CardDescription>
+                Flux montant Section → Région, ou descendant Région → Sections. Les réponses ne sont consolidées qu’en agrégats et seulement si l’option est cochée.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label>Formulaire</Label>
+                  <Select value={formId || 'none'} onValueChange={(value) => setFormId(value === 'none' ? '' : value)}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner un formulaire" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sélectionner</SelectItem>
+                      {forms.map((form) => <SelectItem key={form.id} value={form.id}>{form.title} — v{form.version} ({form.status})</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Organisation source</Label>
+                  <Select value={formSourceOrganizationId || 'auto'} onValueChange={(value) => setFormSourceOrganizationId(value === 'auto' ? '' : value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Organisation du formulaire</SelectItem>
+                      {organizations.map((org) => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="rounded-lg border p-3 text-sm text-muted-foreground">
+                  {selectedForm ? (
+                    <>
+                      <div className="font-medium text-foreground">{selectedForm.title}</div>
+                      <div>/{selectedForm.slug} · v{selectedForm.version} · {selectedForm.questionCount ?? 0} questions</div>
+                      <div>{selectedForm.responseCount ?? 0} réponses locales</div>
+                    </>
+                  ) : 'Choisissez un formulaire à fédérer.'}
+                </div>
+              </div>
+
+              <label className="flex items-start gap-2 rounded-lg border p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={includeFormResponses}
+                  onChange={(event) => setIncludeFormResponses(event.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="font-medium">Inclure la consolidation agrégée des réponses</span>
+                  <span className="block text-muted-foreground">Envoie uniquement compteurs/statistiques par question, sans exports CSV ni réponses libres brutes.</span>
+                </span>
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg"><ArrowUpFromLine className="h-5 w-5" /> Section → Région</CardTitle>
+                    <CardDescription>Proposer un formulaire local à une région mère.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Label>Région cible</Label>
+                    <Select value={formTargetOrganizationId || 'none'} onValueChange={(value) => setFormTargetOrganizationId(value === 'none' ? '' : value)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sélectionner une région</SelectItem>
+                        {regions.map((org) => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={() => proposeFormUpwardMutation.mutate()} disabled={!formId || !formTargetOrganizationId || proposeFormUpwardMutation.isPending}>
+                      <Send className="h-4 w-4 mr-2" /> Proposer à la région
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg"><ArrowDownToLine className="h-5 w-5" /> Région → Sections</CardTitle>
+                    <CardDescription>Distribuer un formulaire régional vers des sections explicitement liées.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Label>Sections cibles</Label>
+                    <Select value="add" onValueChange={(value) => {
+                      if (value !== 'add' && !formTargetOrganizationIds.includes(value)) setFormTargetOrganizationIds([...formTargetOrganizationIds, value]);
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="Ajouter une section" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="add">Ajouter une section</SelectItem>
+                        {sections.map((org) => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {formTargetOrganizationIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {formTargetOrganizationIds.map((id) => (
+                          <Badge key={id} variant="outline" className="gap-1">
+                            {organizations.find((org) => org.id === id)?.name}
+                            <button type="button" onClick={() => setFormTargetOrganizationIds(formTargetOrganizationIds.filter((targetId) => targetId !== id))}>×</button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <Button onClick={() => publishFormDownwardMutation.mutate()} disabled={!formId || formTargetOrganizationIds.length === 0 || publishFormDownwardMutation.isPending}>
+                      <Send className="h-4 w-4 mr-2" /> Publier vers {selectedFormTargetsLabel || 'les sections'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle>Syndications de formulaires</CardTitle>
+                <CardDescription>Copies fédérées, sync inter-instance et agrégats de réponses.</CardDescription>
+              </div>
+              <Select value={formSyndicationFilter} onValueChange={setFormSyndicationFilter}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Statut" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous statuts</SelectItem>
+                  <SelectItem value="proposed">Proposés</SelectItem>
+                  <SelectItem value="accepted">Acceptés</SelectItem>
+                  <SelectItem value="rejected">Refusés</SelectItem>
+                  <SelectItem value="revoked">Révoqués</SelectItem>
+                  <SelectItem value="auto_accepted">Auto-acceptés</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Formulaire</TableHead>
+                    <TableHead>Flux</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Réponses</TableHead>
+                    <TableHead>Sync</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {formSyndications.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Aucune syndication de formulaire.</TableCell></TableRow>
+                  ) : formSyndications.map((syndication) => (
+                    <TableRow key={syndication.id}>
+                      <TableCell>
+                        <div className="font-medium">{syndication.formTitle}</div>
+                        <div className="text-xs text-muted-foreground">/{syndication.formSlug} · v{syndication.formVersion} · {syndication.formStatus}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{syndication.sourceName} → {syndication.targetName}</div>
+                        <Badge variant="outline">{syndication.direction === 'upward' ? 'Section → Région' : 'Région → Section'}</Badge>
+                      </TableCell>
+                      <TableCell><Badge>{statusLabels[syndication.status] ?? syndication.status}</Badge></TableCell>
+                      <TableCell>
+                        {syndication.includeResponses ? (
+                          <div className="text-sm">
+                            <Badge variant="outline">Agrégats activés</Badge>
+                            <div className="text-xs text-muted-foreground mt-1">{syndication.responseCount ?? 0} réponses · dernier {formatDate(syndication.lastResponseAt ?? undefined)}</div>
+                          </div>
+                        ) : <span className="text-muted-foreground">Non consolidées</span>}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant={syndication.syncStatus === 'failed' ? 'destructive' : 'outline'}>{syndication.syncStatus ?? 'local'}</Badge>
+                          {syndication.targetInstanceUrl && <span className="text-xs text-muted-foreground truncate max-w-[180px]">{syndication.targetInstanceUrl}</span>}
+                          {syndication.syncError && <span className="text-xs text-destructive truncate max-w-[220px]" title={syndication.syncError}>{syndication.syncError}</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button size="sm" variant="outline" onClick={() => updateFormSyndicationMutation.mutate({ id: syndication.id, status: 'accepted' })}>
+                          <Check className="h-4 w-4 mr-1" /> Accepter
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => updateFormSyndicationMutation.mutate({ id: syndication.id, status: 'rejected' })}>
+                          <X className="h-4 w-4 mr-1" /> Refuser
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => syncFormSyndicationMutation.mutate(syndication.id)} disabled={syncFormSyndicationMutation.isPending}>
+                          <RotateCw className="h-4 w-4 mr-1" /> Sync
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>

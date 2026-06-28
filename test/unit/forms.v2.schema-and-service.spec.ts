@@ -11,9 +11,12 @@ import {
 } from '../../server/src/forms/forms.utils';
 import {
   hasPermission,
+  insertBusinessAuditLogSchema,
   insertSurveyFormSchema,
+  insertSurveyFormSyndicationSchema,
   submitSurveyResponseSchema,
   updateSurveyFormSchema,
+  updateSurveyFormSyndicationSchema,
   type SurveyQuestion,
   type SurveyResponse,
 } from '../../shared/schema.ts';
@@ -86,6 +89,33 @@ describe('Formulaires v2 — schémas et permissions', () => {
 
     expect(parsed.consentAccepted).toBe(true);
     expect(parsed.respondentEmail).toBe('membre@example.com');
+  });
+
+  it('valide les syndications de formulaires sans réponse brute par défaut', () => {
+    const parsed = insertSurveyFormSyndicationSchema.parse({
+      formId: '550e8400-e29b-41d4-a716-446655440001',
+      sourceOrganizationId: '550e8400-e29b-41d4-a716-446655440002',
+      targetOrganizationId: '550e8400-e29b-41d4-a716-446655440003',
+      direction: 'downward',
+    });
+
+    expect(parsed.includeResponses).toBe(false);
+    expect(parsed.collectResponsesLocally).toBe(true);
+    expect(parsed.status).toBe('proposed');
+    expect(() => insertSurveyFormSyndicationSchema.parse({ ...parsed, direction: 'domain_guess' })).toThrow();
+    expect(updateSurveyFormSyndicationSchema.parse({ includeResponses: true, status: 'accepted' })).toMatchObject({ includeResponses: true, status: 'accepted' });
+  });
+
+  it('valide les logs d’audit métier sans imposer de données personnelles', () => {
+    const parsed = insertBusinessAuditLogSchema.parse({
+      action: 'forms.responses.export_csv',
+      entityType: 'survey_form',
+      entityId: 'form-1',
+      metadata: { responseCount: 12 },
+    });
+
+    expect(parsed.actorEmail).toBeUndefined();
+    expect(parsed.metadata).toEqual({ responseCount: 12 });
   });
 
   it('accorde lecture formulaires aux lecteurs, mais écriture/export/suppression seulement aux managers et super-admin', () => {

@@ -232,7 +232,12 @@ export const organizationRelations = pgTable("organization_relations", {
   relationType: text("relation_type").default(ORGANIZATION_RELATION_TYPE.REGION_SECTION).notNull(),
   status: text("status").default("active").notNull(),
   permissions: jsonb("permissions").$type<Record<string, unknown>>().default({}).notNull(),
+  // federationToken is kept only for legacy outbound sync until explicit rotation.
+  // New rotations store only hash/fingerprint and return the raw token once.
   federationToken: text("federation_token"),
+  federationTokenHash: text("federation_token_hash"),
+  federationTokenFingerprint: text("federation_token_fingerprint"),
+  federationTokenRotatedAt: timestamp("federation_token_rotated_at"),
   syncEnabled: boolean("sync_enabled").default(true).notNull(),
   lastSyncAt: timestamp("last_sync_at"),
   syncStatus: text("sync_status").default(FEDERATION_SYNC_STATUS.IDLE).notNull(),
@@ -246,6 +251,29 @@ export const organizationRelations = pgTable("organization_relations", {
   statusIdx: index("organization_relations_status_idx").on(table.status),
   syncEnabledIdx: index("organization_relations_sync_enabled_idx").on(table.syncEnabled),
   syncStatusIdx: index("organization_relations_sync_status_idx").on(table.syncStatus),
+  tokenHashIdx: index("organization_relations_token_hash_idx").on(table.federationTokenHash),
+}));
+
+export const businessAuditLogs = pgTable("business_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actorEmail: text("actor_email"),
+  action: text("action").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id"),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  relationId: varchar("relation_id").references(() => organizationRelations.id, { onDelete: "set null" }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  actionIdx: index("business_audit_logs_action_idx").on(table.action),
+  entityIdx: index("business_audit_logs_entity_idx").on(table.entityType, table.entityId),
+  actorIdx: index("business_audit_logs_actor_idx").on(table.actorEmail),
+  organizationIdx: index("business_audit_logs_organization_idx").on(table.organizationId),
+  relationIdx: index("business_audit_logs_relation_idx").on(table.relationId),
+  createdAtIdx: index("business_audit_logs_created_at_idx").on(table.createdAt),
+  metadataIdx: index("business_audit_logs_metadata_gin_idx").using("gin", table.metadata),
 }));
 
 // Events table - Flexible status workflow management  
@@ -400,6 +428,67 @@ export const surveyResponses = pgTable("survey_responses", {
   submittedAtIdx: index("survey_responses_submitted_at_idx").on(table.submittedAt),
   answersIdx: index("survey_responses_answers_gin_idx").using("gin", table.answers),
   snapshotIdx: index("survey_responses_form_snapshot_gin_idx").using("gin", table.formSnapshot),
+}));
+
+export const surveyFormSyndications = pgTable("survey_form_syndications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: varchar("form_id").references(() => surveyForms.id, { onDelete: "cascade" }).notNull(),
+  sourceOrganizationId: varchar("source_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  targetOrganizationId: varchar("target_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  direction: text("direction").notNull(),
+  status: text("status").default(SYNDICATION_STATUS.PROPOSED).notNull(),
+  includeResponses: boolean("include_responses").default(false).notNull(),
+  collectResponsesLocally: boolean("collect_responses_locally").default(true).notNull(),
+  localTitleOverride: text("local_title_override"),
+  localDescriptionOverride: text("local_description_override"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdBy: text("created_by"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  targetInstanceUrl: text("target_instance_url"),
+  remoteFormId: varchar("remote_form_id"),
+  remoteSyndicationId: varchar("remote_syndication_id"),
+  syncStatus: text("sync_status").default(FEDERATION_SYNC_STATUS.LOCAL).notNull(),
+  syncError: text("sync_error"),
+  lastSyncAttemptAt: timestamp("last_sync_attempt_at"),
+  syncAttempts: integer("sync_attempts").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  syndicationUnique: unique("survey_form_syndications_unique").on(table.formId, table.sourceOrganizationId, table.targetOrganizationId),
+  formIdx: index("survey_form_syndications_form_idx").on(table.formId),
+  sourceIdx: index("survey_form_syndications_source_idx").on(table.sourceOrganizationId),
+  targetIdx: index("survey_form_syndications_target_idx").on(table.targetOrganizationId),
+  directionIdx: index("survey_form_syndications_direction_idx").on(table.direction),
+  statusIdx: index("survey_form_syndications_status_idx").on(table.status),
+  syncStatusIdx: index("survey_form_syndications_sync_status_idx").on(table.syncStatus),
+  remoteFormIdx: index("survey_form_syndications_remote_form_idx").on(table.remoteFormId),
+  remoteSyndicationIdx: index("survey_form_syndications_remote_syndication_idx").on(table.remoteSyndicationId),
+}));
+
+export const surveyFormResponseSummaries = pgTable("survey_form_response_summaries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  syndicationId: varchar("syndication_id").references(() => surveyFormSyndications.id, { onDelete: "set null" }),
+  formId: varchar("form_id").references(() => surveyForms.id, { onDelete: "cascade" }),
+  remoteFormId: varchar("remote_form_id"),
+  sourceOrganizationId: varchar("source_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  targetOrganizationId: varchar("target_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceInstanceUrl: text("source_instance_url"),
+  responseCount: integer("response_count").default(0).notNull(),
+  lastResponseAt: timestamp("last_response_at"),
+  responsesByDay: jsonb("responses_by_day").$type<Array<Record<string, unknown>>>().default([]).notNull(),
+  questionSummaries: jsonb("question_summaries").$type<Array<Record<string, unknown>>>().default([]).notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  responseSummaryUnique: unique("survey_form_response_summaries_unique").on(table.sourceInstanceUrl, table.remoteFormId, table.targetOrganizationId),
+  syndicationIdx: index("survey_form_response_summaries_syndication_idx").on(table.syndicationId),
+  formIdx: index("survey_form_response_summaries_form_idx").on(table.formId),
+  sourceIdx: index("survey_form_response_summaries_source_idx").on(table.sourceOrganizationId),
+  targetIdx: index("survey_form_response_summaries_target_idx").on(table.targetOrganizationId),
+  updatedAtIdx: index("survey_form_response_summaries_updated_at_idx").on(table.updatedAt),
+  questionSummariesIdx: index("survey_form_response_summaries_question_summaries_gin_idx").using("gin", table.questionSummaries),
 }));
 
 // Loan items table - Matériel disponible au prêt
@@ -1377,6 +1466,54 @@ export const updateEventSyndicationSchema = z.object({
   lastSyncAttemptAt: z.string().datetime().optional().nullable(),
   syncAttempts: z.number().int().min(0).optional(),
   reviewedBy: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+});
+
+export const insertSurveyFormSyndicationSchema = z.object({
+  formId: z.string().uuid(),
+  sourceOrganizationId: z.string().uuid(),
+  targetOrganizationId: z.string().uuid(),
+  direction: z.enum(syndicationDirectionValues),
+  status: z.enum(syndicationStatusValues).default(SYNDICATION_STATUS.PROPOSED),
+  includeResponses: z.boolean().default(false),
+  collectResponsesLocally: z.boolean().default(true),
+  localTitleOverride: optionalSanitizedText(200),
+  localDescriptionOverride: optionalSanitizedText(3000),
+  targetInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  remoteFormId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  remoteSyndicationId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  syncStatus: z.enum(federationSyncStatusValues).default(FEDERATION_SYNC_STATUS.LOCAL),
+  syncError: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  lastSyncAttemptAt: z.string().datetime().optional().nullable(),
+  syncAttempts: z.number().int().min(0).default(0),
+  createdBy: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+});
+
+export const updateSurveyFormSyndicationSchema = z.object({
+  status: z.enum(syndicationStatusValues).optional(),
+  includeResponses: z.boolean().optional(),
+  collectResponsesLocally: z.boolean().optional(),
+  localTitleOverride: optionalSanitizedText(200),
+  localDescriptionOverride: optionalSanitizedText(3000),
+  targetInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  remoteFormId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  remoteSyndicationId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  syncStatus: z.enum(federationSyncStatusValues).optional(),
+  syncError: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  lastSyncAttemptAt: z.string().datetime().optional().nullable(),
+  syncAttempts: z.number().int().min(0).optional(),
+  reviewedBy: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+});
+
+export const insertBusinessAuditLogSchema = z.object({
+  actorEmail: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  action: z.string().min(2).max(120).transform(sanitizeText),
+  entityType: z.string().min(2).max(80).transform(sanitizeText),
+  entityId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  organizationId: z.string().uuid().optional().nullable(),
+  relationId: z.string().uuid().optional().nullable(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  ipAddress: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  userAgent: z.string().max(500).optional().nullable().transform(val => val ? sanitizeText(val) : val),
 });
 
 // Ultra-secure insert schemas with validation - Pure Zod v4 schema (avoiding drizzle-zod type recursion)
@@ -2437,6 +2574,8 @@ export type Organization = typeof organizations.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type OrganizationRelation = typeof organizationRelations.$inferSelect;
 export type InsertOrganizationRelation = z.infer<typeof insertOrganizationRelationSchema>;
+export type BusinessAuditLog = typeof businessAuditLogs.$inferSelect;
+export type InsertBusinessAuditLog = z.infer<typeof insertBusinessAuditLogSchema>;
 
 export type Event = typeof events.$inferSelect;
 export type InsertEvent = z.infer<typeof insertEventSchema>;
@@ -2446,9 +2585,13 @@ export type InsertEventSyndication = z.infer<typeof insertEventSyndicationSchema
 export type SurveyForm = typeof surveyForms.$inferSelect;
 export type SurveyQuestion = typeof surveyQuestions.$inferSelect;
 export type SurveyResponse = typeof surveyResponses.$inferSelect;
+export type SurveyFormSyndication = typeof surveyFormSyndications.$inferSelect;
+export type SurveyFormResponseSummary = typeof surveyFormResponseSummaries.$inferSelect;
 export type InsertSurveyForm = z.infer<typeof insertSurveyFormSchema>;
 export type UpdateSurveyForm = z.infer<typeof updateSurveyFormSchema>;
 export type SubmitSurveyResponse = z.infer<typeof submitSurveyResponseSchema>;
+export type InsertSurveyFormSyndication = z.infer<typeof insertSurveyFormSyndicationSchema>;
+export type UpdateSurveyFormSyndication = z.infer<typeof updateSurveyFormSyndicationSchema>;
 
 export type LoanItem = typeof loanItems.$inferSelect;
 export type InsertLoanItem = z.infer<typeof insertLoanItemSchema>;

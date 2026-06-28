@@ -1,1716 +1,3234 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.memberSubscriptionsRelations = exports.memberActivitiesRelations = exports.membersRelations = exports.eventSponsorshipsRelations = exports.ideaPatronProposalsRelations = exports.patronUpdatesRelations = exports.patronDonationsRelations = exports.patronsRelations = exports.unsubscriptionsRelations = exports.inscriptionsRelations = exports.eventsRelations = exports.votesRelations = exports.ideasRelations = exports.emailConfig = exports.featureConfig = exports.brandingConfig = exports.trackingAlerts = exports.trackingMetrics = exports.eventSponsorships = exports.SPONSORSHIP_STATUS = exports.SPONSORSHIP_LEVEL_LABELS = exports.SPONSORSHIP_LEVEL = exports.memberRelations = exports.memberTasks = exports.memberTagAssignments = exports.memberTags = exports.memberSubscriptions = exports.memberActivities = exports.members = exports.CJD_ROLE_LABELS = exports.CJD_ROLES = exports.ideaPatronProposals = exports.patronUpdates = exports.patronDonations = exports.patrons = exports.developmentRequests = exports.pushSubscriptions = exports.unsubscriptions = exports.inscriptions = exports.loanItems = exports.events = exports.votes = exports.ideas = exports.LOAN_STATUS = exports.EVENT_STATUS = exports.IDEA_STATUS = exports.passwordResetTokens = exports.admins = exports.ADMIN_STATUS = exports.ADMIN_ROLES = void 0;
-exports.insertDevelopmentRequestSchema = exports.getRolePermissions = exports.getRoleDisplayName = exports.hasPermission = exports.NotFoundError = exports.DatabaseError = exports.DuplicateError = exports.ValidationError = exports.updateEventSchema = exports.updateEventStatusSchema = exports.insertUserSchema = exports.users = exports.updateTrackingAlertSchema = exports.insertTrackingAlertSchema = exports.insertTrackingMetricSchema = exports.insertMemberRelationSchema = exports.updateMemberTaskSchema = exports.insertMemberTaskSchema = exports.assignMemberTagSchema = exports.updateMemberTagSchema = exports.insertMemberTagSchema = exports.proposeMemberSchema = exports.updateMemberSchema = exports.insertMemberActivitySchema = exports.insertMemberSchema = exports.updateEventSponsorshipSchema = exports.insertEventSponsorshipSchema = exports.updateIdeaPatronProposalSchema = exports.updatePatronSchema = exports.insertIdeaPatronProposalSchema = exports.updatePatronUpdateSchema = exports.insertPatronUpdateSchema = exports.insertPatronDonationSchema = exports.insertPatronSchema = exports.updateLoanItemStatusSchema = exports.updateLoanItemSchema = exports.insertLoanItemSchema = exports.insertUnsubscriptionSchema = exports.createEventWithInscriptionsSchema = exports.initialInscriptionSchema = exports.insertInscriptionSchema = exports.insertEventSchema = exports.insertVoteSchema = exports.updateIdeaSchema = exports.updateIdeaStatusSchema = exports.insertIdeaSchema = exports.updateAdminPasswordSchema = exports.updateAdminInfoSchema = exports.updateAdminSchema = exports.insertAdminSchema = void 0;
-exports.frontendErrorSchema = exports.statusResponseSchema = exports.statusCheckSchema = exports.insertEventRegistrationSchema = exports.eventRegistrations = exports.insertAdminUserSchema = exports.adminUsers = exports.updateFinancialForecastSchema = exports.insertFinancialForecastSchema = exports.updateFinancialExpenseSchema = exports.insertFinancialExpenseSchema = exports.updateFinancialBudgetSchema = exports.insertFinancialBudgetSchema = exports.updateFinancialCategorySchema = exports.insertFinancialCategorySchema = exports.insertFeatureConfigSchema = exports.insertEmailConfigSchema = exports.insertBrandingConfigSchema = exports.financialForecastsRelations = exports.financialExpensesRelations = exports.financialBudgetsRelations = exports.financialCategoriesRelations = exports.financialForecasts = exports.financialExpenses = exports.financialBudgets = exports.financialCategories = exports.FORECAST_BASED_ON = exports.FORECAST_CONFIDENCE = exports.FINANCIAL_CATEGORY_TYPE = exports.FINANCIAL_PERIOD = exports.insertMemberSubscriptionSchema = exports.updateDevelopmentRequestStatusSchema = exports.updateDevelopmentRequestSchema = void 0;
-const drizzle_orm_1 = require("drizzle-orm");
-const pg_core_1 = require("drizzle-orm/pg-core");
-const drizzle_zod_1 = require("drizzle-zod");
-const zod_1 = require("zod");
-// Admin roles definition
-exports.ADMIN_ROLES = {
-    SUPER_ADMIN: "super_admin",
-    IDEAS_READER: "ideas_reader",
-    IDEAS_MANAGER: "ideas_manager",
-    EVENTS_READER: "events_reader",
-    EVENTS_MANAGER: "events_manager"
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
 };
-// Admin status definition
-exports.ADMIN_STATUS = {
-    PENDING: "pending", // En attente de validation
-    ACTIVE: "active", // Compte validé et actif
-    INACTIVE: "inactive" // Compte désactivé
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
 };
-// Admin users table  
-exports.admins = (0, pg_core_1.pgTable)("admins", {
-    email: (0, pg_core_1.text)("email").primaryKey(),
-    firstName: (0, pg_core_1.text)("first_name").default("Admin").notNull(),
-    lastName: (0, pg_core_1.text)("last_name").default("User").notNull(),
-    password: (0, pg_core_1.text)("password"), // Nullable car géré par Authentik pour les nouveaux utilisateurs
-    addedBy: (0, pg_core_1.text)("added_by"),
-    role: (0, pg_core_1.text)("role").default(exports.ADMIN_ROLES.IDEAS_READER).notNull(), // Rôle par défaut : consultation des idées
-    status: (0, pg_core_1.text)("status").default(exports.ADMIN_STATUS.PENDING).notNull(), // Statut par défaut : en attente
-    isActive: (0, pg_core_1.boolean)("is_active").default(true).notNull(), // Permet de désactiver un admin sans le supprimer
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-}, (table) => ({
-    roleIdx: (0, pg_core_1.index)("admins_role_idx").on(table.role),
-    statusIdx: (0, pg_core_1.index)("admins_status_idx").on(table.status),
-    activeIdx: (0, pg_core_1.index)("admins_active_idx").on(table.isActive),
-}));
-// Password reset tokens table - Tokens pour la réinitialisation de mot de passe
-exports.passwordResetTokens = (0, pg_core_1.pgTable)("password_reset_tokens", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    email: (0, pg_core_1.text)("email").notNull().references(() => exports.admins.email, { onDelete: "cascade" }),
-    token: (0, pg_core_1.text)("token").notNull().unique(),
-    expiresAt: (0, pg_core_1.timestamp)("expires_at").notNull(),
-    usedAt: (0, pg_core_1.timestamp)("used_at"),
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-}, (table) => ({
-    emailIdx: (0, pg_core_1.index)("password_reset_tokens_email_idx").on(table.email),
-    tokenIdx: (0, pg_core_1.index)("password_reset_tokens_token_idx").on(table.token),
-    expiresAtIdx: (0, pg_core_1.index)("password_reset_tokens_expires_at_idx").on(table.expiresAt),
-}));
-// Status constants for ideas and events
-exports.IDEA_STATUS = {
-    PENDING: "pending",
-    APPROVED: "approved",
-    REJECTED: "rejected",
-    UNDER_REVIEW: "under_review",
-    POSTPONED: "postponed",
-    COMPLETED: "completed"
-};
-exports.EVENT_STATUS = {
-    DRAFT: "draft",
-    PUBLISHED: "published",
-    CANCELLED: "cancelled",
-    POSTPONED: "postponed",
-    COMPLETED: "completed"
-};
-exports.LOAN_STATUS = {
-    PENDING: "pending",
-    AVAILABLE: "available",
-    BORROWED: "borrowed",
-    UNAVAILABLE: "unavailable"
-};
-// Ideas table - Flexible status workflow management
-exports.ideas = (0, pg_core_1.pgTable)("ideas", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    title: (0, pg_core_1.text)("title").notNull(),
-    description: (0, pg_core_1.text)("description"),
-    proposedBy: (0, pg_core_1.text)("proposed_by").notNull(),
-    proposedByEmail: (0, pg_core_1.text)("proposed_by_email").notNull(),
-    status: (0, pg_core_1.text)("status").default(exports.IDEA_STATUS.PENDING).notNull(), // pending, approved, rejected, under_review, postponed, completed
-    featured: (0, pg_core_1.boolean)("featured").default(false).notNull(), // Mise en avant de l'idée
-    deadline: (0, pg_core_1.timestamp)("deadline"),
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-    updatedBy: (0, pg_core_1.text)("updated_by"),
-}, (table) => ({
-    statusIdx: (0, pg_core_1.index)("ideas_status_idx").on(table.status),
-    emailIdx: (0, pg_core_1.index)("ideas_email_idx").on(table.proposedByEmail),
-    featuredIdx: (0, pg_core_1.index)("ideas_featured_idx").on(table.featured),
-    createdAtIdx: (0, pg_core_1.index)("ideas_created_at_idx").on(table.createdAt),
-}));
-// Votes table
-exports.votes = (0, pg_core_1.pgTable)("votes", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    ideaId: (0, pg_core_1.varchar)("idea_id").references(() => exports.ideas.id, { onDelete: "cascade" }).notNull(),
-    voterName: (0, pg_core_1.text)("voter_name").notNull(),
-    voterEmail: (0, pg_core_1.text)("voter_email").notNull(),
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-}, (table) => ({
-    // Contrainte unique: un email ne peut voter qu'une seule fois par idée
-    uniqueVotePerEmail: (0, pg_core_1.unique)().on(table.ideaId, table.voterEmail),
-    ideaIdIdx: (0, pg_core_1.index)("votes_idea_id_idx").on(table.ideaId),
-}));
-// Events table - Flexible status workflow management  
-exports.events = (0, pg_core_1.pgTable)("events", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    title: (0, pg_core_1.text)("title").notNull(),
-    description: (0, pg_core_1.text)("description"),
-    date: (0, pg_core_1.timestamp)("date").notNull(),
-    location: (0, pg_core_1.text)("location"), // Lieu de l'événement
-    maxParticipants: (0, pg_core_1.integer)("max_participants"), // Limite de participants (optionnel)
-    helloAssoLink: (0, pg_core_1.text)("hello_asso_link"),
-    enableExternalRedirect: (0, pg_core_1.boolean)("enable_external_redirect").default(false).notNull(), // Active la redirection externe après inscription
-    externalRedirectUrl: (0, pg_core_1.text)("external_redirect_url"), // URL de redirection externe (HelloAsso, etc.)
-    showInscriptionsCount: (0, pg_core_1.boolean)("show_inscriptions_count").default(true).notNull(), // Afficher le nombre d'inscrits
-    showAvailableSeats: (0, pg_core_1.boolean)("show_available_seats").default(true).notNull(), // Afficher le nombre de places disponibles
-    allowUnsubscribe: (0, pg_core_1.boolean)("allow_unsubscribe").default(false).notNull(), // Permet la désinscription (utile pour les plénières)
-    redUnsubscribeButton: (0, pg_core_1.boolean)("red_unsubscribe_button").default(false).notNull(), // Bouton de désinscription rouge (pour les plénières)
-    buttonMode: (0, pg_core_1.text)("button_mode").default("subscribe").notNull(), // "subscribe", "unsubscribe", "both", ou "custom"
-    customButtonText: (0, pg_core_1.text)("custom_button_text"), // Texte personnalisé pour le bouton quand buttonMode est "custom"
-    status: (0, pg_core_1.text)("status").default(exports.EVENT_STATUS.PUBLISHED).notNull(), // draft, published, cancelled, postponed, completed
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-    updatedBy: (0, pg_core_1.text)("updated_by"),
-}, (table) => ({
-    statusIdx: (0, pg_core_1.index)("events_status_idx").on(table.status),
-    dateIdx: (0, pg_core_1.index)("events_date_idx").on(table.date),
-    statusDateIdx: (0, pg_core_1.index)("events_status_date_idx").on(table.status, table.date),
-}));
-// Loan items table - Matériel disponible au prêt
-exports.loanItems = (0, pg_core_1.pgTable)("loan_items", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    title: (0, pg_core_1.text)("title").notNull(),
-    description: (0, pg_core_1.text)("description"),
-    lenderName: (0, pg_core_1.text)("lender_name").notNull(), // Nom du JD qui prête (texte libre)
-    photoUrl: (0, pg_core_1.text)("photo_url"), // URL de la photo uploadée
-    status: (0, pg_core_1.text)("status").default(exports.LOAN_STATUS.PENDING).notNull(), // pending, available, borrowed, unavailable
-    proposedBy: (0, pg_core_1.text)("proposed_by").notNull(), // Nom de la personne qui propose
-    proposedByEmail: (0, pg_core_1.text)("proposed_by_email").notNull(), // Email de la personne qui propose
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-    updatedBy: (0, pg_core_1.text)("updated_by"), // Email de l'admin qui a modifié
-}, (table) => ({
-    statusIdx: (0, pg_core_1.index)("loan_items_status_idx").on(table.status),
-    createdAtIdx: (0, pg_core_1.index)("loan_items_created_at_idx").on(table.createdAt),
-    // Index pour optimiser les recherches textuelles (GIN index pour ILIKE)
-    titleSearchIdx: (0, pg_core_1.index)("loan_items_title_search_idx").on(table.title),
-    // Index composite pour les requêtes fréquentes (status + createdAt)
-    statusCreatedIdx: (0, pg_core_1.index)("loan_items_status_created_idx").on(table.status, table.createdAt),
-}));
-// Inscriptions table  
-exports.inscriptions = (0, pg_core_1.pgTable)("inscriptions", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    eventId: (0, pg_core_1.varchar)("event_id").references(() => exports.events.id, { onDelete: "cascade" }).notNull(),
-    name: (0, pg_core_1.text)("name").notNull(),
-    email: (0, pg_core_1.text)("email").notNull(),
-    company: (0, pg_core_1.text)("company"), // Société (optionnel)
-    phone: (0, pg_core_1.text)("phone"), // Téléphone (optionnel)
-    comments: (0, pg_core_1.text)("comments"), // Commentaires lors de l'inscription (accompagnants, régime alimentaire, etc.)
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-}, (table) => ({
-    // Contrainte unique: un email ne peut s'inscrire qu'une seule fois par événement
-    uniqueRegistrationPerEmail: (0, pg_core_1.unique)().on(table.eventId, table.email),
-    eventIdIdx: (0, pg_core_1.index)("inscriptions_event_id_idx").on(table.eventId),
-}));
-// Unsubscriptions table - for people declaring they cannot attend an event
-exports.unsubscriptions = (0, pg_core_1.pgTable)("unsubscriptions", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    eventId: (0, pg_core_1.varchar)("event_id").references(() => exports.events.id, { onDelete: "cascade" }).notNull(),
-    name: (0, pg_core_1.text)("name").notNull(),
-    email: (0, pg_core_1.text)("email").notNull(),
-    comments: (0, pg_core_1.text)("comments"), // Raison de l'absence, commentaires, etc.
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-}, (table) => ({
-    // Contrainte unique: un email ne peut se désinscrire qu'une seule fois par événement
-    uniqueUnsubscriptionPerEmail: (0, pg_core_1.unique)().on(table.eventId, table.email),
-}));
-// Push subscriptions table for PWA notifications
-exports.pushSubscriptions = (0, pg_core_1.pgTable)("push_subscriptions", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    endpoint: (0, pg_core_1.text)("endpoint").notNull().unique(),
-    p256dh: (0, pg_core_1.text)("p256dh").notNull(),
-    auth: (0, pg_core_1.text)("auth").notNull(),
-    userEmail: (0, pg_core_1.text)("user_email"), // Optional: link to user if logged in
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-}, (table) => ({
-    endpointIdx: (0, pg_core_1.index)("push_subscriptions_endpoint_idx").on(table.endpoint),
-    emailIdx: (0, pg_core_1.index)("push_subscriptions_email_idx").on(table.userEmail),
-}));
-// Development requests table - For GitHub issues integration
-exports.developmentRequests = (0, pg_core_1.pgTable)("development_requests", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    title: (0, pg_core_1.text)("title").notNull(),
-    description: (0, pg_core_1.text)("description").notNull(),
-    type: (0, pg_core_1.text)("type").notNull(), // "bug" or "feature"
-    priority: (0, pg_core_1.text)("priority").default("medium").notNull(), // "low", "medium", "high", "critical"
-    requestedBy: (0, pg_core_1.text)("requested_by").notNull(), // Email du super admin qui a fait la demande
-    requestedByName: (0, pg_core_1.text)("requested_by_name").notNull(), // Nom du demandeur
-    githubIssueNumber: (0, pg_core_1.integer)("github_issue_number"), // Numéro de l'issue GitHub créée
-    githubIssueUrl: (0, pg_core_1.text)("github_issue_url"), // URL complète de l'issue GitHub
-    status: (0, pg_core_1.text)("status").default("open").notNull(), // "open", "in_progress", "closed", "cancelled"
-    githubStatus: (0, pg_core_1.text)("github_status").default("open").notNull(), // Statut depuis GitHub: "open", "closed"
-    adminComment: (0, pg_core_1.text)("admin_comment"), // Commentaire du super administrateur
-    lastStatusChangeBy: (0, pg_core_1.text)("last_status_change_by"), // Email de la personne qui a modifié le statut en dernier
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-    lastSyncedAt: (0, pg_core_1.timestamp)("last_synced_at"), // Dernière synchronisation avec GitHub
-}, (table) => ({
-    typeIdx: (0, pg_core_1.index)("dev_requests_type_idx").on(table.type),
-    statusIdx: (0, pg_core_1.index)("dev_requests_status_idx").on(table.status),
-    requestedByIdx: (0, pg_core_1.index)("dev_requests_requested_by_idx").on(table.requestedBy),
-    githubIssueIdx: (0, pg_core_1.index)("dev_requests_github_issue_idx").on(table.githubIssueNumber),
-}));
-// Patrons table - CRM pour la gestion des mécènes
-exports.patrons = (0, pg_core_1.pgTable)("patrons", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    firstName: (0, pg_core_1.text)("first_name").notNull(),
-    lastName: (0, pg_core_1.text)("last_name").notNull(),
-    role: (0, pg_core_1.text)("role"), // Fonction du mécène
-    company: (0, pg_core_1.text)("company"), // Société
-    phone: (0, pg_core_1.text)("phone"), // Téléphone
-    email: (0, pg_core_1.text)("email").notNull().unique(), // Email unique pour éviter les doublons
-    notes: (0, pg_core_1.text)("notes"), // Informations complémentaires
-    status: (0, pg_core_1.text)("status").notNull().default("active"), // 'active' | 'proposed'
-    referrerId: (0, pg_core_1.varchar)("referrer_id").references(() => exports.members.id, { onDelete: "set null" }), // Prescripteur (membre qui a apporté ce mécène)
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-    createdBy: (0, pg_core_1.text)("created_by"), // Email admin qui a ajouté le mécène
-}, (table) => ({
-    emailIdx: (0, pg_core_1.index)("patrons_email_idx").on(table.email),
-    createdByIdx: (0, pg_core_1.index)("patrons_created_by_idx").on(table.createdBy),
-    createdAtIdx: (0, pg_core_1.index)("patrons_created_at_idx").on(table.createdAt),
-    referrerIdIdx: (0, pg_core_1.index)("patrons_referrer_id_idx").on(table.referrerId),
-}));
-// Patron donations table - Historique des dons
-exports.patronDonations = (0, pg_core_1.pgTable)("patron_donations", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    patronId: (0, pg_core_1.varchar)("patron_id").references(() => exports.patrons.id, { onDelete: "cascade" }).notNull(),
-    donatedAt: (0, pg_core_1.timestamp)("donated_at").notNull(), // Date du don
-    amount: (0, pg_core_1.integer)("amount").notNull(), // Montant en centimes
-    occasion: (0, pg_core_1.text)("occasion").notNull(), // À quelle occasion : événement, projet, etc.
-    recordedBy: (0, pg_core_1.text)("recorded_by").notNull(), // Email admin qui enregistre
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-}, (table) => ({
-    patronIdIdx: (0, pg_core_1.index)("patron_donations_patron_id_idx").on(table.patronId),
-    donatedAtIdx: (0, pg_core_1.index)("patron_donations_donated_at_idx").on(table.donatedAt.desc()),
-}));
-// Patron updates table - Actualités et contacts avec les mécènes
-exports.patronUpdates = (0, pg_core_1.pgTable)("patron_updates", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    patronId: (0, pg_core_1.varchar)("patron_id").references(() => exports.patrons.id, { onDelete: "cascade" }).notNull(),
-    type: (0, pg_core_1.text)("type").notNull(), // 'meeting', 'email', 'call', 'lunch', 'event'
-    subject: (0, pg_core_1.text)("subject").notNull(), // Titre/sujet de l'actualité
-    date: (0, pg_core_1.date)("date").notNull(), // Date du contact (format YYYY-MM-DD)
-    startTime: (0, pg_core_1.text)("start_time"), // Heure de début (format HH:MM, optionnel)
-    duration: (0, pg_core_1.integer)("duration"), // Durée en minutes (optionnel)
-    description: (0, pg_core_1.text)("description").notNull(), // Description détaillée
-    notes: (0, pg_core_1.text)("notes"), // Notes additionnelles (optionnel)
-    createdBy: (0, pg_core_1.text)("created_by").notNull(), // Email de l'admin qui a créé
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-}, (table) => ({
-    patronIdIdx: (0, pg_core_1.index)("patron_updates_patron_id_idx").on(table.patronId),
-    typeIdx: (0, pg_core_1.index)("patron_updates_type_idx").on(table.type),
-    dateIdx: (0, pg_core_1.index)("patron_updates_date_idx").on(table.date.desc()),
-    createdAtIdx: (0, pg_core_1.index)("patron_updates_created_at_idx").on(table.createdAt.desc()),
-}));
-// Idea patron proposals table - Propositions mécènes-idées
-exports.ideaPatronProposals = (0, pg_core_1.pgTable)("idea_patron_proposals", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    ideaId: (0, pg_core_1.varchar)("idea_id").references(() => exports.ideas.id, { onDelete: "cascade" }).notNull(),
-    patronId: (0, pg_core_1.varchar)("patron_id").references(() => exports.patrons.id, { onDelete: "cascade" }).notNull(),
-    proposedByAdminEmail: (0, pg_core_1.text)("proposed_by_admin_email").notNull(), // Email du membre qui propose
-    proposedAt: (0, pg_core_1.timestamp)("proposed_at").defaultNow().notNull(),
-    status: (0, pg_core_1.text)("status").default("proposed").notNull(), // 'proposed', 'contacted', 'declined', 'converted'
-    comments: (0, pg_core_1.text)("comments"), // Notes de suivi
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-}, (table) => ({
-    uniqueIdeaPatron: (0, pg_core_1.unique)().on(table.ideaId, table.patronId),
-    ideaIdIdx: (0, pg_core_1.index)("idea_patron_proposals_idea_id_idx").on(table.ideaId),
-    patronIdIdx: (0, pg_core_1.index)("idea_patron_proposals_patron_id_idx").on(table.patronId),
-    statusIdx: (0, pg_core_1.index)("idea_patron_proposals_status_idx").on(table.status),
-}));
-// CJD Roles definition - Rôles organisationnels CJD
-exports.CJD_ROLES = {
-    PRESIDENT: "president",
-    CO_PRESIDENT: "co_president",
-    TRESORIER: "tresorier",
-    SECRETAIRE: "secretaire",
-    RESPONSABLE_RECRUTEMENT: "responsable_recrutement",
-    RESPONSABLE_JEUNESSE: "responsable_jeunesse",
-    RESPONSABLE_PLENIERES: "responsable_plenieres",
-    RESPONSABLE_MECENES: "responsable_mecenes",
-};
-// Helper to get role label
-exports.CJD_ROLE_LABELS = {
-    [exports.CJD_ROLES.PRESIDENT]: "Président",
-    [exports.CJD_ROLES.CO_PRESIDENT]: "Co-Président",
-    [exports.CJD_ROLES.TRESORIER]: "Trésorier",
-    [exports.CJD_ROLES.SECRETAIRE]: "Secrétaire",
-    [exports.CJD_ROLES.RESPONSABLE_RECRUTEMENT]: "Responsable recrutement",
-    [exports.CJD_ROLES.RESPONSABLE_JEUNESSE]: "Responsable jeunesse",
-    [exports.CJD_ROLES.RESPONSABLE_PLENIERES]: "Responsable plénières",
-    [exports.CJD_ROLES.RESPONSABLE_MECENES]: "Responsable mécènes",
-};
-// Members table - CRM pour la gestion des membres
-exports.members = (0, pg_core_1.pgTable)("members", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    email: (0, pg_core_1.text)("email").notNull().unique(),
-    firstName: (0, pg_core_1.text)("first_name").notNull(),
-    lastName: (0, pg_core_1.text)("last_name").notNull(),
-    company: (0, pg_core_1.text)("company"),
-    phone: (0, pg_core_1.text)("phone"),
-    role: (0, pg_core_1.text)("role"), // Rôle professionnel/métier
-    cjdRole: (0, pg_core_1.text)("cjd_role"), // Rôle organisationnel CJD (président, trésorier, etc.)
-    notes: (0, pg_core_1.text)("notes"),
-    status: (0, pg_core_1.text)("status").default("active").notNull(),
-    proposedBy: (0, pg_core_1.text)("proposed_by"),
-    engagementScore: (0, pg_core_1.integer)("engagement_score").default(0).notNull(),
-    firstSeenAt: (0, pg_core_1.timestamp)("first_seen_at").notNull(),
-    lastActivityAt: (0, pg_core_1.timestamp)("last_activity_at").notNull(),
-    activityCount: (0, pg_core_1.integer)("activity_count").default(0).notNull(),
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-}, (table) => ({
-    emailIdx: (0, pg_core_1.index)("members_email_idx").on(table.email),
-    lastActivityAtIdx: (0, pg_core_1.index)("members_last_activity_at_idx").on(table.lastActivityAt.desc()),
-    engagementScoreIdx: (0, pg_core_1.index)("members_engagement_score_idx").on(table.engagementScore.desc()),
-    statusIdx: (0, pg_core_1.index)("members_status_idx").on(table.status),
-    cjdRoleIdx: (0, pg_core_1.index)("members_cjd_role_idx").on(table.cjdRole),
-}));
-// Member activities table - Journal d'activité des membres
-exports.memberActivities = (0, pg_core_1.pgTable)("member_activities", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    memberEmail: (0, pg_core_1.text)("member_email").references(() => exports.members.email, { onDelete: "cascade" }).notNull(),
-    activityType: (0, pg_core_1.text)("activity_type").notNull(), // 'idea_proposed', 'vote_cast', 'event_registered', 'event_unregistered', 'patron_suggested'
-    entityType: (0, pg_core_1.text)("entity_type").notNull(), // 'idea', 'vote', 'event', 'patron'
-    entityId: (0, pg_core_1.varchar)("entity_id"),
-    entityTitle: (0, pg_core_1.text)("entity_title"),
-    metadata: (0, pg_core_1.text)("metadata"),
-    scoreImpact: (0, pg_core_1.integer)("score_impact").notNull(),
-    occurredAt: (0, pg_core_1.timestamp)("occurred_at").defaultNow().notNull(),
-}, (table) => ({
-    memberEmailIdx: (0, pg_core_1.index)("member_activities_member_email_idx").on(table.memberEmail),
-    occurredAtIdx: (0, pg_core_1.index)("member_activities_occurred_at_idx").on(table.occurredAt.desc()),
-    activityTypeIdx: (0, pg_core_1.index)("member_activities_activity_type_idx").on(table.activityType),
-}));
-// Member subscriptions table - Historique des souscriptions des membres
-exports.memberSubscriptions = (0, pg_core_1.pgTable)("member_subscriptions", {
-    id: (0, pg_core_1.serial)("id").primaryKey(),
-    memberEmail: (0, pg_core_1.varchar)("member_email", { length: 255 }).notNull().references(() => exports.members.email),
-    amountInCents: (0, pg_core_1.integer)("amount_in_cents").notNull(), // Stocké en centimes comme pour les donations
-    startDate: (0, pg_core_1.date)("start_date").notNull(), // Format YYYY-MM-DD
-    endDate: (0, pg_core_1.date)("end_date").notNull(), // Format YYYY-MM-DD
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-}, (table) => ({
-    memberEmailIdx: (0, pg_core_1.index)("member_subscriptions_member_email_idx").on(table.memberEmail),
-    startDateIdx: (0, pg_core_1.index)("member_subscriptions_start_date_idx").on(table.startDate.desc()),
-}));
-// Member tags table - Tags personnalisables pour les membres
-exports.memberTags = (0, pg_core_1.pgTable)("member_tags", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    name: (0, pg_core_1.text)("name").notNull().unique(), // Nom du tag (ex: "VIP", "Ambassadeur")
-    color: (0, pg_core_1.text)("color").default("#3b82f6").notNull(), // Couleur du tag en hex
-    description: (0, pg_core_1.text)("description"), // Description optionnelle
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-}, (table) => ({
-    nameIdx: (0, pg_core_1.index)("member_tags_name_idx").on(table.name),
-}));
-// Member tag assignments table - Association membres <-> tags
-exports.memberTagAssignments = (0, pg_core_1.pgTable)("member_tag_assignments", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    memberEmail: (0, pg_core_1.text)("member_email").references(() => exports.members.email, { onDelete: "cascade" }).notNull(),
-    tagId: (0, pg_core_1.varchar)("tag_id").references(() => exports.memberTags.id, { onDelete: "cascade" }).notNull(),
-    assignedBy: (0, pg_core_1.text)("assigned_by"), // Email de l'admin qui a assigné le tag
-    assignedAt: (0, pg_core_1.timestamp)("assigned_at").defaultNow().notNull(),
-}, (table) => ({
-    memberTagIdx: (0, pg_core_1.index)("member_tag_assignments_member_tag_idx").on(table.memberEmail, table.tagId),
-    memberEmailIdx: (0, pg_core_1.index)("member_tag_assignments_member_email_idx").on(table.memberEmail),
-    tagIdIdx: (0, pg_core_1.index)("member_tag_assignments_tag_id_idx").on(table.tagId),
-}));
-// Member tasks table - Tâches de suivi pour les membres
-exports.memberTasks = (0, pg_core_1.pgTable)("member_tasks", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    memberEmail: (0, pg_core_1.text)("member_email").references(() => exports.members.email, { onDelete: "cascade" }).notNull(),
-    title: (0, pg_core_1.text)("title").notNull(), // Titre de la tâche
-    description: (0, pg_core_1.text)("description"), // Description détaillée
-    taskType: (0, pg_core_1.text)("task_type").notNull(), // 'call', 'email', 'meeting', 'custom'
-    status: (0, pg_core_1.text)("status").default("todo").notNull(), // 'todo', 'in_progress', 'completed', 'cancelled'
-    dueDate: (0, pg_core_1.timestamp)("due_date"), // Date d'échéance
-    completedAt: (0, pg_core_1.timestamp)("completed_at"), // Date de complétion
-    completedBy: (0, pg_core_1.text)("completed_by"), // Email de l'admin qui a complété
-    assignedTo: (0, pg_core_1.text)("assigned_to"), // Email de l'admin assigné à la tâche
-    createdBy: (0, pg_core_1.text)("created_by").notNull(), // Email de l'admin créateur
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-}, (table) => ({
-    memberEmailIdx: (0, pg_core_1.index)("member_tasks_member_email_idx").on(table.memberEmail),
-    statusIdx: (0, pg_core_1.index)("member_tasks_status_idx").on(table.status),
-    dueDateIdx: (0, pg_core_1.index)("member_tasks_due_date_idx").on(table.dueDate),
-    createdByIdx: (0, pg_core_1.index)("member_tasks_created_by_idx").on(table.createdBy),
-}));
-// Member relations table - Relations entre membres (parrainage, équipe)
-exports.memberRelations = (0, pg_core_1.pgTable)("member_relations", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    memberEmail: (0, pg_core_1.text)("member_email").references(() => exports.members.email, { onDelete: "cascade" }).notNull(),
-    relatedMemberEmail: (0, pg_core_1.text)("related_member_email").references(() => exports.members.email, { onDelete: "cascade" }).notNull(),
-    relationType: (0, pg_core_1.text)("relation_type").notNull(), // 'sponsor' (parrainage), 'team' (équipe), 'custom'
-    description: (0, pg_core_1.text)("description"), // Description de la relation
-    createdBy: (0, pg_core_1.text)("created_by"), // Email de l'admin créateur
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-}, (table) => ({
-    memberRelationIdx: (0, pg_core_1.index)("member_relations_member_relation_idx").on(table.memberEmail, table.relatedMemberEmail),
-    memberEmailIdx: (0, pg_core_1.index)("member_relations_member_email_idx").on(table.memberEmail),
-    relatedMemberEmailIdx: (0, pg_core_1.index)("member_relations_related_member_email_idx").on(table.relatedMemberEmail),
-    relationTypeIdx: (0, pg_core_1.index)("member_relations_relation_type_idx").on(table.relationType),
-}));
-// Event sponsorship levels definition
-exports.SPONSORSHIP_LEVEL = {
-    PLATINUM: "platinum",
-    GOLD: "gold",
-    SILVER: "silver",
-    BRONZE: "bronze",
-    PARTNER: "partner"
-};
-// Sponsorship level labels
-exports.SPONSORSHIP_LEVEL_LABELS = {
-    [exports.SPONSORSHIP_LEVEL.PLATINUM]: "Platine",
-    [exports.SPONSORSHIP_LEVEL.GOLD]: "Or",
-    [exports.SPONSORSHIP_LEVEL.SILVER]: "Argent",
-    [exports.SPONSORSHIP_LEVEL.BRONZE]: "Bronze",
-    [exports.SPONSORSHIP_LEVEL.PARTNER]: "Partenaire",
-};
-// Event sponsorship status definition
-exports.SPONSORSHIP_STATUS = {
-    PROPOSED: "proposed", // Proposé au mécène
-    CONFIRMED: "confirmed", // Confirmé par le mécène
-    COMPLETED: "completed", // Réalisé (événement passé)
-    CANCELLED: "cancelled" // Annulé
-};
-// Event sponsorships table - Sponsoring d'événements par les mécènes
-exports.eventSponsorships = (0, pg_core_1.pgTable)("event_sponsorships", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    eventId: (0, pg_core_1.varchar)("event_id").references(() => exports.events.id, { onDelete: "cascade" }).notNull(),
-    patronId: (0, pg_core_1.varchar)("patron_id").references(() => exports.patrons.id, { onDelete: "cascade" }).notNull(),
-    level: (0, pg_core_1.text)("level").notNull(), // platinum, gold, silver, bronze, partner
-    amount: (0, pg_core_1.integer)("amount").notNull(), // Montant en centimes
-    benefits: (0, pg_core_1.text)("benefits"), // Contreparties offertes (texte libre)
-    isPubliclyVisible: (0, pg_core_1.boolean)("is_publicly_visible").default(true).notNull(), // Affichage public
-    status: (0, pg_core_1.text)("status").default(exports.SPONSORSHIP_STATUS.PROPOSED).notNull(), // proposed, confirmed, completed, cancelled
-    logoUrl: (0, pg_core_1.text)("logo_url"), // URL du logo du sponsor (optionnel)
-    websiteUrl: (0, pg_core_1.text)("website_url"), // URL du site web du sponsor (optionnel)
-    proposedByAdminEmail: (0, pg_core_1.text)("proposed_by_admin_email").notNull(), // Email de l'admin qui propose
-    confirmedAt: (0, pg_core_1.timestamp)("confirmed_at"), // Date de confirmation
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
-}, (table) => ({
-    uniqueEventPatron: (0, pg_core_1.unique)().on(table.eventId, table.patronId),
-    eventIdIdx: (0, pg_core_1.index)("event_sponsorships_event_id_idx").on(table.eventId),
-    patronIdIdx: (0, pg_core_1.index)("event_sponsorships_patron_id_idx").on(table.patronId),
-    statusIdx: (0, pg_core_1.index)("event_sponsorships_status_idx").on(table.status),
-    levelIdx: (0, pg_core_1.index)("event_sponsorships_level_idx").on(table.level),
-}));
-// Tracking transversal - Suivi des membres potentiels et mécènes
-exports.trackingMetrics = (0, pg_core_1.pgTable)("tracking_metrics", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    entityType: (0, pg_core_1.text)("entity_type").notNull(), // 'member' | 'patron'
-    entityId: (0, pg_core_1.varchar)("entity_id").notNull(), // ID du membre ou mécène
-    entityEmail: (0, pg_core_1.text)("entity_email").notNull(), // Email pour faciliter les recherches
-    metricType: (0, pg_core_1.text)("metric_type").notNull(), // 'status_change', 'engagement', 'contact', 'conversion', 'activity'
-    metricValue: (0, pg_core_1.integer)("metric_value"), // Valeur numérique de la métrique
-    metricData: (0, pg_core_1.text)("metric_data"), // Données JSON supplémentaires
-    description: (0, pg_core_1.text)("description"), // Description de la métrique
-    recordedBy: (0, pg_core_1.text)("recorded_by"), // Email de l'admin qui a enregistré
-    recordedAt: (0, pg_core_1.timestamp)("recorded_at").defaultNow().notNull(),
-}, (table) => ({
-    entityTypeIdx: (0, pg_core_1.index)("tracking_metrics_entity_type_idx").on(table.entityType),
-    entityIdIdx: (0, pg_core_1.index)("tracking_metrics_entity_id_idx").on(table.entityId),
-    entityEmailIdx: (0, pg_core_1.index)("tracking_metrics_entity_email_idx").on(table.entityEmail),
-    metricTypeIdx: (0, pg_core_1.index)("tracking_metrics_metric_type_idx").on(table.metricType),
-    recordedAtIdx: (0, pg_core_1.index)("tracking_metrics_recorded_at_idx").on(table.recordedAt.desc()),
-}));
-// Tracking alerts - Alertes pour le suivi
-exports.trackingAlerts = (0, pg_core_1.pgTable)("tracking_alerts", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    entityType: (0, pg_core_1.text)("entity_type").notNull(), // 'member' | 'patron'
-    entityId: (0, pg_core_1.varchar)("entity_id").notNull(),
-    entityEmail: (0, pg_core_1.text)("entity_email").notNull(),
-    alertType: (0, pg_core_1.text)("alert_type").notNull(), // 'stale', 'high_potential', 'needs_followup', 'conversion_opportunity'
-    severity: (0, pg_core_1.text)("severity").notNull().default("medium"), // 'low', 'medium', 'high', 'critical'
-    title: (0, pg_core_1.text)("title").notNull(),
-    message: (0, pg_core_1.text)("message").notNull(),
-    isRead: (0, pg_core_1.boolean)("is_read").default(false).notNull(),
-    isResolved: (0, pg_core_1.boolean)("is_resolved").default(false).notNull(),
-    resolvedBy: (0, pg_core_1.text)("resolved_by"), // Email de l'admin qui a résolu
-    resolvedAt: (0, pg_core_1.timestamp)("resolved_at"),
-    createdBy: (0, pg_core_1.text)("created_by"), // Email de l'admin qui a créé (ou système)
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    expiresAt: (0, pg_core_1.timestamp)("expires_at"), // Date d'expiration de l'alerte
-}, (table) => ({
-    entityTypeIdx: (0, pg_core_1.index)("tracking_alerts_entity_type_idx").on(table.entityType),
-    entityIdIdx: (0, pg_core_1.index)("tracking_alerts_entity_id_idx").on(table.entityId),
-    entityEmailIdx: (0, pg_core_1.index)("tracking_alerts_entity_email_idx").on(table.entityEmail),
-    alertTypeIdx: (0, pg_core_1.index)("tracking_alerts_alert_type_idx").on(table.alertType),
-    severityIdx: (0, pg_core_1.index)("tracking_alerts_severity_idx").on(table.severity),
-    isReadIdx: (0, pg_core_1.index)("tracking_alerts_is_read_idx").on(table.isRead),
-    isResolvedIdx: (0, pg_core_1.index)("tracking_alerts_is_resolved_idx").on(table.isResolved),
-    createdAtIdx: (0, pg_core_1.index)("tracking_alerts_created_at_idx").on(table.createdAt.desc()),
-}));
-// Branding configuration table - For customizable branding settings
-exports.brandingConfig = (0, pg_core_1.pgTable)("branding_config", {
-    id: (0, pg_core_1.serial)("id").primaryKey(),
-    config: (0, pg_core_1.text)("config").notNull(),
-    updatedBy: (0, pg_core_1.text)("updated_by"),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var schema_exports = {};
+__export(schema_exports, {
+  ADMIN_ROLES: () => ADMIN_ROLES,
+  ADMIN_STATUS: () => ADMIN_STATUS,
+  CJD_ROLES: () => CJD_ROLES,
+  CJD_ROLE_LABELS: () => CJD_ROLE_LABELS,
+  DatabaseError: () => DatabaseError,
+  DuplicateError: () => DuplicateError,
+  EVENT_STATUS: () => EVENT_STATUS,
+  FEDERATION_STATUS: () => FEDERATION_STATUS,
+  FEDERATION_SYNC_STATUS: () => FEDERATION_SYNC_STATUS,
+  FEDERATION_VISIBILITY: () => FEDERATION_VISIBILITY,
+  FINANCIAL_CATEGORY_TYPE: () => FINANCIAL_CATEGORY_TYPE,
+  FINANCIAL_PERIOD: () => FINANCIAL_PERIOD,
+  FORECAST_BASED_ON: () => FORECAST_BASED_ON,
+  FORECAST_CONFIDENCE: () => FORECAST_CONFIDENCE,
+  IDEA_STATUS: () => IDEA_STATUS,
+  LOAN_STATUS: () => LOAN_STATUS,
+  MEMBER_GROUP_TYPES: () => MEMBER_GROUP_TYPES,
+  MEMBER_GROUP_TYPE_LABELS: () => MEMBER_GROUP_TYPE_LABELS,
+  MEMBER_STATUS: () => MEMBER_STATUS,
+  MEMBER_STATUS_LABELS: () => MEMBER_STATUS_LABELS,
+  NotFoundError: () => NotFoundError,
+  ORGANIZATION_RELATION_TYPE: () => ORGANIZATION_RELATION_TYPE,
+  ORGANIZATION_TYPE: () => ORGANIZATION_TYPE,
+  PAYMENT_METHODS: () => PAYMENT_METHODS,
+  PROSPECTION_STAGES: () => PROSPECTION_STAGES,
+  PROSPECTION_STAGE_LABELS: () => PROSPECTION_STAGE_LABELS,
+  SONCAS_PROFILES: () => SONCAS_PROFILES,
+  SPONSORSHIP_LEVEL: () => SPONSORSHIP_LEVEL,
+  SPONSORSHIP_LEVEL_LABELS: () => SPONSORSHIP_LEVEL_LABELS,
+  SPONSORSHIP_STATUS: () => SPONSORSHIP_STATUS,
+  SUBSCRIPTION_STATUS: () => SUBSCRIPTION_STATUS,
+  SUBSCRIPTION_TYPES: () => SUBSCRIPTION_TYPES,
+  SURVEY_FORM_STATUS: () => SURVEY_FORM_STATUS,
+  SURVEY_QUESTION_TYPE: () => SURVEY_QUESTION_TYPE,
+  SYNDICATION_DIRECTION: () => SYNDICATION_DIRECTION,
+  SYNDICATION_STATUS: () => SYNDICATION_STATUS,
+  ValidationError: () => ValidationError,
+  adminUsers: () => adminUsers,
+  admins: () => admins,
+  assignMemberSchema: () => assignMemberSchema,
+  assignMemberTagSchema: () => assignMemberTagSchema,
+  assignSubscriptionSchema: () => assignSubscriptionSchema,
+  brandingConfig: () => brandingConfig,
+  businessAuditLogs: () => businessAuditLogs,
+  createEventWithInscriptionsSchema: () => createEventWithInscriptionsSchema,
+  developmentRequests: () => developmentRequests,
+  duplicateMemberGroupSchema: () => duplicateMemberGroupSchema,
+  emailConfig: () => emailConfig,
+  eventRegistrations: () => eventRegistrations,
+  eventSponsorships: () => eventSponsorships,
+  eventSponsorshipsRelations: () => eventSponsorshipsRelations,
+  eventSyndications: () => eventSyndications,
+  eventSyndicationsRelations: () => eventSyndicationsRelations,
+  events: () => events,
+  eventsRelations: () => eventsRelations,
+  featureConfig: () => featureConfig,
+  financialBudgets: () => financialBudgets,
+  financialBudgetsRelations: () => financialBudgetsRelations,
+  financialCategories: () => financialCategories,
+  financialCategoriesRelations: () => financialCategoriesRelations,
+  financialExpenses: () => financialExpenses,
+  financialExpensesRelations: () => financialExpensesRelations,
+  financialForecasts: () => financialForecasts,
+  financialForecastsRelations: () => financialForecastsRelations,
+  financialRevenues: () => financialRevenues,
+  financialRevenuesRelations: () => financialRevenuesRelations,
+  frontendErrorSchema: () => frontendErrorSchema,
+  getRoleDisplayName: () => getRoleDisplayName,
+  getRolePermissions: () => getRolePermissions,
+  hasPermission: () => hasPermission,
+  ideaPatronProposals: () => ideaPatronProposals,
+  ideaPatronProposalsRelations: () => ideaPatronProposalsRelations,
+  ideas: () => ideas,
+  ideasRelations: () => ideasRelations,
+  initialInscriptionSchema: () => initialInscriptionSchema,
+  inscriptions: () => inscriptions,
+  inscriptionsRelations: () => inscriptionsRelations,
+  insertAdminSchema: () => insertAdminSchema,
+  insertAdminUserSchema: () => insertAdminUserSchema,
+  insertBrandingConfigSchema: () => insertBrandingConfigSchema,
+  insertBusinessAuditLogSchema: () => insertBusinessAuditLogSchema,
+  insertDevelopmentRequestSchema: () => insertDevelopmentRequestSchema,
+  insertEmailConfigSchema: () => insertEmailConfigSchema,
+  insertEventRegistrationSchema: () => insertEventRegistrationSchema,
+  insertEventSchema: () => insertEventSchema,
+  insertEventSponsorshipSchema: () => insertEventSponsorshipSchema,
+  insertEventSyndicationSchema: () => insertEventSyndicationSchema,
+  insertFeatureConfigSchema: () => insertFeatureConfigSchema,
+  insertFinancialBudgetSchema: () => insertFinancialBudgetSchema,
+  insertFinancialCategorySchema: () => insertFinancialCategorySchema,
+  insertFinancialExpenseSchema: () => insertFinancialExpenseSchema,
+  insertFinancialForecastSchema: () => insertFinancialForecastSchema,
+  insertFinancialRevenueSchema: () => insertFinancialRevenueSchema,
+  insertIdeaPatronProposalSchema: () => insertIdeaPatronProposalSchema,
+  insertIdeaSchema: () => insertIdeaSchema,
+  insertInscriptionSchema: () => insertInscriptionSchema,
+  insertLoanItemSchema: () => insertLoanItemSchema,
+  insertMemberActivitySchema: () => insertMemberActivitySchema,
+  insertMemberContactSchema: () => insertMemberContactSchema,
+  insertMemberGroupMembershipSchema: () => insertMemberGroupMembershipSchema,
+  insertMemberGroupSchema: () => insertMemberGroupSchema,
+  insertMemberRelationSchema: () => insertMemberRelationSchema,
+  insertMemberSchema: () => insertMemberSchema,
+  insertMemberStatusSchema: () => insertMemberStatusSchema,
+  insertMemberSubscriptionSchema: () => insertMemberSubscriptionSchema,
+  insertMemberTagSchema: () => insertMemberTagSchema,
+  insertMemberTaskSchema: () => insertMemberTaskSchema,
+  insertNetworkConnectionSchema: () => insertNetworkConnectionSchema,
+  insertNotificationSchema: () => insertNotificationSchema,
+  insertOrganizationNetworkSchema: () => insertOrganizationNetworkSchema,
+  insertOrganizationRelationSchema: () => insertOrganizationRelationSchema,
+  insertOrganizationSchema: () => insertOrganizationSchema,
+  insertPatronContactSchema: () => insertPatronContactSchema,
+  insertPatronDonationSchema: () => insertPatronDonationSchema,
+  insertPatronSchema: () => insertPatronSchema,
+  insertPatronUpdateSchema: () => insertPatronUpdateSchema,
+  insertSubscriptionTypeSchema: () => insertSubscriptionTypeSchema,
+  insertSurveyFormSchema: () => insertSurveyFormSchema,
+  insertSurveyFormSyndicationSchema: () => insertSurveyFormSyndicationSchema,
+  insertToolCategorySchema: () => insertToolCategorySchema,
+  insertToolSchema: () => insertToolSchema,
+  insertTrackingAlertSchema: () => insertTrackingAlertSchema,
+  insertTrackingMetricSchema: () => insertTrackingMetricSchema,
+  insertUnsubscriptionSchema: () => insertUnsubscriptionSchema,
+  insertUserSchema: () => insertUserSchema,
+  insertVoteSchema: () => insertVoteSchema,
+  loanItems: () => loanItems,
+  memberActivities: () => memberActivities,
+  memberActivitiesRelations: () => memberActivitiesRelations,
+  memberContacts: () => memberContacts,
+  memberContactsRelations: () => memberContactsRelations,
+  memberGroupMemberships: () => memberGroupMemberships,
+  memberGroupMembershipsRelations: () => memberGroupMembershipsRelations,
+  memberGroups: () => memberGroups,
+  memberGroupsRelations: () => memberGroupsRelations,
+  memberOwnershipHistory: () => memberOwnershipHistory,
+  memberRelations: () => memberRelations,
+  memberStatuses: () => memberStatuses,
+  memberSubscriptions: () => memberSubscriptions,
+  memberSubscriptionsRelations: () => memberSubscriptionsRelations,
+  memberTagAssignments: () => memberTagAssignments,
+  memberTags: () => memberTags,
+  memberTasks: () => memberTasks,
+  members: () => members,
+  membersRelations: () => membersRelations,
+  networkConnections: () => networkConnections,
+  notificationMetadataSchema: () => notificationMetadataSchema,
+  notifications: () => notifications,
+  organizationNetworks: () => organizationNetworks,
+  organizationNetworksRelations: () => organizationNetworksRelations,
+  organizationRelations: () => organizationRelations,
+  organizationRelationsRelations: () => organizationRelationsRelations,
+  organizations: () => organizations,
+  organizationsRelations: () => organizationsRelations,
+  passwordResetTokens: () => passwordResetTokens,
+  patronContacts: () => patronContacts,
+  patronDonations: () => patronDonations,
+  patronDonationsRelations: () => patronDonationsRelations,
+  patronUpdates: () => patronUpdates,
+  patronUpdatesRelations: () => patronUpdatesRelations,
+  patrons: () => patrons,
+  patronsRelations: () => patronsRelations,
+  proposeMemberSchema: () => proposeMemberSchema,
+  pushSubscriptions: () => pushSubscriptions,
+  renewSubscriptionSchema: () => renewSubscriptionSchema,
+  statusCheckSchema: () => statusCheckSchema,
+  statusResponseSchema: () => statusResponseSchema,
+  submitSurveyResponseSchema: () => submitSurveyResponseSchema,
+  subscriptionTypeSchema: () => subscriptionTypeSchema,
+  subscriptionTypes: () => subscriptionTypes,
+  subscriptionTypesRelations: () => subscriptionTypesRelations,
+  surveyFormResponseSummaries: () => surveyFormResponseSummaries,
+  surveyFormSyndications: () => surveyFormSyndications,
+  surveyForms: () => surveyForms,
+  surveyQuestionOptionSchema: () => surveyQuestionOptionSchema,
+  surveyQuestionSchema: () => surveyQuestionSchema,
+  surveyQuestions: () => surveyQuestions,
+  surveyResponses: () => surveyResponses,
+  toolCategories: () => toolCategories,
+  toolCategoriesRelations: () => toolCategoriesRelations,
+  tools: () => tools,
+  toolsRelations: () => toolsRelations,
+  trackingAlerts: () => trackingAlerts,
+  trackingMetrics: () => trackingMetrics,
+  unsubscriptions: () => unsubscriptions,
+  unsubscriptionsRelations: () => unsubscriptionsRelations,
+  updateAdminInfoSchema: () => updateAdminInfoSchema,
+  updateAdminPasswordSchema: () => updateAdminPasswordSchema,
+  updateAdminSchema: () => updateAdminSchema,
+  updateDevelopmentRequestSchema: () => updateDevelopmentRequestSchema,
+  updateDevelopmentRequestStatusSchema: () => updateDevelopmentRequestStatusSchema,
+  updateEventSchema: () => updateEventSchema,
+  updateEventSponsorshipSchema: () => updateEventSponsorshipSchema,
+  updateEventStatusSchema: () => updateEventStatusSchema,
+  updateEventSyndicationSchema: () => updateEventSyndicationSchema,
+  updateFinancialBudgetSchema: () => updateFinancialBudgetSchema,
+  updateFinancialCategorySchema: () => updateFinancialCategorySchema,
+  updateFinancialExpenseSchema: () => updateFinancialExpenseSchema,
+  updateFinancialForecastSchema: () => updateFinancialForecastSchema,
+  updateFinancialRevenueSchema: () => updateFinancialRevenueSchema,
+  updateIdeaPatronProposalSchema: () => updateIdeaPatronProposalSchema,
+  updateIdeaSchema: () => updateIdeaSchema,
+  updateIdeaStatusSchema: () => updateIdeaStatusSchema,
+  updateLoanItemSchema: () => updateLoanItemSchema,
+  updateLoanItemStatusSchema: () => updateLoanItemStatusSchema,
+  updateMemberContactSchema: () => updateMemberContactSchema,
+  updateMemberGroupMembershipSchema: () => updateMemberGroupMembershipSchema,
+  updateMemberGroupSchema: () => updateMemberGroupSchema,
+  updateMemberSchema: () => updateMemberSchema,
+  updateMemberStatusSchema: () => updateMemberStatusSchema,
+  updateMemberSubscriptionSchema: () => updateMemberSubscriptionSchema,
+  updateMemberTagSchema: () => updateMemberTagSchema,
+  updateMemberTaskSchema: () => updateMemberTaskSchema,
+  updateNotificationSchema: () => updateNotificationSchema,
+  updateOrganizationNetworkSchema: () => updateOrganizationNetworkSchema,
+  updateOrganizationRelationSchema: () => updateOrganizationRelationSchema,
+  updateOrganizationSchema: () => updateOrganizationSchema,
+  updatePatronContactSchema: () => updatePatronContactSchema,
+  updatePatronSchema: () => updatePatronSchema,
+  updatePatronUpdateSchema: () => updatePatronUpdateSchema,
+  updateSubscriptionTypeSchema: () => updateSubscriptionTypeSchema,
+  updateSurveyFormSchema: () => updateSurveyFormSchema,
+  updateSurveyFormSyndicationSchema: () => updateSurveyFormSyndicationSchema,
+  updateToolCategorySchema: () => updateToolCategorySchema,
+  updateToolSchema: () => updateToolSchema,
+  updateTrackingAlertSchema: () => updateTrackingAlertSchema,
+  users: () => users,
+  votes: () => votes,
+  votesRelations: () => votesRelations
 });
-// Feature configuration table - For enabling/disabling features
-exports.featureConfig = (0, pg_core_1.pgTable)("feature_config", {
-    id: (0, pg_core_1.serial)("id").primaryKey(),
-    featureKey: (0, pg_core_1.text)("feature_key").notNull().unique(),
-    enabled: (0, pg_core_1.boolean)("enabled").default(true).notNull(),
-    updatedBy: (0, pg_core_1.text)("updated_by"),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+module.exports = __toCommonJS(schema_exports);
+var import_drizzle_orm = require("drizzle-orm");
+var import_pg_core = require("drizzle-orm/pg-core");
+var import_drizzle_zod = require("drizzle-zod");
+var import_zod = require("zod");
+const ADMIN_ROLES = {
+  SUPER_ADMIN: "super_admin",
+  IDEAS_READER: "ideas_reader",
+  IDEAS_MANAGER: "ideas_manager",
+  EVENTS_READER: "events_reader",
+  EVENTS_MANAGER: "events_manager"
+};
+const ADMIN_STATUS = {
+  PENDING: "pending",
+  // En attente de validation
+  ACTIVE: "active",
+  // Compte validé et actif
+  INACTIVE: "inactive"
+  // Compte désactivé
+};
+const admins = (0, import_pg_core.pgTable)("admins", {
+  email: (0, import_pg_core.text)("email").primaryKey(),
+  firstName: (0, import_pg_core.text)("first_name").default("Admin").notNull(),
+  lastName: (0, import_pg_core.text)("last_name").default("User").notNull(),
+  password: (0, import_pg_core.text)("password"),
+  addedBy: (0, import_pg_core.text)("added_by"),
+  role: (0, import_pg_core.text)("role").default(ADMIN_ROLES.IDEAS_READER).notNull(),
+  // Rôle par défaut : consultation des idées
+  status: (0, import_pg_core.text)("status").default(ADMIN_STATUS.PENDING).notNull(),
+  // Statut par défaut : en attente
+  isActive: (0, import_pg_core.boolean)("is_active").default(true).notNull(),
+  // Permet de désactiver un admin sans le supprimer
+  notificationEmail: (0, import_pg_core.text)("notification_email"),
+  // Email réel pour les notifications (rappels tâches, etc.)
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
 }, (table) => ({
-    featureKeyIdx: (0, pg_core_1.index)("feature_config_key_idx").on(table.featureKey),
+  roleIdx: (0, import_pg_core.index)("admins_role_idx").on(table.role),
+  statusIdx: (0, import_pg_core.index)("admins_status_idx").on(table.status),
+  activeIdx: (0, import_pg_core.index)("admins_active_idx").on(table.isActive)
 }));
-// Email configuration table - For SMTP settings
-exports.emailConfig = (0, pg_core_1.pgTable)("email_config", {
-    id: (0, pg_core_1.serial)("id").primaryKey(),
-    provider: (0, pg_core_1.varchar)("provider", { length: 50 }).notNull().default('ovh'), // ovh, gmail, smtp, etc.
-    host: (0, pg_core_1.varchar)("host", { length: 255 }).notNull(),
-    port: (0, pg_core_1.integer)("port").notNull().default(465),
-    secure: (0, pg_core_1.boolean)("secure").notNull().default(true),
-    fromName: (0, pg_core_1.varchar)("from_name", { length: 255 }),
-    fromEmail: (0, pg_core_1.varchar)("from_email", { length: 255 }).notNull(),
-    updatedBy: (0, pg_core_1.text)("updated_by"),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+const passwordResetTokens = (0, import_pg_core.pgTable)("password_reset_tokens", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  email: (0, import_pg_core.text)("email").notNull().references(() => admins.email, { onDelete: "cascade" }),
+  token: (0, import_pg_core.text)("token").notNull().unique(),
+  expiresAt: (0, import_pg_core.timestamp)("expires_at").notNull(),
+  usedAt: (0, import_pg_core.timestamp)("used_at"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  emailIdx: (0, import_pg_core.index)("password_reset_tokens_email_idx").on(table.email),
+  tokenIdx: (0, import_pg_core.index)("password_reset_tokens_token_idx").on(table.token),
+  expiresAtIdx: (0, import_pg_core.index)("password_reset_tokens_expires_at_idx").on(table.expiresAt)
+}));
+const IDEA_STATUS = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  UNDER_REVIEW: "under_review",
+  POSTPONED: "postponed",
+  COMPLETED: "completed"
+};
+const EVENT_STATUS = {
+  DRAFT: "draft",
+  PUBLISHED: "published",
+  CANCELLED: "cancelled",
+  POSTPONED: "postponed",
+  COMPLETED: "completed"
+};
+const LOAN_STATUS = {
+  PENDING: "pending",
+  AVAILABLE: "available",
+  BORROWED: "borrowed",
+  UNAVAILABLE: "unavailable"
+};
+const SURVEY_FORM_STATUS = {
+  DRAFT: "draft",
+  PUBLISHED: "published",
+  CLOSED: "closed"
+};
+const SURVEY_QUESTION_TYPE = {
+  TEXT: "text",
+  TEXTAREA: "textarea",
+  EMAIL: "email",
+  PHONE: "phone",
+  NUMBER: "number",
+  DATE: "date",
+  SELECT: "select",
+  RADIO: "radio",
+  MULTISELECT: "multiselect",
+  CHECKBOX: "checkbox",
+  RATING: "rating"
+};
+const ideas = (0, import_pg_core.pgTable)("ideas", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  title: (0, import_pg_core.text)("title").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  proposedBy: (0, import_pg_core.text)("proposed_by").notNull(),
+  proposedByEmail: (0, import_pg_core.text)("proposed_by_email").notNull(),
+  status: (0, import_pg_core.text)("status").default(IDEA_STATUS.PENDING).notNull(),
+  // pending, approved, rejected, under_review, postponed, completed
+  featured: (0, import_pg_core.boolean)("featured").default(false).notNull(),
+  // Mise en avant de l'idée
+  deadline: (0, import_pg_core.timestamp)("deadline"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull(),
+  updatedBy: (0, import_pg_core.text)("updated_by")
+}, (table) => ({
+  statusIdx: (0, import_pg_core.index)("ideas_status_idx").on(table.status),
+  emailIdx: (0, import_pg_core.index)("ideas_email_idx").on(table.proposedByEmail),
+  featuredIdx: (0, import_pg_core.index)("ideas_featured_idx").on(table.featured),
+  createdAtIdx: (0, import_pg_core.index)("ideas_created_at_idx").on(table.createdAt)
+}));
+const votes = (0, import_pg_core.pgTable)("votes", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  ideaId: (0, import_pg_core.varchar)("idea_id").references(() => ideas.id, { onDelete: "cascade" }).notNull(),
+  voterName: (0, import_pg_core.text)("voter_name").notNull(),
+  voterEmail: (0, import_pg_core.text)("voter_email").notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  // Contrainte unique: un email ne peut voter qu'une seule fois par idée
+  uniqueVotePerEmail: (0, import_pg_core.unique)().on(table.ideaId, table.voterEmail),
+  ideaIdIdx: (0, import_pg_core.index)("votes_idea_id_idx").on(table.ideaId)
+}));
+const ORGANIZATION_TYPE = {
+  NETWORK: "network",
+  REGION: "region",
+  SECTION: "section",
+  PARTNER: "partner",
+  EXTERNAL: "external"
+};
+const ORGANIZATION_RELATION_TYPE = {
+  REGION_SECTION: "region_section",
+  PARTNER: "partner",
+  SHARED_PROJECT: "shared_project"
+};
+const FEDERATION_VISIBILITY = {
+  LOCAL: "local",
+  PARENT_REGION: "parent_region",
+  CHILD_SECTIONS: "child_sections",
+  NETWORK: "network",
+  SELECTED_ORGANIZATIONS: "selected_organizations"
+};
+const FEDERATION_STATUS = {
+  LOCAL_ONLY: "local_only",
+  PROPOSED_TO_REGION: "proposed_to_region",
+  ACCEPTED_BY_REGION: "accepted_by_region",
+  PUBLISHED_TO_SECTIONS: "published_to_sections",
+  IMPORTED: "imported"
+};
+const SYNDICATION_DIRECTION = {
+  UPWARD: "upward",
+  DOWNWARD: "downward",
+  LATERAL: "lateral"
+};
+const SYNDICATION_STATUS = {
+  DRAFT: "draft",
+  PROPOSED: "proposed",
+  ACCEPTED: "accepted",
+  REJECTED: "rejected",
+  REVOKED: "revoked",
+  AUTO_ACCEPTED: "auto_accepted"
+};
+const FEDERATION_SYNC_STATUS = {
+  LOCAL: "local",
+  PENDING: "pending",
+  SYNCED: "synced",
+  FAILED: "failed",
+  RECEIVED: "received",
+  IDLE: "idle"
+};
+const organizationNetworks = (0, import_pg_core.pgTable)("organization_networks", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  slug: (0, import_pg_core.text)("slug").notNull().unique(),
+  name: (0, import_pg_core.text)("name").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  isActive: (0, import_pg_core.boolean)("is_active").default(true).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  slugIdx: (0, import_pg_core.index)("organization_networks_slug_idx").on(table.slug),
+  activeIdx: (0, import_pg_core.index)("organization_networks_active_idx").on(table.isActive)
+}));
+const organizations = (0, import_pg_core.pgTable)("organizations", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  networkId: (0, import_pg_core.varchar)("network_id").references(() => organizationNetworks.id, { onDelete: "set null" }),
+  parentOrganizationId: (0, import_pg_core.varchar)("parent_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  slug: (0, import_pg_core.text)("slug").notNull().unique(),
+  name: (0, import_pg_core.text)("name").notNull(),
+  type: (0, import_pg_core.text)("type").default(ORGANIZATION_TYPE.SECTION).notNull(),
+  domain: (0, import_pg_core.text)("domain"),
+  instanceUrl: (0, import_pg_core.text)("instance_url"),
+  brandingConfigId: (0, import_pg_core.integer)("branding_config_id"),
+  isActive: (0, import_pg_core.boolean)("is_active").default(true).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  slugIdx: (0, import_pg_core.index)("organizations_slug_idx").on(table.slug),
+  networkIdx: (0, import_pg_core.index)("organizations_network_idx").on(table.networkId),
+  parentIdx: (0, import_pg_core.index)("organizations_parent_idx").on(table.parentOrganizationId),
+  typeIdx: (0, import_pg_core.index)("organizations_type_idx").on(table.type),
+  domainIdx: (0, import_pg_core.index)("organizations_domain_idx").on(table.domain),
+  activeIdx: (0, import_pg_core.index)("organizations_active_idx").on(table.isActive)
+}));
+const organizationRelations = (0, import_pg_core.pgTable)("organization_relations", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  fromOrganizationId: (0, import_pg_core.varchar)("from_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  toOrganizationId: (0, import_pg_core.varchar)("to_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  relationType: (0, import_pg_core.text)("relation_type").default(ORGANIZATION_RELATION_TYPE.REGION_SECTION).notNull(),
+  status: (0, import_pg_core.text)("status").default("active").notNull(),
+  permissions: (0, import_pg_core.jsonb)("permissions").$type().default({}).notNull(),
+  // federationToken is kept only for legacy outbound sync until explicit rotation.
+  // New rotations store only hash/fingerprint and return the raw token once.
+  federationToken: (0, import_pg_core.text)("federation_token"),
+  federationTokenHash: (0, import_pg_core.text)("federation_token_hash"),
+  federationTokenFingerprint: (0, import_pg_core.text)("federation_token_fingerprint"),
+  federationTokenRotatedAt: (0, import_pg_core.timestamp)("federation_token_rotated_at"),
+  syncEnabled: (0, import_pg_core.boolean)("sync_enabled").default(true).notNull(),
+  lastSyncAt: (0, import_pg_core.timestamp)("last_sync_at"),
+  syncStatus: (0, import_pg_core.text)("sync_status").default(FEDERATION_SYNC_STATUS.IDLE).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  relationUnique: (0, import_pg_core.unique)("organization_relations_unique").on(table.fromOrganizationId, table.toOrganizationId, table.relationType),
+  fromIdx: (0, import_pg_core.index)("organization_relations_from_idx").on(table.fromOrganizationId),
+  toIdx: (0, import_pg_core.index)("organization_relations_to_idx").on(table.toOrganizationId),
+  typeIdx: (0, import_pg_core.index)("organization_relations_type_idx").on(table.relationType),
+  statusIdx: (0, import_pg_core.index)("organization_relations_status_idx").on(table.status),
+  syncEnabledIdx: (0, import_pg_core.index)("organization_relations_sync_enabled_idx").on(table.syncEnabled),
+  syncStatusIdx: (0, import_pg_core.index)("organization_relations_sync_status_idx").on(table.syncStatus),
+  tokenHashIdx: (0, import_pg_core.index)("organization_relations_token_hash_idx").on(table.federationTokenHash)
+}));
+const businessAuditLogs = (0, import_pg_core.pgTable)("business_audit_logs", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  actorEmail: (0, import_pg_core.text)("actor_email"),
+  action: (0, import_pg_core.text)("action").notNull(),
+  entityType: (0, import_pg_core.text)("entity_type").notNull(),
+  entityId: (0, import_pg_core.text)("entity_id"),
+  organizationId: (0, import_pg_core.varchar)("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  relationId: (0, import_pg_core.varchar)("relation_id").references(() => organizationRelations.id, { onDelete: "set null" }),
+  metadata: (0, import_pg_core.jsonb)("metadata").$type().default({}).notNull(),
+  ipAddress: (0, import_pg_core.text)("ip_address"),
+  userAgent: (0, import_pg_core.text)("user_agent"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  actionIdx: (0, import_pg_core.index)("business_audit_logs_action_idx").on(table.action),
+  entityIdx: (0, import_pg_core.index)("business_audit_logs_entity_idx").on(table.entityType, table.entityId),
+  actorIdx: (0, import_pg_core.index)("business_audit_logs_actor_idx").on(table.actorEmail),
+  organizationIdx: (0, import_pg_core.index)("business_audit_logs_organization_idx").on(table.organizationId),
+  relationIdx: (0, import_pg_core.index)("business_audit_logs_relation_idx").on(table.relationId),
+  createdAtIdx: (0, import_pg_core.index)("business_audit_logs_created_at_idx").on(table.createdAt),
+  metadataIdx: (0, import_pg_core.index)("business_audit_logs_metadata_gin_idx").using("gin", table.metadata)
+}));
+const events = (0, import_pg_core.pgTable)("events", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  title: (0, import_pg_core.text)("title").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  date: (0, import_pg_core.timestamp)("date").notNull(),
+  location: (0, import_pg_core.text)("location"),
+  // Lieu de l'événement
+  maxParticipants: (0, import_pg_core.integer)("max_participants"),
+  // Limite de participants (optionnel)
+  helloAssoLink: (0, import_pg_core.text)("hello_asso_link"),
+  enableExternalRedirect: (0, import_pg_core.boolean)("enable_external_redirect").default(false).notNull(),
+  // Active la redirection externe après inscription
+  externalRedirectUrl: (0, import_pg_core.text)("external_redirect_url"),
+  // URL de redirection externe (HelloAsso, etc.)
+  showInscriptionsCount: (0, import_pg_core.boolean)("show_inscriptions_count").default(true).notNull(),
+  // Afficher le nombre d'inscrits
+  showAvailableSeats: (0, import_pg_core.boolean)("show_available_seats").default(true).notNull(),
+  // Afficher le nombre de places disponibles
+  allowUnsubscribe: (0, import_pg_core.boolean)("allow_unsubscribe").default(false).notNull(),
+  // Permet la désinscription (utile pour les plénières)
+  redUnsubscribeButton: (0, import_pg_core.boolean)("red_unsubscribe_button").default(false).notNull(),
+  // Bouton de désinscription rouge (pour les plénières)
+  buttonMode: (0, import_pg_core.text)("button_mode").default("subscribe").notNull(),
+  // "subscribe", "unsubscribe", "both", ou "custom"
+  customButtonText: (0, import_pg_core.text)("custom_button_text"),
+  // Texte personnalisé pour le bouton quand buttonMode est "custom"
+  organizationId: (0, import_pg_core.varchar)("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  originOrganizationId: (0, import_pg_core.varchar)("origin_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceEventId: (0, import_pg_core.varchar)("source_event_id"),
+  sourceInstanceUrl: (0, import_pg_core.text)("source_instance_url"),
+  federationVisibility: (0, import_pg_core.text)("federation_visibility").default(FEDERATION_VISIBILITY.LOCAL).notNull(),
+  federationStatus: (0, import_pg_core.text)("federation_status").default(FEDERATION_STATUS.LOCAL_ONLY).notNull(),
+  isFederatedCopy: (0, import_pg_core.boolean)("is_federated_copy").default(false).notNull(),
+  canonicalEventId: (0, import_pg_core.varchar)("canonical_event_id"),
+  status: (0, import_pg_core.text)("status").default(EVENT_STATUS.PUBLISHED).notNull(),
+  // draft, published, cancelled, postponed, completed
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull(),
+  updatedBy: (0, import_pg_core.text)("updated_by")
+}, (table) => ({
+  statusIdx: (0, import_pg_core.index)("events_status_idx").on(table.status),
+  dateIdx: (0, import_pg_core.index)("events_date_idx").on(table.date),
+  statusDateIdx: (0, import_pg_core.index)("events_status_date_idx").on(table.status, table.date),
+  organizationIdx: (0, import_pg_core.index)("events_organization_idx").on(table.organizationId),
+  originOrganizationIdx: (0, import_pg_core.index)("events_origin_organization_idx").on(table.originOrganizationId),
+  federationVisibilityIdx: (0, import_pg_core.index)("events_federation_visibility_idx").on(table.federationVisibility),
+  federationStatusIdx: (0, import_pg_core.index)("events_federation_status_idx").on(table.federationStatus),
+  sourceInstanceEventUniqueIdx: (0, import_pg_core.uniqueIndex)("events_source_instance_event_unique_idx").on(table.sourceInstanceUrl, table.sourceEventId)
+}));
+const eventSyndications = (0, import_pg_core.pgTable)("event_syndications", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  sourceOrganizationId: (0, import_pg_core.varchar)("source_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  targetOrganizationId: (0, import_pg_core.varchar)("target_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  direction: (0, import_pg_core.text)("direction").notNull(),
+  status: (0, import_pg_core.text)("status").default(SYNDICATION_STATUS.PROPOSED).notNull(),
+  includeInAgenda: (0, import_pg_core.boolean)("include_in_agenda").default(false).notNull(),
+  localTitleOverride: (0, import_pg_core.text)("local_title_override"),
+  localDescriptionOverride: (0, import_pg_core.text)("local_description_override"),
+  localDateOverride: (0, import_pg_core.timestamp)("local_date_override"),
+  localRegistrationUrlOverride: (0, import_pg_core.text)("local_registration_url_override"),
+  lastSyncedAt: (0, import_pg_core.timestamp)("last_synced_at"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  reviewedBy: (0, import_pg_core.text)("reviewed_by"),
+  reviewedAt: (0, import_pg_core.timestamp)("reviewed_at"),
+  targetInstanceUrl: (0, import_pg_core.text)("target_instance_url"),
+  remoteEventId: (0, import_pg_core.varchar)("remote_event_id"),
+  remoteSyndicationId: (0, import_pg_core.varchar)("remote_syndication_id"),
+  syncStatus: (0, import_pg_core.text)("sync_status").default(FEDERATION_SYNC_STATUS.LOCAL).notNull(),
+  syncError: (0, import_pg_core.text)("sync_error"),
+  lastSyncAttemptAt: (0, import_pg_core.timestamp)("last_sync_attempt_at"),
+  syncAttempts: (0, import_pg_core.integer)("sync_attempts").default(0).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  syndicationUnique: (0, import_pg_core.unique)("event_syndications_unique").on(table.eventId, table.sourceOrganizationId, table.targetOrganizationId),
+  eventIdx: (0, import_pg_core.index)("event_syndications_event_idx").on(table.eventId),
+  sourceIdx: (0, import_pg_core.index)("event_syndications_source_idx").on(table.sourceOrganizationId),
+  targetIdx: (0, import_pg_core.index)("event_syndications_target_idx").on(table.targetOrganizationId),
+  directionIdx: (0, import_pg_core.index)("event_syndications_direction_idx").on(table.direction),
+  statusIdx: (0, import_pg_core.index)("event_syndications_status_idx").on(table.status),
+  agendaIdx: (0, import_pg_core.index)("event_syndications_agenda_idx").on(table.includeInAgenda),
+  syncStatusIdx: (0, import_pg_core.index)("event_syndications_sync_status_idx").on(table.syncStatus),
+  remoteEventIdx: (0, import_pg_core.index)("event_syndications_remote_event_idx").on(table.remoteEventId),
+  remoteSyndicationIdx: (0, import_pg_core.index)("event_syndications_remote_syndication_idx").on(table.remoteSyndicationId)
+}));
+const surveyForms = (0, import_pg_core.pgTable)("survey_forms", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  slug: (0, import_pg_core.varchar)("slug", { length: 120 }).notNull().unique(),
+  title: (0, import_pg_core.text)("title").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  status: (0, import_pg_core.text)("status").default(SURVEY_FORM_STATUS.DRAFT).notNull(),
+  version: (0, import_pg_core.integer)("version").default(1).notNull(),
+  organizationId: (0, import_pg_core.varchar)("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  originOrganizationId: (0, import_pg_core.varchar)("origin_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceFormId: (0, import_pg_core.varchar)("source_form_id"),
+  sourceInstanceUrl: (0, import_pg_core.text)("source_instance_url"),
+  federationVisibility: (0, import_pg_core.text)("federation_visibility").default(FEDERATION_VISIBILITY.LOCAL).notNull(),
+  federationStatus: (0, import_pg_core.text)("federation_status").default(FEDERATION_STATUS.LOCAL_ONLY).notNull(),
+  isFederatedCopy: (0, import_pg_core.boolean)("is_federated_copy").default(false).notNull(),
+  canonicalFormId: (0, import_pg_core.varchar)("canonical_form_id"),
+  collectRespondentInfo: (0, import_pg_core.boolean)("collect_respondent_info").default(false).notNull(),
+  allowMultipleSubmissions: (0, import_pg_core.boolean)("allow_multiple_submissions").default(true).notNull(),
+  successMessage: (0, import_pg_core.text)("success_message"),
+  requireConsent: (0, import_pg_core.boolean)("require_consent").default(false).notNull(),
+  consentText: (0, import_pg_core.text)("consent_text"),
+  retentionDays: (0, import_pg_core.integer)("retention_days"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  publishedAt: (0, import_pg_core.timestamp)("published_at"),
+  closedAt: (0, import_pg_core.timestamp)("closed_at"),
+  expiresAt: (0, import_pg_core.timestamp)("expires_at"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  slugIdx: (0, import_pg_core.index)("survey_forms_slug_idx").on(table.slug),
+  statusIdx: (0, import_pg_core.index)("survey_forms_status_idx").on(table.status),
+  expiresAtIdx: (0, import_pg_core.index)("survey_forms_expires_at_idx").on(table.expiresAt),
+  statusExpiresIdx: (0, import_pg_core.index)("survey_forms_status_expires_idx").on(table.status, table.expiresAt),
+  organizationIdx: (0, import_pg_core.index)("survey_forms_organization_idx").on(table.organizationId),
+  originOrganizationIdx: (0, import_pg_core.index)("survey_forms_origin_organization_idx").on(table.originOrganizationId),
+  federationVisibilityIdx: (0, import_pg_core.index)("survey_forms_federation_visibility_idx").on(table.federationVisibility),
+  federationStatusIdx: (0, import_pg_core.index)("survey_forms_federation_status_idx").on(table.federationStatus),
+  sourceInstanceFormUniqueIdx: (0, import_pg_core.uniqueIndex)("survey_forms_source_instance_form_unique_idx").on(table.sourceInstanceUrl, table.sourceFormId),
+  createdAtIdx: (0, import_pg_core.index)("survey_forms_created_at_idx").on(table.createdAt)
+}));
+const surveyQuestions = (0, import_pg_core.pgTable)("survey_questions", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  formId: (0, import_pg_core.varchar)("form_id").references(() => surveyForms.id, { onDelete: "cascade" }).notNull(),
+  label: (0, import_pg_core.text)("label").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  type: (0, import_pg_core.text)("type").default(SURVEY_QUESTION_TYPE.TEXT).notNull(),
+  required: (0, import_pg_core.boolean)("required").default(false).notNull(),
+  options: (0, import_pg_core.jsonb)("options").default(import_drizzle_orm.sql`'[]'::jsonb`).notNull(),
+  validation: (0, import_pg_core.jsonb)("validation").default(import_drizzle_orm.sql`'{}'::jsonb`).notNull(),
+  orderIndex: (0, import_pg_core.integer)("order_index").default(0).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  formIdx: (0, import_pg_core.index)("survey_questions_form_idx").on(table.formId),
+  formOrderIdx: (0, import_pg_core.index)("survey_questions_form_order_idx").on(table.formId, table.orderIndex)
+}));
+const surveyResponses = (0, import_pg_core.pgTable)("survey_responses", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  formId: (0, import_pg_core.varchar)("form_id").references(() => surveyForms.id, { onDelete: "cascade" }).notNull(),
+  formVersion: (0, import_pg_core.integer)("form_version").default(1).notNull(),
+  respondentName: (0, import_pg_core.text)("respondent_name"),
+  respondentEmail: (0, import_pg_core.text)("respondent_email"),
+  answers: (0, import_pg_core.jsonb)("answers").default(import_drizzle_orm.sql`'{}'::jsonb`).notNull(),
+  formSnapshot: (0, import_pg_core.jsonb)("form_snapshot").default(import_drizzle_orm.sql`'{}'::jsonb`).notNull(),
+  consentAccepted: (0, import_pg_core.boolean)("consent_accepted").default(false).notNull(),
+  submittedAt: (0, import_pg_core.timestamp)("submitted_at").defaultNow().notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  formIdx: (0, import_pg_core.index)("survey_responses_form_idx").on(table.formId),
+  formVersionIdx: (0, import_pg_core.index)("survey_responses_form_version_idx").on(table.formId, table.formVersion),
+  submittedAtIdx: (0, import_pg_core.index)("survey_responses_submitted_at_idx").on(table.submittedAt),
+  answersIdx: (0, import_pg_core.index)("survey_responses_answers_gin_idx").using("gin", table.answers),
+  snapshotIdx: (0, import_pg_core.index)("survey_responses_form_snapshot_gin_idx").using("gin", table.formSnapshot)
+}));
+const surveyFormSyndications = (0, import_pg_core.pgTable)("survey_form_syndications", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  formId: (0, import_pg_core.varchar)("form_id").references(() => surveyForms.id, { onDelete: "cascade" }).notNull(),
+  sourceOrganizationId: (0, import_pg_core.varchar)("source_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  targetOrganizationId: (0, import_pg_core.varchar)("target_organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
+  direction: (0, import_pg_core.text)("direction").notNull(),
+  status: (0, import_pg_core.text)("status").default(SYNDICATION_STATUS.PROPOSED).notNull(),
+  includeResponses: (0, import_pg_core.boolean)("include_responses").default(false).notNull(),
+  collectResponsesLocally: (0, import_pg_core.boolean)("collect_responses_locally").default(true).notNull(),
+  localTitleOverride: (0, import_pg_core.text)("local_title_override"),
+  localDescriptionOverride: (0, import_pg_core.text)("local_description_override"),
+  lastSyncedAt: (0, import_pg_core.timestamp)("last_synced_at"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  reviewedBy: (0, import_pg_core.text)("reviewed_by"),
+  reviewedAt: (0, import_pg_core.timestamp)("reviewed_at"),
+  targetInstanceUrl: (0, import_pg_core.text)("target_instance_url"),
+  remoteFormId: (0, import_pg_core.varchar)("remote_form_id"),
+  remoteSyndicationId: (0, import_pg_core.varchar)("remote_syndication_id"),
+  syncStatus: (0, import_pg_core.text)("sync_status").default(FEDERATION_SYNC_STATUS.LOCAL).notNull(),
+  syncError: (0, import_pg_core.text)("sync_error"),
+  lastSyncAttemptAt: (0, import_pg_core.timestamp)("last_sync_attempt_at"),
+  syncAttempts: (0, import_pg_core.integer)("sync_attempts").default(0).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  syndicationUnique: (0, import_pg_core.unique)("survey_form_syndications_unique").on(table.formId, table.sourceOrganizationId, table.targetOrganizationId),
+  formIdx: (0, import_pg_core.index)("survey_form_syndications_form_idx").on(table.formId),
+  sourceIdx: (0, import_pg_core.index)("survey_form_syndications_source_idx").on(table.sourceOrganizationId),
+  targetIdx: (0, import_pg_core.index)("survey_form_syndications_target_idx").on(table.targetOrganizationId),
+  directionIdx: (0, import_pg_core.index)("survey_form_syndications_direction_idx").on(table.direction),
+  statusIdx: (0, import_pg_core.index)("survey_form_syndications_status_idx").on(table.status),
+  syncStatusIdx: (0, import_pg_core.index)("survey_form_syndications_sync_status_idx").on(table.syncStatus),
+  remoteFormIdx: (0, import_pg_core.index)("survey_form_syndications_remote_form_idx").on(table.remoteFormId),
+  remoteSyndicationIdx: (0, import_pg_core.index)("survey_form_syndications_remote_syndication_idx").on(table.remoteSyndicationId)
+}));
+const surveyFormResponseSummaries = (0, import_pg_core.pgTable)("survey_form_response_summaries", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  syndicationId: (0, import_pg_core.varchar)("syndication_id").references(() => surveyFormSyndications.id, { onDelete: "set null" }),
+  formId: (0, import_pg_core.varchar)("form_id").references(() => surveyForms.id, { onDelete: "cascade" }),
+  remoteFormId: (0, import_pg_core.varchar)("remote_form_id"),
+  sourceOrganizationId: (0, import_pg_core.varchar)("source_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  targetOrganizationId: (0, import_pg_core.varchar)("target_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceInstanceUrl: (0, import_pg_core.text)("source_instance_url"),
+  responseCount: (0, import_pg_core.integer)("response_count").default(0).notNull(),
+  lastResponseAt: (0, import_pg_core.timestamp)("last_response_at"),
+  responsesByDay: (0, import_pg_core.jsonb)("responses_by_day").$type().default([]).notNull(),
+  questionSummaries: (0, import_pg_core.jsonb)("question_summaries").$type().default([]).notNull(),
+  metadata: (0, import_pg_core.jsonb)("metadata").$type().default({}).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  responseSummaryUnique: (0, import_pg_core.unique)("survey_form_response_summaries_unique").on(table.sourceInstanceUrl, table.remoteFormId, table.targetOrganizationId),
+  syndicationIdx: (0, import_pg_core.index)("survey_form_response_summaries_syndication_idx").on(table.syndicationId),
+  formIdx: (0, import_pg_core.index)("survey_form_response_summaries_form_idx").on(table.formId),
+  sourceIdx: (0, import_pg_core.index)("survey_form_response_summaries_source_idx").on(table.sourceOrganizationId),
+  targetIdx: (0, import_pg_core.index)("survey_form_response_summaries_target_idx").on(table.targetOrganizationId),
+  updatedAtIdx: (0, import_pg_core.index)("survey_form_response_summaries_updated_at_idx").on(table.updatedAt),
+  questionSummariesIdx: (0, import_pg_core.index)("survey_form_response_summaries_question_summaries_gin_idx").using("gin", table.questionSummaries)
+}));
+const loanItems = (0, import_pg_core.pgTable)("loan_items", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  title: (0, import_pg_core.text)("title").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  lenderName: (0, import_pg_core.text)("lender_name").notNull(),
+  // Nom du JD qui prête (texte libre)
+  photoUrl: (0, import_pg_core.text)("photo_url"),
+  // URL de la photo uploadée
+  status: (0, import_pg_core.text)("status").default(LOAN_STATUS.PENDING).notNull(),
+  // pending, available, borrowed, unavailable
+  proposedBy: (0, import_pg_core.text)("proposed_by").notNull(),
+  // Nom de la personne qui propose
+  proposedByEmail: (0, import_pg_core.text)("proposed_by_email").notNull(),
+  // Email de la personne qui propose
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull(),
+  updatedBy: (0, import_pg_core.text)("updated_by")
+  // Email de l'admin qui a modifié
+}, (table) => ({
+  statusIdx: (0, import_pg_core.index)("loan_items_status_idx").on(table.status),
+  createdAtIdx: (0, import_pg_core.index)("loan_items_created_at_idx").on(table.createdAt),
+  // Index pour optimiser les recherches textuelles (GIN index pour ILIKE)
+  titleSearchIdx: (0, import_pg_core.index)("loan_items_title_search_idx").on(table.title),
+  // Index composite pour les requêtes fréquentes (status + createdAt)
+  statusCreatedIdx: (0, import_pg_core.index)("loan_items_status_created_idx").on(table.status, table.createdAt)
+}));
+const inscriptions = (0, import_pg_core.pgTable)("inscriptions", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  name: (0, import_pg_core.text)("name").notNull(),
+  email: (0, import_pg_core.text)("email").notNull(),
+  company: (0, import_pg_core.text)("company"),
+  // Société (optionnel)
+  phone: (0, import_pg_core.text)("phone"),
+  // Téléphone (optionnel)
+  comments: (0, import_pg_core.text)("comments"),
+  // Commentaires lors de l'inscription (accompagnants, régime alimentaire, etc.)
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  // Contrainte unique: un email ne peut s'inscrire qu'une seule fois par événement
+  uniqueRegistrationPerEmail: (0, import_pg_core.unique)().on(table.eventId, table.email),
+  eventIdIdx: (0, import_pg_core.index)("inscriptions_event_id_idx").on(table.eventId)
+}));
+const unsubscriptions = (0, import_pg_core.pgTable)("unsubscriptions", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  name: (0, import_pg_core.text)("name").notNull(),
+  email: (0, import_pg_core.text)("email").notNull(),
+  comments: (0, import_pg_core.text)("comments"),
+  // Raison de l'absence, commentaires, etc.
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  // Contrainte unique: un email ne peut se désinscrire qu'une seule fois par événement
+  uniqueUnsubscriptionPerEmail: (0, import_pg_core.unique)().on(table.eventId, table.email)
+}));
+const pushSubscriptions = (0, import_pg_core.pgTable)("push_subscriptions", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  endpoint: (0, import_pg_core.text)("endpoint").notNull().unique(),
+  p256dh: (0, import_pg_core.text)("p256dh").notNull(),
+  auth: (0, import_pg_core.text)("auth").notNull(),
+  userEmail: (0, import_pg_core.text)("user_email"),
+  // Optional: link to user if logged in
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  endpointIdx: (0, import_pg_core.index)("push_subscriptions_endpoint_idx").on(table.endpoint),
+  emailIdx: (0, import_pg_core.index)("push_subscriptions_email_idx").on(table.userEmail)
+}));
+const notifications = (0, import_pg_core.pgTable)("notifications", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  userId: (0, import_pg_core.varchar)("user_id").notNull(),
+  // ID of the user receiving the notification
+  type: (0, import_pg_core.text)("type").notNull(),
+  // "idea_update", "event_update", "loan_update", etc.
+  title: (0, import_pg_core.text)("title").notNull(),
+  body: (0, import_pg_core.text)("body").notNull(),
+  icon: (0, import_pg_core.text)("icon"),
+  // Icon URL or emoji
+  isRead: (0, import_pg_core.boolean)("is_read").default(false).notNull(),
+  // Metadata for grouping and filtering by project/offer
+  metadata: (0, import_pg_core.jsonb)("metadata").notNull().default(import_drizzle_orm.sql`'{}'::jsonb`),
+  // {projectId?, offerId?, taskId?, entityType?, entityId?, priority?}
+  // Link to the entity that triggered the notification
+  entityType: (0, import_pg_core.text)("entity_type"),
+  // "idea", "event", "loan_item", "patron_proposal", etc.
+  entityId: (0, import_pg_core.varchar)("entity_id"),
+  // ID of the entity
+  relatedProjectId: (0, import_pg_core.varchar)("related_project_id"),
+  // Optional: link to project
+  relatedOfferId: (0, import_pg_core.varchar)("related_offer_id"),
+  // Optional: link to offer
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  userIdIdx: (0, import_pg_core.index)("notifications_user_id_idx").on(table.userId),
+  typeIdx: (0, import_pg_core.index)("notifications_type_idx").on(table.type),
+  isReadIdx: (0, import_pg_core.index)("notifications_is_read_idx").on(table.isRead),
+  entityIdx: (0, import_pg_core.index)("notifications_entity_idx").on(table.entityType, table.entityId),
+  projectIdIdx: (0, import_pg_core.index)("notifications_project_id_idx").on(table.relatedProjectId),
+  offerIdIdx: (0, import_pg_core.index)("notifications_offer_id_idx").on(table.relatedOfferId),
+  metadataProjectIdx: (0, import_pg_core.index)("notifications_metadata_project_idx").on(
+    import_drizzle_orm.sql`(metadata->>'projectId')`
+  ),
+  metadataOfferIdx: (0, import_pg_core.index)("notifications_metadata_offer_idx").on(
+    import_drizzle_orm.sql`(metadata->>'offerId')`
+  ),
+  createdAtIdx: (0, import_pg_core.index)("notifications_created_at_idx").on(table.createdAt.desc())
+}));
+const developmentRequests = (0, import_pg_core.pgTable)("development_requests", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  title: (0, import_pg_core.text)("title").notNull(),
+  description: (0, import_pg_core.text)("description").notNull(),
+  type: (0, import_pg_core.text)("type").notNull(),
+  // "bug" or "feature"
+  priority: (0, import_pg_core.text)("priority").default("medium").notNull(),
+  // "low", "medium", "high", "critical"
+  requestedBy: (0, import_pg_core.text)("requested_by").notNull(),
+  // Email du super admin qui a fait la demande
+  requestedByName: (0, import_pg_core.text)("requested_by_name").notNull(),
+  // Nom du demandeur
+  githubIssueNumber: (0, import_pg_core.integer)("github_issue_number"),
+  // Numéro de l'issue GitHub créée
+  githubIssueUrl: (0, import_pg_core.text)("github_issue_url"),
+  // URL complète de l'issue GitHub
+  status: (0, import_pg_core.text)("status").default("open").notNull(),
+  // "open", "in_progress", "closed", "cancelled"
+  githubStatus: (0, import_pg_core.text)("github_status").default("open").notNull(),
+  // Statut depuis GitHub: "open", "closed"
+  adminComment: (0, import_pg_core.text)("admin_comment"),
+  // Commentaire du super administrateur
+  lastStatusChangeBy: (0, import_pg_core.text)("last_status_change_by"),
+  // Email de la personne qui a modifié le statut en dernier
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull(),
+  lastSyncedAt: (0, import_pg_core.timestamp)("last_synced_at")
+  // Dernière synchronisation avec GitHub
+}, (table) => ({
+  typeIdx: (0, import_pg_core.index)("dev_requests_type_idx").on(table.type),
+  statusIdx: (0, import_pg_core.index)("dev_requests_status_idx").on(table.status),
+  requestedByIdx: (0, import_pg_core.index)("dev_requests_requested_by_idx").on(table.requestedBy),
+  githubIssueIdx: (0, import_pg_core.index)("dev_requests_github_issue_idx").on(table.githubIssueNumber)
+}));
+const patrons = (0, import_pg_core.pgTable)("patrons", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  firstName: (0, import_pg_core.text)("first_name").notNull(),
+  lastName: (0, import_pg_core.text)("last_name").notNull(),
+  role: (0, import_pg_core.text)("role"),
+  // Fonction du mécène
+  company: (0, import_pg_core.text)("company"),
+  // Société
+  department: (0, import_pg_core.text)("department"),
+  // Département
+  city: (0, import_pg_core.text)("city"),
+  // Ville
+  postalCode: (0, import_pg_core.text)("postal_code"),
+  // Code postal
+  sector: (0, import_pg_core.text)("sector"),
+  // Secteur d'activité
+  phone: (0, import_pg_core.text)("phone"),
+  // Téléphone
+  email: (0, import_pg_core.text)("email").notNull().unique(),
+  // Email unique pour éviter les doublons
+  notes: (0, import_pg_core.text)("notes"),
+  // Informations complémentaires
+  status: (0, import_pg_core.text)("status").notNull().default("active"),
+  // 'active' | 'proposed'
+  referrerId: (0, import_pg_core.varchar)("referrer_id").references(() => members.id, { onDelete: "set null" }),
+  // Prescripteur (membre qui a apporté ce mécène)
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull(),
+  createdBy: (0, import_pg_core.text)("created_by")
+  // Email admin qui a ajouté le mécène
+}, (table) => ({
+  emailIdx: (0, import_pg_core.index)("patrons_email_idx").on(table.email),
+  createdByIdx: (0, import_pg_core.index)("patrons_created_by_idx").on(table.createdBy),
+  createdAtIdx: (0, import_pg_core.index)("patrons_created_at_idx").on(table.createdAt),
+  referrerIdIdx: (0, import_pg_core.index)("patrons_referrer_id_idx").on(table.referrerId)
+}));
+const patronContacts = (0, import_pg_core.pgTable)("patron_contacts", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  patronId: (0, import_pg_core.varchar)("patron_id").references(() => patrons.id, { onDelete: "cascade" }).notNull(),
+  firstName: (0, import_pg_core.text)("first_name").notNull(),
+  lastName: (0, import_pg_core.text)("last_name").notNull(),
+  role: (0, import_pg_core.text)("role"),
+  // Fonction du contact
+  email: (0, import_pg_core.text)("email"),
+  // Email du contact
+  phone: (0, import_pg_core.text)("phone"),
+  // Téléphone du contact
+  isPrimary: (0, import_pg_core.boolean)("is_primary").default(false).notNull(),
+  // Contact principal
+  notes: (0, import_pg_core.text)("notes"),
+  // Notes sur ce contact
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  patronIdIdx: (0, import_pg_core.index)("patron_contacts_patron_id_idx").on(table.patronId),
+  emailIdx: (0, import_pg_core.index)("patron_contacts_email_idx").on(table.email),
+  isPrimaryIdx: (0, import_pg_core.index)("patron_contacts_is_primary_idx").on(table.isPrimary)
+}));
+const patronDonations = (0, import_pg_core.pgTable)("patron_donations", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  patronId: (0, import_pg_core.varchar)("patron_id").references(() => patrons.id, { onDelete: "cascade" }).notNull(),
+  donatedAt: (0, import_pg_core.timestamp)("donated_at").notNull(),
+  // Date du don
+  amount: (0, import_pg_core.integer)("amount").notNull(),
+  // Montant en centimes
+  occasion: (0, import_pg_core.text)("occasion").notNull(),
+  // À quelle occasion : événement, projet, etc.
+  recordedBy: (0, import_pg_core.text)("recorded_by").notNull(),
+  // Email admin qui enregistre
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  patronIdIdx: (0, import_pg_core.index)("patron_donations_patron_id_idx").on(table.patronId),
+  donatedAtIdx: (0, import_pg_core.index)("patron_donations_donated_at_idx").on(table.donatedAt.desc())
+}));
+const patronUpdates = (0, import_pg_core.pgTable)("patron_updates", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  patronId: (0, import_pg_core.varchar)("patron_id").references(() => patrons.id, { onDelete: "cascade" }).notNull(),
+  type: (0, import_pg_core.text)("type").notNull(),
+  // 'meeting', 'email', 'call', 'lunch', 'event'
+  subject: (0, import_pg_core.text)("subject").notNull(),
+  // Titre/sujet de l'actualité
+  date: (0, import_pg_core.date)("date").notNull(),
+  // Date du contact (format YYYY-MM-DD)
+  startTime: (0, import_pg_core.text)("start_time"),
+  // Heure de début (format HH:MM, optionnel)
+  duration: (0, import_pg_core.integer)("duration"),
+  // Durée en minutes (optionnel)
+  description: (0, import_pg_core.text)("description").notNull(),
+  // Description détaillée
+  notes: (0, import_pg_core.text)("notes"),
+  // Notes additionnelles (optionnel)
+  createdBy: (0, import_pg_core.text)("created_by").notNull(),
+  // Email de l'admin qui a créé
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  patronIdIdx: (0, import_pg_core.index)("patron_updates_patron_id_idx").on(table.patronId),
+  typeIdx: (0, import_pg_core.index)("patron_updates_type_idx").on(table.type),
+  dateIdx: (0, import_pg_core.index)("patron_updates_date_idx").on(table.date.desc()),
+  createdAtIdx: (0, import_pg_core.index)("patron_updates_created_at_idx").on(table.createdAt.desc())
+}));
+const ideaPatronProposals = (0, import_pg_core.pgTable)("idea_patron_proposals", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  ideaId: (0, import_pg_core.varchar)("idea_id").references(() => ideas.id, { onDelete: "cascade" }).notNull(),
+  patronId: (0, import_pg_core.varchar)("patron_id").references(() => patrons.id, { onDelete: "cascade" }).notNull(),
+  proposedByAdminEmail: (0, import_pg_core.text)("proposed_by_admin_email").notNull(),
+  // Email du membre qui propose
+  proposedAt: (0, import_pg_core.timestamp)("proposed_at").defaultNow().notNull(),
+  status: (0, import_pg_core.text)("status").default("proposed").notNull(),
+  // 'proposed', 'contacted', 'declined', 'converted'
+  comments: (0, import_pg_core.text)("comments"),
+  // Notes de suivi
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  uniqueIdeaPatron: (0, import_pg_core.unique)().on(table.ideaId, table.patronId),
+  ideaIdIdx: (0, import_pg_core.index)("idea_patron_proposals_idea_id_idx").on(table.ideaId),
+  patronIdIdx: (0, import_pg_core.index)("idea_patron_proposals_patron_id_idx").on(table.patronId),
+  statusIdx: (0, import_pg_core.index)("idea_patron_proposals_status_idx").on(table.status)
+}));
+const MEMBER_STATUS = {
+  ACTIVE: "active",
+  PROPOSED: "proposed",
+  INACTIVE: "inactive"
+};
+const MEMBER_STATUS_LABELS = {
+  [MEMBER_STATUS.ACTIVE]: "Actif",
+  [MEMBER_STATUS.PROPOSED]: "Propos\xE9",
+  [MEMBER_STATUS.INACTIVE]: "Inactif"
+};
+const PROSPECTION_STAGES = {
+  QUALIFICATION: "Qualification",
+  R1: "R1",
+  R2: "R2",
+  CONTRACTUALISATION: "Contractualisation",
+  HORS_CIBLE: "Hors cible",
+  EN_REFLEXION: "En r\xE9flexion",
+  REFUSE: "Refus\xE9",
+  SIGNE: "Sign\xE9"
+};
+const PROSPECTION_STAGE_LABELS = {
+  [PROSPECTION_STAGES.QUALIFICATION]: "Qualification",
+  [PROSPECTION_STAGES.R1]: "R1",
+  [PROSPECTION_STAGES.R2]: "R2",
+  [PROSPECTION_STAGES.CONTRACTUALISATION]: "Contractualisation",
+  [PROSPECTION_STAGES.HORS_CIBLE]: "Hors cible",
+  [PROSPECTION_STAGES.EN_REFLEXION]: "En r\xE9flexion",
+  [PROSPECTION_STAGES.REFUSE]: "Refus\xE9",
+  [PROSPECTION_STAGES.SIGNE]: "Sign\xE9"
+};
+const SONCAS_PROFILES = [
+  "S\xE9curit\xE9",
+  "Orgueil",
+  "Nouveaut\xE9",
+  "Confort",
+  "Argent",
+  "Sympathie"
+];
+const CJD_ROLES = {
+  PRESIDENT: "president",
+  CO_PRESIDENT: "co_president",
+  TRESORIER: "tresorier",
+  SECRETAIRE: "secretaire",
+  RESPONSABLE_RECRUTEMENT: "responsable_recrutement",
+  RESPONSABLE_JEUNESSE: "responsable_jeunesse",
+  RESPONSABLE_PLENIERES: "responsable_plenieres",
+  RESPONSABLE_MECENES: "responsable_mecenes"
+};
+const CJD_ROLE_LABELS = {
+  [CJD_ROLES.PRESIDENT]: "Pr\xE9sident",
+  [CJD_ROLES.CO_PRESIDENT]: "Co-Pr\xE9sident",
+  [CJD_ROLES.TRESORIER]: "Tr\xE9sorier",
+  [CJD_ROLES.SECRETAIRE]: "Secr\xE9taire",
+  [CJD_ROLES.RESPONSABLE_RECRUTEMENT]: "Responsable recrutement",
+  [CJD_ROLES.RESPONSABLE_JEUNESSE]: "Responsable jeunesse",
+  [CJD_ROLES.RESPONSABLE_PLENIERES]: "Responsable pl\xE9ni\xE8res",
+  [CJD_ROLES.RESPONSABLE_MECENES]: "Responsable m\xE9c\xE8nes"
+};
+const memberStatuses = (0, import_pg_core.pgTable)("member_statuses", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  code: (0, import_pg_core.varchar)("code", { length: 50 }).notNull().unique(),
+  // Code technique
+  label: (0, import_pg_core.varchar)("label", { length: 100 }).notNull(),
+  // Libellé affiché
+  category: (0, import_pg_core.varchar)("category", { length: 20 }).notNull(),
+  // "member" ou "prospect"
+  color: (0, import_pg_core.varchar)("color", { length: 20 }).notNull().default("gray"),
+  // Couleur badge
+  description: (0, import_pg_core.text)("description"),
+  // Description
+  isSystem: (0, import_pg_core.boolean)("is_system").notNull().default(false),
+  // Non supprimable
+  displayOrder: (0, import_pg_core.integer)("display_order").notNull().default(0),
+  // Ordre affichage
+  isActive: (0, import_pg_core.boolean)("is_active").notNull().default(true),
+  // Actif/désactivé
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  categoryIdx: (0, import_pg_core.index)("member_statuses_category_idx").on(table.category),
+  isActiveIdx: (0, import_pg_core.index)("member_statuses_is_active_idx").on(table.isActive),
+  displayOrderIdx: (0, import_pg_core.index)("member_statuses_display_order_idx").on(table.displayOrder)
+}));
+const members = (0, import_pg_core.pgTable)("members", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  email: (0, import_pg_core.text)("email").notNull().unique(),
+  firstName: (0, import_pg_core.text)("first_name").notNull(),
+  lastName: (0, import_pg_core.text)("last_name").notNull(),
+  company: (0, import_pg_core.text)("company"),
+  department: (0, import_pg_core.text)("department"),
+  // Département
+  city: (0, import_pg_core.text)("city"),
+  // Ville
+  postalCode: (0, import_pg_core.text)("postal_code"),
+  // Code postal
+  firstContactDate: (0, import_pg_core.date)("first_contact_date"),
+  // Date du premier contact
+  meetingDate: (0, import_pg_core.date)("meeting_date"),
+  // Date du RDV
+  sector: (0, import_pg_core.text)("sector"),
+  // Secteur d'activité
+  phone: (0, import_pg_core.text)("phone"),
+  role: (0, import_pg_core.text)("role"),
+  // Rôle professionnel/métier
+  cjdRole: (0, import_pg_core.text)("cjd_role"),
+  // Rôle organisationnel CJD (président, trésorier, etc.)
+  notes: (0, import_pg_core.text)("notes"),
+  status: (0, import_pg_core.text)("status").default("active").notNull(),
+  // Statut de base: active, proposed, inactive
+  prospectionStatus: (0, import_pg_core.text)("prospection_status"),
+  // Étape pipeline: Qualification, R1, R2, Contractualisation, Hors cible, En réflexion, Refusé, Signé
+  proposedBy: (0, import_pg_core.text)("proposed_by"),
+  soncasProfile: (0, import_pg_core.text)("soncas_profile"),
+  // Profil SONCAS: Sécurité, Orgueil, Nouveauté, Confort, Argent, Sympathie
+  createdBy: (0, import_pg_core.text)("created_by"),
+  // Email de l'admin créateur
+  assignedTo: (0, import_pg_core.text)("assigned_to"),
+  // Email de l'admin responsable actuel
+  engagementScore: (0, import_pg_core.integer)("engagement_score").default(0).notNull(),
+  firstSeenAt: (0, import_pg_core.timestamp)("first_seen_at").notNull(),
+  lastActivityAt: (0, import_pg_core.timestamp)("last_activity_at").notNull(),
+  activityCount: (0, import_pg_core.integer)("activity_count").default(0).notNull(),
+  subscriptionEndDate: (0, import_pg_core.timestamp)("subscription_end_date"),
+  // Date de fin de cotisation
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  emailIdx: (0, import_pg_core.index)("members_email_idx").on(table.email),
+  lastActivityAtIdx: (0, import_pg_core.index)("members_last_activity_at_idx").on(table.lastActivityAt.desc()),
+  engagementScoreIdx: (0, import_pg_core.index)("members_engagement_score_idx").on(table.engagementScore.desc()),
+  statusIdx: (0, import_pg_core.index)("members_status_idx").on(table.status),
+  cjdRoleIdx: (0, import_pg_core.index)("members_cjd_role_idx").on(table.cjdRole),
+  cityIdx: (0, import_pg_core.index)("members_city_idx").on(table.city)
+}));
+const memberActivities = (0, import_pg_core.pgTable)("member_activities", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  memberEmail: (0, import_pg_core.text)("member_email").references(() => members.email, { onDelete: "cascade" }).notNull(),
+  activityType: (0, import_pg_core.text)("activity_type").notNull(),
+  // 'idea_proposed', 'vote_cast', 'event_registered', 'event_unregistered', 'patron_suggested'
+  entityType: (0, import_pg_core.text)("entity_type").notNull(),
+  // 'idea', 'vote', 'event', 'patron'
+  entityId: (0, import_pg_core.varchar)("entity_id"),
+  entityTitle: (0, import_pg_core.text)("entity_title"),
+  metadata: (0, import_pg_core.text)("metadata"),
+  scoreImpact: (0, import_pg_core.integer)("score_impact").notNull(),
+  occurredAt: (0, import_pg_core.timestamp)("occurred_at").defaultNow().notNull()
+}, (table) => ({
+  memberEmailIdx: (0, import_pg_core.index)("member_activities_member_email_idx").on(table.memberEmail),
+  occurredAtIdx: (0, import_pg_core.index)("member_activities_occurred_at_idx").on(table.occurredAt.desc()),
+  activityTypeIdx: (0, import_pg_core.index)("member_activities_activity_type_idx").on(table.activityType)
+}));
+const memberOwnershipHistory = (0, import_pg_core.pgTable)("member_ownership_history", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  memberEmail: (0, import_pg_core.text)("member_email").references(() => members.email, { onDelete: "cascade" }).notNull(),
+  action: (0, import_pg_core.text)("action").notNull(),
+  // 'created' | 'assigned' | 'reassigned'
+  adminEmail: (0, import_pg_core.text)("admin_email").notNull(),
+  // Qui a effectué l'action
+  fromEmail: (0, import_pg_core.text)("from_email"),
+  // Ancien responsable (null pour 'created')
+  toEmail: (0, import_pg_core.text)("to_email").notNull(),
+  // Nouveau responsable
+  note: (0, import_pg_core.text)("note"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  memberEmailIdx: (0, import_pg_core.index)("moh_member_email_idx").on(table.memberEmail),
+  createdAtIdx: (0, import_pg_core.index)("moh_created_at_idx").on(table.createdAt.desc())
+}));
+const SUBSCRIPTION_TYPES = {
+  MONTHLY: "monthly",
+  QUARTERLY: "quarterly",
+  YEARLY: "yearly"
+};
+const SUBSCRIPTION_STATUS = {
+  ACTIVE: "active",
+  EXPIRED: "expired",
+  CANCELLED: "cancelled"
+};
+const PAYMENT_METHODS = {
+  CASH: "cash",
+  CHECK: "check",
+  BANK_TRANSFER: "bank_transfer",
+  CARD: "card"
+};
+const memberSubscriptions = (0, import_pg_core.pgTable)("member_subscriptions", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  memberEmail: (0, import_pg_core.varchar)("member_email", { length: 255 }).notNull().references(() => members.email),
+  amountInCents: (0, import_pg_core.integer)("amount_in_cents").notNull(),
+  // Stocké en centimes comme pour les donations
+  startDate: (0, import_pg_core.date)("start_date").notNull(),
+  // Format YYYY-MM-DD
+  endDate: (0, import_pg_core.date)("end_date").notNull(),
+  // Format YYYY-MM-DD
+  subscriptionType: (0, import_pg_core.text)("subscription_type").notNull(),
+  // "monthly", "quarterly", "yearly"
+  subscriptionTypeId: (0, import_pg_core.uuid)("subscription_type_id").references(() => subscriptionTypes.id, { onDelete: "set null" }),
+  status: (0, import_pg_core.text)("status").default("active").notNull(),
+  // "active", "expired", "cancelled"
+  paymentMethod: (0, import_pg_core.text)("payment_method"),
+  // "cash", "check", "bank_transfer", "card" (optionnel)
+  assignedBy: (0, import_pg_core.varchar)("assigned_by", { length: 255 }),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  memberEmailIdx: (0, import_pg_core.index)("member_subscriptions_member_email_idx").on(table.memberEmail),
+  startDateIdx: (0, import_pg_core.index)("member_subscriptions_start_date_idx").on(table.startDate.desc()),
+  statusIdx: (0, import_pg_core.index)("member_subscriptions_status_idx").on(table.status),
+  subscriptionTypeIdIdx: (0, import_pg_core.index)("member_subscriptions_subscription_type_id_idx").on(table.subscriptionTypeId)
+}));
+const memberTags = (0, import_pg_core.pgTable)("member_tags", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  name: (0, import_pg_core.text)("name").notNull().unique(),
+  // Nom du tag (ex: "VIP", "Ambassadeur")
+  color: (0, import_pg_core.text)("color").default("#3b82f6").notNull(),
+  // Couleur du tag en hex
+  description: (0, import_pg_core.text)("description"),
+  // Description optionnelle
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  nameIdx: (0, import_pg_core.index)("member_tags_name_idx").on(table.name)
+}));
+const memberTagAssignments = (0, import_pg_core.pgTable)("member_tag_assignments", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  memberEmail: (0, import_pg_core.text)("member_email").references(() => members.email, { onDelete: "cascade" }).notNull(),
+  tagId: (0, import_pg_core.varchar)("tag_id").references(() => memberTags.id, { onDelete: "cascade" }).notNull(),
+  assignedBy: (0, import_pg_core.text)("assigned_by"),
+  // Email de l'admin qui a assigné le tag
+  assignedAt: (0, import_pg_core.timestamp)("assigned_at").defaultNow().notNull()
+}, (table) => ({
+  memberTagIdx: (0, import_pg_core.index)("member_tag_assignments_member_tag_idx").on(table.memberEmail, table.tagId),
+  memberEmailIdx: (0, import_pg_core.index)("member_tag_assignments_member_email_idx").on(table.memberEmail),
+  tagIdIdx: (0, import_pg_core.index)("member_tag_assignments_tag_id_idx").on(table.tagId)
+}));
+const MEMBER_GROUP_TYPES = {
+  COPIL: "copil",
+  COMMISSION: "commission",
+  BUREAU: "bureau",
+  WORKING_GROUP: "working_group",
+  OTHER: "other"
+};
+const MEMBER_GROUP_TYPE_LABELS = {
+  [MEMBER_GROUP_TYPES.COPIL]: "COPIL",
+  [MEMBER_GROUP_TYPES.COMMISSION]: "Commission",
+  [MEMBER_GROUP_TYPES.BUREAU]: "Bureau",
+  [MEMBER_GROUP_TYPES.WORKING_GROUP]: "Groupe de travail",
+  [MEMBER_GROUP_TYPES.OTHER]: "Autre"
+};
+const memberGroups = (0, import_pg_core.pgTable)("member_groups", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  name: (0, import_pg_core.text)("name").notNull(),
+  // Nom affiché (ex: COPIL, Commission événementiel)
+  type: (0, import_pg_core.text)("type").notNull().default(MEMBER_GROUP_TYPES.OTHER),
+  year: (0, import_pg_core.integer)("year").notNull(),
+  // Année de mandat / exercice
+  description: (0, import_pg_core.text)("description"),
+  color: (0, import_pg_core.text)("color").default("#3b82f6").notNull(),
+  isActive: (0, import_pg_core.boolean)("is_active").default(true).notNull(),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  nameYearUnique: (0, import_pg_core.unique)("member_groups_name_year_unique").on(table.name, table.year),
+  yearIdx: (0, import_pg_core.index)("member_groups_year_idx").on(table.year),
+  typeIdx: (0, import_pg_core.index)("member_groups_type_idx").on(table.type),
+  activeIdx: (0, import_pg_core.index)("member_groups_active_idx").on(table.isActive)
+}));
+const memberGroupMemberships = (0, import_pg_core.pgTable)("member_group_memberships", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  groupId: (0, import_pg_core.varchar)("group_id").references(() => memberGroups.id, { onDelete: "cascade" }).notNull(),
+  memberEmail: (0, import_pg_core.text)("member_email").references(() => members.email, { onDelete: "cascade" }).notNull(),
+  role: (0, import_pg_core.text)("role"),
+  // Rôle dans le groupe (président, référent, membre...)
+  mission: (0, import_pg_core.text)("mission"),
+  // Ce que la personne fait / porte dans le groupe
+  startDate: (0, import_pg_core.date)("start_date"),
+  endDate: (0, import_pg_core.date)("end_date"),
+  notes: (0, import_pg_core.text)("notes"),
+  assignedBy: (0, import_pg_core.text)("assigned_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  groupMemberUnique: (0, import_pg_core.unique)("member_group_memberships_group_member_unique").on(table.groupId, table.memberEmail),
+  groupIdIdx: (0, import_pg_core.index)("member_group_memberships_group_id_idx").on(table.groupId),
+  memberEmailIdx: (0, import_pg_core.index)("member_group_memberships_member_email_idx").on(table.memberEmail)
+}));
+const memberTasks = (0, import_pg_core.pgTable)("member_tasks", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  memberEmail: (0, import_pg_core.text)("member_email").references(() => members.email, { onDelete: "cascade" }).notNull(),
+  title: (0, import_pg_core.text)("title").notNull(),
+  // Titre de la tâche
+  description: (0, import_pg_core.text)("description"),
+  // Description détaillée
+  taskType: (0, import_pg_core.text)("task_type").notNull(),
+  // 'call', 'email', 'meeting', 'custom'
+  status: (0, import_pg_core.text)("status").default("todo").notNull(),
+  // 'todo', 'in_progress', 'completed', 'cancelled'
+  dueDate: (0, import_pg_core.timestamp)("due_date"),
+  // Date d'échéance
+  completedAt: (0, import_pg_core.timestamp)("completed_at"),
+  // Date de complétion
+  completedBy: (0, import_pg_core.text)("completed_by"),
+  // Email de l'admin qui a complété
+  assignedTo: (0, import_pg_core.text)("assigned_to"),
+  // Email de l'admin assigné à la tâche
+  createdBy: (0, import_pg_core.text)("created_by").notNull(),
+  // Email de l'admin créateur
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  memberEmailIdx: (0, import_pg_core.index)("member_tasks_member_email_idx").on(table.memberEmail),
+  statusIdx: (0, import_pg_core.index)("member_tasks_status_idx").on(table.status),
+  dueDateIdx: (0, import_pg_core.index)("member_tasks_due_date_idx").on(table.dueDate),
+  createdByIdx: (0, import_pg_core.index)("member_tasks_created_by_idx").on(table.createdBy)
+}));
+const memberRelations = (0, import_pg_core.pgTable)("member_relations", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  memberEmail: (0, import_pg_core.text)("member_email").references(() => members.email, { onDelete: "cascade" }).notNull(),
+  relatedMemberEmail: (0, import_pg_core.text)("related_member_email").references(() => members.email, { onDelete: "cascade" }).notNull(),
+  relationType: (0, import_pg_core.text)("relation_type").notNull(),
+  // 'sponsor' (parrainage), 'team' (équipe), 'custom'
+  description: (0, import_pg_core.text)("description"),
+  // Description de la relation
+  createdBy: (0, import_pg_core.text)("created_by"),
+  // Email de l'admin créateur
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  memberRelationIdx: (0, import_pg_core.index)("member_relations_member_relation_idx").on(table.memberEmail, table.relatedMemberEmail),
+  memberEmailIdx: (0, import_pg_core.index)("member_relations_member_email_idx").on(table.memberEmail),
+  relatedMemberEmailIdx: (0, import_pg_core.index)("member_relations_related_member_email_idx").on(table.relatedMemberEmail),
+  relationTypeIdx: (0, import_pg_core.index)("member_relations_relation_type_idx").on(table.relationType)
+}));
+const memberContacts = (0, import_pg_core.pgTable)("member_contacts", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  memberEmail: (0, import_pg_core.text)("member_email").notNull().references(() => members.email, { onDelete: "cascade" }),
+  type: (0, import_pg_core.text)("type").notNull(),
+  // 'meeting' | 'email' | 'call' | 'lunch' | 'event'
+  subject: (0, import_pg_core.text)("subject").notNull(),
+  date: (0, import_pg_core.date)("date").notNull(),
+  startTime: (0, import_pg_core.text)("start_time"),
+  duration: (0, import_pg_core.integer)("duration"),
+  // minutes
+  description: (0, import_pg_core.text)("description").notNull(),
+  notes: (0, import_pg_core.text)("notes"),
+  createdBy: (0, import_pg_core.text)("created_by").notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
+}, (table) => ({
+  memberEmailIdx: (0, import_pg_core.index)("idx_member_contacts_email").on(table.memberEmail),
+  dateIdx: (0, import_pg_core.index)("idx_member_contacts_date").on(table.date)
+}));
+const SPONSORSHIP_LEVEL = {
+  PLATINUM: "platinum",
+  GOLD: "gold",
+  SILVER: "silver",
+  BRONZE: "bronze",
+  PARTNER: "partner"
+};
+const SPONSORSHIP_LEVEL_LABELS = {
+  [SPONSORSHIP_LEVEL.PLATINUM]: "Platine",
+  [SPONSORSHIP_LEVEL.GOLD]: "Or",
+  [SPONSORSHIP_LEVEL.SILVER]: "Argent",
+  [SPONSORSHIP_LEVEL.BRONZE]: "Bronze",
+  [SPONSORSHIP_LEVEL.PARTNER]: "Partenaire"
+};
+const SPONSORSHIP_STATUS = {
+  PROPOSED: "proposed",
+  // Proposé au mécène
+  CONFIRMED: "confirmed",
+  // Confirmé par le mécène
+  COMPLETED: "completed",
+  // Réalisé (événement passé)
+  CANCELLED: "cancelled"
+  // Annulé
+};
+const eventSponsorships = (0, import_pg_core.pgTable)("event_sponsorships", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  patronId: (0, import_pg_core.varchar)("patron_id").references(() => patrons.id, { onDelete: "cascade" }).notNull(),
+  level: (0, import_pg_core.text)("level").notNull(),
+  // platinum, gold, silver, bronze, partner
+  amount: (0, import_pg_core.integer)("amount").notNull(),
+  // Montant en centimes
+  benefits: (0, import_pg_core.text)("benefits"),
+  // Contreparties offertes (texte libre)
+  isPubliclyVisible: (0, import_pg_core.boolean)("is_publicly_visible").default(true).notNull(),
+  // Affichage public
+  status: (0, import_pg_core.text)("status").default(SPONSORSHIP_STATUS.PROPOSED).notNull(),
+  // proposed, confirmed, completed, cancelled
+  logoUrl: (0, import_pg_core.text)("logo_url"),
+  // URL du logo du sponsor (optionnel)
+  websiteUrl: (0, import_pg_core.text)("website_url"),
+  // URL du site web du sponsor (optionnel)
+  proposedByAdminEmail: (0, import_pg_core.text)("proposed_by_admin_email").notNull(),
+  // Email de l'admin qui propose
+  confirmedAt: (0, import_pg_core.timestamp)("confirmed_at"),
+  // Date de confirmation
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  uniqueEventPatron: (0, import_pg_core.unique)().on(table.eventId, table.patronId),
+  eventIdIdx: (0, import_pg_core.index)("event_sponsorships_event_id_idx").on(table.eventId),
+  patronIdIdx: (0, import_pg_core.index)("event_sponsorships_patron_id_idx").on(table.patronId),
+  statusIdx: (0, import_pg_core.index)("event_sponsorships_status_idx").on(table.status),
+  levelIdx: (0, import_pg_core.index)("event_sponsorships_level_idx").on(table.level)
+}));
+const trackingMetrics = (0, import_pg_core.pgTable)("tracking_metrics", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  entityType: (0, import_pg_core.text)("entity_type").notNull(),
+  // 'member' | 'patron'
+  entityId: (0, import_pg_core.varchar)("entity_id").notNull(),
+  // ID du membre ou mécène
+  entityEmail: (0, import_pg_core.text)("entity_email").notNull(),
+  // Email pour faciliter les recherches
+  metricType: (0, import_pg_core.text)("metric_type").notNull(),
+  // 'status_change', 'engagement', 'contact', 'conversion', 'activity'
+  metricValue: (0, import_pg_core.integer)("metric_value"),
+  // Valeur numérique de la métrique
+  metricData: (0, import_pg_core.text)("metric_data"),
+  // Données JSON supplémentaires
+  description: (0, import_pg_core.text)("description"),
+  // Description de la métrique
+  recordedBy: (0, import_pg_core.text)("recorded_by"),
+  // Email de l'admin qui a enregistré
+  recordedAt: (0, import_pg_core.timestamp)("recorded_at").defaultNow().notNull()
+}, (table) => ({
+  entityTypeIdx: (0, import_pg_core.index)("tracking_metrics_entity_type_idx").on(table.entityType),
+  entityIdIdx: (0, import_pg_core.index)("tracking_metrics_entity_id_idx").on(table.entityId),
+  entityEmailIdx: (0, import_pg_core.index)("tracking_metrics_entity_email_idx").on(table.entityEmail),
+  metricTypeIdx: (0, import_pg_core.index)("tracking_metrics_metric_type_idx").on(table.metricType),
+  recordedAtIdx: (0, import_pg_core.index)("tracking_metrics_recorded_at_idx").on(table.recordedAt.desc())
+}));
+const trackingAlerts = (0, import_pg_core.pgTable)("tracking_alerts", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  entityType: (0, import_pg_core.text)("entity_type").notNull(),
+  // 'member' | 'patron'
+  entityId: (0, import_pg_core.varchar)("entity_id").notNull(),
+  entityEmail: (0, import_pg_core.text)("entity_email").notNull(),
+  alertType: (0, import_pg_core.text)("alert_type").notNull(),
+  // 'stale', 'high_potential', 'needs_followup', 'conversion_opportunity'
+  severity: (0, import_pg_core.text)("severity").notNull().default("medium"),
+  // 'low', 'medium', 'high', 'critical'
+  title: (0, import_pg_core.text)("title").notNull(),
+  message: (0, import_pg_core.text)("message").notNull(),
+  isRead: (0, import_pg_core.boolean)("is_read").default(false).notNull(),
+  isResolved: (0, import_pg_core.boolean)("is_resolved").default(false).notNull(),
+  resolvedBy: (0, import_pg_core.text)("resolved_by"),
+  // Email de l'admin qui a résolu
+  resolvedAt: (0, import_pg_core.timestamp)("resolved_at"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  // Email de l'admin qui a créé (ou système)
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  expiresAt: (0, import_pg_core.timestamp)("expires_at")
+  // Date d'expiration de l'alerte
+}, (table) => ({
+  entityTypeIdx: (0, import_pg_core.index)("tracking_alerts_entity_type_idx").on(table.entityType),
+  entityIdIdx: (0, import_pg_core.index)("tracking_alerts_entity_id_idx").on(table.entityId),
+  entityEmailIdx: (0, import_pg_core.index)("tracking_alerts_entity_email_idx").on(table.entityEmail),
+  alertTypeIdx: (0, import_pg_core.index)("tracking_alerts_alert_type_idx").on(table.alertType),
+  severityIdx: (0, import_pg_core.index)("tracking_alerts_severity_idx").on(table.severity),
+  isReadIdx: (0, import_pg_core.index)("tracking_alerts_is_read_idx").on(table.isRead),
+  isResolvedIdx: (0, import_pg_core.index)("tracking_alerts_is_resolved_idx").on(table.isResolved),
+  createdAtIdx: (0, import_pg_core.index)("tracking_alerts_created_at_idx").on(table.createdAt.desc())
+}));
+const brandingConfig = (0, import_pg_core.pgTable)("branding_config", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  config: (0, import_pg_core.text)("config").notNull(),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
 });
-// Relations
-exports.ideasRelations = (0, drizzle_orm_1.relations)(exports.ideas, ({ many }) => ({
-    votes: many(exports.votes),
-    patronProposals: many(exports.ideaPatronProposals),
+const featureConfig = (0, import_pg_core.pgTable)("feature_config", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  featureKey: (0, import_pg_core.text)("feature_key").notNull().unique(),
+  enabled: (0, import_pg_core.boolean)("enabled").default(true).notNull(),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  featureKeyIdx: (0, import_pg_core.index)("feature_config_key_idx").on(table.featureKey)
 }));
-exports.votesRelations = (0, drizzle_orm_1.relations)(exports.votes, ({ one }) => ({
-    idea: one(exports.ideas, {
-        fields: [exports.votes.ideaId],
-        references: [exports.ideas.id],
-    }),
+const emailConfig = (0, import_pg_core.pgTable)("email_config", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  provider: (0, import_pg_core.varchar)("provider", { length: 50 }).notNull().default("ovh"),
+  // ovh, gmail, smtp, etc.
+  host: (0, import_pg_core.varchar)("host", { length: 255 }).notNull(),
+  port: (0, import_pg_core.integer)("port").notNull().default(465),
+  secure: (0, import_pg_core.boolean)("secure").notNull().default(true),
+  username: (0, import_pg_core.text)("username"),
+  password: (0, import_pg_core.text)("password"),
+  fromName: (0, import_pg_core.varchar)("from_name", { length: 255 }),
+  fromEmail: (0, import_pg_core.varchar)("from_email", { length: 255 }).notNull(),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+});
+const ideasRelations = (0, import_drizzle_orm.relations)(ideas, ({ many }) => ({
+  votes: many(votes),
+  patronProposals: many(ideaPatronProposals)
 }));
-exports.eventsRelations = (0, drizzle_orm_1.relations)(exports.events, ({ many }) => ({
-    inscriptions: many(exports.inscriptions),
-    unsubscriptions: many(exports.unsubscriptions),
-    sponsorships: many(exports.eventSponsorships),
+const votesRelations = (0, import_drizzle_orm.relations)(votes, ({ one }) => ({
+  idea: one(ideas, {
+    fields: [votes.ideaId],
+    references: [ideas.id]
+  })
 }));
-exports.inscriptionsRelations = (0, drizzle_orm_1.relations)(exports.inscriptions, ({ one }) => ({
-    event: one(exports.events, {
-        fields: [exports.inscriptions.eventId],
-        references: [exports.events.id],
-    }),
+const organizationNetworksRelations = (0, import_drizzle_orm.relations)(organizationNetworks, ({ many }) => ({
+  organizations: many(organizations)
 }));
-exports.unsubscriptionsRelations = (0, drizzle_orm_1.relations)(exports.unsubscriptions, ({ one }) => ({
-    event: one(exports.events, {
-        fields: [exports.unsubscriptions.eventId],
-        references: [exports.events.id],
-    }),
+const organizationsRelations = (0, import_drizzle_orm.relations)(organizations, ({ one, many }) => ({
+  network: one(organizationNetworks, {
+    fields: [organizations.networkId],
+    references: [organizationNetworks.id]
+  }),
+  parent: one(organizations, {
+    fields: [organizations.parentOrganizationId],
+    references: [organizations.id]
+  }),
+  childRelations: many(organizationRelations, { relationName: "fromOrganization" }),
+  parentRelations: many(organizationRelations, { relationName: "toOrganization" }),
+  events: many(events)
 }));
-exports.patronsRelations = (0, drizzle_orm_1.relations)(exports.patrons, ({ many }) => ({
-    donations: many(exports.patronDonations),
-    proposals: many(exports.ideaPatronProposals),
-    updates: many(exports.patronUpdates),
-    sponsorships: many(exports.eventSponsorships),
+const organizationRelationsRelations = (0, import_drizzle_orm.relations)(organizationRelations, ({ one }) => ({
+  fromOrganization: one(organizations, {
+    fields: [organizationRelations.fromOrganizationId],
+    references: [organizations.id],
+    relationName: "fromOrganization"
+  }),
+  toOrganization: one(organizations, {
+    fields: [organizationRelations.toOrganizationId],
+    references: [organizations.id],
+    relationName: "toOrganization"
+  })
 }));
-exports.patronDonationsRelations = (0, drizzle_orm_1.relations)(exports.patronDonations, ({ one }) => ({
-    patron: one(exports.patrons, {
-        fields: [exports.patronDonations.patronId],
-        references: [exports.patrons.id],
-    }),
+const eventsRelations = (0, import_drizzle_orm.relations)(events, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [events.organizationId],
+    references: [organizations.id]
+  }),
+  originOrganization: one(organizations, {
+    fields: [events.originOrganizationId],
+    references: [organizations.id]
+  }),
+  inscriptions: many(inscriptions),
+  unsubscriptions: many(unsubscriptions),
+  sponsorships: many(eventSponsorships),
+  syndications: many(eventSyndications)
 }));
-exports.patronUpdatesRelations = (0, drizzle_orm_1.relations)(exports.patronUpdates, ({ one }) => ({
-    patron: one(exports.patrons, {
-        fields: [exports.patronUpdates.patronId],
-        references: [exports.patrons.id],
-    }),
+const eventSyndicationsRelations = (0, import_drizzle_orm.relations)(eventSyndications, ({ one }) => ({
+  event: one(events, {
+    fields: [eventSyndications.eventId],
+    references: [events.id]
+  }),
+  sourceOrganization: one(organizations, {
+    fields: [eventSyndications.sourceOrganizationId],
+    references: [organizations.id]
+  }),
+  targetOrganization: one(organizations, {
+    fields: [eventSyndications.targetOrganizationId],
+    references: [organizations.id]
+  })
 }));
-exports.ideaPatronProposalsRelations = (0, drizzle_orm_1.relations)(exports.ideaPatronProposals, ({ one }) => ({
-    idea: one(exports.ideas, {
-        fields: [exports.ideaPatronProposals.ideaId],
-        references: [exports.ideas.id],
-    }),
-    patron: one(exports.patrons, {
-        fields: [exports.ideaPatronProposals.patronId],
-        references: [exports.patrons.id],
-    }),
+const inscriptionsRelations = (0, import_drizzle_orm.relations)(inscriptions, ({ one }) => ({
+  event: one(events, {
+    fields: [inscriptions.eventId],
+    references: [events.id]
+  })
 }));
-exports.eventSponsorshipsRelations = (0, drizzle_orm_1.relations)(exports.eventSponsorships, ({ one }) => ({
-    event: one(exports.events, {
-        fields: [exports.eventSponsorships.eventId],
-        references: [exports.events.id],
-    }),
-    patron: one(exports.patrons, {
-        fields: [exports.eventSponsorships.patronId],
-        references: [exports.patrons.id],
-    }),
+const unsubscriptionsRelations = (0, import_drizzle_orm.relations)(unsubscriptions, ({ one }) => ({
+  event: one(events, {
+    fields: [unsubscriptions.eventId],
+    references: [events.id]
+  })
 }));
-exports.membersRelations = (0, drizzle_orm_1.relations)(exports.members, ({ many }) => ({
-    activities: many(exports.memberActivities),
-    subscriptions: many(exports.memberSubscriptions),
+const patronsRelations = (0, import_drizzle_orm.relations)(patrons, ({ many }) => ({
+  donations: many(patronDonations),
+  proposals: many(ideaPatronProposals),
+  updates: many(patronUpdates),
+  sponsorships: many(eventSponsorships)
 }));
-exports.memberActivitiesRelations = (0, drizzle_orm_1.relations)(exports.memberActivities, ({ one }) => ({
-    member: one(exports.members, {
-        fields: [exports.memberActivities.memberEmail],
-        references: [exports.members.email],
-    }),
+const patronDonationsRelations = (0, import_drizzle_orm.relations)(patronDonations, ({ one }) => ({
+  patron: one(patrons, {
+    fields: [patronDonations.patronId],
+    references: [patrons.id]
+  })
 }));
-exports.memberSubscriptionsRelations = (0, drizzle_orm_1.relations)(exports.memberSubscriptions, ({ one }) => ({
-    member: one(exports.members, {
-        fields: [exports.memberSubscriptions.memberEmail],
-        references: [exports.members.email],
-    }),
+const patronUpdatesRelations = (0, import_drizzle_orm.relations)(patronUpdates, ({ one }) => ({
+  patron: one(patrons, {
+    fields: [patronUpdates.patronId],
+    references: [patrons.id]
+  })
 }));
-// Security helper functions - Plus permissif pour permettre plus de domaines
+const ideaPatronProposalsRelations = (0, import_drizzle_orm.relations)(ideaPatronProposals, ({ one }) => ({
+  idea: one(ideas, {
+    fields: [ideaPatronProposals.ideaId],
+    references: [ideas.id]
+  }),
+  patron: one(patrons, {
+    fields: [ideaPatronProposals.patronId],
+    references: [patrons.id]
+  })
+}));
+const eventSponsorshipsRelations = (0, import_drizzle_orm.relations)(eventSponsorships, ({ one }) => ({
+  event: one(events, {
+    fields: [eventSponsorships.eventId],
+    references: [events.id]
+  }),
+  patron: one(patrons, {
+    fields: [eventSponsorships.patronId],
+    references: [patrons.id]
+  })
+}));
+const membersRelations = (0, import_drizzle_orm.relations)(members, ({ many }) => ({
+  activities: many(memberActivities),
+  subscriptions: many(memberSubscriptions),
+  groupMemberships: many(memberGroupMemberships)
+}));
+const memberGroupsRelations = (0, import_drizzle_orm.relations)(memberGroups, ({ many }) => ({
+  memberships: many(memberGroupMemberships)
+}));
+const memberGroupMembershipsRelations = (0, import_drizzle_orm.relations)(memberGroupMemberships, ({ one }) => ({
+  group: one(memberGroups, {
+    fields: [memberGroupMemberships.groupId],
+    references: [memberGroups.id]
+  }),
+  member: one(members, {
+    fields: [memberGroupMemberships.memberEmail],
+    references: [members.email]
+  })
+}));
+const memberActivitiesRelations = (0, import_drizzle_orm.relations)(memberActivities, ({ one }) => ({
+  member: one(members, {
+    fields: [memberActivities.memberEmail],
+    references: [members.email]
+  })
+}));
+const memberContactsRelations = (0, import_drizzle_orm.relations)(memberContacts, ({ one }) => ({
+  member: one(members, {
+    fields: [memberContacts.memberEmail],
+    references: [members.email]
+  })
+}));
 const isValidDomain = (email) => {
-    const domain = email.split('@')[1];
-    // Accepte la plupart des domaines courants
-    return domain && (domain.includes('.') &&
-        !domain.includes('<') &&
-        !domain.includes('>') &&
-        domain.length >= 3);
+  const domain = email.split("@")[1];
+  return domain && (domain.includes(".") && !domain.includes("<") && !domain.includes(">") && domain.length >= 3);
 };
-const sanitizeText = (text) => text
-    .replace(/[<>]/g, '') // Remove potential HTML
-    .trim()
-    .slice(0, 5000); // Limit length
-// Ultra-secure insert schemas with validation - Pure Zod v4 schema (avoiding drizzle-zod type recursion)
-exports.insertAdminSchema = zod_1.z.object({
-    email: zod_1.z.string()
-        .email("Email invalide")
-        .min(5, "Email trop court")
-        .max(100, "Email trop long")
-        .transform(sanitizeText),
-    firstName: zod_1.z.string()
-        .min(1, "Le prénom est obligatoire")
-        .max(50, "Le prénom ne peut pas dépasser 50 caractères")
-        .transform(sanitizeText),
-    lastName: zod_1.z.string()
-        .min(1, "Le nom de famille est obligatoire")
-        .max(50, "Le nom de famille ne peut pas dépasser 50 caractères")
-        .transform(sanitizeText),
-    password: zod_1.z.string()
-        .min(8, "Le mot de passe doit contenir au moins 8 caractères")
-        .max(128, "Le mot de passe ne peut pas dépasser 128 caractères")
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Le mot de passe doit contenir au moins : 1 majuscule (A-Z), 1 minuscule (a-z) et 1 chiffre (0-9)")
-        .optional()
-        .nullable(), // Optionnel car géré par Authentik
-    addedBy: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
-    role: zod_1.z.enum([
-        exports.ADMIN_ROLES.SUPER_ADMIN,
-        exports.ADMIN_ROLES.IDEAS_READER,
-        exports.ADMIN_ROLES.IDEAS_MANAGER,
-        exports.ADMIN_ROLES.EVENTS_READER,
-        exports.ADMIN_ROLES.EVENTS_MANAGER
-    ]).default(exports.ADMIN_ROLES.IDEAS_READER),
+const sanitizeText = (text2) => text2.replace(/[<>]/g, "").trim().slice(0, 5e3);
+const optionalSanitizedText = (max = 5e3) => import_zod.z.string().max(max).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0);
+const organizationTypeValues = Object.values(ORGANIZATION_TYPE);
+const relationTypeValues = Object.values(ORGANIZATION_RELATION_TYPE);
+const syndicationDirectionValues = Object.values(SYNDICATION_DIRECTION);
+const syndicationStatusValues = Object.values(SYNDICATION_STATUS);
+const federationSyncStatusValues = Object.values(FEDERATION_SYNC_STATUS);
+const insertOrganizationNetworkSchema = import_zod.z.object({
+  slug: import_zod.z.string().min(2).max(80).regex(/^[a-z0-9-]+$/).transform(sanitizeText),
+  name: import_zod.z.string().min(2).max(200).transform(sanitizeText),
+  description: optionalSanitizedText(1e3),
+  isActive: import_zod.z.boolean().default(true)
 });
-exports.updateAdminSchema = zod_1.z.object({
-    role: zod_1.z.enum([
-        exports.ADMIN_ROLES.SUPER_ADMIN,
-        exports.ADMIN_ROLES.IDEAS_READER,
-        exports.ADMIN_ROLES.IDEAS_MANAGER,
-        exports.ADMIN_ROLES.EVENTS_READER,
-        exports.ADMIN_ROLES.EVENTS_MANAGER
-    ]).optional(),
-    isActive: zod_1.z.boolean().optional(),
+const updateOrganizationNetworkSchema = insertOrganizationNetworkSchema.partial();
+const insertOrganizationSchema = import_zod.z.object({
+  networkId: import_zod.z.string().uuid().optional().nullable(),
+  parentOrganizationId: import_zod.z.string().uuid().optional().nullable(),
+  slug: import_zod.z.string().min(2).max(80).regex(/^[a-z0-9-]+$/).transform(sanitizeText),
+  name: import_zod.z.string().min(2).max(200).transform(sanitizeText),
+  type: import_zod.z.enum(organizationTypeValues).default(ORGANIZATION_TYPE.SECTION),
+  domain: optionalSanitizedText(255),
+  instanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  brandingConfigId: import_zod.z.number().int().positive().optional().nullable(),
+  isActive: import_zod.z.boolean().default(true)
 });
-exports.updateAdminInfoSchema = zod_1.z.object({
-    firstName: zod_1.z.string()
-        .min(1, "Le prénom est obligatoire")
-        .max(50, "Le prénom ne peut pas dépasser 50 caractères")
-        .transform(sanitizeText),
-    lastName: zod_1.z.string()
-        .min(1, "Le nom de famille est obligatoire")
-        .max(50, "Le nom de famille ne peut pas dépasser 50 caractères")
-        .transform(sanitizeText),
+const updateOrganizationSchema = insertOrganizationSchema.partial();
+const insertOrganizationRelationSchema = import_zod.z.object({
+  fromOrganizationId: import_zod.z.string().uuid(),
+  toOrganizationId: import_zod.z.string().uuid(),
+  relationType: import_zod.z.enum(relationTypeValues).default(ORGANIZATION_RELATION_TYPE.REGION_SECTION),
+  status: import_zod.z.enum(["pending", "active", "revoked"]).default("active"),
+  permissions: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
+  federationToken: import_zod.z.string().min(16).max(512).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  syncEnabled: import_zod.z.boolean().default(true),
+  lastSyncAt: import_zod.z.string().datetime().optional().nullable(),
+  syncStatus: import_zod.z.enum(federationSyncStatusValues).default(FEDERATION_SYNC_STATUS.IDLE)
 });
-exports.updateAdminPasswordSchema = zod_1.z.object({
-    password: zod_1.z.string()
-        .min(8, "Le mot de passe doit contenir au moins 8 caractères")
-        .max(128, "Le mot de passe ne peut pas dépasser 128 caractères")
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Le mot de passe doit contenir au moins : 1 majuscule (A-Z), 1 minuscule (a-z) et 1 chiffre (0-9)"),
+const updateOrganizationRelationSchema = insertOrganizationRelationSchema.partial().omit({ fromOrganizationId: true, toOrganizationId: true });
+const insertEventSyndicationSchema = import_zod.z.object({
+  eventId: import_zod.z.string().uuid(),
+  sourceOrganizationId: import_zod.z.string().uuid(),
+  targetOrganizationId: import_zod.z.string().uuid(),
+  direction: import_zod.z.enum(syndicationDirectionValues),
+  status: import_zod.z.enum(syndicationStatusValues).default(SYNDICATION_STATUS.PROPOSED),
+  includeInAgenda: import_zod.z.boolean().default(false),
+  localTitleOverride: optionalSanitizedText(200),
+  localDescriptionOverride: optionalSanitizedText(5e3),
+  localDateOverride: import_zod.z.string().datetime().optional().nullable(),
+  localRegistrationUrlOverride: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  targetInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  remoteEventId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  remoteSyndicationId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  syncStatus: import_zod.z.enum(federationSyncStatusValues).default(FEDERATION_SYNC_STATUS.LOCAL),
+  syncError: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  lastSyncAttemptAt: import_zod.z.string().datetime().optional().nullable(),
+  syncAttempts: import_zod.z.number().int().min(0).default(0),
+  createdBy: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0)
 });
-// Pure Zod v4 schema (avoiding drizzle-zod type recursion)
-exports.insertIdeaSchema = zod_1.z.object({
-    title: zod_1.z.string()
-        .min(3, "Le titre doit contenir au moins 3 caractères")
-        .max(200, "Le titre est trop long (maximum 200 caractères). Raccourcissez votre titre ou utilisez la description pour plus de détails.")
-        .transform(sanitizeText),
-    description: zod_1.z.string()
-        .max(5000, "Description trop longue (max 5000 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    proposedBy: zod_1.z.string()
-        .min(2, "Votre nom doit contenir au moins 2 caractères")
-        .max(100, "Votre nom est trop long (maximum 100 caractères)")
-        .transform(sanitizeText),
-    proposedByEmail: zod_1.z.string()
-        .email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)")
-        .transform(sanitizeText),
-    company: zod_1.z.string()
-        .max(100, "Le nom de la société est trop long (maximum 100 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    phone: zod_1.z.string()
-        .max(20, "Le numéro de téléphone est trop long (maximum 20 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    deadline: zod_1.z.string().datetime().optional(),
+const updateEventSyndicationSchema = import_zod.z.object({
+  status: import_zod.z.enum(syndicationStatusValues).optional(),
+  includeInAgenda: import_zod.z.boolean().optional(),
+  localTitleOverride: optionalSanitizedText(200),
+  localDescriptionOverride: optionalSanitizedText(5e3),
+  localDateOverride: import_zod.z.string().datetime().optional().nullable(),
+  localRegistrationUrlOverride: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  targetInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  remoteEventId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  remoteSyndicationId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  syncStatus: import_zod.z.enum(federationSyncStatusValues).optional(),
+  syncError: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  lastSyncAttemptAt: import_zod.z.string().datetime().optional().nullable(),
+  syncAttempts: import_zod.z.number().int().min(0).optional(),
+  reviewedBy: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0)
 });
-exports.updateIdeaStatusSchema = zod_1.z.object({
-    status: zod_1.z.enum([
-        exports.IDEA_STATUS.PENDING,
-        exports.IDEA_STATUS.APPROVED,
-        exports.IDEA_STATUS.REJECTED,
-        exports.IDEA_STATUS.UNDER_REVIEW,
-        exports.IDEA_STATUS.POSTPONED,
-        exports.IDEA_STATUS.COMPLETED
-    ]),
+const insertSurveyFormSyndicationSchema = import_zod.z.object({
+  formId: import_zod.z.string().uuid(),
+  sourceOrganizationId: import_zod.z.string().uuid(),
+  targetOrganizationId: import_zod.z.string().uuid(),
+  direction: import_zod.z.enum(syndicationDirectionValues),
+  status: import_zod.z.enum(syndicationStatusValues).default(SYNDICATION_STATUS.PROPOSED),
+  includeResponses: import_zod.z.boolean().default(false),
+  collectResponsesLocally: import_zod.z.boolean().default(true),
+  localTitleOverride: optionalSanitizedText(200),
+  localDescriptionOverride: optionalSanitizedText(3e3),
+  targetInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  remoteFormId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  remoteSyndicationId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  syncStatus: import_zod.z.enum(federationSyncStatusValues).default(FEDERATION_SYNC_STATUS.LOCAL),
+  syncError: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  lastSyncAttemptAt: import_zod.z.string().datetime().optional().nullable(),
+  syncAttempts: import_zod.z.number().int().min(0).default(0),
+  createdBy: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0)
 });
-exports.updateIdeaSchema = zod_1.z.object({
-    title: zod_1.z.string()
-        .min(1, "Le titre est requis")
-        .max(255, "Le titre est trop long (maximum 255 caractères). Raccourcissez votre titre."),
-    description: zod_1.z.string().nullable().optional(),
-    proposedBy: zod_1.z.string()
-        .min(2, "Votre nom doit contenir au moins 2 caractères")
-        .max(100, "Votre nom est trop long (maximum 100 caractères)")
-        .transform(sanitizeText),
-    proposedByEmail: zod_1.z.string()
-        .email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)")
-        .transform(sanitizeText),
-    createdAt: zod_1.z.string().datetime("La date de publication n'est pas valide").optional(),
+const updateSurveyFormSyndicationSchema = import_zod.z.object({
+  status: import_zod.z.enum(syndicationStatusValues).optional(),
+  includeResponses: import_zod.z.boolean().optional(),
+  collectResponsesLocally: import_zod.z.boolean().optional(),
+  localTitleOverride: optionalSanitizedText(200),
+  localDescriptionOverride: optionalSanitizedText(3e3),
+  targetInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  remoteFormId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  remoteSyndicationId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  syncStatus: import_zod.z.enum(federationSyncStatusValues).optional(),
+  syncError: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  lastSyncAttemptAt: import_zod.z.string().datetime().optional().nullable(),
+  syncAttempts: import_zod.z.number().int().min(0).optional(),
+  reviewedBy: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0)
 });
-// Pure Zod v4 schema
-exports.insertVoteSchema = zod_1.z.object({
-    ideaId: zod_1.z.string()
-        .min(1, "ID d'idée requis")
-        .refine((id) => {
-        // Accepter les UUIDs standard (36 caractères) ou les IDs existants (20 caractères alphanumériques)
-        const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
-        const isLegacyId = /^[a-zA-Z0-9]{20}$/.test(id);
-        return isUuid || isLegacyId;
-    }, "ID d'idée invalide")
-        .transform(sanitizeText),
-    voterName: zod_1.z.string()
-        .min(2, "Votre nom doit contenir au moins 2 caractères")
-        .max(100, "Votre nom est trop long (maximum 100 caractères)")
-        .transform(sanitizeText),
-    voterEmail: zod_1.z.string()
-        .email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)")
-        .transform(sanitizeText),
+const insertBusinessAuditLogSchema = import_zod.z.object({
+  actorEmail: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  action: import_zod.z.string().min(2).max(120).transform(sanitizeText),
+  entityType: import_zod.z.string().min(2).max(80).transform(sanitizeText),
+  entityId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  organizationId: import_zod.z.string().uuid().optional().nullable(),
+  relationId: import_zod.z.string().uuid().optional().nullable(),
+  metadata: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
+  ipAddress: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  userAgent: import_zod.z.string().max(500).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
 });
-// Pure Zod v4 schema
-exports.insertEventSchema = zod_1.z.object({
-    title: zod_1.z.string()
-        .min(3, "Le titre doit contenir au moins 3 caractères")
-        .max(200, "Le titre est trop long (maximum 200 caractères). Raccourcissez votre titre ou utilisez la description pour plus de détails.")
-        .transform(sanitizeText),
-    description: zod_1.z.string()
-        .max(5000, "La description est trop longue (maximum 5000 caractères). Raccourcissez votre texte.")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    date: zod_1.z.string().datetime("La date n'est pas valide. Veuillez sélectionner une date et heure correctes."),
-    location: zod_1.z.string()
-        .max(200, "Le nom du lieu est trop long (maximum 200 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    maxParticipants: zod_1.z.number()
-        .min(1, "Le nombre maximum de participants doit être d'au moins 1 personne")
-        .max(1000, "Le nombre maximum de participants ne peut pas dépasser 1000 personnes")
-        .optional(),
-    helloAssoLink: zod_1.z.string()
-        .optional()
-        .refine(url => !url || url.includes('helloasso.com'), "L'adresse doit être un lien HelloAsso valide (contenant 'helloasso.com')")
-        .refine(url => !url || zod_1.z.string().url().safeParse(url).success, "L'adresse web n'est pas valide. Veuillez saisir une URL complète (ex: https://exemple.com)")
-        .transform(val => val ? sanitizeText(val) : undefined),
-    enableExternalRedirect: zod_1.z.boolean().optional(),
-    externalRedirectUrl: zod_1.z.string()
-        .optional()
-        .refine(url => !url || zod_1.z.string().url().safeParse(url).success, "L'adresse web de redirection n'est pas valide. Veuillez saisir une URL complète (ex: https://exemple.com)")
-        .transform(val => val ? sanitizeText(val) : undefined),
-    showInscriptionsCount: zod_1.z.boolean().optional(),
-    showAvailableSeats: zod_1.z.boolean().optional(),
-    allowUnsubscribe: zod_1.z.boolean().optional(),
-    redUnsubscribeButton: zod_1.z.boolean().optional(),
-    buttonMode: zod_1.z.enum(["subscribe", "unsubscribe", "both", "custom"]).optional(),
-    customButtonText: zod_1.z.string()
-        .max(50, "Le texte du bouton personnalisé est trop long (maximum 50 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    status: zod_1.z.enum(["draft", "published", "cancelled", "archived", "postponed", "completed"]).optional(),
+const insertAdminSchema = import_zod.z.object({
+  email: import_zod.z.string().email("Email invalide").min(5, "Email trop court").max(100, "Email trop long").transform(sanitizeText),
+  firstName: import_zod.z.string().min(1, "Le pr\xE9nom est obligatoire").max(50, "Le pr\xE9nom ne peut pas d\xE9passer 50 caract\xE8res").transform(sanitizeText),
+  lastName: import_zod.z.string().min(1, "Le nom de famille est obligatoire").max(50, "Le nom de famille ne peut pas d\xE9passer 50 caract\xE8res").transform(sanitizeText),
+  password: import_zod.z.string().min(8, "Le mot de passe doit contenir au moins 8 caract\xE8res").max(128, "Le mot de passe ne peut pas d\xE9passer 128 caract\xE8res").regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Le mot de passe doit contenir au moins : 1 majuscule (A-Z), 1 minuscule (a-z) et 1 chiffre (0-9)").optional().nullable(),
+  addedBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  role: import_zod.z.enum([
+    ADMIN_ROLES.SUPER_ADMIN,
+    ADMIN_ROLES.IDEAS_READER,
+    ADMIN_ROLES.IDEAS_MANAGER,
+    ADMIN_ROLES.EVENTS_READER,
+    ADMIN_ROLES.EVENTS_MANAGER
+  ]).default(ADMIN_ROLES.IDEAS_READER)
 });
-// Pure Zod v4 schema
-exports.insertInscriptionSchema = zod_1.z.object({
-    eventId: zod_1.z.string()
-        .uuid("L'identifiant de l'événement n'est pas valide")
-        .transform(sanitizeText),
-    name: zod_1.z.string()
-        .min(2, "Votre nom doit contenir au moins 2 caractères")
-        .max(100, "Votre nom est trop long (maximum 100 caractères)")
-        .transform(sanitizeText),
-    email: zod_1.z.string()
-        .email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)")
-        .refine(isValidDomain, "Le domaine de votre adresse email n'est pas autorisé")
-        .transform(sanitizeText),
-    company: zod_1.z.string()
-        .max(100, "Le nom de la société est trop long (maximum 100 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    phone: zod_1.z.string()
-        .max(20, "Le numéro de téléphone est trop long (maximum 20 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    comments: zod_1.z.string()
-        .max(500, "Vos commentaires sont trop longs (maximum 500 caractères). Raccourcissez votre message.")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
+const updateAdminSchema = import_zod.z.object({
+  role: import_zod.z.enum([
+    ADMIN_ROLES.SUPER_ADMIN,
+    ADMIN_ROLES.IDEAS_READER,
+    ADMIN_ROLES.IDEAS_MANAGER,
+    ADMIN_ROLES.EVENTS_READER,
+    ADMIN_ROLES.EVENTS_MANAGER
+  ]).optional(),
+  isActive: import_zod.z.boolean().optional()
 });
-// Schema for initial inscription (without eventId since it will be auto-generated)
-exports.initialInscriptionSchema = zod_1.z.object({
-    name: zod_1.z.string()
-        .min(2, "Votre nom doit contenir au moins 2 caractères")
-        .max(100, "Votre nom est trop long (maximum 100 caractères)")
-        .transform(sanitizeText),
-    email: zod_1.z.string()
-        .email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)")
-        .refine(isValidDomain, "Le domaine de votre adresse email n'est pas autorisé")
-        .transform(sanitizeText),
-    company: zod_1.z.string()
-        .max(100, "Le nom de la société est trop long (maximum 100 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    phone: zod_1.z.string()
-        .max(20, "Le numéro de téléphone est trop long (maximum 20 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    comments: zod_1.z.string()
-        .max(500, "Vos commentaires sont trop longs (maximum 500 caractères). Raccourcissez votre message.")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
+const updateAdminInfoSchema = import_zod.z.object({
+  firstName: import_zod.z.string().min(1, "Le pr\xE9nom est obligatoire").max(50, "Le pr\xE9nom ne peut pas d\xE9passer 50 caract\xE8res").transform(sanitizeText),
+  lastName: import_zod.z.string().min(1, "Le nom de famille est obligatoire").max(50, "Le nom de famille ne peut pas d\xE9passer 50 caract\xE8res").transform(sanitizeText),
+  notificationEmail: import_zod.z.string().email("Email invalide").optional().nullable()
 });
-// Schema for creating event with initial inscriptions
-exports.createEventWithInscriptionsSchema = zod_1.z.object({
-    event: exports.insertEventSchema,
-    initialInscriptions: zod_1.z.array(exports.initialInscriptionSchema).default([])
+const updateAdminPasswordSchema = import_zod.z.object({
+  password: import_zod.z.string().min(8, "Le mot de passe doit contenir au moins 8 caract\xE8res").max(128, "Le mot de passe ne peut pas d\xE9passer 128 caract\xE8res").regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Le mot de passe doit contenir au moins : 1 majuscule (A-Z), 1 minuscule (a-z) et 1 chiffre (0-9)")
 });
-// Pure Zod v4 schema
-exports.insertUnsubscriptionSchema = zod_1.z.object({
-    eventId: zod_1.z.string()
-        .uuid("L'identifiant de l'événement n'est pas valide")
-        .transform(sanitizeText),
-    name: zod_1.z.string()
-        .min(2, "Votre nom doit contenir au moins 2 caractères")
-        .max(100, "Votre nom est trop long (maximum 100 caractères)")
-        .transform(sanitizeText),
-    email: zod_1.z.string()
-        .email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)")
-        .refine(isValidDomain, "Le domaine de votre adresse email n'est pas autorisé")
-        .transform(sanitizeText),
-    comments: zod_1.z.string()
-        .max(500, "Votre raison d'absence est trop longue (maximum 500 caractères). Raccourcissez votre message.")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
+const insertIdeaSchema = import_zod.z.object({
+  title: import_zod.z.string().min(3, "Le titre doit contenir au moins 3 caract\xE8res").max(200, "Le titre est trop long (maximum 200 caract\xE8res). Raccourcissez votre titre ou utilisez la description pour plus de d\xE9tails.").transform(sanitizeText),
+  description: import_zod.z.string().max(5e3, "Description trop longue (max 5000 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  proposedBy: import_zod.z.string().min(2, "Votre nom doit contenir au moins 2 caract\xE8res").max(100, "Votre nom est trop long (maximum 100 caract\xE8res)").transform(sanitizeText),
+  proposedByEmail: import_zod.z.string().email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)").transform(sanitizeText),
+  company: import_zod.z.string().max(100, "Le nom de la soci\xE9t\xE9 est trop long (maximum 100 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  phone: import_zod.z.string().max(20, "Le num\xE9ro de t\xE9l\xE9phone est trop long (maximum 20 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  deadline: import_zod.z.string().datetime().optional()
 });
-// Loan items schemas - Pure Zod v4 schema
-exports.insertLoanItemSchema = zod_1.z.object({
-    title: zod_1.z.string()
-        .min(3, "Le titre doit contenir au moins 3 caractères")
-        .max(200, "Le titre est trop long (maximum 200 caractères)")
-        .transform(sanitizeText),
-    description: zod_1.z.string()
-        .max(5000, "La description est trop longue (maximum 5000 caractères)")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    lenderName: zod_1.z.string()
-        .min(2, "Le nom du JD qui prête doit contenir au moins 2 caractères")
-        .max(100, "Le nom du JD est trop long (maximum 100 caractères)")
-        .transform(sanitizeText),
-    photoUrl: zod_1.z.string()
-        .url("L'URL de la photo n'est pas valide")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    proposedBy: zod_1.z.string()
-        .min(2, "Votre nom doit contenir au moins 2 caractères")
-        .max(100, "Votre nom est trop long (maximum 100 caractères)")
-        .transform(sanitizeText),
-    proposedByEmail: zod_1.z.string()
-        .email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)")
-        .transform(sanitizeText),
-    status: zod_1.z.enum(["available", "borrowed", "reserved", "unavailable"]).optional(),
+const updateIdeaStatusSchema = import_zod.z.object({
+  status: import_zod.z.enum([
+    IDEA_STATUS.PENDING,
+    IDEA_STATUS.APPROVED,
+    IDEA_STATUS.REJECTED,
+    IDEA_STATUS.UNDER_REVIEW,
+    IDEA_STATUS.POSTPONED,
+    IDEA_STATUS.COMPLETED
+  ])
 });
-exports.updateLoanItemSchema = zod_1.z.object({
-    title: zod_1.z.string()
-        .min(3, "Le titre doit contenir au moins 3 caractères")
-        .max(200, "Le titre est trop long (maximum 200 caractères)")
-        .optional(),
-    description: zod_1.z.string()
-        .max(5000, "La description est trop longue (maximum 5000 caractères)")
-        .optional()
-        .nullable(),
-    lenderName: zod_1.z.string()
-        .min(2, "Le nom du JD qui prête doit contenir au moins 2 caractères")
-        .max(100, "Le nom du JD est trop long (maximum 100 caractères)")
-        .optional(),
-    photoUrl: zod_1.z.string()
-        .url("L'URL de la photo n'est pas valide")
-        .optional()
-        .nullable(),
+const updateIdeaSchema = import_zod.z.object({
+  title: import_zod.z.string().min(1, "Le titre est requis").max(255, "Le titre est trop long (maximum 255 caract\xE8res). Raccourcissez votre titre."),
+  description: import_zod.z.string().nullable().optional(),
+  proposedBy: import_zod.z.string().min(2, "Votre nom doit contenir au moins 2 caract\xE8res").max(100, "Votre nom est trop long (maximum 100 caract\xE8res)").transform(sanitizeText),
+  proposedByEmail: import_zod.z.string().email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)").transform(sanitizeText),
+  createdAt: import_zod.z.string().datetime("La date de publication n'est pas valide").optional()
 });
-exports.updateLoanItemStatusSchema = zod_1.z.object({
-    status: zod_1.z.enum([
-        exports.LOAN_STATUS.PENDING,
-        exports.LOAN_STATUS.AVAILABLE,
-        exports.LOAN_STATUS.BORROWED,
-        exports.LOAN_STATUS.UNAVAILABLE
-    ]),
+const insertVoteSchema = import_zod.z.object({
+  ideaId: import_zod.z.string().min(1, "ID d'id\xE9e requis").refine(
+    (id) => {
+      const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+      const isLegacyId = /^[a-zA-Z0-9]{20}$/.test(id);
+      return isUuid || isLegacyId;
+    },
+    "ID d'id\xE9e invalide"
+  ).transform(sanitizeText),
+  voterName: import_zod.z.string().min(2, "Votre nom doit contenir au moins 2 caract\xE8res").max(100, "Votre nom est trop long (maximum 100 caract\xE8res)").transform(sanitizeText),
+  voterEmail: import_zod.z.string().email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)").transform(sanitizeText)
 });
-// Pure Zod v4 schema
-exports.insertPatronSchema = zod_1.z.object({
-    firstName: zod_1.z.string()
-        .min(2, "Le prénom doit contenir au moins 2 caractères")
-        .max(100, "Le prénom ne peut pas dépasser 100 caractères")
-        .transform(sanitizeText),
-    lastName: zod_1.z.string()
-        .min(2, "Le nom doit contenir au moins 2 caractères")
-        .max(100, "Le nom ne peut pas dépasser 100 caractères")
-        .transform(sanitizeText),
-    role: zod_1.z.string()
-        .max(100, "La fonction ne peut pas dépasser 100 caractères")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    company: zod_1.z.string()
-        .max(200, "Le nom de la société ne peut pas dépasser 200 caractères")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    phone: zod_1.z.string()
-        .max(20, "Le numéro de téléphone ne peut pas dépasser 20 caractères")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    email: zod_1.z.string()
-        .email("Adresse email invalide")
-        .transform(sanitizeText),
-    notes: zod_1.z.string()
-        .max(2000, "Les notes ne peuvent pas dépasser 2000 caractères")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    referrerId: zod_1.z.string()
-        .optional()
-        .transform(val => {
-        if (!val || val.trim() === "")
-            return undefined;
-        return sanitizeText(val);
-    })
-        .refine(val => !val || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val), {
-        message: "L'identifiant du prescripteur n'est pas valide"
-    }),
-    createdBy: zod_1.z.string()
-        .email("Email de l'administrateur invalide")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
+const insertEventSchema = import_zod.z.object({
+  title: import_zod.z.string().min(3, "Le titre doit contenir au moins 3 caract\xE8res").max(200, "Le titre est trop long (maximum 200 caract\xE8res). Raccourcissez votre titre ou utilisez la description pour plus de d\xE9tails.").transform(sanitizeText),
+  description: import_zod.z.string().max(5e3, "La description est trop longue (maximum 5000 caract\xE8res). Raccourcissez votre texte.").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  date: import_zod.z.string().datetime("La date n'est pas valide. Veuillez s\xE9lectionner une date et heure correctes."),
+  location: import_zod.z.string().max(200, "Le nom du lieu est trop long (maximum 200 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  maxParticipants: import_zod.z.number().min(1, "Le nombre maximum de participants doit \xEAtre d'au moins 1 personne").max(1e3, "Le nombre maximum de participants ne peut pas d\xE9passer 1000 personnes").optional(),
+  helloAssoLink: import_zod.z.string().optional().refine((url) => !url || url.includes("helloasso.com"), "L'adresse doit \xEAtre un lien HelloAsso valide (contenant 'helloasso.com')").refine((url) => !url || import_zod.z.string().url().safeParse(url).success, "L'adresse web n'est pas valide. Veuillez saisir une URL compl\xE8te (ex: https://exemple.com)").transform((val) => val ? sanitizeText(val) : void 0),
+  enableExternalRedirect: import_zod.z.boolean().optional(),
+  externalRedirectUrl: import_zod.z.string().optional().refine((url) => !url || import_zod.z.string().url().safeParse(url).success, "L'adresse web de redirection n'est pas valide. Veuillez saisir une URL compl\xE8te (ex: https://exemple.com)").transform((val) => val ? sanitizeText(val) : void 0),
+  showInscriptionsCount: import_zod.z.boolean().optional(),
+  showAvailableSeats: import_zod.z.boolean().optional(),
+  allowUnsubscribe: import_zod.z.boolean().optional(),
+  redUnsubscribeButton: import_zod.z.boolean().optional(),
+  buttonMode: import_zod.z.enum(["subscribe", "unsubscribe", "both", "custom"]).optional(),
+  customButtonText: import_zod.z.string().max(50, "Le texte du bouton personnalis\xE9 est trop long (maximum 50 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  organizationId: import_zod.z.string().uuid().optional().nullable(),
+  originOrganizationId: import_zod.z.string().uuid().optional().nullable(),
+  sourceEventId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  sourceInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  federationVisibility: import_zod.z.enum(["local", "parent_region", "child_sections", "network", "selected_organizations"]).optional(),
+  federationStatus: import_zod.z.enum(["local_only", "proposed_to_region", "accepted_by_region", "published_to_sections", "imported"]).optional(),
+  isFederatedCopy: import_zod.z.boolean().optional(),
+  canonicalEventId: import_zod.z.string().uuid().optional().nullable(),
+  status: import_zod.z.enum(["draft", "published", "cancelled", "archived", "postponed", "completed"]).optional()
 });
-// Pure Zod v4 schema
-exports.insertPatronDonationSchema = zod_1.z.object({
-    patronId: zod_1.z.string()
-        .uuid("L'identifiant du mécène n'est pas valide")
-        .transform(sanitizeText),
-    donatedAt: zod_1.z.string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD")
-        .transform((val) => new Date(val + 'T00:00:00.000Z')),
-    amount: zod_1.z.number()
-        .int("Le montant doit être un nombre entier")
-        .min(0, "Le montant ne peut pas être négatif"),
-    occasion: zod_1.z.string()
-        .min(3, "L'occasion doit contenir au moins 3 caractères")
-        .max(200, "L'occasion ne peut pas dépasser 200 caractères")
-        .transform(sanitizeText),
-    recordedBy: zod_1.z.string()
-        .email("Email de l'administrateur invalide")
-        .transform(sanitizeText),
+const surveyQuestionOptionSchema = import_zod.z.object({
+  label: import_zod.z.string().min(1).max(200).transform(sanitizeText),
+  value: import_zod.z.string().min(1).max(200).optional().transform((val) => val ? sanitizeText(val) : void 0)
 });
-// Pure Zod v4 schema
-exports.insertPatronUpdateSchema = zod_1.z.object({
-    patronId: zod_1.z.string()
-        .uuid("L'identifiant du mécène n'est pas valide")
-        .transform(sanitizeText),
-    type: zod_1.z.enum(["meeting", "email", "call", "lunch", "event"], {
-        message: "Le type doit être 'meeting', 'email', 'call', 'lunch' ou 'event'"
-    }),
-    subject: zod_1.z.string()
-        .min(3, "Le sujet doit contenir au moins 3 caractères")
-        .max(200, "Le sujet ne peut pas dépasser 200 caractères")
-        .transform(sanitizeText),
-    date: zod_1.z.string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD"),
-    startTime: zod_1.z.string()
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    duration: zod_1.z.number()
-        .int("La durée doit être un nombre entier")
-        .min(0, "La durée ne peut pas être négative")
-        .optional(),
-    description: zod_1.z.string()
-        .min(1, "La description est obligatoire")
-        .max(3000, "La description ne peut pas dépasser 3000 caractères")
-        .transform(sanitizeText),
-    notes: zod_1.z.string()
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    createdBy: zod_1.z.string()
-        .email("Email de l'administrateur invalide")
-        .transform(sanitizeText),
+const surveyQuestionSchema = import_zod.z.object({
+  id: import_zod.z.string().uuid().optional(),
+  label: import_zod.z.string().min(2, "Le libell\xE9 de question doit contenir au moins 2 caract\xE8res").max(500).transform(sanitizeText),
+  description: import_zod.z.string().max(1e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  type: import_zod.z.enum(["text", "textarea", "email", "phone", "number", "date", "select", "radio", "multiselect", "checkbox", "rating"]),
+  required: import_zod.z.boolean().default(false),
+  options: import_zod.z.array(surveyQuestionOptionSchema).default([]),
+  validation: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
+  orderIndex: import_zod.z.number().int().min(0).optional()
 });
-exports.updatePatronUpdateSchema = zod_1.z.object({
-    type: zod_1.z.enum(["meeting", "email", "call", "lunch", "event"]).optional(),
-    subject: zod_1.z.string()
-        .min(3, "Le sujet doit contenir au moins 3 caractères")
-        .max(200, "Le sujet ne peut pas dépasser 200 caractères")
-        .transform(sanitizeText)
-        .optional(),
-    date: zod_1.z.string()
-        .regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD")
-        .optional(),
-    startTime: zod_1.z.string()
-        .regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "L'heure doit être au format HH:MM")
-        .transform(val => sanitizeText(val))
-        .optional(),
-    duration: zod_1.z.number()
-        .int("La durée doit être un nombre entier")
-        .min(0, "La durée ne peut pas être négative")
-        .optional(),
-    description: zod_1.z.string()
-        .min(1, "La description est obligatoire")
-        .max(3000, "La description ne peut pas dépasser 3000 caractères")
-        .transform(sanitizeText)
-        .optional(),
-    notes: zod_1.z.string()
-        .max(2000, "Les notes ne peuvent pas dépasser 2000 caractères")
-        .transform(val => sanitizeText(val))
-        .optional(),
+const insertSurveyFormSchema = import_zod.z.object({
+  title: import_zod.z.string().min(3, "Le titre du formulaire doit contenir au moins 3 caract\xE8res").max(200).transform(sanitizeText),
+  slug: import_zod.z.string().min(3).max(120).regex(/^[a-z0-9-]+$/).optional(),
+  description: import_zod.z.string().max(3e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  status: import_zod.z.enum(["draft", "published", "closed"]).default("draft"),
+  collectRespondentInfo: import_zod.z.boolean().default(false),
+  allowMultipleSubmissions: import_zod.z.boolean().default(true),
+  successMessage: import_zod.z.string().max(1e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  expiresAt: import_zod.z.string().datetime().optional().nullable(),
+  organizationId: import_zod.z.string().uuid().optional().nullable(),
+  originOrganizationId: import_zod.z.string().uuid().optional().nullable(),
+  sourceFormId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  sourceInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  federationVisibility: import_zod.z.enum(["local", "parent_region", "child_sections", "network", "selected_organizations"]).optional(),
+  federationStatus: import_zod.z.enum(["local_only", "proposed_to_region", "accepted_by_region", "published_to_sections", "imported"]).optional(),
+  isFederatedCopy: import_zod.z.boolean().optional(),
+  canonicalFormId: import_zod.z.string().uuid().optional().nullable(),
+  requireConsent: import_zod.z.boolean().default(false),
+  consentText: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  retentionDays: import_zod.z.number().int().min(1).max(3650).optional().nullable(),
+  questions: import_zod.z.array(surveyQuestionSchema).default([])
 });
-// Pure Zod v4 schema
-exports.insertIdeaPatronProposalSchema = zod_1.z.object({
-    ideaId: zod_1.z.string()
-        .uuid("L'identifiant de l'idée n'est pas valide")
-        .transform(sanitizeText),
-    patronId: zod_1.z.string()
-        .uuid("L'identifiant du mécène n'est pas valide")
-        .transform(sanitizeText),
-    proposedByAdminEmail: zod_1.z.string()
-        .email("Email de l'administrateur invalide")
-        .transform(sanitizeText),
-    status: zod_1.z.enum(["proposed", "contacted", "declined", "converted"]).default("proposed"),
-    comments: zod_1.z.string()
-        .max(1000, "Les commentaires ne peuvent pas dépasser 1000 caractères")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
+const updateSurveyFormSchema = insertSurveyFormSchema.partial().extend({
+  questions: import_zod.z.array(surveyQuestionSchema).optional()
 });
-exports.updatePatronSchema = zod_1.z.object({
-    firstName: zod_1.z.string()
-        .min(2, "Le prénom doit contenir au moins 2 caractères")
-        .max(100, "Le prénom ne peut pas dépasser 100 caractères")
-        .transform(sanitizeText)
-        .optional(),
-    lastName: zod_1.z.string()
-        .min(2, "Le nom doit contenir au moins 2 caractères")
-        .max(100, "Le nom ne peut pas dépasser 100 caractères")
-        .transform(sanitizeText)
-        .optional(),
-    role: zod_1.z.string()
-        .max(100, "La fonction ne peut pas dépasser 100 caractères")
-        .transform(val => sanitizeText(val))
-        .optional(),
-    company: zod_1.z.string()
-        .max(200, "Le nom de la société ne peut pas dépasser 200 caractères")
-        .transform(val => sanitizeText(val))
-        .optional(),
-    phone: zod_1.z.string()
-        .max(20, "Le numéro de téléphone ne peut pas dépasser 20 caractères")
-        .transform(val => sanitizeText(val))
-        .optional(),
-    email: zod_1.z.string()
-        .email("Adresse email invalide")
-        .transform(sanitizeText)
-        .optional(),
-    notes: zod_1.z.string()
-        .max(2000, "Les notes ne peuvent pas dépasser 2000 caractères")
-        .transform(val => sanitizeText(val))
-        .optional(),
-    referrerId: zod_1.z.string()
-        .optional()
-        .nullable()
-        .transform(val => {
-        if (!val || val.trim() === "")
-            return null;
-        return sanitizeText(val);
-    })
-        .refine(val => !val || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val), {
-        message: "L'identifiant du prescripteur n'est pas valide"
-    }),
+const submitSurveyResponseSchema = import_zod.z.object({
+  respondentName: import_zod.z.string().max(200).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  respondentEmail: import_zod.z.string().email("Adresse email invalide").optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  answers: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
+  consentAccepted: import_zod.z.boolean().optional().default(false)
 });
-exports.updateIdeaPatronProposalSchema = zod_1.z.object({
-    status: zod_1.z.enum(["proposed", "contacted", "declined", "converted"]).optional(),
-    comments: zod_1.z.string()
-        .max(1000, "Les commentaires ne peuvent pas dépasser 1000 caractères")
-        .transform(val => sanitizeText(val))
-        .optional(),
+const insertInscriptionSchema = import_zod.z.object({
+  eventId: import_zod.z.string().uuid("L'identifiant de l'\xE9v\xE9nement n'est pas valide").transform(sanitizeText),
+  name: import_zod.z.string().min(2, "Votre nom doit contenir au moins 2 caract\xE8res").max(100, "Votre nom est trop long (maximum 100 caract\xE8res)").transform(sanitizeText),
+  email: import_zod.z.string().email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)").refine(isValidDomain, "Le domaine de votre adresse email n'est pas autoris\xE9").transform(sanitizeText),
+  company: import_zod.z.string().max(100, "Le nom de la soci\xE9t\xE9 est trop long (maximum 100 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  phone: import_zod.z.string().max(20, "Le num\xE9ro de t\xE9l\xE9phone est trop long (maximum 20 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  comments: import_zod.z.string().max(500, "Vos commentaires sont trop longs (maximum 500 caract\xE8res). Raccourcissez votre message.").optional().transform((val) => val ? sanitizeText(val) : void 0)
 });
-// Pure Zod v4 schema
-exports.insertEventSponsorshipSchema = zod_1.z.object({
-    eventId: zod_1.z.string()
-        .uuid("L'identifiant de l'événement n'est pas valide")
-        .transform(sanitizeText),
-    patronId: zod_1.z.string()
-        .uuid("L'identifiant du mécène n'est pas valide")
-        .transform(sanitizeText),
-    level: zod_1.z.enum(["platinum", "gold", "silver", "bronze", "partner"], {
-        message: "Niveau de sponsoring invalide"
-    }),
-    amount: zod_1.z.number()
-        .int("Le montant doit être un nombre entier")
-        .min(0, "Le montant ne peut pas être négatif"),
-    benefits: zod_1.z.string()
-        .max(2000, "Les contreparties ne peuvent pas dépasser 2000 caractères")
-        .transform(val => val ? sanitizeText(val) : undefined)
-        .optional(),
-    isPubliclyVisible: zod_1.z.boolean().default(true),
-    status: zod_1.z.enum(["proposed", "confirmed", "completed", "cancelled"]).default("proposed"),
-    logoUrl: zod_1.z.string()
-        .url("URL du logo invalide")
-        .max(500, "L'URL du logo est trop longue")
-        .transform(val => val ? sanitizeText(val) : undefined)
-        .optional(),
-    websiteUrl: zod_1.z.string()
-        .url("URL du site web invalide")
-        .max(500, "L'URL du site web est trop longue")
-        .transform(val => val ? sanitizeText(val) : undefined)
-        .optional(),
-    proposedByAdminEmail: zod_1.z.string()
-        .email("Email de l'administrateur invalide")
-        .transform(sanitizeText),
-    confirmedAt: zod_1.z.string()
-        .optional()
-        .nullable()
-        .transform(val => {
-        if (!val)
-            return null;
-        return val;
-    }),
+const initialInscriptionSchema = import_zod.z.object({
+  name: import_zod.z.string().min(2, "Votre nom doit contenir au moins 2 caract\xE8res").max(100, "Votre nom est trop long (maximum 100 caract\xE8res)").transform(sanitizeText),
+  email: import_zod.z.string().email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)").refine(isValidDomain, "Le domaine de votre adresse email n'est pas autoris\xE9").transform(sanitizeText),
+  company: import_zod.z.string().max(100, "Le nom de la soci\xE9t\xE9 est trop long (maximum 100 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  phone: import_zod.z.string().max(20, "Le num\xE9ro de t\xE9l\xE9phone est trop long (maximum 20 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  comments: import_zod.z.string().max(500, "Vos commentaires sont trop longs (maximum 500 caract\xE8res). Raccourcissez votre message.").optional().transform((val) => val ? sanitizeText(val) : void 0)
 });
-exports.updateEventSponsorshipSchema = zod_1.z.object({
-    level: zod_1.z.enum(["platinum", "gold", "silver", "bronze", "partner"]).optional(),
-    amount: zod_1.z.number().int().min(0).optional(),
-    benefits: zod_1.z.string()
-        .max(2000, "Les contreparties ne peuvent pas dépasser 2000 caractères")
-        .transform(val => sanitizeText(val))
-        .optional(),
-    isPubliclyVisible: zod_1.z.boolean().optional(),
-    status: zod_1.z.enum(["proposed", "confirmed", "completed", "cancelled"]).optional(),
-    logoUrl: zod_1.z.string()
-        .url("URL du logo invalide")
-        .max(500)
-        .transform(val => sanitizeText(val))
-        .optional(),
-    websiteUrl: zod_1.z.string()
-        .url("URL du site web invalide")
-        .max(500)
-        .transform(val => sanitizeText(val))
-        .optional(),
-    confirmedAt: zod_1.z.string().optional().nullable(),
+const createEventWithInscriptionsSchema = import_zod.z.object({
+  event: insertEventSchema,
+  initialInscriptions: import_zod.z.array(initialInscriptionSchema).default([])
 });
-// Pure Zod v4 schema
-exports.insertMemberSchema = zod_1.z.object({
-    email: zod_1.z.string().email().transform(sanitizeText),
-    firstName: zod_1.z.string().min(2).max(100).transform(sanitizeText),
-    lastName: zod_1.z.string().min(2).max(100).transform(sanitizeText),
-    company: zod_1.z.string().max(200).optional().transform(val => val ? sanitizeText(val) : undefined),
-    phone: zod_1.z.string().max(20).optional().transform(val => val ? sanitizeText(val) : undefined),
-    role: zod_1.z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
-    notes: zod_1.z.string().max(2000).optional().transform(val => val ? sanitizeText(val) : undefined),
-    status: zod_1.z.enum(['active', 'proposed']).default('active'),
-    proposedBy: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+const insertUnsubscriptionSchema = import_zod.z.object({
+  eventId: import_zod.z.string().uuid("L'identifiant de l'\xE9v\xE9nement n'est pas valide").transform(sanitizeText),
+  name: import_zod.z.string().min(2, "Votre nom doit contenir au moins 2 caract\xE8res").max(100, "Votre nom est trop long (maximum 100 caract\xE8res)").transform(sanitizeText),
+  email: import_zod.z.string().email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)").refine(isValidDomain, "Le domaine de votre adresse email n'est pas autoris\xE9").transform(sanitizeText),
+  comments: import_zod.z.string().max(500, "Votre raison d'absence est trop longue (maximum 500 caract\xE8res). Raccourcissez votre message.").optional().transform((val) => val ? sanitizeText(val) : void 0)
 });
-// Pure Zod v4 schema
-exports.insertMemberActivitySchema = zod_1.z.object({
-    memberEmail: zod_1.z.string().email().transform(sanitizeText),
-    activityType: zod_1.z.enum(['idea_proposed', 'vote_cast', 'event_registered', 'event_unregistered', 'patron_suggested']),
-    entityType: zod_1.z.enum(['idea', 'vote', 'event', 'patron']),
-    entityId: zod_1.z.string().uuid().optional(),
-    entityTitle: zod_1.z.string().max(500).optional().transform(val => val ? sanitizeText(val) : undefined),
-    metadata: zod_1.z.string().optional(),
-    scoreImpact: zod_1.z.number().int(),
+const insertLoanItemSchema = import_zod.z.object({
+  title: import_zod.z.string().min(3, "Le titre doit contenir au moins 3 caract\xE8res").max(200, "Le titre est trop long (maximum 200 caract\xE8res)").transform(sanitizeText),
+  description: import_zod.z.string().max(5e3, "La description est trop longue (maximum 5000 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  lenderName: import_zod.z.string().min(2, "Le nom du JD qui pr\xEAte doit contenir au moins 2 caract\xE8res").max(100, "Le nom du JD est trop long (maximum 100 caract\xE8res)").transform(sanitizeText),
+  photoUrl: import_zod.z.string().url("L'URL de la photo n'est pas valide").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  proposedBy: import_zod.z.string().min(2, "Votre nom doit contenir au moins 2 caract\xE8res").max(100, "Votre nom est trop long (maximum 100 caract\xE8res)").transform(sanitizeText),
+  proposedByEmail: import_zod.z.string().email("Adresse email invalide. Veuillez saisir une adresse email valide (ex: nom@domaine.fr)").transform(sanitizeText),
+  status: import_zod.z.enum(["available", "borrowed", "reserved", "unavailable"]).optional()
 });
-exports.updateMemberSchema = zod_1.z.object({
-    firstName: zod_1.z.string().min(2).max(100).transform(sanitizeText).optional(),
-    lastName: zod_1.z.string().min(2).max(100).transform(sanitizeText).optional(),
-    company: zod_1.z.string().max(200).transform(sanitizeText).optional(),
-    phone: zod_1.z.string().max(20).transform(sanitizeText).optional(),
-    role: zod_1.z.string().max(100).transform(sanitizeText).optional(),
-    notes: zod_1.z.string().max(2000).transform(sanitizeText).optional(),
+const updateLoanItemSchema = import_zod.z.object({
+  title: import_zod.z.string().min(3, "Le titre doit contenir au moins 3 caract\xE8res").max(200, "Le titre est trop long (maximum 200 caract\xE8res)").optional(),
+  description: import_zod.z.string().max(5e3, "La description est trop longue (maximum 5000 caract\xE8res)").optional().nullable(),
+  lenderName: import_zod.z.string().min(2, "Le nom du JD qui pr\xEAte doit contenir au moins 2 caract\xE8res").max(100, "Le nom du JD est trop long (maximum 100 caract\xE8res)").optional(),
+  photoUrl: import_zod.z.string().url("L'URL de la photo n'est pas valide").optional().nullable()
 });
-exports.proposeMemberSchema = zod_1.z.object({
-    email: zod_1.z.string().email("Adresse email invalide").transform(sanitizeText),
-    firstName: zod_1.z.string().min(2, "Le prénom doit contenir au moins 2 caractères").max(100).transform(sanitizeText),
-    lastName: zod_1.z.string().min(2, "Le nom doit contenir au moins 2 caractères").max(100).transform(sanitizeText),
-    company: zod_1.z.string().max(200).optional().transform(val => val ? sanitizeText(val) : undefined),
-    phone: zod_1.z.string().max(20).optional().transform(val => val ? sanitizeText(val) : undefined),
-    role: zod_1.z.string().max(100).optional().transform(val => val ? sanitizeText(val) : undefined),
-    notes: zod_1.z.string().max(2000).optional().transform(val => val ? sanitizeText(val) : undefined),
-    proposedBy: zod_1.z.string().email("Email du proposeur invalide").transform(sanitizeText),
+const updateLoanItemStatusSchema = import_zod.z.object({
+  status: import_zod.z.enum([
+    LOAN_STATUS.PENDING,
+    LOAN_STATUS.AVAILABLE,
+    LOAN_STATUS.BORROWED,
+    LOAN_STATUS.UNAVAILABLE
+  ])
 });
-// Schemas for member tags
-exports.insertMemberTagSchema = zod_1.z.object({
-    name: zod_1.z.string().min(1, "Le nom du tag est requis").max(50).transform(sanitizeText),
-    color: zod_1.z.string().regex(/^#[0-9A-Fa-f]{6}$/, "La couleur doit être au format hex (#RRGGBB)").default("#3b82f6"),
-    description: zod_1.z.string().max(500).optional().transform(val => val ? sanitizeText(val) : undefined),
+const insertPatronSchema = import_zod.z.object({
+  firstName: import_zod.z.string().min(2, "Le pr\xE9nom doit contenir au moins 2 caract\xE8res").max(100, "Le pr\xE9nom ne peut pas d\xE9passer 100 caract\xE8res").transform(sanitizeText),
+  lastName: import_zod.z.string().min(2, "Le nom doit contenir au moins 2 caract\xE8res").max(100, "Le nom ne peut pas d\xE9passer 100 caract\xE8res").transform(sanitizeText),
+  role: import_zod.z.string().max(100, "La fonction ne peut pas d\xE9passer 100 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  company: import_zod.z.string().max(200, "Le nom de la soci\xE9t\xE9 ne peut pas d\xE9passer 200 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  phone: import_zod.z.string().max(20, "Le num\xE9ro de t\xE9l\xE9phone ne peut pas d\xE9passer 20 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  email: import_zod.z.string().email("Adresse email invalide").transform(sanitizeText),
+  notes: import_zod.z.string().max(2e3, "Les notes ne peuvent pas d\xE9passer 2000 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  department: import_zod.z.string().max(100, "Le d\xE9partement ne peut pas d\xE9passer 100 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  city: import_zod.z.string().max(100, "La ville ne peut pas d\xE9passer 100 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  postalCode: import_zod.z.string().max(20, "Le code postal ne peut pas d\xE9passer 20 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  sector: import_zod.z.string().max(200, "Le secteur ne peut pas d\xE9passer 200 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  referrerId: import_zod.z.string().optional().transform((val) => {
+    if (!val || val.trim() === "") return void 0;
+    return sanitizeText(val);
+  }).refine((val) => !val || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val), {
+    message: "L'identifiant du prescripteur n'est pas valide"
+  }),
+  createdBy: import_zod.z.string().email("Email de l'administrateur invalide").optional().transform((val) => val ? sanitizeText(val) : void 0)
 });
-exports.updateMemberTagSchema = zod_1.z.object({
-    name: zod_1.z.string().min(1).max(50).transform(sanitizeText).optional(),
-    color: zod_1.z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-    description: zod_1.z.string().max(500).optional().transform(val => val ? sanitizeText(val) : undefined),
+const insertPatronDonationSchema = import_zod.z.object({
+  patronId: import_zod.z.string().uuid("L'identifiant du m\xE9c\xE8ne n'est pas valide").transform(sanitizeText),
+  donatedAt: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}T|^\d{4}-\d{2}-\d{2}$/, "La date doit \xEAtre au format YYYY-MM-DD ou ISO").transform((val) => {
+    if (val.includes("T")) {
+      return new Date(val);
+    }
+    return /* @__PURE__ */ new Date(val + "T00:00:00.000Z");
+  }),
+  amountInCents: import_zod.z.number().int("Le montant doit \xEAtre un nombre entier").min(0, "Le montant ne peut pas \xEAtre n\xE9gatif").optional(),
+  amount: import_zod.z.number().int("Le montant doit \xEAtre un nombre entier").min(0, "Le montant ne peut pas \xEAtre n\xE9gatif").optional(),
+  occasion: import_zod.z.string().min(1, "L'occasion est obligatoire").max(200, "L'occasion ne peut pas d\xE9passer 200 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  recordedBy: import_zod.z.string().email("Email de l'administrateur invalide").transform(sanitizeText)
+}).refine(
+  (data) => data.amountInCents !== void 0 || data.amount !== void 0,
+  { message: "Soit 'amountInCents' soit 'amount' doit \xEAtre fourni" }
+).transform((data) => {
+  const { amountInCents, ...rest } = data;
+  return {
+    ...rest,
+    // Normalize to 'amount' field for database
+    amount: data.amountInCents ?? data.amount
+  };
 });
-exports.assignMemberTagSchema = zod_1.z.object({
-    memberEmail: zod_1.z.string().email().transform(sanitizeText),
-    tagId: zod_1.z.string().uuid(),
-    assignedBy: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+const insertPatronUpdateSchema = import_zod.z.object({
+  patronId: import_zod.z.string().uuid("L'identifiant du m\xE9c\xE8ne n'est pas valide").transform(sanitizeText),
+  type: import_zod.z.enum(["meeting", "email", "call", "lunch", "event"], {
+    message: "Le type doit \xEAtre 'meeting', 'email', 'call', 'lunch' ou 'event'"
+  }),
+  subject: import_zod.z.string().min(3, "Le sujet doit contenir au moins 3 caract\xE8res").max(200, "Le sujet ne peut pas d\xE9passer 200 caract\xE8res").transform(sanitizeText),
+  date: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit \xEAtre au format YYYY-MM-DD"),
+  startTime: import_zod.z.string().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  duration: import_zod.z.number().int("La dur\xE9e doit \xEAtre un nombre entier").min(0, "La dur\xE9e ne peut pas \xEAtre n\xE9gative").optional(),
+  description: import_zod.z.string().min(1, "La description est obligatoire").max(3e3, "La description ne peut pas d\xE9passer 3000 caract\xE8res").transform(sanitizeText),
+  notes: import_zod.z.string().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  createdBy: import_zod.z.string().email("Email de l'administrateur invalide").optional().pipe(import_zod.z.string().transform(sanitizeText).optional())
 });
-// Schemas for member tasks
-exports.insertMemberTaskSchema = zod_1.z.object({
-    memberEmail: zod_1.z.string().email().transform(sanitizeText),
-    title: zod_1.z.string().min(1, "Le titre est requis").max(200).transform(sanitizeText),
-    description: zod_1.z.string().max(2000).optional().transform(val => val ? sanitizeText(val) : undefined),
-    taskType: zod_1.z.enum(['call', 'email', 'meeting', 'custom']),
-    status: zod_1.z.enum(['todo', 'in_progress', 'completed', 'cancelled']).default('todo'),
-    dueDate: zod_1.z.string().datetime().optional(),
-    assignedTo: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
-    createdBy: zod_1.z.string().email().transform(sanitizeText),
+const updatePatronUpdateSchema = import_zod.z.object({
+  type: import_zod.z.enum(["meeting", "email", "call", "lunch", "event"]).optional(),
+  subject: import_zod.z.string().min(3, "Le sujet doit contenir au moins 3 caract\xE8res").max(200, "Le sujet ne peut pas d\xE9passer 200 caract\xE8res").transform(sanitizeText).optional(),
+  date: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit \xEAtre au format YYYY-MM-DD").optional(),
+  startTime: import_zod.z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "L'heure doit \xEAtre au format HH:MM").transform((val) => sanitizeText(val)).optional(),
+  duration: import_zod.z.number().int("La dur\xE9e doit \xEAtre un nombre entier").min(0, "La dur\xE9e ne peut pas \xEAtre n\xE9gative").optional(),
+  description: import_zod.z.string().min(1, "La description est obligatoire").max(3e3, "La description ne peut pas d\xE9passer 3000 caract\xE8res").transform(sanitizeText).optional(),
+  notes: import_zod.z.string().max(2e3, "Les notes ne peuvent pas d\xE9passer 2000 caract\xE8res").transform((val) => sanitizeText(val)).optional()
 });
-exports.updateMemberTaskSchema = zod_1.z.object({
-    title: zod_1.z.string().min(1).max(200).transform(sanitizeText).optional(),
-    description: zod_1.z.string().max(2000).optional().transform(val => val ? sanitizeText(val) : undefined),
-    taskType: zod_1.z.enum(['call', 'email', 'meeting', 'custom']).optional(),
-    status: zod_1.z.enum(['todo', 'in_progress', 'completed', 'cancelled']).optional(),
-    dueDate: zod_1.z.string().datetime().optional().nullable(),
-    assignedTo: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
-    completedBy: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+const insertIdeaPatronProposalSchema = import_zod.z.object({
+  ideaId: import_zod.z.string().uuid("L'identifiant de l'id\xE9e n'est pas valide").transform(sanitizeText),
+  patronId: import_zod.z.string().uuid("L'identifiant du m\xE9c\xE8ne n'est pas valide").transform(sanitizeText),
+  proposedByAdminEmail: import_zod.z.string().email("Email de l'administrateur invalide").transform(sanitizeText),
+  status: import_zod.z.enum(["proposed", "contacted", "declined", "converted"]).default("proposed"),
+  comments: import_zod.z.string().max(1e3, "Les commentaires ne peuvent pas d\xE9passer 1000 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0)
 });
-// Schemas for member relations
-exports.insertMemberRelationSchema = zod_1.z.object({
-    memberEmail: zod_1.z.string().email().transform(sanitizeText),
-    relatedMemberEmail: zod_1.z.string().email().transform(sanitizeText),
-    relationType: zod_1.z.enum(['sponsor', 'team', 'custom']),
-    description: zod_1.z.string().max(500).optional().transform(val => val ? sanitizeText(val) : undefined),
-    createdBy: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+const updatePatronSchema = import_zod.z.object({
+  firstName: import_zod.z.string().min(2, "Le pr\xE9nom doit contenir au moins 2 caract\xE8res").max(100, "Le pr\xE9nom ne peut pas d\xE9passer 100 caract\xE8res").transform(sanitizeText).optional(),
+  lastName: import_zod.z.string().min(2, "Le nom doit contenir au moins 2 caract\xE8res").max(100, "Le nom ne peut pas d\xE9passer 100 caract\xE8res").transform(sanitizeText).optional(),
+  role: import_zod.z.string().max(100, "La fonction ne peut pas d\xE9passer 100 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
+  company: import_zod.z.string().max(200, "Le nom de la soci\xE9t\xE9 ne peut pas d\xE9passer 200 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
+  phone: import_zod.z.string().max(20, "Le num\xE9ro de t\xE9l\xE9phone ne peut pas d\xE9passer 20 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
+  email: import_zod.z.string().email("Adresse email invalide").transform(sanitizeText).optional(),
+  notes: import_zod.z.string().max(2e3, "Les notes ne peuvent pas d\xE9passer 2000 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
+  department: import_zod.z.string().max(100, "Le d\xE9partement ne peut pas d\xE9passer 100 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
+  city: import_zod.z.string().max(100, "La ville ne peut pas d\xE9passer 100 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
+  postalCode: import_zod.z.string().max(20, "Le code postal ne peut pas d\xE9passer 20 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
+  sector: import_zod.z.string().max(200, "Le secteur ne peut pas d\xE9passer 200 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
+  referrerId: import_zod.z.string().optional().nullable().transform((val) => {
+    if (!val || val.trim() === "") return null;
+    return sanitizeText(val);
+  }).refine((val) => !val || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val), {
+    message: "L'identifiant du prescripteur n'est pas valide"
+  })
 });
-// Schemas for tracking metrics
-exports.insertTrackingMetricSchema = zod_1.z.object({
-    entityType: zod_1.z.enum(['member', 'patron']),
-    entityId: zod_1.z.string().min(1),
-    entityEmail: zod_1.z.string().email().transform(sanitizeText),
-    metricType: zod_1.z.enum(['status_change', 'engagement', 'contact', 'conversion', 'activity']),
-    metricValue: zod_1.z.number().optional(),
-    metricData: zod_1.z.string().optional().transform(val => val ? sanitizeText(val) : undefined),
-    description: zod_1.z.string().max(1000).optional().transform(val => val ? sanitizeText(val) : undefined),
-    recordedBy: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+const updateIdeaPatronProposalSchema = import_zod.z.object({
+  status: import_zod.z.enum(["proposed", "contacted", "declined", "converted"]).optional(),
+  comments: import_zod.z.string().max(1e3, "Les commentaires ne peuvent pas d\xE9passer 1000 caract\xE8res").transform((val) => sanitizeText(val)).optional()
 });
-// Schemas for tracking alerts
-exports.insertTrackingAlertSchema = zod_1.z.object({
-    entityType: zod_1.z.enum(['member', 'patron']),
-    entityId: zod_1.z.string().min(1),
-    entityEmail: zod_1.z.string().email().transform(sanitizeText),
-    alertType: zod_1.z.enum(['stale', 'high_potential', 'needs_followup', 'conversion_opportunity']),
-    severity: zod_1.z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
-    title: zod_1.z.string().min(1).max(200).transform(sanitizeText),
-    message: zod_1.z.string().min(1).max(2000).transform(sanitizeText),
-    createdBy: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
-    expiresAt: zod_1.z.string().datetime().optional(),
+const insertEventSponsorshipSchema = import_zod.z.object({
+  eventId: import_zod.z.string().min(1, "L'identifiant de l'\xE9v\xE9nement est requis").transform(sanitizeText),
+  patronId: import_zod.z.string().uuid("L'identifiant du m\xE9c\xE8ne n'est pas valide").transform(sanitizeText),
+  level: import_zod.z.enum(["platinum", "gold", "silver", "bronze", "partner"], {
+    message: "Niveau de sponsoring invalide"
+  }).optional(),
+  type: import_zod.z.enum(["platinum", "gold", "silver", "bronze", "partner"], {
+    message: "Type de sponsoring invalide"
+  }).optional(),
+  amountInCents: import_zod.z.number().int("Le montant doit \xEAtre un nombre entier").min(0, "Le montant ne peut pas \xEAtre n\xE9gatif").optional(),
+  amount: import_zod.z.number().int("Le montant doit \xEAtre un nombre entier").min(0, "Le montant ne peut pas \xEAtre n\xE9gatif").optional(),
+  benefits: import_zod.z.string().max(2e3, "Les contreparties ne peuvent pas d\xE9passer 2000 caract\xE8res").transform((val) => val ? sanitizeText(val) : void 0).optional(),
+  isPubliclyVisible: import_zod.z.boolean().default(true),
+  status: import_zod.z.enum(["proposed", "confirmed", "completed", "cancelled"]).default("proposed"),
+  logoUrl: import_zod.z.string().url("URL du logo invalide").max(500, "L'URL du logo est trop longue").transform((val) => val ? sanitizeText(val) : void 0).optional(),
+  websiteUrl: import_zod.z.string().url("URL du site web invalide").max(500, "L'URL du site web est trop longue").transform((val) => val ? sanitizeText(val) : void 0).optional(),
+  notes: import_zod.z.string().max(2e3, "Les notes ne peuvent pas d\xE9passer 2000 caract\xE8res").transform((val) => val ? sanitizeText(val) : void 0).optional(),
+  proposedByAdminEmail: import_zod.z.string().email("Email de l'administrateur invalide").transform(sanitizeText),
+  confirmedAt: import_zod.z.string().optional().nullable().transform((val) => {
+    if (!val) return null;
+    return val;
+  })
+}).refine(
+  (data) => data.level || data.type,
+  { message: "Soit 'level' soit 'type' doit \xEAtre fourni" }
+).refine(
+  (data) => data.amountInCents || data.amount,
+  { message: "Soit 'amountInCents' soit 'amount' doit \xEAtre fourni" }
+).transform((data) => {
+  const { type, amountInCents, confirmedAt, ...rest } = data;
+  const result = {
+    ...rest,
+    // Normalize to 'level' field for database
+    level: data.level ?? data.type,
+    // Normalize to 'amount' field for database
+    amount: data.amountInCents ?? data.amount
+  };
+  if (confirmedAt !== null && confirmedAt !== void 0) {
+    result.confirmedAt = confirmedAt;
+  }
+  return result;
 });
-exports.updateTrackingAlertSchema = zod_1.z.object({
-    isRead: zod_1.z.boolean().optional(),
-    isResolved: zod_1.z.boolean().optional(),
-    resolvedBy: zod_1.z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+const updateEventSponsorshipSchema = import_zod.z.object({
+  level: import_zod.z.enum(["platinum", "gold", "silver", "bronze", "partner"]).optional(),
+  amount: import_zod.z.number().int().min(0).optional(),
+  benefits: import_zod.z.string().max(2e3, "Les contreparties ne peuvent pas d\xE9passer 2000 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
+  isPubliclyVisible: import_zod.z.boolean().optional(),
+  status: import_zod.z.enum(["proposed", "confirmed", "completed", "cancelled"]).optional(),
+  logoUrl: import_zod.z.string().url("URL du logo invalide").max(500).transform((val) => sanitizeText(val)).optional(),
+  websiteUrl: import_zod.z.string().url("URL du site web invalide").max(500).transform((val) => sanitizeText(val)).optional(),
+  confirmedAt: import_zod.z.string().optional().nullable()
 });
-// For compatibility with existing auth system
-exports.users = exports.admins;
-exports.insertUserSchema = exports.insertAdminSchema;
-// Additional validation schemas for API routes - using new status system
-exports.updateEventStatusSchema = zod_1.z.object({
-    status: zod_1.z.enum([
-        exports.EVENT_STATUS.DRAFT,
-        exports.EVENT_STATUS.PUBLISHED,
-        exports.EVENT_STATUS.CANCELLED,
-        exports.EVENT_STATUS.POSTPONED,
-        exports.EVENT_STATUS.COMPLETED
-    ]),
+const insertMemberSchema = import_zod.z.object({
+  email: import_zod.z.string().email().transform(sanitizeText),
+  firstName: import_zod.z.string().min(2).max(100).transform(sanitizeText),
+  lastName: import_zod.z.string().min(2).max(100).transform(sanitizeText),
+  company: import_zod.z.string().max(200).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  department: import_zod.z.string().max(100).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  city: import_zod.z.string().max(100).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  postalCode: import_zod.z.string().max(20).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  firstContactDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date()]).optional(),
+  meetingDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date()]).optional(),
+  sector: import_zod.z.string().max(200).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  phone: import_zod.z.string().max(20).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  role: import_zod.z.string().max(100).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  cjdRole: import_zod.z.string().max(100).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  notes: import_zod.z.string().max(2e3).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  status: import_zod.z.enum([
+    MEMBER_STATUS.ACTIVE,
+    MEMBER_STATUS.PROPOSED,
+    MEMBER_STATUS.INACTIVE
+  ]).default(MEMBER_STATUS.ACTIVE),
+  prospectionStatus: import_zod.z.enum([
+    PROSPECTION_STAGES.QUALIFICATION,
+    PROSPECTION_STAGES.R1,
+    PROSPECTION_STAGES.R2,
+    PROSPECTION_STAGES.CONTRACTUALISATION,
+    PROSPECTION_STAGES.HORS_CIBLE,
+    PROSPECTION_STAGES.EN_REFLEXION,
+    PROSPECTION_STAGES.REFUSE,
+    PROSPECTION_STAGES.SIGNE
+  ]).optional(),
+  proposedBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  soncasProfile: import_zod.z.enum(SONCAS_PROFILES).optional(),
+  assignedTo: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
 });
-exports.updateEventSchema = exports.insertEventSchema.partial();
-// Custom error types for better error handling
+const insertMemberActivitySchema = import_zod.z.object({
+  memberEmail: import_zod.z.string().email().transform(sanitizeText),
+  activityType: import_zod.z.enum(["idea_proposed", "vote_cast", "event_registered", "event_unregistered", "patron_suggested"]),
+  entityType: import_zod.z.enum(["idea", "vote", "event", "patron"]),
+  entityId: import_zod.z.string().uuid().optional(),
+  entityTitle: import_zod.z.string().max(500).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  metadata: import_zod.z.string().optional(),
+  scoreImpact: import_zod.z.number().int()
+});
+const updateMemberSchema = import_zod.z.object({
+  firstName: import_zod.z.string().min(2).max(100).transform(sanitizeText).optional(),
+  lastName: import_zod.z.string().min(2).max(100).transform(sanitizeText).optional(),
+  company: import_zod.z.string().max(200).transform(sanitizeText).optional(),
+  department: import_zod.z.string().max(100).transform(sanitizeText).optional(),
+  city: import_zod.z.string().max(100).transform(sanitizeText).optional(),
+  postalCode: import_zod.z.string().max(20).transform(sanitizeText).optional(),
+  firstContactDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date()]).optional(),
+  meetingDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date()]).optional(),
+  sector: import_zod.z.string().max(200).transform(sanitizeText).optional(),
+  phone: import_zod.z.string().max(20).transform(sanitizeText).optional(),
+  role: import_zod.z.string().max(100).transform(sanitizeText).optional(),
+  cjdRole: import_zod.z.string().max(100).transform(sanitizeText).optional(),
+  notes: import_zod.z.string().max(2e3).transform(sanitizeText).optional(),
+  status: import_zod.z.enum([
+    MEMBER_STATUS.ACTIVE,
+    MEMBER_STATUS.PROPOSED,
+    MEMBER_STATUS.INACTIVE
+  ]).optional(),
+  prospectionStatus: import_zod.z.enum([
+    PROSPECTION_STAGES.QUALIFICATION,
+    PROSPECTION_STAGES.R1,
+    PROSPECTION_STAGES.R2,
+    PROSPECTION_STAGES.CONTRACTUALISATION,
+    PROSPECTION_STAGES.HORS_CIBLE,
+    PROSPECTION_STAGES.EN_REFLEXION,
+    PROSPECTION_STAGES.REFUSE,
+    PROSPECTION_STAGES.SIGNE
+  ]).nullable().optional(),
+  soncasProfile: import_zod.z.enum(SONCAS_PROFILES).optional(),
+  assignedTo: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const assignMemberSchema = import_zod.z.object({
+  assignedTo: import_zod.z.string().email("Email de l'admin invalide").transform(sanitizeText),
+  note: import_zod.z.string().max(500).optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const proposeMemberSchema = import_zod.z.object({
+  email: import_zod.z.string().email("Adresse email invalide").transform(sanitizeText),
+  firstName: import_zod.z.string().min(2, "Le pr\xE9nom doit contenir au moins 2 caract\xE8res").max(100).transform(sanitizeText),
+  lastName: import_zod.z.string().min(2, "Le nom doit contenir au moins 2 caract\xE8res").max(100).transform(sanitizeText),
+  company: import_zod.z.string().max(200).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  department: import_zod.z.string().max(100).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  city: import_zod.z.string().max(100).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  postalCode: import_zod.z.string().max(20).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  firstContactDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date()]).optional(),
+  meetingDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date()]).optional(),
+  sector: import_zod.z.string().max(200).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  phone: import_zod.z.string().max(20).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  role: import_zod.z.string().max(100).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  cjdRole: import_zod.z.string().max(100).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  notes: import_zod.z.string().max(2e3).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  proposedBy: import_zod.z.string().email("Email du proposeur invalide").transform(sanitizeText),
+  soncasProfile: import_zod.z.enum(SONCAS_PROFILES).optional()
+});
+const insertPatronContactSchema = import_zod.z.object({
+  patronId: import_zod.z.string().uuid(),
+  firstName: import_zod.z.string().min(2).max(100).transform(sanitizeText),
+  lastName: import_zod.z.string().min(2).max(100).transform(sanitizeText),
+  role: import_zod.z.string().max(100).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  email: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  phone: import_zod.z.string().max(20).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  isPrimary: import_zod.z.boolean().default(false),
+  notes: import_zod.z.string().max(2e3).optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const updatePatronContactSchema = import_zod.z.object({
+  firstName: import_zod.z.string().min(2).max(100).transform(sanitizeText).optional(),
+  lastName: import_zod.z.string().min(2).max(100).transform(sanitizeText).optional(),
+  role: import_zod.z.string().max(100).transform(sanitizeText).optional(),
+  email: import_zod.z.string().email().transform(sanitizeText).optional(),
+  phone: import_zod.z.string().max(20).transform(sanitizeText).optional(),
+  isPrimary: import_zod.z.boolean().optional(),
+  notes: import_zod.z.string().max(2e3).transform(sanitizeText).optional()
+});
+const insertMemberStatusSchema = import_zod.z.object({
+  code: import_zod.z.string().min(1).max(50).transform(sanitizeText),
+  label: import_zod.z.string().min(1).max(100).transform(sanitizeText),
+  category: import_zod.z.enum(["member", "prospect"]),
+  color: import_zod.z.enum(["green", "orange", "gray", "red", "blue", "yellow", "purple", "cyan", "pink", "indigo"]).default("gray"),
+  description: import_zod.z.string().max(500).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  displayOrder: import_zod.z.number().int().min(0).default(0)
+});
+const updateMemberStatusSchema = import_zod.z.object({
+  code: import_zod.z.string().min(1).max(50).transform(sanitizeText).optional(),
+  label: import_zod.z.string().min(1).max(100).transform(sanitizeText).optional(),
+  category: import_zod.z.enum(["member", "prospect"]).optional(),
+  color: import_zod.z.enum(["green", "orange", "gray", "red", "blue", "yellow", "purple", "cyan", "pink", "indigo"]).optional(),
+  description: import_zod.z.string().max(500).transform(sanitizeText).optional(),
+  displayOrder: import_zod.z.number().int().min(0).optional(),
+  isActive: import_zod.z.boolean().optional()
+});
+const insertMemberTagSchema = import_zod.z.object({
+  name: import_zod.z.string().min(1, "Le nom du tag est requis").max(50).transform(sanitizeText),
+  color: import_zod.z.string().regex(/^#[0-9A-Fa-f]{6}$/, "La couleur doit \xEAtre au format hex (#RRGGBB)").default("#3b82f6"),
+  description: import_zod.z.string().max(500).optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const updateMemberTagSchema = import_zod.z.object({
+  name: import_zod.z.string().min(1).max(50).transform(sanitizeText).optional(),
+  color: import_zod.z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  description: import_zod.z.string().max(500).optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const assignMemberTagSchema = import_zod.z.object({
+  memberEmail: import_zod.z.string().email().transform(sanitizeText),
+  tagId: import_zod.z.string().uuid(),
+  assignedBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const memberGroupTypeValues = Object.values(MEMBER_GROUP_TYPES);
+const insertMemberGroupSchema = import_zod.z.object({
+  name: import_zod.z.string().min(1, "Le nom du groupe est requis").max(120).transform(sanitizeText),
+  type: import_zod.z.enum(memberGroupTypeValues).default(MEMBER_GROUP_TYPES.OTHER),
+  year: import_zod.z.number().int().min(2e3).max(2100),
+  description: import_zod.z.string().max(1e3).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  color: import_zod.z.string().regex(/^#[0-9A-Fa-f]{6}$/, "La couleur doit \xEAtre au format hex (#RRGGBB)").default("#3b82f6"),
+  isActive: import_zod.z.boolean().default(true),
+  createdBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const updateMemberGroupSchema = insertMemberGroupSchema.partial().extend({
+  year: import_zod.z.number().int().min(2e3).max(2100).optional()
+});
+const insertMemberGroupMembershipSchema = import_zod.z.object({
+  groupId: import_zod.z.string().uuid(),
+  memberEmail: import_zod.z.string().email().transform(sanitizeText),
+  role: import_zod.z.string().max(120).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  mission: import_zod.z.string().max(1e3).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  startDate: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  endDate: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  notes: import_zod.z.string().max(1e3).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  assignedBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const updateMemberGroupMembershipSchema = insertMemberGroupMembershipSchema.omit({ groupId: true, memberEmail: true }).partial();
+const duplicateMemberGroupSchema = import_zod.z.object({
+  targetYear: import_zod.z.number().int().min(2e3).max(2100),
+  name: import_zod.z.string().min(1).max(120).optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const insertMemberTaskSchema = import_zod.z.object({
+  memberEmail: import_zod.z.string().email().transform(sanitizeText),
+  title: import_zod.z.string().min(1, "Le titre est requis").max(200).transform(sanitizeText),
+  description: import_zod.z.string().max(2e3).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  taskType: import_zod.z.enum(["call", "email", "meeting", "custom"]),
+  status: import_zod.z.enum(["todo", "in_progress", "completed", "cancelled"]).default("todo"),
+  dueDate: import_zod.z.string().datetime().optional(),
+  assignedTo: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  createdBy: import_zod.z.string().email().transform(sanitizeText)
+});
+const updateMemberTaskSchema = import_zod.z.object({
+  title: import_zod.z.string().min(1).max(200).transform(sanitizeText).optional(),
+  description: import_zod.z.string().max(2e3).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  taskType: import_zod.z.enum(["call", "email", "meeting", "custom"]).optional(),
+  status: import_zod.z.enum(["todo", "in_progress", "completed", "cancelled"]).optional(),
+  dueDate: import_zod.z.string().datetime().optional().nullable(),
+  assignedTo: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  completedBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const insertMemberRelationSchema = import_zod.z.object({
+  memberEmail: import_zod.z.string().email().transform(sanitizeText),
+  relatedMemberEmail: import_zod.z.string().email().transform(sanitizeText),
+  relationType: import_zod.z.enum(["sponsor", "team", "custom"]),
+  description: import_zod.z.string().max(500).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  createdBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const insertMemberContactSchema = import_zod.z.object({
+  memberEmail: import_zod.z.string().email("Email du membre invalide").transform(sanitizeText),
+  type: import_zod.z.enum(["meeting", "email", "call", "lunch", "event"], {
+    message: "Le type doit \xEAtre 'meeting', 'email', 'call', 'lunch' ou 'event'"
+  }),
+  subject: import_zod.z.string().min(3, "Le sujet doit contenir au moins 3 caract\xE8res").max(200, "Le sujet ne peut pas d\xE9passer 200 caract\xE8res").transform(sanitizeText),
+  date: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit \xEAtre au format YYYY-MM-DD"),
+  startTime: import_zod.z.string().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  duration: import_zod.z.number().int("La dur\xE9e doit \xEAtre un nombre entier").min(0, "La dur\xE9e ne peut pas \xEAtre n\xE9gative").optional(),
+  description: import_zod.z.string().min(1, "La description est obligatoire").max(3e3, "La description ne peut pas d\xE9passer 3000 caract\xE8res").transform(sanitizeText),
+  notes: import_zod.z.string().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  createdBy: import_zod.z.string().email("Email de l'administrateur invalide").optional().pipe(import_zod.z.string().transform(sanitizeText).optional())
+});
+const updateMemberContactSchema = import_zod.z.object({
+  type: import_zod.z.enum(["meeting", "email", "call", "lunch", "event"]).optional(),
+  subject: import_zod.z.string().min(3, "Le sujet doit contenir au moins 3 caract\xE8res").max(200, "Le sujet ne peut pas d\xE9passer 200 caract\xE8res").transform(sanitizeText).optional(),
+  date: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit \xEAtre au format YYYY-MM-DD").optional(),
+  startTime: import_zod.z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "L'heure doit \xEAtre au format HH:MM").transform((val) => sanitizeText(val)).optional(),
+  duration: import_zod.z.number().int("La dur\xE9e doit \xEAtre un nombre entier").min(0, "La dur\xE9e ne peut pas \xEAtre n\xE9gative").optional(),
+  description: import_zod.z.string().min(1, "La description est obligatoire").max(3e3, "La description ne peut pas d\xE9passer 3000 caract\xE8res").transform(sanitizeText).optional(),
+  notes: import_zod.z.string().max(2e3, "Les notes ne peuvent pas d\xE9passer 2000 caract\xE8res").transform((val) => sanitizeText(val)).optional()
+});
+const insertTrackingMetricSchema = import_zod.z.object({
+  entityType: import_zod.z.enum(["member", "patron"]),
+  entityId: import_zod.z.string().min(1),
+  entityEmail: import_zod.z.string().email().transform(sanitizeText),
+  metricType: import_zod.z.enum(["status_change", "engagement", "contact", "conversion", "activity"]),
+  metricValue: import_zod.z.number().optional(),
+  metricData: import_zod.z.string().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  description: import_zod.z.string().max(1e3).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  recordedBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const insertTrackingAlertSchema = import_zod.z.object({
+  entityType: import_zod.z.enum(["member", "patron"]),
+  entityId: import_zod.z.string().min(1),
+  entityEmail: import_zod.z.string().email().transform(sanitizeText),
+  alertType: import_zod.z.enum(["stale", "high_potential", "needs_followup", "conversion_opportunity"]),
+  severity: import_zod.z.enum(["low", "medium", "high", "critical"]).default("medium"),
+  title: import_zod.z.string().min(1).max(200).transform(sanitizeText),
+  message: import_zod.z.string().min(1).max(2e3).transform(sanitizeText),
+  createdBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0),
+  expiresAt: import_zod.z.string().datetime().optional()
+});
+const updateTrackingAlertSchema = import_zod.z.object({
+  isRead: import_zod.z.boolean().optional(),
+  isResolved: import_zod.z.boolean().optional(),
+  resolvedBy: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
+});
+const users = admins;
+const insertUserSchema = insertAdminSchema;
+const updateEventStatusSchema = import_zod.z.object({
+  status: import_zod.z.enum([
+    EVENT_STATUS.DRAFT,
+    EVENT_STATUS.PUBLISHED,
+    EVENT_STATUS.CANCELLED,
+    EVENT_STATUS.POSTPONED,
+    EVENT_STATUS.COMPLETED
+  ])
+});
+const updateEventSchema = insertEventSchema.partial();
 class ValidationError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = 'ValidationError';
-    }
+  constructor(message) {
+    super(message);
+    this.name = "ValidationError";
+  }
 }
-exports.ValidationError = ValidationError;
 class DuplicateError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = 'DuplicateError';
-    }
+  constructor(message) {
+    super(message);
+    this.name = "DuplicateError";
+  }
 }
-exports.DuplicateError = DuplicateError;
 class DatabaseError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = 'DatabaseError';
-    }
+  constructor(message) {
+    super(message);
+    this.name = "DatabaseError";
+  }
 }
-exports.DatabaseError = DatabaseError;
 class NotFoundError extends Error {
-    constructor(message) {
-        super(message);
-        this.name = 'NotFoundError';
-    }
+  constructor(message) {
+    super(message);
+    this.name = "NotFoundError";
+  }
 }
-exports.NotFoundError = NotFoundError;
-// Type guard for validating admin roles
 function isValidAdminRole(role) {
-    return typeof role === 'string' && Object.values(exports.ADMIN_ROLES).includes(role);
+  return typeof role === "string" && Object.values(ADMIN_ROLES).includes(role);
 }
-// Permission helper functions
 const hasPermission = (userRole, permission) => {
-    // Validate role is a valid AdminRole
-    if (!isValidAdminRole(userRole)) {
-        console.warn(`Invalid admin role: ${userRole}`);
-        return false;
-    }
-    // Super admin a tous les droits
-    if (userRole === exports.ADMIN_ROLES.SUPER_ADMIN)
-        return true;
-    switch (permission) {
-        case 'ideas.read':
-            return [exports.ADMIN_ROLES.IDEAS_READER, exports.ADMIN_ROLES.IDEAS_MANAGER].includes(userRole);
-        case 'ideas.write':
-        case 'ideas.delete':
-        case 'ideas.manage':
-            return userRole === exports.ADMIN_ROLES.IDEAS_MANAGER;
-        case 'events.read':
-            return [exports.ADMIN_ROLES.EVENTS_READER, exports.ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
-        case 'events.write':
-        case 'events.delete':
-        case 'events.manage':
-            return userRole === exports.ADMIN_ROLES.EVENTS_MANAGER;
-        case 'admin.view':
-            // Tous les admins peuvent voir les membres
-            return true;
-        case 'admin.edit':
-            // Les gestionnaires et super admins peuvent éditer les données (inscriptions, votes, etc.)
-            // Note: SUPER_ADMIN already returns true above
-            return [exports.ADMIN_ROLES.IDEAS_MANAGER, exports.ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
-        case 'admin.manage':
-            // Only SUPER_ADMIN can manage admins (already returns true above)
-            return false;
-        default:
-            return false;
-    }
+  if (!isValidAdminRole(userRole)) {
+    console.warn(`Invalid admin role: ${userRole}`);
+    return false;
+  }
+  if (userRole === ADMIN_ROLES.SUPER_ADMIN) return true;
+  switch (permission) {
+    case "ideas.read":
+      return [ADMIN_ROLES.IDEAS_READER, ADMIN_ROLES.IDEAS_MANAGER].includes(userRole);
+    case "ideas.write":
+    case "ideas.delete":
+    case "ideas.manage":
+      return userRole === ADMIN_ROLES.IDEAS_MANAGER;
+    case "events.read":
+      return [ADMIN_ROLES.EVENTS_READER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "events.write":
+    case "events.delete":
+    case "events.manage":
+      return userRole === ADMIN_ROLES.EVENTS_MANAGER;
+    case "forms.view":
+    case "forms.read":
+      return [ADMIN_ROLES.IDEAS_READER, ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_READER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "forms.write":
+    case "forms.delete":
+    case "forms.export":
+    case "forms.manage":
+      return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "admin.view":
+      return true;
+    case "admin.edit":
+      return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "admin.manage":
+      return false;
+    default:
+      return false;
+  }
 };
-exports.hasPermission = hasPermission;
 const getRoleDisplayName = (role) => {
-    switch (role) {
-        case exports.ADMIN_ROLES.SUPER_ADMIN:
-            return "Super Administrateur";
-        case exports.ADMIN_ROLES.IDEAS_READER:
-            return "Consultation des idées";
-        case exports.ADMIN_ROLES.IDEAS_MANAGER:
-            return "Gestion des idées";
-        case exports.ADMIN_ROLES.EVENTS_READER:
-            return "Consultation des événements";
-        case exports.ADMIN_ROLES.EVENTS_MANAGER:
-            return "Gestion des événements";
-        default:
-            return "Rôle inconnu";
-    }
+  switch (role) {
+    case ADMIN_ROLES.SUPER_ADMIN:
+      return "Super Administrateur";
+    case ADMIN_ROLES.IDEAS_READER:
+      return "Consultation des id\xE9es";
+    case ADMIN_ROLES.IDEAS_MANAGER:
+      return "Gestion des id\xE9es";
+    case ADMIN_ROLES.EVENTS_READER:
+      return "Consultation des \xE9v\xE9nements";
+    case ADMIN_ROLES.EVENTS_MANAGER:
+      return "Gestion des \xE9v\xE9nements";
+    default:
+      return "R\xF4le inconnu";
+  }
 };
-exports.getRoleDisplayName = getRoleDisplayName;
 const getRolePermissions = (role) => {
-    switch (role) {
-        case exports.ADMIN_ROLES.SUPER_ADMIN:
-            return ['Toutes les permissions', 'Gestion des administrateurs'];
-        case exports.ADMIN_ROLES.IDEAS_READER:
-            return ['Consultation des idées'];
-        case exports.ADMIN_ROLES.IDEAS_MANAGER:
-            return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes'];
-        case exports.ADMIN_ROLES.EVENTS_READER:
-            return ['Consultation des événements'];
-        case exports.ADMIN_ROLES.EVENTS_MANAGER:
-            return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences'];
-        default:
-            return [];
-    }
+  switch (role) {
+    case ADMIN_ROLES.SUPER_ADMIN:
+      return ["Toutes les permissions", "Gestion des administrateurs"];
+    case ADMIN_ROLES.IDEAS_READER:
+      return ["Consultation des id\xE9es", "Consultation des formulaires"];
+    case ADMIN_ROLES.IDEAS_MANAGER:
+      return ["Consultation des id\xE9es", "Modification des id\xE9es", "Suppression des id\xE9es", "Gestion des votes", "Gestion des formulaires"];
+    case ADMIN_ROLES.EVENTS_READER:
+      return ["Consultation des \xE9v\xE9nements", "Consultation des formulaires"];
+    case ADMIN_ROLES.EVENTS_MANAGER:
+      return ["Consultation des \xE9v\xE9nements", "Modification des \xE9v\xE9nements", "Suppression des \xE9v\xE9nements", "Gestion des inscriptions et absences", "Gestion des formulaires"];
+    default:
+      return [];
+  }
 };
-exports.getRolePermissions = getRolePermissions;
-// Development requests validation schemas
-exports.insertDevelopmentRequestSchema = (0, drizzle_zod_1.createInsertSchema)(exports.developmentRequests).pick({
-    title: true,
-    description: true,
-    type: true,
-    priority: true,
-    requestedBy: true,
-    requestedByName: true,
+const insertDevelopmentRequestSchema = (0, import_drizzle_zod.createInsertSchema)(developmentRequests).pick({
+  title: true,
+  description: true,
+  type: true,
+  priority: true,
+  requestedBy: true,
+  requestedByName: true
 }).extend({
-    title: zod_1.z.string()
-        .min(5, "Le titre doit contenir au moins 5 caractères")
-        .max(200, "Le titre ne peut pas dépasser 200 caractères")
-        .transform(sanitizeText),
-    description: zod_1.z.string()
-        .min(20, "La description doit contenir au moins 20 caractères")
-        .max(3000, "La description ne peut pas dépasser 3000 caractères")
-        .transform(sanitizeText),
-    type: zod_1.z.enum(["bug", "feature"], {
-        message: "Le type doit être 'bug' ou 'feature'"
-    }),
-    priority: zod_1.z.enum(["low", "medium", "high", "critical"]).default("medium"),
-    requestedBy: zod_1.z.string().email("Email invalide").transform(sanitizeText),
-    requestedByName: zod_1.z.string()
-        .min(2, "Le nom doit contenir au moins 2 caractères")
-        .max(100, "Le nom ne peut pas dépasser 100 caractères")
-        .transform(sanitizeText),
+  title: import_zod.z.string().min(5, "Le titre doit contenir au moins 5 caract\xE8res").max(200, "Le titre ne peut pas d\xE9passer 200 caract\xE8res").transform(sanitizeText),
+  description: import_zod.z.string().min(20, "La description doit contenir au moins 20 caract\xE8res").max(3e3, "La description ne peut pas d\xE9passer 3000 caract\xE8res").transform(sanitizeText),
+  type: import_zod.z.enum(["bug", "feature"], {
+    message: "Le type doit \xEAtre 'bug' ou 'feature'"
+  }),
+  priority: import_zod.z.enum(["low", "medium", "high", "critical"]).default("medium"),
+  requestedBy: import_zod.z.string().email("Email invalide").transform(sanitizeText),
+  requestedByName: import_zod.z.string().min(2, "Le nom doit contenir au moins 2 caract\xE8res").max(100, "Le nom ne peut pas d\xE9passer 100 caract\xE8res").transform(sanitizeText)
 });
-exports.updateDevelopmentRequestSchema = zod_1.z.object({
-    status: zod_1.z.enum(["open", "in_progress", "closed", "cancelled"]).optional(),
-    githubStatus: zod_1.z.enum(["open", "closed"]).optional(),
-    githubIssueNumber: zod_1.z.number().int().positive().optional(),
-    githubIssueUrl: zod_1.z.string().url().optional(),
-    lastSyncedAt: zod_1.z.date().optional(),
+const updateDevelopmentRequestSchema = import_zod.z.object({
+  title: import_zod.z.string().min(5, "Le titre doit contenir au moins 5 caract\xE8res").max(200, "Le titre ne peut pas d\xE9passer 200 caract\xE8res").optional().transform((value) => value ? sanitizeText(value) : void 0),
+  description: import_zod.z.string().min(20, "La description doit contenir au moins 20 caract\xE8res").max(3e3, "La description ne peut pas d\xE9passer 3000 caract\xE8res").optional().transform((value) => value ? sanitizeText(value) : void 0),
+  type: import_zod.z.enum(["bug", "feature"], {
+    message: "Le type doit \xEAtre 'bug' ou 'feature'"
+  }).optional(),
+  priority: import_zod.z.enum(["low", "medium", "high", "critical"]).optional(),
+  adminComment: import_zod.z.string().max(1e3, "Le commentaire ne peut pas d\xE9passer 1000 caract\xE8res").optional().transform((value) => value ? sanitizeText(value) : void 0),
+  status: import_zod.z.enum(["pending", "in_progress", "done", "cancelled", "open", "closed"]).optional(),
+  githubStatus: import_zod.z.enum(["open", "closed"]).optional(),
+  githubIssueNumber: import_zod.z.number().int().positive().optional(),
+  githubIssueUrl: import_zod.z.string().url().optional(),
+  lastSyncedAt: import_zod.z.date().optional()
 });
-// Schéma spécial pour les mises à jour de statut par le super administrateur
-exports.updateDevelopmentRequestStatusSchema = zod_1.z.object({
-    status: zod_1.z.enum(["open", "in_progress", "closed", "cancelled"]),
-    adminComment: zod_1.z.string()
-        .max(1000, "Le commentaire ne peut pas dépasser 1000 caractères")
-        .optional()
-        .transform(val => val ? sanitizeText(val) : undefined),
-    lastStatusChangeBy: zod_1.z.string().email("Email invalide").transform(sanitizeText),
+const updateDevelopmentRequestStatusSchema = import_zod.z.object({
+  status: import_zod.z.enum(["pending", "in_progress", "done", "cancelled", "open", "closed"]),
+  adminComment: import_zod.z.string().max(1e3, "Le commentaire ne peut pas d\xE9passer 1000 caract\xE8res").optional().transform((val) => val ? sanitizeText(val) : void 0),
+  lastStatusChangeBy: import_zod.z.string().email("Email invalide").transform(sanitizeText)
 });
-// Member subscriptions schemas
-exports.insertMemberSubscriptionSchema = (0, drizzle_zod_1.createInsertSchema)(exports.memberSubscriptions).omit({
-    id: true,
-    createdAt: true,
+const insertMemberSubscriptionSchema = (0, import_drizzle_zod.createInsertSchema)(memberSubscriptions).omit({
+  id: true,
+  createdAt: true
+}).extend({
+  subscriptionType: import_zod.z.enum([
+    SUBSCRIPTION_TYPES.MONTHLY,
+    SUBSCRIPTION_TYPES.QUARTERLY,
+    SUBSCRIPTION_TYPES.YEARLY
+  ]),
+  status: import_zod.z.enum([
+    SUBSCRIPTION_STATUS.ACTIVE,
+    SUBSCRIPTION_STATUS.EXPIRED,
+    SUBSCRIPTION_STATUS.CANCELLED
+  ]).optional().default(SUBSCRIPTION_STATUS.ACTIVE),
+  paymentMethod: import_zod.z.enum([
+    PAYMENT_METHODS.CASH,
+    PAYMENT_METHODS.CHECK,
+    PAYMENT_METHODS.BANK_TRANSFER,
+    PAYMENT_METHODS.CARD
+  ]).optional().nullable()
 });
-// Financial planning constants
-exports.FINANCIAL_PERIOD = {
-    MONTH: "month",
-    QUARTER: "quarter",
-    YEAR: "year"
+const FINANCIAL_PERIOD = {
+  MONTH: "month",
+  QUARTER: "quarter",
+  YEAR: "year"
 };
-exports.FINANCIAL_CATEGORY_TYPE = {
-    INCOME: "income",
-    EXPENSE: "expense"
+const FINANCIAL_CATEGORY_TYPE = {
+  INCOME: "income",
+  EXPENSE: "expense"
 };
-exports.FORECAST_CONFIDENCE = {
-    HIGH: "high",
-    MEDIUM: "medium",
-    LOW: "low"
+const FORECAST_CONFIDENCE = {
+  HIGH: "high",
+  MEDIUM: "medium",
+  LOW: "low"
 };
-exports.FORECAST_BASED_ON = {
-    HISTORICAL: "historical",
-    ESTIMATE: "estimate"
+const FORECAST_BASED_ON = {
+  HISTORICAL: "historical",
+  ESTIMATE: "estimate"
 };
-// Financial categories table - Catégories budgétaires
-exports.financialCategories = (0, pg_core_1.pgTable)("financial_categories", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    name: (0, pg_core_1.text)("name").notNull(),
-    type: (0, pg_core_1.text)("type").notNull(), // income or expense
-    parentId: (0, pg_core_1.varchar)("parent_id"), // Catégorie parente (hiérarchie) - référence ajoutée via relation
-    description: (0, pg_core_1.text)("description"),
-    isActive: (0, pg_core_1.boolean)("is_active").default(true).notNull(),
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+const financialCategories = (0, import_pg_core.pgTable)("financial_categories", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  name: (0, import_pg_core.text)("name").notNull(),
+  type: (0, import_pg_core.text)("type").notNull(),
+  // income or expense
+  parentId: (0, import_pg_core.varchar)("parent_id"),
+  // Catégorie parente (hiérarchie) - référence ajoutée via relation
+  description: (0, import_pg_core.text)("description"),
+  isActive: (0, import_pg_core.boolean)("is_active").default(true).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
 }, (table) => ({
-    typeIdx: (0, pg_core_1.index)("financial_categories_type_idx").on(table.type),
-    parentIdIdx: (0, pg_core_1.index)("financial_categories_parent_id_idx").on(table.parentId),
-    nameIdx: (0, pg_core_1.index)("financial_categories_name_idx").on(table.name),
+  typeIdx: (0, import_pg_core.index)("financial_categories_type_idx").on(table.type),
+  parentIdIdx: (0, import_pg_core.index)("financial_categories_parent_id_idx").on(table.parentId),
+  nameIdx: (0, import_pg_core.index)("financial_categories_name_idx").on(table.name)
 }));
-// Financial budgets table - Budgets prévisionnels
-exports.financialBudgets = (0, pg_core_1.pgTable)("financial_budgets", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    name: (0, pg_core_1.text)("name").notNull(),
-    category: (0, pg_core_1.varchar)("category").references(() => exports.financialCategories.id, { onDelete: "restrict" }).notNull(),
-    period: (0, pg_core_1.text)("period").notNull(), // month, quarter, year
-    year: (0, pg_core_1.integer)("year").notNull(),
-    month: (0, pg_core_1.integer)("month"), // 1-12 si period = month
-    quarter: (0, pg_core_1.integer)("quarter"), // 1-4 si period = quarter
-    amountInCents: (0, pg_core_1.integer)("amount_in_cents").notNull(), // Montant en centimes
-    description: (0, pg_core_1.text)("description"),
-    createdBy: (0, pg_core_1.text)("created_by").notNull(), // Email admin
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+const financialBudgets = (0, import_pg_core.pgTable)("financial_budgets", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  name: (0, import_pg_core.text)("name").notNull(),
+  category: (0, import_pg_core.varchar)("category").references(() => financialCategories.id, { onDelete: "restrict" }).notNull(),
+  period: (0, import_pg_core.text)("period").notNull(),
+  // month, quarter, year
+  year: (0, import_pg_core.integer)("year").notNull(),
+  month: (0, import_pg_core.integer)("month"),
+  // 1-12 si period = month
+  quarter: (0, import_pg_core.integer)("quarter"),
+  // 1-4 si period = quarter
+  amountInCents: (0, import_pg_core.integer)("amount_in_cents").notNull(),
+  // Montant en centimes
+  description: (0, import_pg_core.text)("description"),
+  createdBy: (0, import_pg_core.text)("created_by").notNull(),
+  // Email admin
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
 }, (table) => ({
-    categoryIdx: (0, pg_core_1.index)("financial_budgets_category_idx").on(table.category),
-    periodIdx: (0, pg_core_1.index)("financial_budgets_period_idx").on(table.period),
-    yearIdx: (0, pg_core_1.index)("financial_budgets_year_idx").on(table.year),
-    periodYearIdx: (0, pg_core_1.index)("financial_budgets_period_year_idx").on(table.period, table.year),
+  categoryIdx: (0, import_pg_core.index)("financial_budgets_category_idx").on(table.category),
+  periodIdx: (0, import_pg_core.index)("financial_budgets_period_idx").on(table.period),
+  yearIdx: (0, import_pg_core.index)("financial_budgets_year_idx").on(table.year),
+  periodYearIdx: (0, import_pg_core.index)("financial_budgets_period_year_idx").on(table.period, table.year)
 }));
-// Financial expenses table - Dépenses réelles
-exports.financialExpenses = (0, pg_core_1.pgTable)("financial_expenses", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    category: (0, pg_core_1.varchar)("category").references(() => exports.financialCategories.id, { onDelete: "restrict" }).notNull(),
-    description: (0, pg_core_1.text)("description").notNull(),
-    amountInCents: (0, pg_core_1.integer)("amount_in_cents").notNull(), // Montant en centimes
-    expenseDate: (0, pg_core_1.date)("expense_date").notNull(), // Date de la dépense (format YYYY-MM-DD)
-    paymentMethod: (0, pg_core_1.text)("payment_method"), // cash, card, transfer, check, etc.
-    vendor: (0, pg_core_1.text)("vendor"), // Fournisseur/prestataire
-    budgetId: (0, pg_core_1.varchar)("budget_id").references(() => exports.financialBudgets.id, { onDelete: "set null" }), // Budget associé (optionnel)
-    receiptUrl: (0, pg_core_1.text)("receipt_url"), // URL du justificatif (upload)
-    createdBy: (0, pg_core_1.text)("created_by").notNull(), // Email admin
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+const financialExpenses = (0, import_pg_core.pgTable)("financial_expenses", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  category: (0, import_pg_core.varchar)("category").references(() => financialCategories.id, { onDelete: "restrict" }).notNull(),
+  description: (0, import_pg_core.text)("description").notNull(),
+  amountInCents: (0, import_pg_core.integer)("amount_in_cents").notNull(),
+  // Montant en centimes
+  expenseDate: (0, import_pg_core.date)("expense_date").notNull(),
+  // Date de la dépense (format YYYY-MM-DD)
+  paymentMethod: (0, import_pg_core.text)("payment_method"),
+  // cash, card, transfer, check, etc.
+  vendor: (0, import_pg_core.text)("vendor"),
+  // Fournisseur/prestataire
+  budgetId: (0, import_pg_core.varchar)("budget_id").references(() => financialBudgets.id, { onDelete: "set null" }),
+  // Budget associé (optionnel)
+  receiptUrl: (0, import_pg_core.text)("receipt_url"),
+  // URL du justificatif (upload)
+  createdBy: (0, import_pg_core.text)("created_by").notNull(),
+  // Email admin
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
 }, (table) => ({
-    categoryIdx: (0, pg_core_1.index)("financial_expenses_category_idx").on(table.category),
-    expenseDateIdx: (0, pg_core_1.index)("financial_expenses_expense_date_idx").on(table.expenseDate.desc()),
-    budgetIdIdx: (0, pg_core_1.index)("financial_expenses_budget_id_idx").on(table.budgetId),
-    createdByIdx: (0, pg_core_1.index)("financial_expenses_created_by_idx").on(table.createdBy),
+  categoryIdx: (0, import_pg_core.index)("financial_expenses_category_idx").on(table.category),
+  expenseDateIdx: (0, import_pg_core.index)("financial_expenses_expense_date_idx").on(table.expenseDate.desc()),
+  budgetIdIdx: (0, import_pg_core.index)("financial_expenses_budget_id_idx").on(table.budgetId),
+  createdByIdx: (0, import_pg_core.index)("financial_expenses_created_by_idx").on(table.createdBy)
 }));
-// Financial forecasts table - Prévisions de revenus
-exports.financialForecasts = (0, pg_core_1.pgTable)("financial_forecasts", {
-    id: (0, pg_core_1.varchar)("id").primaryKey().default((0, drizzle_orm_1.sql) `gen_random_uuid()`),
-    category: (0, pg_core_1.varchar)("category").references(() => exports.financialCategories.id, { onDelete: "restrict" }).notNull(),
-    period: (0, pg_core_1.text)("period").notNull(), // month, quarter, year
-    year: (0, pg_core_1.integer)("year").notNull(),
-    month: (0, pg_core_1.integer)("month"), // 1-12 si period = month
-    quarter: (0, pg_core_1.integer)("quarter"), // 1-4 si period = quarter
-    forecastedAmountInCents: (0, pg_core_1.integer)("forecasted_amount_in_cents").notNull(), // Montant prévu en centimes
-    confidence: (0, pg_core_1.text)("confidence").default(exports.FORECAST_CONFIDENCE.MEDIUM).notNull(), // high, medium, low
-    basedOn: (0, pg_core_1.text)("based_on").default(exports.FORECAST_BASED_ON.HISTORICAL).notNull(), // historical, estimate
-    notes: (0, pg_core_1.text)("notes"), // Notes sur la prévision
-    createdBy: (0, pg_core_1.text)("created_by").notNull(), // Email admin
-    createdAt: (0, pg_core_1.timestamp)("created_at").defaultNow().notNull(),
-    updatedAt: (0, pg_core_1.timestamp)("updated_at").defaultNow().notNull(),
+const financialForecasts = (0, import_pg_core.pgTable)("financial_forecasts", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  category: (0, import_pg_core.varchar)("category").references(() => financialCategories.id, { onDelete: "restrict" }).notNull(),
+  period: (0, import_pg_core.text)("period").notNull(),
+  // month, quarter, year
+  year: (0, import_pg_core.integer)("year").notNull(),
+  month: (0, import_pg_core.integer)("month"),
+  // 1-12 si period = month
+  quarter: (0, import_pg_core.integer)("quarter"),
+  // 1-4 si period = quarter
+  forecastedAmountInCents: (0, import_pg_core.integer)("forecasted_amount_in_cents").notNull(),
+  // Montant prévu en centimes
+  confidence: (0, import_pg_core.text)("confidence").default(FORECAST_CONFIDENCE.MEDIUM).notNull(),
+  // high, medium, low
+  basedOn: (0, import_pg_core.text)("based_on").default(FORECAST_BASED_ON.HISTORICAL).notNull(),
+  // historical, estimate
+  notes: (0, import_pg_core.text)("notes"),
+  // Notes sur la prévision
+  createdBy: (0, import_pg_core.text)("created_by").notNull(),
+  // Email admin
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
 }, (table) => ({
-    categoryIdx: (0, pg_core_1.index)("financial_forecasts_category_idx").on(table.category),
-    periodIdx: (0, pg_core_1.index)("financial_forecasts_period_idx").on(table.period),
-    yearIdx: (0, pg_core_1.index)("financial_forecasts_year_idx").on(table.year),
-    periodYearIdx: (0, pg_core_1.index)("financial_forecasts_period_year_idx").on(table.period, table.year),
+  categoryIdx: (0, import_pg_core.index)("financial_forecasts_category_idx").on(table.category),
+  periodIdx: (0, import_pg_core.index)("financial_forecasts_period_idx").on(table.period),
+  yearIdx: (0, import_pg_core.index)("financial_forecasts_year_idx").on(table.year),
+  periodYearIdx: (0, import_pg_core.index)("financial_forecasts_period_year_idx").on(table.period, table.year)
 }));
-// Financial categories relations
-exports.financialCategoriesRelations = (0, drizzle_orm_1.relations)(exports.financialCategories, ({ one, many }) => ({
-    parent: one(exports.financialCategories, {
-        fields: [exports.financialCategories.parentId],
-        references: [exports.financialCategories.id],
-        relationName: "categoryParent",
-    }),
-    children: many(exports.financialCategories, {
-        relationName: "categoryParent",
-    }),
-    budgets: many(exports.financialBudgets),
-    expenses: many(exports.financialExpenses),
-    forecasts: many(exports.financialForecasts),
+const financialRevenues = (0, import_pg_core.pgTable)("financial_revenues", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  type: (0, import_pg_core.text)("type").notNull(),
+  // donation, grant, sponsorship, other
+  description: (0, import_pg_core.text)("description").notNull(),
+  amountInCents: (0, import_pg_core.integer)("amount_in_cents").notNull(),
+  // Montant en centimes
+  revenueDate: (0, import_pg_core.date)("revenue_date").notNull(),
+  // Date du revenu (format YYYY-MM-DD)
+  memberEmail: (0, import_pg_core.text)("member_email"),
+  // Email du membre (si applicable)
+  patronId: (0, import_pg_core.varchar)("patron_id"),
+  // ID du mécène (si applicable)
+  paymentMethod: (0, import_pg_core.text)("payment_method"),
+  // cash, check, bank_transfer, card (optionnel)
+  status: (0, import_pg_core.text)("status").default("confirmed").notNull(),
+  // pending, confirmed, cancelled
+  receiptUrl: (0, import_pg_core.text)("receipt_url"),
+  // URL du justificatif (upload)
+  notes: (0, import_pg_core.text)("notes"),
+  // Notes supplémentaires
+  createdBy: (0, import_pg_core.text)("created_by").notNull(),
+  // Email admin
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  typeIdx: (0, import_pg_core.index)("financial_revenues_type_idx").on(table.type),
+  revenueDateIdx: (0, import_pg_core.index)("financial_revenues_revenue_date_idx").on(table.revenueDate.desc()),
+  memberEmailIdx: (0, import_pg_core.index)("financial_revenues_member_email_idx").on(table.memberEmail),
+  patronIdIdx: (0, import_pg_core.index)("financial_revenues_patron_id_idx").on(table.patronId),
+  statusIdx: (0, import_pg_core.index)("financial_revenues_status_idx").on(table.status),
+  createdByIdx: (0, import_pg_core.index)("financial_revenues_created_by_idx").on(table.createdBy)
 }));
-// Financial budgets relations
-exports.financialBudgetsRelations = (0, drizzle_orm_1.relations)(exports.financialBudgets, ({ one, many }) => ({
-    category: one(exports.financialCategories, {
-        fields: [exports.financialBudgets.category],
-        references: [exports.financialCategories.id],
-    }),
-    expenses: many(exports.financialExpenses),
+const subscriptionTypes = (0, import_pg_core.pgTable)("subscription_types", {
+  id: (0, import_pg_core.uuid)("id").primaryKey().defaultRandom(),
+  name: (0, import_pg_core.varchar)("name", { length: 255 }).notNull().unique(),
+  description: (0, import_pg_core.text)("description"),
+  amountInCents: (0, import_pg_core.integer)("amount_in_cents").notNull(),
+  durationType: (0, import_pg_core.varchar)("duration_type", { length: 20 }).notNull(),
+  // 'monthly' | 'quarterly' | 'yearly'
+  isActive: (0, import_pg_core.boolean)("is_active").notNull().default(true),
+  createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
+}, (table) => ({
+  nameIdx: (0, import_pg_core.index)("subscription_types_name_idx").on(table.name),
+  durationTypeIdx: (0, import_pg_core.index)("subscription_types_duration_type_idx").on(table.durationType),
+  isActiveIdx: (0, import_pg_core.index)("subscription_types_is_active_idx").on(table.isActive)
 }));
-// Financial expenses relations
-exports.financialExpensesRelations = (0, drizzle_orm_1.relations)(exports.financialExpenses, ({ one }) => ({
-    category: one(exports.financialCategories, {
-        fields: [exports.financialExpenses.category],
-        references: [exports.financialCategories.id],
-    }),
-    budget: one(exports.financialBudgets, {
-        fields: [exports.financialExpenses.budgetId],
-        references: [exports.financialBudgets.id],
-    }),
+const financialCategoriesRelations = (0, import_drizzle_orm.relations)(financialCategories, ({ one, many }) => ({
+  parent: one(financialCategories, {
+    fields: [financialCategories.parentId],
+    references: [financialCategories.id],
+    relationName: "categoryParent"
+  }),
+  children: many(financialCategories, {
+    relationName: "categoryParent"
+  }),
+  budgets: many(financialBudgets),
+  expenses: many(financialExpenses),
+  forecasts: many(financialForecasts)
 }));
-// Financial forecasts relations
-exports.financialForecastsRelations = (0, drizzle_orm_1.relations)(exports.financialForecasts, ({ one }) => ({
-    category: one(exports.financialCategories, {
-        fields: [exports.financialForecasts.category],
-        references: [exports.financialCategories.id],
-    }),
+const financialBudgetsRelations = (0, import_drizzle_orm.relations)(financialBudgets, ({ one, many }) => ({
+  category: one(financialCategories, {
+    fields: [financialBudgets.category],
+    references: [financialCategories.id]
+  }),
+  expenses: many(financialExpenses)
 }));
-// Branding configuration schemas - Pure Zod v4 schema
-exports.insertBrandingConfigSchema = zod_1.z.object({
-    key: zod_1.z.string().min(1, "Key requis"),
-    config: zod_1.z.string().refine((val) => {
-        try {
-            JSON.parse(val);
-            return true;
-        }
-        catch {
-            return false;
-        }
-    }, { message: "Config must be valid JSON" }),
-    createdAt: zod_1.z.date().optional(),
+const financialExpensesRelations = (0, import_drizzle_orm.relations)(financialExpenses, ({ one }) => ({
+  category: one(financialCategories, {
+    fields: [financialExpenses.category],
+    references: [financialCategories.id]
+  }),
+  budget: one(financialBudgets, {
+    fields: [financialExpenses.budgetId],
+    references: [financialBudgets.id]
+  })
+}));
+const financialForecastsRelations = (0, import_drizzle_orm.relations)(financialForecasts, ({ one }) => ({
+  category: one(financialCategories, {
+    fields: [financialForecasts.category],
+    references: [financialCategories.id]
+  })
+}));
+const financialRevenuesRelations = (0, import_drizzle_orm.relations)(financialRevenues, ({ one }) => ({
+  member: one(members, {
+    fields: [financialRevenues.memberEmail],
+    references: [members.email]
+  }),
+  patron: one(patrons, {
+    fields: [financialRevenues.patronId],
+    references: [patrons.id]
+  })
+}));
+const subscriptionTypesRelations = (0, import_drizzle_orm.relations)(subscriptionTypes, ({ many }) => ({
+  subscriptions: many(memberSubscriptions)
+}));
+const memberSubscriptionsRelations = (0, import_drizzle_orm.relations)(memberSubscriptions, ({ one }) => ({
+  member: one(members, {
+    fields: [memberSubscriptions.memberEmail],
+    references: [members.email]
+  }),
+  subscriptionType: one(subscriptionTypes, {
+    fields: [memberSubscriptions.subscriptionTypeId],
+    references: [subscriptionTypes.id]
+  })
+}));
+const insertBrandingConfigSchema = import_zod.z.object({
+  key: import_zod.z.string().min(1, "Key requis"),
+  config: import_zod.z.string().refine((val) => {
+    try {
+      JSON.parse(val);
+      return true;
+    } catch {
+      return false;
+    }
+  }, { message: "Config must be valid JSON" }),
+  createdAt: import_zod.z.date().optional()
 });
-// Email config schemas - Pure Zod v4 schema
-exports.insertEmailConfigSchema = zod_1.z.object({
-    host: zod_1.z.string().min(1, "Host requis"),
-    port: zod_1.z.number().min(1).max(65535, "Port invalide"),
-    secure: zod_1.z.boolean(),
-    username: zod_1.z.string().optional(),
-    password: zod_1.z.string().optional(),
-    fromEmail: zod_1.z.string().email("Email invalide"),
-    fromName: zod_1.z.string().optional(),
-    provider: zod_1.z.enum(['ovh', 'gmail', 'outlook', 'smtp', 'other']).optional().default('smtp'),
-    createdAt: zod_1.z.date().optional(),
+const insertEmailConfigSchema = import_zod.z.object({
+  host: import_zod.z.string().min(1, "Host requis"),
+  port: import_zod.z.number().min(1).max(65535, "Port invalide"),
+  secure: import_zod.z.boolean(),
+  username: import_zod.z.string().optional(),
+  password: import_zod.z.string().optional(),
+  fromEmail: import_zod.z.string().email("Email invalide"),
+  fromName: import_zod.z.string().optional(),
+  provider: import_zod.z.enum(["ovh", "gmail", "outlook", "smtp", "other"]).optional().default("smtp"),
+  createdAt: import_zod.z.date().optional()
 });
-// Feature configuration schemas - Pure Zod v4 schema
-exports.insertFeatureConfigSchema = zod_1.z.object({
-    featureKey: zod_1.z.string().min(1).max(50),
-    enabled: zod_1.z.boolean().default(true),
-    createdAt: zod_1.z.date().optional(),
+const insertFeatureConfigSchema = import_zod.z.object({
+  featureKey: import_zod.z.string().min(1).max(50),
+  enabled: import_zod.z.boolean().default(true),
+  createdAt: import_zod.z.date().optional()
 });
-// Financial categories schemas - Manual Zod v4 schemas
-exports.insertFinancialCategorySchema = zod_1.z.object({
-    name: zod_1.z.string().min(1, "Le nom est requis"),
-    type: zod_1.z.enum(["income", "expense"]),
-    parentId: zod_1.z.string().uuid().optional().nullable(),
-    description: zod_1.z.string().optional().nullable(),
-    isActive: zod_1.z.boolean().default(true),
+const insertFinancialCategorySchema = import_zod.z.object({
+  name: import_zod.z.string().min(1, "Le nom est requis"),
+  type: import_zod.z.enum(["income", "expense"]),
+  parentId: import_zod.z.string().uuid().optional().nullable(),
+  description: import_zod.z.string().optional().nullable(),
+  isActive: import_zod.z.boolean().default(true)
 });
-exports.updateFinancialCategorySchema = exports.insertFinancialCategorySchema.partial();
-// Financial budgets schemas - Manual Zod v4 schemas
-exports.insertFinancialBudgetSchema = zod_1.z.object({
-    name: zod_1.z.string().min(1, "Le nom est requis"),
-    category: zod_1.z.string().uuid("L'identifiant de la catégorie n'est pas valide"),
-    period: zod_1.z.enum(["month", "quarter", "year"]),
-    year: zod_1.z.number().int().min(2000).max(2100),
-    month: zod_1.z.number().int().min(1).max(12).optional().nullable(),
-    quarter: zod_1.z.number().int().min(1).max(4).optional().nullable(),
-    amountInCents: zod_1.z.number().int().min(0, "Le montant doit être positif"),
-    description: zod_1.z.string().optional().nullable(),
-    createdBy: zod_1.z.string().email("Email de l'administrateur invalide"),
+const updateFinancialCategorySchema = insertFinancialCategorySchema.partial();
+const insertFinancialBudgetSchema = import_zod.z.object({
+  name: import_zod.z.string().min(1, "Le nom est requis"),
+  category: import_zod.z.string().uuid("L'identifiant de la cat\xE9gorie n'est pas valide"),
+  period: import_zod.z.enum(["month", "quarter", "year"]),
+  year: import_zod.z.number().int().min(2e3).max(2100),
+  month: import_zod.z.number().int().min(1).max(12).optional().nullable(),
+  quarter: import_zod.z.number().int().min(1).max(4).optional().nullable(),
+  amountInCents: import_zod.z.number().int().min(0, "Le montant doit \xEAtre positif"),
+  description: import_zod.z.string().optional().nullable(),
+  createdBy: import_zod.z.string().email("Email de l'administrateur invalide")
 });
-exports.updateFinancialBudgetSchema = exports.insertFinancialBudgetSchema.partial();
-// Financial expenses schemas - Manual Zod v4 schemas
-exports.insertFinancialExpenseSchema = zod_1.z.object({
-    category: zod_1.z.string().uuid("L'identifiant de la catégorie n'est pas valide"),
-    description: zod_1.z.string().min(1, "La description est requise"),
-    amountInCents: zod_1.z.number().int().min(0, "Le montant doit être positif"),
-    expenseDate: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit être au format YYYY-MM-DD"),
-    paymentMethod: zod_1.z.string().optional().nullable(),
-    vendor: zod_1.z.string().optional().nullable(),
-    budgetId: zod_1.z.string().uuid().optional().nullable(),
-    receiptUrl: zod_1.z.string().url().optional().nullable(),
-    createdBy: zod_1.z.string().email("Email de l'administrateur invalide"),
+const updateFinancialBudgetSchema = insertFinancialBudgetSchema.partial();
+const insertFinancialExpenseSchema = import_zod.z.object({
+  category: import_zod.z.string().uuid("L'identifiant de la cat\xE9gorie n'est pas valide"),
+  description: import_zod.z.string().min(1, "La description est requise"),
+  amountInCents: import_zod.z.number().int().min(0, "Le montant doit \xEAtre positif"),
+  expenseDate: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit \xEAtre au format YYYY-MM-DD"),
+  paymentMethod: import_zod.z.string().optional().nullable(),
+  vendor: import_zod.z.string().optional().nullable(),
+  budgetId: import_zod.z.string().uuid().optional().nullable(),
+  receiptUrl: import_zod.z.string().url().optional().nullable(),
+  createdBy: import_zod.z.string().email("Email de l'administrateur invalide")
 });
-exports.updateFinancialExpenseSchema = exports.insertFinancialExpenseSchema.partial();
-// Financial forecasts schemas - Manual Zod v4 schemas
-exports.insertFinancialForecastSchema = zod_1.z.object({
-    category: zod_1.z.string().uuid("L'identifiant de la catégorie n'est pas valide"),
-    period: zod_1.z.enum(["month", "quarter", "year"]),
-    year: zod_1.z.number().int().min(2000).max(2100),
-    month: zod_1.z.number().int().min(1).max(12).optional().nullable(),
-    quarter: zod_1.z.number().int().min(1).max(4).optional().nullable(),
-    forecastedAmountInCents: zod_1.z.number().int(),
-    confidence: zod_1.z.enum(["low", "medium", "high"]).default("medium"),
-    basedOn: zod_1.z.enum(["historical", "estimate"]).default("estimate"),
-    notes: zod_1.z.string().optional().nullable(),
-    createdBy: zod_1.z.string().email("Email de l'administrateur invalide"),
+const updateFinancialExpenseSchema = insertFinancialExpenseSchema.partial();
+const insertFinancialForecastSchema = import_zod.z.object({
+  category: import_zod.z.string().uuid("L'identifiant de la cat\xE9gorie n'est pas valide"),
+  period: import_zod.z.enum(["month", "quarter", "year"]),
+  year: import_zod.z.number().int().min(2e3).max(2100),
+  month: import_zod.z.number().int().min(1).max(12).optional().nullable(),
+  quarter: import_zod.z.number().int().min(1).max(4).optional().nullable(),
+  forecastedAmountInCents: import_zod.z.number().int(),
+  confidence: import_zod.z.enum(["low", "medium", "high"]).default("medium"),
+  basedOn: import_zod.z.enum(["historical", "estimate"]).default("estimate"),
+  notes: import_zod.z.string().optional().nullable(),
+  createdBy: import_zod.z.string().email("Email de l'administrateur invalide")
 });
-exports.updateFinancialForecastSchema = exports.insertFinancialForecastSchema.partial();
-exports.adminUsers = exports.admins;
-exports.insertAdminUserSchema = exports.insertAdminSchema;
-exports.eventRegistrations = exports.inscriptions;
-exports.insertEventRegistrationSchema = exports.insertInscriptionSchema;
-// ===================================
-// System Status / Health Check Types
-// ===================================
-// Note: These are runtime/operational types, not persistent database tables
-exports.statusCheckSchema = zod_1.z.object({
-    name: zod_1.z.string(),
-    status: zod_1.z.enum(['healthy', 'warning', 'unhealthy', 'unknown']),
-    message: zod_1.z.string(),
-    responseTime: zod_1.z.number().optional(),
-    details: zod_1.z.record(zod_1.z.string(), zod_1.z.any()).optional(),
-    error: zod_1.z.string().optional(),
+const updateFinancialForecastSchema = insertFinancialForecastSchema.partial();
+const insertFinancialRevenueSchema = import_zod.z.object({
+  type: import_zod.z.enum(["donation", "grant", "sponsorship", "other"], {
+    message: "Le type de revenu doit \xEAtre donation, grant, sponsorship ou other"
+  }),
+  description: import_zod.z.string().min(1, "La description est requise"),
+  amountInCents: import_zod.z.number().int().min(0, "Le montant doit \xEAtre positif"),
+  revenueDate: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "La date doit \xEAtre au format YYYY-MM-DD"),
+  memberEmail: import_zod.z.string().email("Email du membre invalide").optional().nullable(),
+  patronId: import_zod.z.string().uuid().optional().nullable(),
+  paymentMethod: import_zod.z.string().optional().nullable(),
+  status: import_zod.z.enum(["pending", "confirmed", "cancelled"], {
+    message: "Le statut doit \xEAtre pending, confirmed ou cancelled"
+  }).optional().default("confirmed"),
+  receiptUrl: import_zod.z.string().url().optional().nullable(),
+  notes: import_zod.z.string().optional().nullable(),
+  createdBy: import_zod.z.string().email("Email de l'administrateur invalide")
 });
-exports.statusResponseSchema = zod_1.z.object({
-    timestamp: zod_1.z.string(),
-    uptime: zod_1.z.number(),
-    environment: zod_1.z.string(),
-    overallStatus: zod_1.z.enum(['healthy', 'warning', 'unhealthy', 'error']),
-    checks: zod_1.z.object({
-        application: exports.statusCheckSchema.optional(),
-        database: exports.statusCheckSchema.optional(),
-        databasePool: exports.statusCheckSchema.optional(),
-        memory: exports.statusCheckSchema.optional(),
-        email: exports.statusCheckSchema.optional(),
-        pushNotifications: exports.statusCheckSchema.optional(),
-        minio: exports.statusCheckSchema.optional(),
-    }),
+const updateFinancialRevenueSchema = insertFinancialRevenueSchema.partial();
+const updateMemberSubscriptionSchema = insertMemberSubscriptionSchema.partial();
+const insertSubscriptionTypeSchema = import_zod.z.object({
+  name: import_zod.z.string().min(1, "Le nom est requis").max(255, "Le nom ne peut pas d\xE9passer 255 caract\xE8res"),
+  description: import_zod.z.string().optional(),
+  amountInCents: import_zod.z.number().int().min(0, "Le montant doit \xEAtre positif ou z\xE9ro"),
+  durationType: import_zod.z.enum(["monthly", "quarterly", "yearly"], {
+    message: "Le type de dur\xE9e doit \xEAtre monthly, quarterly ou yearly"
+  }),
+  isActive: import_zod.z.boolean().optional().default(true)
 });
-// Frontend error logging schema
-exports.frontendErrorSchema = zod_1.z.object({
-    message: zod_1.z.string().min(1).max(1000),
-    stack: zod_1.z.string().optional(),
-    componentStack: zod_1.z.string().optional(),
-    url: zod_1.z.string().url().max(500),
-    userAgent: zod_1.z.string().max(500),
-    timestamp: zod_1.z.string().datetime()
+const updateSubscriptionTypeSchema = insertSubscriptionTypeSchema.partial();
+const subscriptionTypeSchema = import_zod.z.object({
+  id: import_zod.z.string().uuid("ID invalide"),
+  name: import_zod.z.string(),
+  description: import_zod.z.string().nullable(),
+  amountInCents: import_zod.z.number(),
+  durationType: import_zod.z.enum(["monthly", "quarterly", "yearly"]),
+  isActive: import_zod.z.boolean(),
+  createdAt: import_zod.z.string().datetime("Date de cr\xE9ation invalide"),
+  updatedAt: import_zod.z.string().datetime("Date de mise \xE0 jour invalide")
+});
+const assignSubscriptionSchema = import_zod.z.object({
+  memberEmail: import_zod.z.string().email("Format d'email invalide"),
+  memberName: import_zod.z.string().min(1, "Le nom du membre est requis"),
+  subscriptionTypeId: import_zod.z.string().uuid("ID de type de cotisation invalide"),
+  startDate: import_zod.z.string().datetime("Date de d\xE9but invalide"),
+  paymentMethod: import_zod.z.string().optional(),
+  notes: import_zod.z.string().optional(),
+  assignedBy: import_zod.z.string().email("Email de l'administrateur invalide")
+});
+const renewSubscriptionSchema = import_zod.z.object({
+  subscriptionId: import_zod.z.number().int().positive("ID de cotisation invalide"),
+  paymentMethod: import_zod.z.string().optional(),
+  notes: import_zod.z.string().optional()
+});
+const adminUsers = admins;
+const insertAdminUserSchema = insertAdminSchema;
+const eventRegistrations = inscriptions;
+const insertEventRegistrationSchema = insertInscriptionSchema;
+const notificationMetadataSchema = import_zod.z.object({
+  projectId: import_zod.z.string().uuid().optional(),
+  offerId: import_zod.z.string().uuid().optional(),
+  taskId: import_zod.z.string().uuid().optional(),
+  priority: import_zod.z.enum(["low", "normal", "high"]).optional(),
+  tags: import_zod.z.array(import_zod.z.string()).optional()
+}).strict();
+const insertNotificationSchema = import_zod.z.object({
+  userId: import_zod.z.string().uuid("ID utilisateur invalide"),
+  type: import_zod.z.string().min(1, "Type de notification requis"),
+  title: import_zod.z.string().min(1, "Titre requis").max(255),
+  body: import_zod.z.string().min(1, "Corps requis").max(1e3),
+  icon: import_zod.z.string().url().optional().nullable(),
+  isRead: import_zod.z.boolean().default(false),
+  metadata: notificationMetadataSchema.default({}),
+  entityType: import_zod.z.string().optional().nullable(),
+  entityId: import_zod.z.string().uuid().optional().nullable(),
+  relatedProjectId: import_zod.z.string().uuid().optional().nullable(),
+  relatedOfferId: import_zod.z.string().uuid().optional().nullable()
+});
+const updateNotificationSchema = import_zod.z.object({
+  isRead: import_zod.z.boolean().optional(),
+  metadata: notificationMetadataSchema.optional()
+}).strict();
+const toolCategories = (0, import_pg_core.pgTable)("tool_categories", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  name: (0, import_pg_core.text)("name").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  icon: (0, import_pg_core.text)("icon"),
+  // Nom de l'icône Lucide (ex: "Wrench", "Users")
+  color: (0, import_pg_core.text)("color").default("#10b981"),
+  // Couleur hex pour l'affichage
+  order: (0, import_pg_core.integer)("order").default(0).notNull(),
+  // Ordre d'affichage
+  isActive: (0, import_pg_core.boolean)("is_active").default(true).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  orderIdx: (0, import_pg_core.index)("tool_categories_order_idx").on(table.order),
+  activeIdx: (0, import_pg_core.index)("tool_categories_active_idx").on(table.isActive)
+}));
+const toolCategoriesRelations = (0, import_drizzle_orm.relations)(toolCategories, ({ many }) => ({
+  tools: many(tools)
+}));
+const tools = (0, import_pg_core.pgTable)("tools", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  categoryId: (0, import_pg_core.varchar)("category_id").references(() => toolCategories.id, { onDelete: "set null" }),
+  name: (0, import_pg_core.text)("name").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  logoUrl: (0, import_pg_core.text)("logo_url"),
+  // URL du logo/image de l'outil
+  price: (0, import_pg_core.text)("price"),
+  // Prix (texte pour gérer "Gratuit", "À partir de 10€/mois", etc.)
+  link: (0, import_pg_core.text)("link"),
+  // Lien externe vers l'outil
+  tags: (0, import_pg_core.text)("tags").array(),
+  // Tags pour le filtrage
+  isFeatured: (0, import_pg_core.boolean)("is_featured").default(false).notNull(),
+  // Mise en avant
+  isActive: (0, import_pg_core.boolean)("is_active").default(true).notNull(),
+  order: (0, import_pg_core.integer)("order").default(0).notNull(),
+  // Ordre d'affichage dans la catégorie
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull(),
+  createdBy: (0, import_pg_core.text)("created_by")
+  // Email de l'admin qui a créé
+}, (table) => ({
+  categoryIdx: (0, import_pg_core.index)("tools_category_idx").on(table.categoryId),
+  featuredIdx: (0, import_pg_core.index)("tools_featured_idx").on(table.isFeatured),
+  activeIdx: (0, import_pg_core.index)("tools_active_idx").on(table.isActive),
+  orderIdx: (0, import_pg_core.index)("tools_order_idx").on(table.order)
+}));
+const toolsRelations = (0, import_drizzle_orm.relations)(tools, ({ one }) => ({
+  category: one(toolCategories, {
+    fields: [tools.categoryId],
+    references: [toolCategories.id]
+  })
+}));
+const insertToolCategorySchema = (0, import_drizzle_zod.createInsertSchema)(toolCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+}).extend({
+  name: import_zod.z.string().min(2, "Le nom doit contenir au moins 2 caract\xE8res").max(100),
+  description: import_zod.z.string().max(500).optional(),
+  icon: import_zod.z.string().max(50).optional(),
+  color: import_zod.z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Couleur invalide").optional(),
+  order: import_zod.z.number().int().min(0).optional(),
+  isActive: import_zod.z.boolean().optional()
+});
+const updateToolCategorySchema = insertToolCategorySchema.partial();
+const insertToolSchema = (0, import_drizzle_zod.createInsertSchema)(tools).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+}).extend({
+  name: import_zod.z.string().min(2, "Le nom doit contenir au moins 2 caract\xE8res").max(200),
+  description: import_zod.z.string().max(1e3).optional(),
+  categoryId: import_zod.z.string().uuid().optional().nullable(),
+  logoUrl: import_zod.z.string().url().optional().nullable(),
+  price: import_zod.z.string().max(100).optional().nullable(),
+  link: import_zod.z.string().url().optional().nullable(),
+  tags: import_zod.z.array(import_zod.z.string().max(50)).max(10).optional(),
+  isFeatured: import_zod.z.boolean().optional(),
+  isActive: import_zod.z.boolean().optional(),
+  order: import_zod.z.number().int().min(0).optional(),
+  createdBy: import_zod.z.string().email().optional()
+});
+const updateToolSchema = insertToolSchema.partial();
+const statusCheckSchema = import_zod.z.object({
+  name: import_zod.z.string(),
+  status: import_zod.z.enum(["healthy", "warning", "unhealthy", "unknown"]),
+  message: import_zod.z.string(),
+  responseTime: import_zod.z.number().optional(),
+  details: import_zod.z.record(import_zod.z.string(), import_zod.z.any()).optional(),
+  error: import_zod.z.string().optional()
+});
+const statusResponseSchema = import_zod.z.object({
+  timestamp: import_zod.z.string(),
+  uptime: import_zod.z.number(),
+  environment: import_zod.z.string(),
+  overallStatus: import_zod.z.enum(["healthy", "warning", "unhealthy", "error"]),
+  checks: import_zod.z.object({
+    application: statusCheckSchema.optional(),
+    database: statusCheckSchema.optional(),
+    databasePool: statusCheckSchema.optional(),
+    memory: statusCheckSchema.optional(),
+    email: statusCheckSchema.optional(),
+    pushNotifications: statusCheckSchema.optional(),
+    minio: statusCheckSchema.optional()
+  })
+});
+const frontendErrorSchema = import_zod.z.object({
+  message: import_zod.z.string().min(1).max(1e3),
+  stack: import_zod.z.string().optional(),
+  componentStack: import_zod.z.string().optional(),
+  url: import_zod.z.string().url().max(500),
+  userAgent: import_zod.z.string().max(500),
+  timestamp: import_zod.z.string().datetime()
+});
+const networkConnections = (0, import_pg_core.pgTable)("network_connections", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  ownerEmail: (0, import_pg_core.text)("owner_email").notNull(),
+  ownerType: (0, import_pg_core.text)("owner_type").notNull(),
+  // 'member' | 'patron'
+  connectedEmail: (0, import_pg_core.text)("connected_email").notNull(),
+  connectedType: (0, import_pg_core.text)("connected_type").notNull(),
+  // 'member' | 'patron'
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  createdBy: (0, import_pg_core.text)("created_by")
+}, (table) => ({
+  ownerEmailIdx: (0, import_pg_core.index)("network_connections_owner_email_idx").on(table.ownerEmail),
+  connectedEmailIdx: (0, import_pg_core.index)("network_connections_connected_email_idx").on(table.connectedEmail),
+  uniqueConnection: (0, import_pg_core.unique)("network_connections_unique").on(table.ownerEmail, table.connectedEmail)
+}));
+const insertNetworkConnectionSchema = import_zod.z.object({
+  ownerEmail: import_zod.z.string().email(),
+  ownerType: import_zod.z.enum(["member", "patron"]),
+  connectedEmail: import_zod.z.string().email(),
+  connectedType: import_zod.z.enum(["member", "patron"]),
+  createdBy: import_zod.z.string().email().optional()
+});
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  ADMIN_ROLES,
+  ADMIN_STATUS,
+  CJD_ROLES,
+  CJD_ROLE_LABELS,
+  DatabaseError,
+  DuplicateError,
+  EVENT_STATUS,
+  FEDERATION_STATUS,
+  FEDERATION_SYNC_STATUS,
+  FEDERATION_VISIBILITY,
+  FINANCIAL_CATEGORY_TYPE,
+  FINANCIAL_PERIOD,
+  FORECAST_BASED_ON,
+  FORECAST_CONFIDENCE,
+  IDEA_STATUS,
+  LOAN_STATUS,
+  MEMBER_GROUP_TYPES,
+  MEMBER_GROUP_TYPE_LABELS,
+  MEMBER_STATUS,
+  MEMBER_STATUS_LABELS,
+  NotFoundError,
+  ORGANIZATION_RELATION_TYPE,
+  ORGANIZATION_TYPE,
+  PAYMENT_METHODS,
+  PROSPECTION_STAGES,
+  PROSPECTION_STAGE_LABELS,
+  SONCAS_PROFILES,
+  SPONSORSHIP_LEVEL,
+  SPONSORSHIP_LEVEL_LABELS,
+  SPONSORSHIP_STATUS,
+  SUBSCRIPTION_STATUS,
+  SUBSCRIPTION_TYPES,
+  SURVEY_FORM_STATUS,
+  SURVEY_QUESTION_TYPE,
+  SYNDICATION_DIRECTION,
+  SYNDICATION_STATUS,
+  ValidationError,
+  adminUsers,
+  admins,
+  assignMemberSchema,
+  assignMemberTagSchema,
+  assignSubscriptionSchema,
+  brandingConfig,
+  businessAuditLogs,
+  createEventWithInscriptionsSchema,
+  developmentRequests,
+  duplicateMemberGroupSchema,
+  emailConfig,
+  eventRegistrations,
+  eventSponsorships,
+  eventSponsorshipsRelations,
+  eventSyndications,
+  eventSyndicationsRelations,
+  events,
+  eventsRelations,
+  featureConfig,
+  financialBudgets,
+  financialBudgetsRelations,
+  financialCategories,
+  financialCategoriesRelations,
+  financialExpenses,
+  financialExpensesRelations,
+  financialForecasts,
+  financialForecastsRelations,
+  financialRevenues,
+  financialRevenuesRelations,
+  frontendErrorSchema,
+  getRoleDisplayName,
+  getRolePermissions,
+  hasPermission,
+  ideaPatronProposals,
+  ideaPatronProposalsRelations,
+  ideas,
+  ideasRelations,
+  initialInscriptionSchema,
+  inscriptions,
+  inscriptionsRelations,
+  insertAdminSchema,
+  insertAdminUserSchema,
+  insertBrandingConfigSchema,
+  insertBusinessAuditLogSchema,
+  insertDevelopmentRequestSchema,
+  insertEmailConfigSchema,
+  insertEventRegistrationSchema,
+  insertEventSchema,
+  insertEventSponsorshipSchema,
+  insertEventSyndicationSchema,
+  insertFeatureConfigSchema,
+  insertFinancialBudgetSchema,
+  insertFinancialCategorySchema,
+  insertFinancialExpenseSchema,
+  insertFinancialForecastSchema,
+  insertFinancialRevenueSchema,
+  insertIdeaPatronProposalSchema,
+  insertIdeaSchema,
+  insertInscriptionSchema,
+  insertLoanItemSchema,
+  insertMemberActivitySchema,
+  insertMemberContactSchema,
+  insertMemberGroupMembershipSchema,
+  insertMemberGroupSchema,
+  insertMemberRelationSchema,
+  insertMemberSchema,
+  insertMemberStatusSchema,
+  insertMemberSubscriptionSchema,
+  insertMemberTagSchema,
+  insertMemberTaskSchema,
+  insertNetworkConnectionSchema,
+  insertNotificationSchema,
+  insertOrganizationNetworkSchema,
+  insertOrganizationRelationSchema,
+  insertOrganizationSchema,
+  insertPatronContactSchema,
+  insertPatronDonationSchema,
+  insertPatronSchema,
+  insertPatronUpdateSchema,
+  insertSubscriptionTypeSchema,
+  insertSurveyFormSchema,
+  insertSurveyFormSyndicationSchema,
+  insertToolCategorySchema,
+  insertToolSchema,
+  insertTrackingAlertSchema,
+  insertTrackingMetricSchema,
+  insertUnsubscriptionSchema,
+  insertUserSchema,
+  insertVoteSchema,
+  loanItems,
+  memberActivities,
+  memberActivitiesRelations,
+  memberContacts,
+  memberContactsRelations,
+  memberGroupMemberships,
+  memberGroupMembershipsRelations,
+  memberGroups,
+  memberGroupsRelations,
+  memberOwnershipHistory,
+  memberRelations,
+  memberStatuses,
+  memberSubscriptions,
+  memberSubscriptionsRelations,
+  memberTagAssignments,
+  memberTags,
+  memberTasks,
+  members,
+  membersRelations,
+  networkConnections,
+  notificationMetadataSchema,
+  notifications,
+  organizationNetworks,
+  organizationNetworksRelations,
+  organizationRelations,
+  organizationRelationsRelations,
+  organizations,
+  organizationsRelations,
+  passwordResetTokens,
+  patronContacts,
+  patronDonations,
+  patronDonationsRelations,
+  patronUpdates,
+  patronUpdatesRelations,
+  patrons,
+  patronsRelations,
+  proposeMemberSchema,
+  pushSubscriptions,
+  renewSubscriptionSchema,
+  statusCheckSchema,
+  statusResponseSchema,
+  submitSurveyResponseSchema,
+  subscriptionTypeSchema,
+  subscriptionTypes,
+  subscriptionTypesRelations,
+  surveyFormResponseSummaries,
+  surveyFormSyndications,
+  surveyForms,
+  surveyQuestionOptionSchema,
+  surveyQuestionSchema,
+  surveyQuestions,
+  surveyResponses,
+  toolCategories,
+  toolCategoriesRelations,
+  tools,
+  toolsRelations,
+  trackingAlerts,
+  trackingMetrics,
+  unsubscriptions,
+  unsubscriptionsRelations,
+  updateAdminInfoSchema,
+  updateAdminPasswordSchema,
+  updateAdminSchema,
+  updateDevelopmentRequestSchema,
+  updateDevelopmentRequestStatusSchema,
+  updateEventSchema,
+  updateEventSponsorshipSchema,
+  updateEventStatusSchema,
+  updateEventSyndicationSchema,
+  updateFinancialBudgetSchema,
+  updateFinancialCategorySchema,
+  updateFinancialExpenseSchema,
+  updateFinancialForecastSchema,
+  updateFinancialRevenueSchema,
+  updateIdeaPatronProposalSchema,
+  updateIdeaSchema,
+  updateIdeaStatusSchema,
+  updateLoanItemSchema,
+  updateLoanItemStatusSchema,
+  updateMemberContactSchema,
+  updateMemberGroupMembershipSchema,
+  updateMemberGroupSchema,
+  updateMemberSchema,
+  updateMemberStatusSchema,
+  updateMemberSubscriptionSchema,
+  updateMemberTagSchema,
+  updateMemberTaskSchema,
+  updateNotificationSchema,
+  updateOrganizationNetworkSchema,
+  updateOrganizationRelationSchema,
+  updateOrganizationSchema,
+  updatePatronContactSchema,
+  updatePatronSchema,
+  updatePatronUpdateSchema,
+  updateSubscriptionTypeSchema,
+  updateSurveyFormSchema,
+  updateSurveyFormSyndicationSchema,
+  updateToolCategorySchema,
+  updateToolSchema,
+  updateTrackingAlertSchema,
+  users,
+  votes,
+  votesRelations
 });

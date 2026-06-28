@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 
 export const AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION = 'autoShareEventsToParent';
 
@@ -8,6 +8,36 @@ export function safeCompareFederationToken(expected: string | null | undefined, 
   const receivedBuffer = Buffer.from(received);
   if (expectedBuffer.length !== receivedBuffer.length) return false;
   return timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
+export function generateFederationToken(): string {
+  return randomBytes(48).toString('base64url');
+}
+
+export function hashFederationToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
+}
+
+export function federationTokenFingerprintFromHash(hash: string | null | undefined): string | null {
+  return hash ? hash.slice(0, 12).toUpperCase() : null;
+}
+
+export function federationTokenFingerprint(token: string | null | undefined): string | null {
+  return token ? federationTokenFingerprintFromHash(hashFederationToken(token)) : null;
+}
+
+export function safeCompareFederationTokenHash(expectedHash: string | null | undefined, received: string | undefined): boolean {
+  if (!expectedHash || !received) return false;
+  const receivedHash = hashFederationToken(received);
+  return safeCompareFederationToken(expectedHash, receivedHash);
+}
+
+export function safeCompareFederationRelationSecret(
+  relation: { federationToken?: string | null; federationTokenHash?: string | null },
+  received: string | undefined,
+): boolean {
+  if (relation.federationTokenHash) return safeCompareFederationTokenHash(relation.federationTokenHash, received);
+  return safeCompareFederationToken(relation.federationToken, received);
 }
 
 export function normalizeFederationInstanceUrl(value?: string | null): string | null {
@@ -82,10 +112,16 @@ export function isAutoShareEventsToParentEnabledForRelation(relation: { permissi
     && permissions[AUTO_SHARE_EVENTS_TO_PARENT_PERMISSION] !== false;
 }
 
-export function withoutFederationRelationSecret<T extends { federationToken?: string | null }>(relation: T) {
-  const { federationToken, ...safeRelation } = relation;
+export function withoutFederationRelationSecret<T extends {
+  federationToken?: string | null;
+  federationTokenHash?: string | null;
+  federationTokenFingerprint?: string | null;
+  federationTokenRotatedAt?: Date | string | null;
+}>(relation: T) {
+  const { federationToken, federationTokenHash, ...safeRelation } = relation;
   return {
     ...safeRelation,
-    hasFederationToken: Boolean(federationToken),
+    hasFederationToken: Boolean(federationToken || federationTokenHash),
+    federationTokenFingerprint: relation.federationTokenFingerprint ?? federationTokenFingerprintFromHash(federationTokenHash) ?? federationTokenFingerprint(federationToken),
   };
 }

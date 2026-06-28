@@ -177,6 +177,8 @@ export const queryKeys = {
     organizations: () => ['federation', 'organizations'] as const,
     relations: () => ['federation', 'relations'] as const,
     syndications: (params?: Record<string, unknown>) => ['federation', 'syndications', params] as const,
+    formSyndications: (params?: Record<string, unknown>) => ['federation', 'forms', 'syndications', params] as const,
+    formResponsesSummary: (formId: string) => ['federation', 'forms', 'responses-summary', formId] as const,
     agenda: (params?: Record<string, unknown>) => ['federation', 'agenda', params] as const,
   },
 

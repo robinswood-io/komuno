@@ -83,15 +83,22 @@ export class AdminFederationController {
   @Post('relations')
   @Permissions('admin.manage')
   @ApiOperation({ summary: 'Créer un lien entre organisations' })
-  async createRelation(@Body() body: unknown) {
-    return await this.federationService.createRelation(body);
+  async createRelation(@Body() body: unknown, @User() user: { email?: string }) {
+    return await this.federationService.createRelation(body, user.email);
   }
 
   @Patch('relations/:id')
   @Permissions('admin.manage')
   @ApiOperation({ summary: 'Modifier un lien entre organisations' })
-  async updateRelation(@Param('id') id: string, @Body() body: unknown) {
-    return await this.federationService.updateRelation(id, body);
+  async updateRelation(@Param('id') id: string, @Body() body: unknown, @User() user: { email?: string }) {
+    return await this.federationService.updateRelation(id, body, user.email);
+  }
+
+  @Post('relations/:id/rotate-token')
+  @Permissions('admin.manage')
+  @ApiOperation({ summary: 'Régénérer le jeton de fédération de la relation (affiché une seule fois)' })
+  async rotateRelationToken(@Param('id') id: string, @User() user: { email?: string }) {
+    return await this.federationService.rotateRelationToken(id, user.email);
   }
 
   @Get('settings')
@@ -104,16 +111,16 @@ export class AdminFederationController {
   @Put('settings')
   @Permissions('admin.manage')
   @ApiOperation({ summary: 'Mettre à jour les paramètres de fédération de cette instance' })
-  async updateFederationSettings(@Body() body: unknown) {
-    return await this.federationService.updateFederationSettings(body);
+  async updateFederationSettings(@Body() body: unknown, @User() user: { email?: string }) {
+    return await this.federationService.updateFederationSettings(body, user.email);
   }
 
   @Post('sync')
   @Permissions('admin.manage')
   @ApiOperation({ summary: 'Déclencher la synchronisation inter-instance des relations et syndications' })
   @ApiQuery({ name: 'autoShareBackfill', required: false, description: 'Créer aussi les remontées automatiques pour les événements locaux existants' })
-  async syncFederationNow(@Query('autoShareBackfill') autoShareBackfill?: string) {
-    return await this.federationService.syncFederationNow({ autoShareBackfill: autoShareBackfill === 'true' });
+  async syncFederationNow(@Query('autoShareBackfill') autoShareBackfill?: string, @User() user?: { email?: string }) {
+    return await this.federationService.syncFederationNow({ autoShareBackfill: autoShareBackfill === 'true', actorEmail: user?.email });
   }
 
   @Get('syndications')
@@ -134,6 +141,81 @@ export class AdminFederationController {
     @Query('includeInAgenda') includeInAgenda?: string,
   ) {
     return await this.federationService.getSyndications({ status, direction, sourceOrganizationId, targetOrganizationId, syncStatus, includeInAgenda });
+  }
+
+  @Get('forms/syndications')
+  @Permissions('forms.view')
+  @ApiOperation({ summary: 'Lister les propositions / publications de formulaires fédérés' })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'direction', required: false })
+  @ApiQuery({ name: 'sourceOrganizationId', required: false })
+  @ApiQuery({ name: 'targetOrganizationId', required: false })
+  @ApiQuery({ name: 'syncStatus', required: false })
+  async getFormSyndications(
+    @Query('status') status?: string,
+    @Query('direction') direction?: string,
+    @Query('sourceOrganizationId') sourceOrganizationId?: string,
+    @Query('targetOrganizationId') targetOrganizationId?: string,
+    @Query('syncStatus') syncStatus?: string,
+  ) {
+    return await this.federationService.getFormSyndications({ status, direction, sourceOrganizationId, targetOrganizationId, syncStatus });
+  }
+
+  @Get('forms/:formId/responses-summary')
+  @Permissions('forms.view')
+  @ApiOperation({ summary: 'Consolidation agrégée des réponses fédérées par section' })
+  async getFederatedFormResponseSummary(@Param('formId') formId: string) {
+    return await this.federationService.getFederatedFormResponseSummary(formId);
+  }
+
+  @Post('forms/:formId/propose-upward')
+  @Permissions('forms.write')
+  @ApiOperation({ summary: 'Proposer un formulaire de section à la région' })
+  async proposeFormUpward(
+    @Param('formId') formId: string,
+    @Body() body: unknown,
+    @User() user: { email?: string },
+  ) {
+    return await this.federationService.proposeFormUpward(formId, body, user.email);
+  }
+
+  @Post('forms/:formId/publish-downward')
+  @Permissions('forms.write')
+  @ApiOperation({ summary: 'Publier un formulaire régional vers une ou plusieurs sections' })
+  async publishFormDownward(
+    @Param('formId') formId: string,
+    @Body() body: unknown,
+    @User() user: { email?: string },
+  ) {
+    return await this.federationService.publishFormDownward(formId, body, user.email);
+  }
+
+  @Patch('forms/syndications/:id')
+  @Permissions('forms.write')
+  @ApiOperation({ summary: 'Accepter / refuser / modifier une syndication de formulaire' })
+  async updateFormSyndication(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @User() user: { email?: string },
+  ) {
+    return await this.federationService.updateFormSyndication(id, body, user.email);
+  }
+
+  @Post('forms/syndications/:id/sync')
+  @Permissions('forms.write')
+  @ApiOperation({ summary: 'Relancer la synchronisation inter-instance d’une syndication de formulaire' })
+  async syncFormSyndication(@Param('id') id: string) {
+    return await this.federationService.syncFormSyndication(id);
+  }
+
+  @Post('forms/syndications/:id/revoke')
+  @Permissions('forms.write')
+  @ApiOperation({ summary: 'Révoquer une syndication de formulaire' })
+  async revokeFormSyndication(
+    @Param('id') id: string,
+    @User() user: { email?: string },
+  ) {
+    return await this.federationService.revokeFormSyndication(id, user.email);
   }
 
   @Post('events/:eventId/propose-upward')
@@ -220,5 +302,16 @@ export class PublicFederationController {
   ) {
     const bearerToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
     return await this.federationService.ingestFederatedEvent(body, token || bearerToken);
+  }
+
+  @Post('forms/ingest')
+  @ApiOperation({ summary: 'Recevoir un formulaire fédéré depuis une autre instance Komuno' })
+  async ingestFederatedForm(
+    @Headers('x-komuno-federation-token') token: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: unknown,
+  ) {
+    const bearerToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+    return await this.federationService.ingestFederatedForm(body, token || bearerToken);
   }
 }

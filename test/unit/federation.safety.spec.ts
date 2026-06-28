@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  federationTokenFingerprintFromHash,
+  hashFederationToken,
   isAutoShareEventsToParentEnabledForRelation,
   isFederationOrganizationOnInstance,
   isRemoteFederationInstance,
   normalizeFederationInstanceUrl,
+  safeCompareFederationRelationSecret,
   safeCompareFederationToken,
+  safeCompareFederationTokenHash,
   withoutFederationRelationSecret,
 } from '../../server/src/federation/federation.utils';
 
@@ -16,6 +20,19 @@ describe('Fédération — invariants de sécurité sans DB', () => {
     expect(safeCompareFederationToken('token-secret-123', 'short')).toBe(false);
     expect(safeCompareFederationToken(null, 'token-secret-123')).toBe(false);
     expect(safeCompareFederationToken('token-secret-123', undefined)).toBe(false);
+  });
+
+  it('valide les tokens hashés sans exposer le secret brut', () => {
+    const token = 'komuno_rotation_secret_1234567890';
+    const hash = hashFederationToken(token);
+    expect(hash).toHaveLength(64);
+    expect(hash).not.toContain(token);
+    expect(federationTokenFingerprintFromHash(hash)).toBe(hash.slice(0, 12).toUpperCase());
+    expect(safeCompareFederationTokenHash(hash, token)).toBe(true);
+    expect(safeCompareFederationTokenHash(hash, `${token}-wrong`)).toBe(false);
+    expect(safeCompareFederationRelationSecret({ federationToken: 'legacy-clear', federationTokenHash: hash }, token)).toBe(true);
+    expect(safeCompareFederationRelationSecret({ federationToken: 'legacy-clear', federationTokenHash: hash }, 'legacy-clear')).toBe(false);
+    expect(safeCompareFederationRelationSecret({ federationToken: 'legacy-clear', federationTokenHash: null }, 'legacy-clear')).toBe(true);
   });
 
   it('normalise les URLs d’instance sans inférer de relation métier', () => {
@@ -51,7 +68,23 @@ describe('Fédération — invariants de sécurité sans DB', () => {
       federationToken: 'super-secret-token',
     });
 
-    expect(safe).toEqual({ id: 'relation-1', status: 'active', hasFederationToken: true });
+    expect(safe).toEqual({ id: 'relation-1', status: 'active', hasFederationToken: true, federationTokenFingerprint: expect.any(String) });
+    expect(safe.federationTokenFingerprint).toHaveLength(12);
     expect(Object.prototype.hasOwnProperty.call(safe, 'federationToken')).toBe(false);
+  });
+
+  it('ne renvoie jamais federationTokenHash dans les objets exposés aux admins', () => {
+    const tokenHash = hashFederationToken('hash-only-secret');
+    const safe = withoutFederationRelationSecret({
+      id: 'relation-2',
+      federationToken: null,
+      federationTokenHash: tokenHash,
+      federationTokenFingerprint: null,
+    });
+
+    expect(safe.hasFederationToken).toBe(true);
+    expect(safe.federationTokenFingerprint).toBe(tokenHash.slice(0, 12).toUpperCase());
+    expect(Object.prototype.hasOwnProperty.call(safe, 'federationToken')).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(safe, 'federationTokenHash')).toBe(false);
   });
 });
