@@ -13,7 +13,7 @@ import {
   UnauthorizedException,
   BadRequestException
 } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -68,6 +68,7 @@ export class AuthController {
    * POST /api/auth/login
    */
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Connexion utilisateur (local)' })
   @ApiBody({
@@ -115,13 +116,9 @@ export class AuthController {
               return res.status(500).json({ message: 'Erreur lors de la connexion' });
             }
 
-            // Log session cookie info for debugging
-            const sessionId = (req as any).sessionID;
-            const cookies = res.getHeaders()['set-cookie'];
             logger.info('[Auth] Connexion locale réussie', {
               email: user.email,
-              sessionID: sessionId,
-              cookies: Array.isArray(cookies) ? cookies.map(c => c.split(';')[0]) : [cookies],
+              hasSession: Boolean((req as any).sessionID),
             });
 
             res.json(this.authService.getUserWithoutPassword(user));
@@ -146,6 +143,7 @@ export class AuthController {
    * POST /api/auth/forgot-password
    */
   @Post('forgot-password')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Demander un lien de réinitialisation de mot de passe' })
   @ApiBody({
@@ -182,6 +180,7 @@ export class AuthController {
    * GET /api/auth/reset-password/validate?token=xxx
    */
   @Get('reset-password/validate')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Valider un token de réinitialisation de mot de passe' })
   @ApiQuery({ name: 'token', required: true, description: 'Token de réinitialisation', example: 'abcd1234efgh5678' })
   @ApiResponse({ status: 200, description: 'Token valide', schema: { type: 'object', properties: { valid: { type: 'boolean', example: true } } } })
@@ -200,6 +199,7 @@ export class AuthController {
    * POST /api/auth/reset-password
    */
   @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Réinitialiser le mot de passe avec un token' })
   @ApiBody({

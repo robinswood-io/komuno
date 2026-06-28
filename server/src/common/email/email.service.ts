@@ -35,9 +35,11 @@ export class EmailService {
           port,
           secure,
           auth: { user: dbConfig.username, pass: dbConfig.password },
+          disableFileAccess: true,
+          disableUrlAccess: true,
         });
-        const name = dbConfig.fromName ?? 'Komuno';
-        const addr = dbConfig.fromEmail ?? dbConfig.username;
+        const name = this.sanitizeHeaderValue(dbConfig.fromName ?? 'Komuno').replace(/"/g, "'");
+        const addr = this.normalizeEmailAddress(dbConfig.fromEmail ?? dbConfig.username) ?? dbConfig.username;
         this.fromAddress = `"${name}" <${addr}>`;
         this.logger.log(`Email service initialisé depuis la DB (${dbConfig.host}:${port})`);
         return;
@@ -57,8 +59,10 @@ export class EmailService {
           user: this.config.get<string>('SMTP_USER'),
           pass: this.config.get<string>('SMTP_PASS'),
         },
+        disableFileAccess: true,
+        disableUrlAccess: true,
       });
-      this.fromAddress = this.config.get<string>('SMTP_FROM') ?? 'noreply@cjd80.fr';
+      this.fromAddress = this.sanitizeHeaderValue(this.config.get<string>('SMTP_FROM') ?? 'noreply@cjd80.fr');
       this.logger.log(`Email service initialisé depuis les variables d'environnement`);
     } else {
       this.logger.warn('SMTP_HOST non configuré — emails désactivés (mode log)');
@@ -71,7 +75,32 @@ export class EmailService {
       this.logger.log(`[EMAIL SIMULÉ] To: ${options.to} | Sujet: ${options.subject}`);
       return;
     }
-    await this.transporter.sendMail({ from: this.fromAddress, ...options });
-    this.logger.log(`Email envoyé à ${options.to}`);
+    const to = this.normalizeEmailAddress(options.to);
+    if (!to) {
+      throw new Error('Adresse email destinataire invalide');
+    }
+
+    await this.transporter.sendMail({
+      from: this.fromAddress,
+      to,
+      subject: this.sanitizeHeaderValue(options.subject),
+      html: options.html,
+      disableFileAccess: true,
+      disableUrlAccess: true,
+    });
+    this.logger.log(`Email envoyé à ${to}`);
+  }
+
+  private sanitizeHeaderValue(value: string): string {
+    return value.replace(/[\r\n]+/g, ' ').trim();
+  }
+
+  private normalizeEmailAddress(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const normalized = this.sanitizeHeaderValue(value).trim().toLowerCase();
+    if (!/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(normalized)) {
+      return null;
+    }
+    return normalized;
   }
 }

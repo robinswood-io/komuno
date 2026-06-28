@@ -82,17 +82,21 @@ export class BrandingService {
 
   async uploadLogo(file: Express.Multer.File, userEmail: string) {
     try {
-      // Générer un nom de fichier unique
+      const logoType = this.detectAllowedLogoType(file.buffer);
+      if (!logoType) {
+        throw new BadRequestException('Signature de fichier invalide. Formats acceptés: PNG, JPG, WebP');
+      }
+
+      // Générer un nom de fichier unique sans réutiliser originalname (non fiable).
       const timestamp = Date.now();
-      const extension = file.originalname.split('.').pop();
-      const filename = `logo-${timestamp}.${extension}`;
+      const filename = `logo-${timestamp}.${logoType.extension}`;
 
       // Upload vers MinIO dans le bucket 'assets'
       await this.minioService.uploadFile(
         'assets',
         filename,
         file.buffer,
-        file.mimetype
+        logoType.contentType
       );
 
       // Utiliser une URL applicative stable (évite les endpoints MinIO internes).
@@ -122,6 +126,26 @@ export class BrandingService {
 
   async getLogoStream(filename: string): Promise<NodeJS.ReadableStream> {
     return this.minioService.getObjectStream(this.minioService.assetsBucket, filename);
+  }
+
+  private detectAllowedLogoType(buffer: Buffer): { extension: 'png' | 'jpg' | 'webp'; contentType: string } | null {
+    if (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))) {
+      return { extension: 'png', contentType: 'image/png' };
+    }
+
+    if (buffer.length >= 3 && buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+      return { extension: 'jpg', contentType: 'image/jpeg' };
+    }
+
+    if (
+      buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    ) {
+      return { extension: 'webp', contentType: 'image/webp' };
+    }
+
+    return null;
   }
 
   private normalizeBrandingConfig(configString: string): { config: string; changed: boolean } {

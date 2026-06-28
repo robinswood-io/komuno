@@ -8,7 +8,7 @@ export default registerAs('app', () => ({
   // Application
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '5000', 10),
-  corsOrigin: process.env.CORS_ORIGIN || '*',
+  corsOrigin: process.env.CORS_ORIGIN || '',
   siteUrl: process.env.SITE_URL || 'http://localhost:5000',
 
   // Base de données

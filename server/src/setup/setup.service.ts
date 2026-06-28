@@ -95,6 +95,8 @@ export class SetupService {
   }
 
   async testEmail(email: string) {
+    await this.assertFirstInstall('Le test email public n’est disponible que lors de la première installation');
+
     if (!email) {
       throw new BadRequestException("Email de test requis");
     }
@@ -127,6 +129,8 @@ export class SetupService {
   }
 
   async generateConfig() {
+    await this.assertFirstInstall('La génération de configuration publique n’est disponible que lors de la première installation');
+
     const brandingResult = await this.storageService.instance.getBrandingConfig();
     let brandingConfig: any = {};
     
@@ -161,6 +165,13 @@ export class SetupService {
     } catch (error: any) {
       logger.error('Erreur lors de la génération des fichiers statiques', { error });
       throw new InternalServerErrorException(error.message || "Erreur lors de la génération des fichiers statiques. Vous pouvez les générer manuellement avec 'npm run generate:config'.");
+    }
+  }
+
+  private async assertFirstInstall(message: string) {
+    const status = await this.getSetupStatus();
+    if (!status.isFirstInstall) {
+      throw new BadRequestException(message);
     }
   }
 

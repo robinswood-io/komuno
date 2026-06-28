@@ -1625,6 +1625,15 @@ const isValidDomain = (email) => {
 };
 const sanitizeText = (text2) => text2.replace(/[<>]/g, "").trim().slice(0, 5e3);
 const optionalSanitizedText = (max = 5e3) => import_zod.z.string().max(max).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0);
+const isHttpUrl = (url) => {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+};
 const organizationTypeValues = Object.values(ORGANIZATION_TYPE);
 const relationTypeValues = Object.values(ORGANIZATION_RELATION_TYPE);
 const syndicationDirectionValues = Object.values(SYNDICATION_DIRECTION);
@@ -1818,9 +1827,9 @@ const insertEventSchema = import_zod.z.object({
   date: import_zod.z.string().datetime("La date n'est pas valide. Veuillez s\xE9lectionner une date et heure correctes."),
   location: import_zod.z.string().max(200, "Le nom du lieu est trop long (maximum 200 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
   maxParticipants: import_zod.z.number().min(1, "Le nombre maximum de participants doit \xEAtre d'au moins 1 personne").max(1e3, "Le nombre maximum de participants ne peut pas d\xE9passer 1000 personnes").optional(),
-  helloAssoLink: import_zod.z.string().optional().refine((url) => !url || url.includes("helloasso.com"), "L'adresse doit \xEAtre un lien HelloAsso valide (contenant 'helloasso.com')").refine((url) => !url || import_zod.z.string().url().safeParse(url).success, "L'adresse web n'est pas valide. Veuillez saisir une URL compl\xE8te (ex: https://exemple.com)").transform((val) => val ? sanitizeText(val) : void 0),
+  helloAssoLink: import_zod.z.string().optional().refine((url) => !url || url.includes("helloasso.com"), "L'adresse doit \xEAtre un lien HelloAsso valide (contenant 'helloasso.com')").refine((url) => !url || import_zod.z.string().url().safeParse(url).success, "L'adresse web n'est pas valide. Veuillez saisir une URL compl\xE8te (ex: https://exemple.com)").refine(isHttpUrl, "L'adresse web doit utiliser http ou https").transform((val) => val ? sanitizeText(val) : void 0),
   enableExternalRedirect: import_zod.z.boolean().optional(),
-  externalRedirectUrl: import_zod.z.string().optional().refine((url) => !url || import_zod.z.string().url().safeParse(url).success, "L'adresse web de redirection n'est pas valide. Veuillez saisir une URL compl\xE8te (ex: https://exemple.com)").transform((val) => val ? sanitizeText(val) : void 0),
+  externalRedirectUrl: import_zod.z.string().optional().refine((url) => !url || import_zod.z.string().url().safeParse(url).success, "L'adresse web de redirection n'est pas valide. Veuillez saisir une URL compl\xE8te (ex: https://exemple.com)").refine(isHttpUrl, "L'adresse web de redirection doit utiliser http ou https").transform((val) => val ? sanitizeText(val) : void 0),
   showInscriptionsCount: import_zod.z.boolean().optional(),
   showAvailableSeats: import_zod.z.boolean().optional(),
   allowUnsubscribe: import_zod.z.boolean().optional(),

@@ -104,6 +104,8 @@ class EmailService {
         connectionTimeout: 10_000,
         greetingTimeout: 10_000,
         socketTimeout: 20_000,
+        disableFileAccess: true,
+        disableUrlAccess: true,
       });
       
       const source = dbConfig ? 'base de données' : 'variables d\'environnement';
@@ -152,15 +154,17 @@ class EmailService {
     }
 
     try {
-      const fromName = this.config.fromName || getShortAppName();
-      const fromEmail = this.config.fromEmail || this.config.auth.user;
+      const fromName = this.sanitizeHeaderValue(this.config.fromName || getShortAppName()).replace(/"/g, "'");
+      const fromEmail = this.normalizeEmailAddress(this.config.fromEmail || this.config.auth.user) || this.config.auth.user;
       
       const mailOptions = {
         from: `"${fromName}" <${fromEmail}>`,
         to: recipients.join(', '),
-        subject: emailData.subject,
+        subject: this.sanitizeHeaderValue(emailData.subject),
         html: emailData.html,
-        text: emailData.text || this.stripHtml(emailData.html)
+        text: emailData.text || this.stripHtml(emailData.html),
+        disableFileAccess: true,
+        disableUrlAccess: true,
       };
 
       const info = await this.transporter.sendMail(mailOptions);
@@ -248,10 +252,23 @@ class EmailService {
     return Array.from(
       new Set(
         recipients
-          .map((recipient) => recipient.trim().toLowerCase())
-          .filter((recipient) => recipient.length > 0)
+          .map((recipient) => this.normalizeEmailAddress(recipient))
+          .filter((recipient): recipient is string => Boolean(recipient))
       )
     );
+  }
+
+  private sanitizeHeaderValue(value: string): string {
+    return value.replace(/[\r\n]+/g, ' ').trim();
+  }
+
+  private normalizeEmailAddress(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const normalized = this.sanitizeHeaderValue(value).trim().toLowerCase();
+    if (!/^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(normalized)) {
+      return null;
+    }
+    return normalized;
   }
 }
 

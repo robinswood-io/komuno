@@ -232,7 +232,7 @@ function ToolCard({ tool, featured = false }: { tool: ToolWithCategory; featured
             variant="outline"
             size="sm"
             className="w-full"
-            onClick={() => window.open(tool.link!, '_blank')}
+            onClick={() => window.open(tool.link!, '_blank', 'noopener,noreferrer')}
           >
             <ExternalLink className="w-4 h-4 mr-2" />
             Accéder à l'outil

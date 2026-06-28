@@ -12,9 +12,10 @@ import { AuthService } from './auth/auth.service';
 import { validateEnvironment, checkExternalDependencies } from './config/env-validation';
 import { setupGracefulShutdown, rejectDuringShutdown } from './config/graceful-shutdown';
 import { getHelmetConfig } from './config/security-middleware';
+import { buildCorsOptions, getAllowedCorsOrigins } from './config/cors';
 import session from 'express-session';
 import passport from 'passport';
-import type { Express } from 'express';
+import type { Express, RequestHandler } from 'express';
 // Import types for Express.User extension
 import type { Admin } from '@shared/schema';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -57,48 +58,51 @@ async function bootstrap() {
   // Middleware pour rejeter les requêtes pendant le shutdown
   expressApp.use(rejectDuringShutdown());
 
-  // 5. Configuration CORS
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-  });
-  logger.info('[CORS] Origine autorisée:', process.env.CORS_ORIGIN || '*');
+  // 5. Configuration CORS — fail-closed en production, jamais "*" avec credentials.
+  const corsOptions = buildCorsOptions();
+  app.enableCors(corsOptions);
+  logger.info('[CORS] Origines cross-origin autorisées:', getAllowedCorsOrigins());
 
-  // 5.5 Configuration Swagger/OpenAPI
-  const config = new DocumentBuilder()
-    .setTitle('CJD Amiens API')
-    .setDescription('API Boîte à Kiffs - Gestion collaborative idées, événements, prêts')
-    .setVersion('2.0.0')
-    .addTag('auth', 'Authentification locale et gestion de session')
-    .addTag('ideas', 'Gestion des idées collaboratives')
-    .addTag('events', 'Gestion des événements')
-    .addTag('loans', 'Gestion des prêts matériel')
-    .addTag('members', 'CRM Membres')
-    .addTag('patrons', 'CRM Sponsors')
-    .addTag('financial', 'Gestion financière')
-    .addTag('tracking', 'Suivi et alertes')
-    .addTag('admin', 'Administration')
-    .addTag('branding', 'Configuration branding')
-    .addTag('features', 'Gestion des fonctionnalités')
-    .addTag('health', 'Health check et monitoring')
-    .addBearerAuth()
-    .build();
+  // 5.5 Configuration Swagger/OpenAPI — désactivée par défaut en production.
+  // L'exposition publique d'un schéma d'API admin facilite la reconnaissance.
+  const swaggerEnabled = process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true';
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('Komuno API')
+      .setDescription('API Komuno')
+      .setVersion(process.env.npm_package_version || '2.0.0')
+      .addTag('auth', 'Authentification locale et gestion de session')
+      .addTag('ideas', 'Gestion des idées collaboratives')
+      .addTag('events', 'Gestion des événements')
+      .addTag('loans', 'Gestion des prêts matériel')
+      .addTag('members', 'CRM Membres')
+      .addTag('patrons', 'CRM Sponsors')
+      .addTag('financial', 'Gestion financière')
+      .addTag('tracking', 'Suivi et alertes')
+      .addTag('admin', 'Administration')
+      .addTag('branding', 'Configuration branding')
+      .addTag('features', 'Gestion des fonctionnalités')
+      .addTag('health', 'Health check et monitoring')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
-    customSiteTitle: 'CJD Amiens API Documentation',
-    customfavIcon: '/favicon.ico',
-    customCss: '.swagger-ui .topbar { display: none }',
-    jsonDocumentUrl: '/api/docs-json',
-  });
-  logger.info('[Swagger] ✅ Documentation API disponible sur /api/docs');
-  logger.info('[Swagger] ✅ Export JSON disponible sur /api/docs-json');
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      customSiteTitle: 'Komuno API Documentation',
+      customfavIcon: '/favicon.ico',
+      customCss: '.swagger-ui .topbar { display: none }',
+      jsonDocumentUrl: '/api/docs-json',
+    });
+    logger.warn('[Swagger] Documentation API activée sur /api/docs');
+  } else {
+    logger.info('[Swagger] Documentation API désactivée en production');
+  }
 
   // Configurer les sessions Express et Passport
   const sessionConfig = app.get('SESSION_CONFIG');
-  expressApp.use(session(sessionConfig));
-  expressApp.use(passport.initialize());
-  expressApp.use(passport.session());
+  expressApp.use(session(sessionConfig) as unknown as RequestHandler);
+  expressApp.use(passport.initialize() as unknown as RequestHandler);
+  expressApp.use(passport.session() as unknown as RequestHandler);
 
   // Configurer Passport serialize/deserialize
   const authService = app.get(AuthService);

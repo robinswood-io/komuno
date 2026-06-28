@@ -1390,6 +1390,16 @@ const sanitizeText = (text: string) => text
 const optionalSanitizedText = (max: number = 5000) =>
   z.string().max(max).optional().nullable().transform(val => val ? sanitizeText(val) : undefined);
 
+const isHttpUrl = (url: string | null | undefined) => {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
 const organizationTypeValues = Object.values(ORGANIZATION_TYPE) as [OrganizationType, ...OrganizationType[]];
 const relationTypeValues = Object.values(ORGANIZATION_RELATION_TYPE) as [typeof ORGANIZATION_RELATION_TYPE[keyof typeof ORGANIZATION_RELATION_TYPE], ...Array<typeof ORGANIZATION_RELATION_TYPE[keyof typeof ORGANIZATION_RELATION_TYPE]>];
 const syndicationDirectionValues = Object.values(SYNDICATION_DIRECTION) as [typeof SYNDICATION_DIRECTION[keyof typeof SYNDICATION_DIRECTION], ...Array<typeof SYNDICATION_DIRECTION[keyof typeof SYNDICATION_DIRECTION]>];
@@ -1680,11 +1690,13 @@ export const insertEventSchema = z.object({
     .optional()
     .refine(url => !url || url.includes('helloasso.com'), "L'adresse doit être un lien HelloAsso valide (contenant 'helloasso.com')")
     .refine(url => !url || z.string().url().safeParse(url).success, "L'adresse web n'est pas valide. Veuillez saisir une URL complète (ex: https://exemple.com)")
+    .refine(isHttpUrl, "L'adresse web doit utiliser http ou https")
     .transform(val => val ? sanitizeText(val) : undefined),
   enableExternalRedirect: z.boolean().optional(),
   externalRedirectUrl: z.string()
     .optional()
     .refine(url => !url || z.string().url().safeParse(url).success, "L'adresse web de redirection n'est pas valide. Veuillez saisir une URL complète (ex: https://exemple.com)")
+    .refine(isHttpUrl, "L'adresse web de redirection doit utiliser http ou https")
     .transform(val => val ? sanitizeText(val) : undefined),
   showInscriptionsCount: z.boolean().optional(),
   showAvailableSeats: z.boolean().optional(),

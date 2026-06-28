@@ -14,7 +14,7 @@ import { setupGracefulShutdown, rejectDuringShutdown } from './src/config/gracef
 import { getHelmetConfig } from './src/config/security-middleware';
 import session from 'express-session';
 import passport from 'passport';
-import type { Express } from 'express';
+import type { Express, RequestHandler } from 'express';
 // Import types for Express.User extension
 import type { Admin } from '@shared/schema';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -56,24 +56,30 @@ async function bootstrap() {
       secret: process.env.SESSION_SECRET || 'test-secret-dev-only',
       resave: false,
       saveUninitialized: false,
+      rolling: true,
       cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000,
       }
-    })
+    }) as unknown as RequestHandler
   );
-  expressApp.use(passport.initialize());
-  expressApp.use(passport.session());
+  expressApp.use(passport.initialize() as unknown as RequestHandler);
+  expressApp.use(passport.session() as unknown as RequestHandler);
 
-  // 5. Configurer Swagger
-  const config = new DocumentBuilder()
-    .setTitle('CJD80 API')
-    .setDescription('API CJD80 - Club des Jeunes Dirigeants')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  // 5. Configurer Swagger — désactivé par défaut en production
+  const swaggerEnabled = process.env.NODE_ENV !== 'production' || process.env.ENABLE_SWAGGER === 'true';
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('Komuno API')
+      .setDescription('API Komuno')
+      .setVersion(process.env.npm_package_version || '1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   // 6. Initialiser MinIO (optionnel)
   try {

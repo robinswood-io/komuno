@@ -1,10 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
+const HOP_BY_HOP_HEADERS = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+]);
+const FORWARDED_HEADERS = new Set([
+  'forwarded',
+  'x-forwarded-for',
+  'x-forwarded-host',
+  'x-forwarded-port',
+  'x-forwarded-proto',
+  'x-real-ip',
+]);
+
+function safePath(path: string[]): string {
+  return path.map((segment) => encodeURIComponent(segment)).join('/');
+}
 
 async function proxyToBackend(request: NextRequest, params: { path: string[] }) {
-  const path = params.path.join('/');
-  const backendUrl = `${BACKEND_URL}/api/${path}`;
+  const backendUrl = `${BACKEND_URL}/api/${safePath(params.path)}`;
 
   // Copy search params
   const url = new URL(backendUrl);
@@ -12,14 +33,25 @@ async function proxyToBackend(request: NextRequest, params: { path: string[] }) 
     url.searchParams.append(key, value);
   });
 
-  // Prepare headers
+  // Prepare headers: forward app headers/cookies, strip hop-by-hop and spoofable proxy headers.
   const headers = new Headers();
   request.headers.forEach((value, key) => {
-    // Skip host header to avoid issues
-    if (key.toLowerCase() !== 'host') {
-      headers.set(key, value);
+    const normalizedKey = key.toLowerCase();
+    if (
+      normalizedKey === 'host' ||
+      HOP_BY_HOP_HEADERS.has(normalizedKey) ||
+      FORWARDED_HEADERS.has(normalizedKey)
+    ) {
+      return;
     }
+    headers.set(key, value);
   });
+
+  const host = request.headers.get('host');
+  if (host && /^[a-z0-9.-]+(?::\d+)?$/i.test(host)) {
+    headers.set('x-forwarded-host', host);
+  }
+  headers.set('x-forwarded-proto', request.nextUrl.protocol.replace(':', '') || 'https');
 
   try {
     // Get request body if present
@@ -33,12 +65,15 @@ async function proxyToBackend(request: NextRequest, params: { path: string[] }) 
       method: request.method,
       headers,
       body,
+      redirect: 'manual',
     });
 
-    // Copy response headers
+    // Copy response headers, except hop-by-hop headers.
     const responseHeaders = new Headers();
     response.headers.forEach((value, key) => {
-      responseHeaders.set(key, value);
+      if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+        responseHeaders.set(key, value);
+      }
     });
 
     // Return proxied response

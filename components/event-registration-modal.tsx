@@ -14,6 +14,17 @@ import { getIdentity, saveIdentity, clearIdentity, createUserIdentity } from "@/
 import type { Event, InsertInscription, InsertUnsubscription } from "@/shared/schema";
 import { api, queryKeys, type ApiResponse } from '@/lib/api/client';
 
+function getSafeHttpRedirectUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 interface EventRegistrationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -73,8 +84,9 @@ export default function EventRegistrationModal({
         console.warn('Failed to manage user identity:', error);
       }
 
-      // Vérifier si une redirection externe est configurée
-      if (event?.enableExternalRedirect && event?.externalRedirectUrl) {
+      // Vérifier si une redirection externe HTTP(S) est configurée
+      const safeRedirectUrl = event?.enableExternalRedirect ? getSafeHttpRedirectUrl(event.externalRedirectUrl) : null;
+      if (safeRedirectUrl) {
         toast({
           title: "Inscription confirmee !",
           description: `Vous etes inscrit(e) a "${event?.title}". Vous allez etre redirige vers le site de paiement...`,
@@ -83,9 +95,7 @@ export default function EventRegistrationModal({
 
         // Rediriger après un court délai pour que l'utilisateur puisse voir le message
         setTimeout(() => {
-          if (event.externalRedirectUrl) {
-            window.location.href = event.externalRedirectUrl;
-          }
+          window.location.assign(safeRedirectUrl);
         }, 2000);
       } else {
         toast({

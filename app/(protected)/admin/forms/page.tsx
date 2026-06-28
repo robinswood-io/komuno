@@ -512,7 +512,7 @@ export default function AdminFormsPage() {
                         <Copy className="mr-2 h-4 w-4" /> Copier le lien
                       </Button>
                       <Button variant="outline" asChild disabled={selectedForm.status !== 'published'}>
-                        <a href={selectedForm.publicUrl} target="_blank" rel="noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Voir</a>
+                        <a href={selectedForm.publicUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Voir</a>
                       </Button>
                       <Button variant="outline" onClick={() => duplicateMutation.mutate(selectedForm.id)} disabled={duplicateMutation.isPending}>
                         <CopyPlus className="mr-2 h-4 w-4" /> Dupliquer

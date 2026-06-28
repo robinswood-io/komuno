@@ -50,6 +50,18 @@ const envSchema = z.object({
   GITHUB_REPO_OWNER: z.string().optional(),
   GITHUB_REPO_NAME: z.string().optional(),
   GITHUB_WEBHOOK_SECRET: z.string().optional(),
+
+  // Sécurité
+  CORS_ORIGIN: z.string().optional(),
+  KOMUNO_DEMO_MODE: z.string().optional(),
+}).superRefine((env, ctx) => {
+  if (env.NODE_ENV === 'production' && env.KOMUNO_DEMO_MODE === 'true') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['KOMUNO_DEMO_MODE'],
+      message: 'KOMUNO_DEMO_MODE ne doit jamais être activé en production',
+    });
+  }
 });
 
 export type ValidatedEnv = z.infer<typeof envSchema>;

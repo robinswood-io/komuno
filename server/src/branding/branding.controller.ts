@@ -10,6 +10,9 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { User } from '../auth/decorators/user.decorator';
 import type { Admin } from '@shared/schema';
 
+const ALLOWED_LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+const MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024;
+
 @ApiTags('branding')
 @Controller('api/admin/branding')
 export class BrandingController {
@@ -45,7 +48,6 @@ export class BrandingController {
   }
 
   @Put()
-  @SkipThrottle()
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions('admin.manage')
   @ApiBearerAuth()
@@ -69,7 +71,6 @@ export class BrandingController {
   }
 
   @Delete()
-  @SkipThrottle()
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions('admin.manage')
   @ApiBearerAuth()
@@ -83,11 +84,26 @@ export class BrandingController {
   }
 
   @Post('logo')
-  @SkipThrottle()
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions('admin.manage')
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('logo'))
+  @UseInterceptors(FileInterceptor('logo', {
+    limits: {
+      fileSize: MAX_LOGO_SIZE_BYTES,
+      files: 1,
+      fields: 0,
+      parts: 1,
+      fieldNameSize: 32,
+      fieldSize: 0,
+    },
+    fileFilter: (_req, file, callback) => {
+      if (!ALLOWED_LOGO_MIME_TYPES.includes(file.mimetype)) {
+        callback(new BadRequestException('Type de fichier non autorisé. Formats acceptés: PNG, JPG, WebP'), false);
+        return;
+      }
+      callback(null, true);
+    },
+  }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Uploader le logo de l\'application (nécessite permission admin.manage)' })
   @ApiBody({
@@ -97,7 +113,7 @@ export class BrandingController {
         logo: {
           type: 'string',
           format: 'binary',
-          description: 'Fichier image du logo (PNG, JPG, SVG)'
+          description: 'Fichier image du logo (PNG, JPG, WebP)'
         }
       }
     }
@@ -123,15 +139,13 @@ export class BrandingController {
       throw new BadRequestException('Aucun fichier fourni');
     }
 
-    // Valider le type de fichier
-    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
-    if (!allowedMimeTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Type de fichier non autorisé. Formats acceptés: PNG, JPG, SVG, WebP');
+    // Valider le type de fichier (MIME client, puis signature côté service)
+    if (!ALLOWED_LOGO_MIME_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException('Type de fichier non autorisé. Formats acceptés: PNG, JPG, WebP');
     }
 
     // Valider la taille (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
       throw new BadRequestException('Fichier trop volumineux. Taille maximale: 5MB');
     }
 
@@ -147,8 +161,6 @@ export class BrandingController {
       case 'jpg':
       case 'jpeg':
         return 'image/jpeg';
-      case 'svg':
-        return 'image/svg+xml';
       case 'webp':
         return 'image/webp';
       case 'gif':

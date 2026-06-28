@@ -24,8 +24,15 @@ export default function LoginPage() {
   // Calculer isAdmin après tous les hooks
   const isAdmin = user ? hasPermission(user.role, 'admin.view') : false;
 
-  // Vérifier les paramètres d'erreur dans l'URL
+  // Vérifier les paramètres d'erreur dans l'URL sans refléter de texte arbitraire.
   const error = searchParams.get('error');
+  const errorMessage = error === 'authentication_failed'
+    ? "L'authentification a échoué. Veuillez réessayer."
+    : error === 'session_failed'
+      ? "Erreur lors de l'établissement de la session. Veuillez réessayer."
+      : error
+        ? "Une erreur d'authentification est survenue. Veuillez réessayer."
+        : null;
 
   // Redirect if already logged in (dans useEffect pour éviter setState pendant render)
   useEffect(() => {
@@ -69,15 +76,11 @@ export default function LoginPage() {
             </CardHeader>
             <form onSubmit={handleLogin}>
               <CardContent className="space-y-4">
-                {error && (
+                {errorMessage && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Erreur d'authentification</AlertTitle>
-                    <AlertDescription>
-                      {error === "authentication_failed" && "L'authentification a échoué. Veuillez réessayer."}
-                      {error === "session_failed" && "Erreur lors de l'établissement de la session. Veuillez réessayer."}
-                      {error !== "authentication_failed" && error !== "session_failed" && decodeURIComponent(error)}
-                    </AlertDescription>
+                    <AlertDescription>{errorMessage}</AlertDescription>
                   </Alert>
                 )}
 

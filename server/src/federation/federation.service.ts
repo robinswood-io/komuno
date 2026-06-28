@@ -56,12 +56,24 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { questionCatalogWithSnapshots, summarizeSurveyQuestion } from '../forms/forms.utils';
 
+const isHttpUrl = (url: string | null | undefined) => {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
+const httpUrlSchema = z.string().url().refine(isHttpUrl, 'URL HTTP(S) requise');
+
 const federatedOrganizationPayloadSchema = z.object({
   slug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/),
   name: z.string().min(2).max(200),
   type: z.string().min(2).max(40),
   domain: z.string().max(255).optional().nullable(),
-  instanceUrl: z.string().url().optional().nullable(),
+  instanceUrl: httpUrlSchema.optional().nullable(),
 });
 
 const federatedEventPayloadSchema = z.object({
@@ -80,7 +92,7 @@ const federatedEventPayloadSchema = z.object({
     SYNDICATION_STATUS.AUTO_ACCEPTED,
   ]).default(SYNDICATION_STATUS.PROPOSED),
   includeInAgenda: z.boolean().default(false),
-  sourceInstanceUrl: z.string().url(),
+  sourceInstanceUrl: httpUrlSchema,
   sourceSyndicationId: z.string().max(120).optional().nullable(),
   sentAt: z.string().datetime().optional(),
   sourceOrganization: federatedOrganizationPayloadSchema,
@@ -92,9 +104,9 @@ const federatedEventPayloadSchema = z.object({
     date: z.string().datetime(),
     location: z.string().max(200).optional().nullable(),
     maxParticipants: z.number().int().min(1).max(1000).optional().nullable(),
-    helloAssoLink: z.string().url().optional().nullable(),
+    helloAssoLink: httpUrlSchema.optional().nullable(),
     enableExternalRedirect: z.boolean().optional(),
-    externalRedirectUrl: z.string().url().optional().nullable(),
+    externalRedirectUrl: httpUrlSchema.optional().nullable(),
     showInscriptionsCount: z.boolean().optional(),
     showAvailableSeats: z.boolean().optional(),
     allowUnsubscribe: z.boolean().optional(),
@@ -139,7 +151,7 @@ const federatedFormPayloadSchema = z.object({
   ]).default(SYNDICATION_STATUS.PROPOSED),
   includeResponses: z.boolean().default(false),
   collectResponsesLocally: z.boolean().default(true),
-  sourceInstanceUrl: z.string().url(),
+  sourceInstanceUrl: httpUrlSchema,
   sourceSyndicationId: z.string().max(120).optional().nullable(),
   sentAt: z.string().datetime().optional(),
   sourceOrganization: federatedOrganizationPayloadSchema,
@@ -172,7 +184,7 @@ type FederatedFormPayload = z.infer<typeof federatedFormPayloadSchema>;
 
 const federatedRelationHandshakeSchema = z.object({
   protocolVersion: z.literal(1).default(1),
-  senderInstanceUrl: z.string().url().optional().nullable(),
+  senderInstanceUrl: httpUrlSchema.optional().nullable(),
   sentAt: z.string().datetime().optional(),
   relation: z.object({
     fromOrganizationSlug: z.string().min(2).max(80).regex(/^[a-z0-9-]+$/),

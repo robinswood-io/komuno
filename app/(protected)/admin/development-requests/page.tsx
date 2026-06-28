@@ -410,7 +410,7 @@ export default function AdminDevelopmentRequestsPage() {
                           <a
                             href={request.githubIssueUrl}
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener noreferrer"
                             className="text-xs text-primary underline"
                           >
                             #{request.githubIssueNumber ?? 'issue'}
