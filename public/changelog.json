@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.11.0",
+    "version": "2.11.1",
     "releasedAt": "2026-06-28",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Secure tokens and federate forms"
+      "nouveautes": [],
+      "corrections": [
+        "Encrypt outbound relation tokens"
       ],
-      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.11.1",
+      "releasedAt": "2026-06-28",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Encrypt outbound relation tokens"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.11.0",
       "releasedAt": "2026-06-28",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.9",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Auto-répare la connexion traefik_public côté REP"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-28T12:49:43.181Z",
+  "generatedAt": "2026-06-28T19:16:39.242Z",
   "source": "conventional-commits"
 }
