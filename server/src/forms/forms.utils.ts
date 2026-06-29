@@ -10,6 +10,8 @@ const QUESTION_TYPE_EMAIL = 'email';
 const QUESTION_TYPE_NUMBER = 'number';
 const QUESTION_TYPE_RATING = 'rating';
 const QUESTION_TYPE_CHECKBOX = 'checkbox';
+const QUESTION_TYPE_DATE = 'date';
+const SURVEY_SLUG_MAX_LENGTH = 120;
 
 export type QuestionOption = { label: string; value: string };
 export type AnswerMap = Record<string, unknown>;
@@ -41,6 +43,47 @@ export function slugifySurveyValue(value: string): string {
     .slice(0, 100) || 'formulaire';
 }
 
+export function surveySlugCandidate(baseSlug: string, suffix?: number): string {
+  const normalized = slugifySurveyValue(baseSlug);
+  if (!suffix) return normalized.slice(0, SURVEY_SLUG_MAX_LENGTH);
+
+  const suffixText = `-${suffix}`;
+  return `${normalized.slice(0, SURVEY_SLUG_MAX_LENGTH - suffixText.length)}${suffixText}`;
+}
+
+export async function resolveUniqueSurveySlug(
+  baseSlug: string,
+  isTaken: (candidate: string) => Promise<boolean>,
+): Promise<string> {
+  let suffix: number | undefined;
+
+  for (let attempts = 0; attempts < 1000; attempts += 1) {
+    const candidate = surveySlugCandidate(baseSlug, suffix);
+    if (!(await isTaken(candidate))) return candidate;
+    suffix = suffix ? suffix + 1 : 2;
+  }
+
+  throw new BadRequestException('Impossible de générer une URL unique pour ce formulaire');
+}
+
+export function normalizeSurveyFormPayload(data: unknown): unknown {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return data;
+
+  const payload = { ...(data as Record<string, unknown>) };
+  const rawSlug = typeof payload.slug === 'string' ? payload.slug.trim() : undefined;
+  const rawTitle = typeof payload.title === 'string' ? payload.title.trim() : undefined;
+
+  if (rawSlug !== undefined) {
+    const normalizedSlug = rawSlug ? slugifySurveyValue(rawSlug) : '';
+    if (normalizedSlug.length >= 3) payload.slug = normalizedSlug;
+    else if (rawTitle && slugifySurveyValue(rawTitle).length >= 3) payload.slug = slugifySurveyValue(rawTitle);
+    else if (rawSlug === '') delete payload.slug;
+    else payload.slug = normalizedSlug;
+  }
+
+  return payload;
+}
+
 export function normalizeSurveyOptions(options: unknown): QuestionOption[] {
   if (!Array.isArray(options)) return [];
   return options
@@ -66,8 +109,8 @@ export function assertSurveyQuestionsCanBeSaved(status: string | undefined, ques
 
   for (const question of questions ?? []) {
     const options = normalizeSurveyOptions(question.options);
-    if (surveyOptionTypes.has(question.type) && options.length === 0) {
-      throw new BadRequestException(`La question « ${question.label} » doit contenir au moins une option`);
+    if (surveyOptionTypes.has(question.type) && options.length < 2) {
+      throw new BadRequestException(`La question « ${question.label} » doit contenir au moins deux options`);
     }
     const values = options.map((option) => option.value);
     if (new Set(values).size !== values.length) {
@@ -150,6 +193,9 @@ export function formatSurveyAnswerForDisplay(question: SurveyQuestion, value: un
 }
 
 export function validateSurveyAnswer(question: SurveyQuestion, value: unknown) {
+  if (question.required && question.type === QUESTION_TYPE_CHECKBOX && value !== true) {
+    throw new BadRequestException(`La question « ${question.label} » doit être confirmée`);
+  }
   if (question.required && isEmptySurveyAnswer(value)) {
     throw new BadRequestException(`La question « ${question.label} » est obligatoire`);
   }
@@ -172,11 +218,25 @@ export function validateSurveyAnswer(question: SurveyQuestion, value: unknown) {
       if (!Number.isFinite(rating) || rating < 1 || rating > 5) throw new BadRequestException(`La note « ${question.label} » doit être comprise entre 1 et 5`);
       return rating;
     }
+    case QUESTION_TYPE_DATE: {
+      const answer = String(value).trim();
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(answer);
+      if (!match) throw new BadRequestException(`La réponse à « ${question.label} » doit être une date valide`);
+      const [, yearText, monthText, dayText] = match;
+      const year = Number(yearText);
+      const month = Number(monthText);
+      const day = Number(dayText);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+        throw new BadRequestException(`La réponse à « ${question.label} » doit être une date valide`);
+      }
+      return answer;
+    }
     case QUESTION_TYPE_CHECKBOX:
       return Boolean(value);
     case QUESTION_TYPE_MULTISELECT: {
       if (!Array.isArray(value)) throw new BadRequestException(`La réponse à « ${question.label} » doit être une liste`);
-      const values = value.map(String);
+      const values = Array.from(new Set(value.map(String).filter((answer) => answer.trim())));
       if (allowed.size && values.some((answer) => !allowed.has(answer))) throw new BadRequestException(`Une réponse à « ${question.label} » n’est pas autorisée`);
       return values;
     }

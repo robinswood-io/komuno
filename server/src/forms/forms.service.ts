@@ -23,8 +23,10 @@ import {
   formatSurveyAnswerForDisplay,
   isSurveyFormExpired,
   normalizeSurveyDate,
+  normalizeSurveyFormPayload,
   normalizeSurveyOptions,
   questionCatalogWithSnapshots,
+  resolveUniqueSurveySlug,
   slugifySurveyValue,
   snapshotSurveyQuestions,
   summarizeSurveyQuestion,
@@ -79,15 +81,10 @@ export class FormsService {
   }
 
   private async ensureUniqueSlug(baseSlug: string, currentFormId?: string): Promise<string> {
-    const normalized = this.slugify(baseSlug);
-    let candidate = normalized;
-    let suffix = 2;
-
-    while (true) {
+    return await resolveUniqueSurveySlug(baseSlug, async (candidate) => {
       const [existing] = await db.select({ id: surveyForms.id }).from(surveyForms).where(eq(surveyForms.slug, candidate)).limit(1);
-      if (!existing || existing.id === currentFormId) return candidate;
-      candidate = `${normalized}-${suffix++}`;
-    }
+      return Boolean(existing && existing.id !== currentFormId);
+    });
   }
 
   private async getFormOrThrow(id: string) {
@@ -152,7 +149,7 @@ export class FormsService {
 
   async createForm(data: unknown, userEmail?: string) {
     try {
-      const validated = insertSurveyFormSchema.parse(data);
+      const validated = insertSurveyFormSchema.parse(normalizeSurveyFormPayload(data));
       this.assertQuestionsCanBeSaved(validated.status, validated.questions);
       const slug = await this.ensureUniqueSlug(validated.slug ?? validated.title);
       const now = new Date();
@@ -226,12 +223,13 @@ export class FormsService {
   async updateForm(id: string, data: unknown, userEmail?: string) {
     try {
       const current = await this.getFormOrThrow(id);
-      const validated = updateSurveyFormSchema.parse(data);
+      const validated = updateSurveyFormSchema.parse(normalizeSurveyFormPayload(data));
       if ((validated.status ?? current.status) === SURVEY_FORM_STATUS.PUBLISHED && validated.questions === undefined) {
         const existingQuestions = await this.getQuestions(id);
         if (existingQuestions.length === 0) {
           throw new BadRequestException('Un formulaire publié doit contenir au moins une question');
         }
+        this.assertQuestionsCanBeSaved(SURVEY_FORM_STATUS.PUBLISHED, existingQuestions);
       }
       this.assertQuestionsCanBeSaved(validated.status ?? current.status, validated.questions);
       const patch: Record<string, unknown> = { updatedAt: sql`NOW()` };

@@ -82,17 +82,20 @@ export default function PublicSurveyFormPage() {
     },
   });
 
-  const requiredMissing = useMemo(() => {
-    if (!form) return false;
+  const blockingMessage = useMemo(() => {
+    if (!form) return null;
     const respondentEmailRequired = form.collectRespondentInfo || !form.allowMultipleSubmissions;
-    if (respondentEmailRequired && !respondentEmail) return true;
-    if (form.requireConsent && !consentAccepted) return true;
-    return form.questions.some((question) => {
+    if (respondentEmailRequired && !respondentEmail) return 'Renseignez votre email avant d’envoyer.';
+    if (form.requireConsent && !consentAccepted) return 'Acceptez le consentement RGPD pour envoyer le formulaire.';
+
+    const missingQuestion = form.questions.find((question) => {
       if (!question.required) return false;
       const value = answers[question.id];
       if (question.type === 'checkbox') return value !== true;
       return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
     });
+
+    return missingQuestion ? `Répondez à la question obligatoire « ${missingQuestion.label} ».` : null;
   }, [answers, consentAccepted, form, respondentEmail]);
 
   const setAnswer = (questionId: string, value: unknown) => setAnswers((current) => ({ ...current, [questionId]: value }));
@@ -232,9 +235,10 @@ export default function PublicSurveyFormPage() {
             </label>
           )}
 
+          {blockingMessage && <Alert><AlertDescription>{blockingMessage}</AlertDescription></Alert>}
           {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
 
-          <Button size="lg" className="w-full" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending || requiredMissing}>
+          <Button size="lg" className="w-full" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending || Boolean(blockingMessage)}>
             {submitMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
             Envoyer ma réponse
           </Button>

