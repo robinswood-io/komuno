@@ -4,6 +4,21 @@ import { buildCorsOptions, getAllowedCorsOrigins } from '../../server/src/config
 import { isDemoModeEnabled } from '../../server/src/auth/demo-user';
 
 describe('Sécurité — durcissement transversal', () => {
+  it('publie un Content-Security-Policy applicatif non permissif', async () => {
+    const module = await import('../../next.config.js');
+    const nextConfig = module.default ?? module;
+    const headerGroups = await nextConfig.headers();
+    const headers = headerGroups.flatMap((group: { headers: Array<{ key: string; value: string }> }) => group.headers);
+    const csp = headers.find((header: { key: string }) => header.key.toLowerCase() === 'content-security-policy')?.value;
+
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("base-uri 'self'");
+    expect(csp).toContain('upgrade-insecure-requests');
+    expect(csp).not.toContain('default-src *');
+  });
+
   it('désactive toujours le demo-mode en production', () => {
     expect(isDemoModeEnabled({ NODE_ENV: 'production', KOMUNO_DEMO_MODE: 'true' } as NodeJS.ProcessEnv)).toBe(false);
     expect(isDemoModeEnabled({ NODE_ENV: 'development', KOMUNO_DEMO_MODE: 'true' } as NodeJS.ProcessEnv)).toBe(true);
