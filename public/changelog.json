@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.11.3",
-    "releasedAt": "2026-06-28",
+    "version": "2.11.4",
+    "releasedAt": "2026-06-29",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Remove unused private auth package"
+        "Add application content security policy"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.11.4",
+      "releasedAt": "2026-06-29",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Add application content security policy"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.11.3",
       "releasedAt": "2026-06-28",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.12",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte des ajustements techniques.",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": [
-          "Tracer exposition port compose rep"
-        ]
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-28T22:48:15.633Z",
+  "generatedAt": "2026-06-29T07:24:33.181Z",
   "source": "conventional-commits"
 }
