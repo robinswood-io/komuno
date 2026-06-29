@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.11.4",
+    "version": "2.12.0",
     "releasedAt": "2026-06-29",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
-      "corrections": [
-        "Add application content security policy"
+      "nouveautes": [
+        "Improve form builder UI"
       ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.12.0",
+      "releasedAt": "2026-06-29",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Improve form builder UI"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.11.4",
       "releasedAt": "2026-06-29",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.13",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Ajouter smoke test public bloquant pour rep"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-29T07:24:33.181Z",
+  "generatedAt": "2026-06-29T08:07:09.497Z",
   "source": "conventional-commits"
 }
