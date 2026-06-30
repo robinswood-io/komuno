@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.17.0] - 2026-06-30
+
+### En bref
+
+- Cette version apporte 1 nouveaute(s).
+
+### Nouveautes
+
+- Add scoped organization admin onboarding
+
 ## [2.16.1] - 2026-06-30
 
 ### En bref
