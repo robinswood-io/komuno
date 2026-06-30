@@ -20,11 +20,13 @@ import {
   type IntegrationAccount,
 } from '../../../shared/schema';
 import {
+  decryptIntegrationSecret,
   encryptIntegrationSecret,
   integrationSecretFingerprint,
   sanitizeIntegrationSettings,
   withoutIntegrationSecret,
 } from './integrations.utils';
+import { syncHelloAssoCatalog, testHelloAssoConnection } from './providers/helloasso';
 
 const accountInputSchema = insertIntegrationAccountSchema.extend({
   secret: z.string().min(8).max(5000).optional(),
@@ -250,23 +252,19 @@ export class IntegrationsService {
 
   async testAccount(id: string, userEmail?: string) {
     const account = await this.getAccountOrThrow(id);
-    const hasSecret = Boolean(account.secretEncryptedPayload);
-    const status = account.enabled && (hasSecret || account.authType === INTEGRATION_AUTH_TYPE.NONE)
-      ? INTEGRATION_SYNC_STATUS.SUCCESS
-      : INTEGRATION_SYNC_STATUS.PARTIAL;
-    const error = status === INTEGRATION_SYNC_STATUS.PARTIAL ? 'configuration_incomplete_or_missing_secret' : null;
+    const result = await this.runConnectionTest(account);
     const run = await this.createSyncRun({
       accountId: account.id,
       provider: account.provider,
       operation: 'connection_test',
-      status,
-      error,
-      metadata: { authType: account.authType, hasSecret, enabled: account.enabled },
+      status: result.status,
+      error: result.error,
+      metadata: result.metadata,
     });
 
     await db.update(integrationAccounts).set({
-      status: status === INTEGRATION_SYNC_STATUS.SUCCESS ? INTEGRATION_STATUS.CONNECTED : INTEGRATION_STATUS.ERROR,
-      lastError: error,
+      status: result.status === INTEGRATION_SYNC_STATUS.SUCCESS ? INTEGRATION_STATUS.CONNECTED : INTEGRATION_STATUS.ERROR,
+      lastError: result.error,
       lastSyncAt: new Date(),
       updatedAt: sql`NOW()`,
     }).where(eq(integrationAccounts.id, account.id));
@@ -277,9 +275,97 @@ export class IntegrationsService {
       entityType: 'integration_account',
       entityId: account.id,
       organizationId: account.organizationId,
-      metadata: { provider: account.provider, status, error },
+      metadata: { provider: account.provider, status: result.status, error: result.error },
     });
     return { success: true, data: run };
+  }
+
+  async syncAccount(id: string, userEmail?: string) {
+    const account = await this.getAccountOrThrow(id);
+    if (!account.enabled) throw new BadRequestException('Compte intégration désactivé');
+
+    try {
+      const result = await this.runProviderSync(account);
+      const run = await this.createSyncRun({
+        accountId: account.id,
+        provider: account.provider,
+        operation: result.operation,
+        status: INTEGRATION_SYNC_STATUS.SUCCESS,
+        metadata: result.metadata,
+      });
+      await db.update(integrationAccounts).set({
+        status: INTEGRATION_STATUS.CONNECTED,
+        lastError: null,
+        lastSyncAt: new Date(),
+        updatedAt: sql`NOW()`,
+      }).where(eq(integrationAccounts.id, account.id));
+      this.audit({
+        actorEmail: userEmail ?? null,
+        action: 'integrations.account.sync',
+        entityType: 'integration_account',
+        entityId: account.id,
+        organizationId: account.organizationId,
+        metadata: { provider: account.provider, operation: result.operation },
+      });
+      return { success: true, data: run };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'sync_failed';
+      const run = await this.createSyncRun({
+        accountId: account.id,
+        provider: account.provider,
+        operation: 'manual_sync',
+        status: INTEGRATION_SYNC_STATUS.FAILED,
+        error: message,
+        metadata: { provider: account.provider },
+      });
+      await db.update(integrationAccounts).set({
+        status: INTEGRATION_STATUS.ERROR,
+        lastError: message,
+        lastSyncAt: new Date(),
+        updatedAt: sql`NOW()`,
+      }).where(eq(integrationAccounts.id, account.id));
+      throw error;
+    }
+  }
+
+  private decryptAccountSecret(account: IntegrationAccount): string | null {
+    return account.secretEncryptedPayload ? decryptIntegrationSecret(account.secretEncryptedPayload) : null;
+  }
+
+  private async runConnectionTest(account: IntegrationAccount): Promise<{ status: string; error: string | null; metadata: Record<string, unknown> }> {
+    const hasSecret = Boolean(account.secretEncryptedPayload);
+    if (!account.enabled || (!hasSecret && account.authType !== INTEGRATION_AUTH_TYPE.NONE)) {
+      return {
+        status: INTEGRATION_SYNC_STATUS.PARTIAL,
+        error: 'configuration_incomplete_or_missing_secret',
+        metadata: { authType: account.authType, hasSecret, enabled: account.enabled },
+      };
+    }
+
+    if (account.provider === INTEGRATION_PROVIDER.HELLOASSO) {
+      const metadata = await testHelloAssoConnection({
+        settings: account.settings as Record<string, unknown>,
+        clientSecret: this.decryptAccountSecret(account),
+      });
+      return { status: INTEGRATION_SYNC_STATUS.SUCCESS, error: null, metadata };
+    }
+
+    return {
+      status: INTEGRATION_SYNC_STATUS.SUCCESS,
+      error: null,
+      metadata: { authType: account.authType, hasSecret, enabled: account.enabled, provider: account.provider },
+    };
+  }
+
+  private async runProviderSync(account: IntegrationAccount): Promise<{ operation: string; metadata: Record<string, unknown> }> {
+    if (account.provider === INTEGRATION_PROVIDER.HELLOASSO) {
+      const metadata = await syncHelloAssoCatalog({
+        settings: account.settings as Record<string, unknown>,
+        clientSecret: this.decryptAccountSecret(account),
+      });
+      return { operation: 'helloasso_catalog_sync', metadata };
+    }
+    throw new BadRequestException(`La synchronisation manuelle n'est pas encore disponible pour ${account.provider}`);
   }
 
   async recordWebhook(providerInput: string, payload: unknown, headers: Record<string, unknown> = {}) {

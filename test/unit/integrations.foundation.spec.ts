@@ -9,6 +9,12 @@ import {
   withoutIntegrationSecret,
 } from '../../server/src/integrations/integrations.utils';
 import {
+  getHelloAssoBases,
+  requestHelloAssoToken,
+  syncHelloAssoCatalog,
+  testHelloAssoConnection,
+} from '../../server/src/integrations/providers/helloasso';
+import {
   hasPermission,
   insertIntegrationAccountSchema,
   insertIntegrationWebhookEventSchema,
@@ -71,6 +77,56 @@ describe('Intégrations — socle sécurisé', () => {
     expect(hasPermission('ideas_manager', 'integrations.view')).toBe(true);
     expect(hasPermission('events_manager', 'integrations.write')).toBe(true);
     expect(hasPermission('super_admin', 'integrations.manage')).toBe(true);
+  });
+
+  it('configure HelloAsso sur les bons endpoints sandbox/production', () => {
+    expect(getHelloAssoBases('sandbox')).toEqual({
+      oauth: 'https://api.helloasso-sandbox.com/oauth2',
+      api: 'https://api.helloasso-sandbox.com/v5',
+    });
+    expect(getHelloAssoBases('production').api).toBe('https://api.helloasso.com/v5');
+  });
+
+  it('authentifie HelloAsso sans exposer le secret dans le résultat', async () => {
+    const calls: Array<{ input: string; body?: string }> = [];
+    const fetchImpl = async (input: string, init?: RequestInit) => {
+      calls.push({ input, body: init?.body?.toString() });
+      return { ok: true, status: 200, statusText: 'OK', json: async () => ({ access_token: 'access-token', token_type: 'Bearer', expires_in: 1800 }) } as any;
+    };
+
+    const result = await requestHelloAssoToken({
+      settings: { environment: 'sandbox', clientId: 'client-id-123' },
+      clientSecret: 'client-secret-456',
+      fetchImpl,
+    });
+
+    expect(calls[0].input).toBe('https://api.helloasso-sandbox.com/oauth2/token');
+    expect(calls[0].body).toContain('grant_type=client_credentials');
+    expect(calls[0].body).toContain('client_id=client-id-123');
+    expect(calls[0].body).toContain('client_secret=client-secret-456');
+    expect(result).toEqual({ accessToken: 'access-token', tokenType: 'Bearer', expiresIn: 1800, environment: 'sandbox' });
+  });
+
+  it('teste et synchronise HelloAsso en ne conservant que des métadonnées publiques/agrégées', async () => {
+    const calls: string[] = [];
+    const fetchImpl = async (input: string) => {
+      calls.push(input);
+      if (input.endsWith('/oauth2/token')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ access_token: 'access-token' }) } as any;
+      if (input.includes('/forms?')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ title: 'Billetterie', formSlug: 'billetterie', formType: 'Event', state: 'Public' }], pagination: { continuationToken: 'next-forms' } }) } as any;
+      if (input.includes('/orders?')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ payer: { email: 'pii@example.org' } }], pagination: { continuationToken: 'next-orders' } }) } as any;
+      throw new Error(`Unexpected call: ${input}`);
+    };
+
+    const settings = { environment: 'sandbox', clientId: 'client-id-123', organizationSlug: 'cjd-amiens', syncOrdersEnabled: true };
+    const testResult = await testHelloAssoConnection({ settings, clientSecret: 'client-secret-456', fetchImpl });
+    const syncResult = await syncHelloAssoCatalog({ settings, clientSecret: 'client-secret-456', fetchImpl });
+
+    expect(testResult.verifiedScopes).toEqual(['oauth_token', 'organization_forms']);
+    expect(syncResult.formsCount).toBe(1);
+    expect(syncResult.ordersCount).toBe(1);
+    expect(JSON.stringify(syncResult)).not.toContain('pii@example.org');
+    expect(calls.some((call) => call.includes('/organizations/cjd-amiens/forms'))).toBe(true);
+    expect(calls.some((call) => call.includes('/organizations/cjd-amiens/orders'))).toBe(true);
   });
 
   it('génère un calendrier ICS valide et échappe les champs texte', () => {

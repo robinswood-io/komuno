@@ -60,6 +60,14 @@ export class IntegrationsController {
     return await this.integrationsService.testAccount(id, user.email);
   }
 
+  @Post('accounts/:id/sync')
+  @Permissions('integrations.write')
+  @ApiOperation({ summary: 'Synchroniser manuellement un compte d’intégration' })
+  @ApiParam({ name: 'id' })
+  async syncAccount(@Param('id') id: string, @User() user: { email?: string }) {
+    return await this.integrationsService.syncAccount(id, user.email);
+  }
+
   @Get('sync-runs')
   @Permissions('integrations.view')
   @ApiOperation({ summary: 'Lister les derniers runs de synchronisation intégrations' })

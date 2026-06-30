@@ -138,6 +138,15 @@ export default function AdminIntegrationsPage() {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/api/admin/integrations/accounts/${id}/sync`),
+    onSuccess: async () => {
+      toast({ title: 'Synchronisation enregistrée', description: 'Aucune donnée personnelle brute n’est stockée par le sync HelloAsso v1.' });
+      await invalidateIntegrations();
+    },
+    onError: (error) => toast({ title: 'Synchronisation impossible', description: error instanceof Error ? error.message : 'Erreur inconnue', variant: 'destructive' }),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/admin/integrations/accounts/${id}`),
     onSuccess: async () => {
@@ -151,7 +160,7 @@ export default function AdminIntegrationsPage() {
     const next = providers.find((item) => item.provider === nextProvider);
     setLabel(next?.label ?? providerLabels[nextProvider]);
     setAuthType(next?.authType ?? 'none');
-    setSettings(nextProvider === 'helloasso' ? '{\n  "environment": "sandbox"\n}' : '{}');
+    setSettings(nextProvider === 'helloasso' ? '{\n  "environment": "sandbox",\n  "clientId": "votre-client-id",\n  "organizationSlug": "votre-association",\n  "pageSize": 20,\n  "syncOrdersEnabled": false\n}' : '{}');
   };
 
   return (
@@ -238,6 +247,11 @@ export default function AdminIntegrationsPage() {
               <div className="space-y-2">
                 <Label>Réglages JSON non sensibles</Label>
                 <Textarea value={settings} onChange={(event) => setSettings(event.target.value)} className="min-h-28 font-mono text-xs" />
+                {provider === 'helloasso' && (
+                  <p className="text-xs text-muted-foreground">
+                    HelloAsso v1 : stocker le <strong>clientId</strong> ici et coller le <strong>clientSecret</strong> dans le champ secret. Le sync commandes reste en compteur uniquement par défaut.
+                  </p>
+                )}
                 {currentProvider && <p className="text-xs text-muted-foreground">Recommandé : {currentProvider.capabilities.join(', ')}</p>}
               </div>
               <div className="flex items-center justify-between rounded-lg border p-3">
@@ -275,6 +289,9 @@ export default function AdminIntegrationsPage() {
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => testMutation.mutate(account.id)} disabled={testMutation.isPending}>
                     <RefreshCw className="mr-2 h-4 w-4" /> Tester
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => syncMutation.mutate(account.id)} disabled={syncMutation.isPending}>
+                    <RefreshCw className="mr-2 h-4 w-4" /> Sync
                   </Button>
                   <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(account.id)} disabled={deleteMutation.isPending}>
                     <Trash2 className="mr-2 h-4 w-4" /> Supprimer
