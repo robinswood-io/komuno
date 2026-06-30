@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.15.1",
+    "version": "2.15.2",
     "releasedAt": "2026-06-30",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte des ajustements techniques.",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
-      "corrections": [
-        "Restore member edit workflow"
-      ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
-      "maintenance": []
+      "maintenance": [
+        "Remove accidental tenant route changes"
+      ]
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.15.2",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte des ajustements techniques.",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Remove accidental tenant route changes"
+        ]
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.15.1",
       "releasedAt": "2026-06-30",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.2.4",
-      "releasedAt": "2026-06-18",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Use CJD Amiens logo"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-30T14:43:40.776Z",
+  "generatedAt": "2026-06-30T14:44:30.430Z",
   "source": "conventional-commits"
 }
