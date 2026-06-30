@@ -19,12 +19,16 @@ export class AuditController {
   @ApiQuery({ name: 'entityType', required: false })
   @ApiQuery({ name: 'entityId', required: false })
   @ApiQuery({ name: 'actorEmail', required: false })
+  @ApiQuery({ name: 'from', required: false, description: 'Date ISO min incluse' })
+  @ApiQuery({ name: 'to', required: false, description: 'Date ISO max incluse' })
   @ApiQuery({ name: 'limit', required: false })
   async listAuditLogs(
     @Query('action') action?: string,
     @Query('entityType') entityType?: string,
     @Query('entityId') entityId?: string,
     @Query('actorEmail') actorEmail?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
     @Query('limit') limit?: string,
   ) {
     return await this.auditService.list({
@@ -32,6 +36,8 @@ export class AuditController {
       entityType,
       entityId,
       actorEmail,
+      from,
+      to,
       limit: limit ? Number(limit) : undefined,
     });
   }

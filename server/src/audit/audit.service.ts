@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   businessAuditLogs,
@@ -58,6 +58,8 @@ export class AuditService {
     entityType?: string;
     entityId?: string;
     actorEmail?: string;
+    from?: string;
+    to?: string;
     limit?: number;
   }) {
     const conditions = [] as any[];
@@ -65,6 +67,14 @@ export class AuditService {
     if (options?.entityType) conditions.push(eq(businessAuditLogs.entityType, options.entityType));
     if (options?.entityId) conditions.push(eq(businessAuditLogs.entityId, options.entityId));
     if (options?.actorEmail) conditions.push(eq(businessAuditLogs.actorEmail, options.actorEmail));
+    if (options?.from) {
+      const fromDate = new Date(options.from);
+      if (!Number.isNaN(fromDate.getTime())) conditions.push(gte(businessAuditLogs.createdAt, fromDate));
+    }
+    if (options?.to) {
+      const toDate = new Date(options.to);
+      if (!Number.isNaN(toDate.getTime())) conditions.push(lte(businessAuditLogs.createdAt, toDate));
+    }
     const limit = Math.max(1, Math.min(options?.limit ?? 100, 200));
 
     const rows = await db.select().from(businessAuditLogs)

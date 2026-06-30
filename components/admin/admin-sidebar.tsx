@@ -30,6 +30,7 @@ import {
   Network,
   FileQuestion,
   PlugZap,
+  ScrollText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -156,6 +157,11 @@ const navItems: (NavItem | NavSection)[] = [
         title: 'Intégrations',
         href: '/admin/integrations',
         icon: PlugZap,
+      },
+      {
+        title: 'Audit',
+        href: '/admin/audit',
+        icon: ScrollText,
       },
       {
         title: 'Demandes dev',
