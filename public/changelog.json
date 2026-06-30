@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.13.0",
+    "version": "2.13.1",
     "releasedAt": "2026-06-30",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Add integration foundation and calendar feeds"
+      "nouveautes": [],
+      "corrections": [
+        "Return raw calendar feeds and validate webhooks"
       ],
-      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.13.1",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Return raw calendar feeds and validate webhooks"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.13.0",
       "releasedAt": "2026-06-30",
@@ -484,24 +500,8 @@
         ]
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.2.0",
-      "releasedAt": "2026-06-18",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add annual member groups"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-30T13:04:53.521Z",
+  "generatedAt": "2026-06-30T13:22:33.495Z",
   "source": "conventional-commits"
 }
