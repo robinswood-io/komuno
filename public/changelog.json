@@ -1,12 +1,12 @@
 {
   "latest": {
-    "version": "2.19.0",
+    "version": "2.20.0",
     "releasedAt": "2026-06-30",
     "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [
-        "Add Stripe connector"
+        "Add outbound webhooks"
       ],
       "corrections": [],
       "ameliorations": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.20.0",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add outbound webhooks"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.19.0",
       "releasedAt": "2026-06-30",
@@ -482,26 +498,8 @@
         "maintenance": []
       },
       "commitCount": 3
-    },
-    {
-      "version": "2.5.0",
-      "releasedAt": "2026-06-25",
-      "summary": "Cette version apporte 1 nouveaute(s), 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add public demo mode"
-        ],
-        "corrections": [
-          "Automate inter-instance sync"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 2
     }
   ],
-  "generatedAt": "2026-06-30T16:05:12.297Z",
+  "generatedAt": "2026-06-30T16:36:31.499Z",
   "source": "conventional-commits"
 }
