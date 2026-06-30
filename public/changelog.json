@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.15.2",
+    "version": "2.16.0",
     "releasedAt": "2026-06-30",
-    "summary": "Cette version apporte des ajustements techniques.",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
+      "nouveautes": [
+        "Add SaaS organization tenant route"
+      ],
       "corrections": [],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Remove accidental tenant route changes"
-      ]
+      "maintenance": []
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.16.0",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add SaaS organization tenant route"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.15.2",
       "releasedAt": "2026-06-30",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.3.0",
-      "releasedAt": "2026-06-22",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add regional organization module"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-30T14:44:30.430Z",
+  "generatedAt": "2026-06-30T14:49:21.721Z",
   "source": "conventional-commits"
 }
