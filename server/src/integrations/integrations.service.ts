@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
@@ -11,11 +11,14 @@ import {
   INTEGRATION_STATUS,
   INTEGRATION_SYNC_STATUS,
   INTEGRATION_WEBHOOK_STATUS,
+  INTEGRATION_OUTBOUND_WEBHOOK_STATUS,
   insertIntegrationAccountSchema,
   insertIntegrationWebhookEventSchema,
+  insertIntegrationOutboundWebhookDeliverySchema,
   integrationAccounts,
   integrationSyncRuns,
   integrationWebhookEvents,
+  integrationOutboundWebhookDeliveries,
   updateIntegrationAccountSchema,
   type IntegrationAccount,
 } from '../../../shared/schema';
@@ -28,6 +31,13 @@ import {
 } from './integrations.utils';
 import { syncBrevoLists, testBrevoConnection } from './providers/brevo';
 import { syncHelloAssoCatalog, testHelloAssoConnection } from './providers/helloasso';
+import {
+  buildOutboundWebhookPayload,
+  deliverOutboundWebhook,
+  eventMatchesWebhook,
+  parseOutboundWebhookSecret,
+  parseOutboundWebhookSettings,
+} from './providers/outbound-webhook';
 import { syncStripeCatalog, testStripeConnection } from './providers/stripe';
 
 const accountInputSchema = insertIntegrationAccountSchema.extend({
@@ -136,7 +146,7 @@ export class IntegrationsService {
           label: 'Webhooks sortants',
           priority: 'P2',
           authType: INTEGRATION_AUTH_TYPE.WEBHOOK_SECRET,
-          capabilities: ['outbound_events', 'automation'],
+          capabilities: ['outbound_events', 'signed_webhooks', 'retry_logs', 'automation'],
           recommended: false,
         },
       ],
@@ -368,11 +378,220 @@ export class IntegrationsService {
       return { status: INTEGRATION_SYNC_STATUS.SUCCESS, error: null, metadata };
     }
 
+    if (account.provider === INTEGRATION_PROVIDER.WEBHOOK) {
+      const settings = parseOutboundWebhookSettings(account.settings as Record<string, unknown>);
+      const secret = parseOutboundWebhookSecret(this.decryptAccountSecret(account));
+      const target = new URL(secret.targetUrl);
+      return {
+        status: INTEGRATION_SYNC_STATUS.SUCCESS,
+        error: null,
+        metadata: {
+          authType: account.authType,
+          events: settings.events,
+          maxAttempts: settings.maxAttempts,
+          timeoutMs: settings.timeoutMs,
+          targetHost: target.hostname,
+          secretMode: secret.secretMode,
+          signed: true,
+        },
+      };
+    }
+
     return {
       status: INTEGRATION_SYNC_STATUS.SUCCESS,
       error: null,
       metadata: { authType: account.authType, hasSecret, enabled: account.enabled, provider: account.provider },
     };
+  }
+
+  private safeOutboundDelivery(delivery: typeof integrationOutboundWebhookDeliveries.$inferSelect) {
+    const { responseBody: _responseBody, payload: _payload, ...safe } = delivery;
+    return safe;
+  }
+
+  async listOutboundWebhookDeliveries(options?: { accountId?: string; status?: string }) {
+    const conditions = [] as any[];
+    if (options?.accountId) conditions.push(eq(integrationOutboundWebhookDeliveries.accountId, options.accountId));
+    if (options?.status) conditions.push(eq(integrationOutboundWebhookDeliveries.status, options.status));
+    const deliveries = await db.select().from(integrationOutboundWebhookDeliveries)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(integrationOutboundWebhookDeliveries.createdAt))
+      .limit(100);
+    return { success: true, data: deliveries.map((delivery) => this.safeOutboundDelivery(delivery)) };
+  }
+
+  private webhookEventId(eventType: string, data: Record<string, unknown>) {
+    const explicitId = data.id ?? data.eventId ?? data.event_id;
+    if (explicitId) return `${eventType}:${String(explicitId)}`;
+    return `${eventType}:${createHash('sha256').update(JSON.stringify(data)).digest('hex')}`;
+  }
+
+  private async createAndDeliverOutboundWebhook(account: IntegrationAccount, input: { eventType: string; data?: Record<string, unknown>; eventId?: string }) {
+    const settings = parseOutboundWebhookSettings(account.settings as Record<string, unknown>);
+    const secret = parseOutboundWebhookSecret(this.decryptAccountSecret(account));
+    const payload = buildOutboundWebhookPayload({
+      id: input.eventId ?? this.webhookEventId(input.eventType, input.data ?? {}),
+      type: input.eventType,
+      data: input.data ?? {},
+    });
+    const payloadHash = createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+    const validated = insertIntegrationOutboundWebhookDeliverySchema.parse({
+      accountId: account.id,
+      eventId: String(payload.id),
+      eventType: input.eventType,
+      payloadHash,
+      payload,
+      status: INTEGRATION_OUTBOUND_WEBHOOK_STATUS.PENDING,
+      maxAttempts: settings.maxAttempts,
+    });
+
+    let delivery = null as typeof integrationOutboundWebhookDeliveries.$inferSelect | null;
+    try {
+      [delivery] = await db.insert(integrationOutboundWebhookDeliveries).values(validated).returning();
+    } catch (error) {
+      if ((error as any)?.code === '23505') {
+        [delivery] = await db.select().from(integrationOutboundWebhookDeliveries)
+          .where(and(eq(integrationOutboundWebhookDeliveries.accountId, account.id), eq(integrationOutboundWebhookDeliveries.eventId, String(payload.id))))
+          .limit(1);
+        return { delivery, duplicate: true };
+      }
+      throw error;
+    }
+
+    const delivered = await this.deliverOutboundWebhookDelivery(account, delivery, { targetUrl: secret.targetUrl, signingSecret: secret.signingSecret, timeoutMs: settings.timeoutMs });
+    return { delivery: delivered, duplicate: false };
+  }
+
+  private nextRetryDate(attemptCount: number) {
+    const delayMs = Math.min(60 * 60 * 1000, Math.pow(2, Math.max(0, attemptCount - 1)) * 60 * 1000);
+    return new Date(Date.now() + delayMs);
+  }
+
+  private async deliverOutboundWebhookDelivery(
+    account: IntegrationAccount,
+    delivery: typeof integrationOutboundWebhookDeliveries.$inferSelect,
+    secretOptions?: { targetUrl: string; signingSecret: string; timeoutMs: number },
+  ) {
+    const settings = parseOutboundWebhookSettings(account.settings as Record<string, unknown>);
+    const secret = secretOptions ?? (() => {
+      const parsed = parseOutboundWebhookSecret(this.decryptAccountSecret(account));
+      return { targetUrl: parsed.targetUrl, signingSecret: parsed.signingSecret, timeoutMs: settings.timeoutMs };
+    })();
+    const attemptCount = delivery.attemptCount + 1;
+    try {
+      const result = await deliverOutboundWebhook({
+        targetUrl: secret.targetUrl,
+        signingSecret: secret.signingSecret,
+        eventType: delivery.eventType,
+        payload: delivery.payload,
+        timeoutMs: secret.timeoutMs,
+      });
+      const delivered = result.ok;
+      const retrying = !delivered && attemptCount < delivery.maxAttempts;
+      const [updated] = await db.update(integrationOutboundWebhookDeliveries).set({
+        status: delivered
+          ? INTEGRATION_OUTBOUND_WEBHOOK_STATUS.DELIVERED
+          : retrying ? INTEGRATION_OUTBOUND_WEBHOOK_STATUS.RETRYING : INTEGRATION_OUTBOUND_WEBHOOK_STATUS.FAILED,
+        attemptCount,
+        lastAttemptAt: new Date(),
+        deliveredAt: delivered ? new Date() : null,
+        nextAttemptAt: retrying ? this.nextRetryDate(attemptCount) : null,
+        responseStatus: result.status,
+        responseBody: result.responseBody,
+        error: delivered ? null : `HTTP ${result.status}`,
+        updatedAt: sql`NOW()`,
+      }).where(eq(integrationOutboundWebhookDeliveries.id, delivery.id)).returning();
+
+      this.audit({
+        actorEmail: null,
+        action: delivered ? 'integrations.webhook.deliver' : 'integrations.webhook.delivery_failed',
+        entityType: 'integration_outbound_webhook_delivery',
+        entityId: updated.id,
+        organizationId: account.organizationId,
+        metadata: { accountId: account.id, eventType: delivery.eventType, status: updated.status, responseStatus: result.status },
+      });
+      return updated;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'webhook_delivery_failed';
+      const retrying = attemptCount < delivery.maxAttempts;
+      const [updated] = await db.update(integrationOutboundWebhookDeliveries).set({
+        status: retrying ? INTEGRATION_OUTBOUND_WEBHOOK_STATUS.RETRYING : INTEGRATION_OUTBOUND_WEBHOOK_STATUS.FAILED,
+        attemptCount,
+        lastAttemptAt: new Date(),
+        nextAttemptAt: retrying ? this.nextRetryDate(attemptCount) : null,
+        error: message,
+        updatedAt: sql`NOW()`,
+      }).where(eq(integrationOutboundWebhookDeliveries.id, delivery.id)).returning();
+      this.audit({
+        actorEmail: null,
+        action: 'integrations.webhook.delivery_failed',
+        entityType: 'integration_outbound_webhook_delivery',
+        entityId: updated.id,
+        organizationId: account.organizationId,
+        metadata: { accountId: account.id, eventType: delivery.eventType, status: updated.status, error: message },
+      });
+      return updated;
+    }
+  }
+
+  async emitOutboundEvent(eventType: string, data: Record<string, unknown> = {}) {
+    const accounts = await db.select().from(integrationAccounts).where(and(
+      eq(integrationAccounts.provider, INTEGRATION_PROVIDER.WEBHOOK),
+      eq(integrationAccounts.enabled, true),
+    ));
+    const results = [] as Array<{ accountId: string; deliveryId: string | null; status: string; duplicate: boolean }>;
+    for (const account of accounts) {
+      const settings = parseOutboundWebhookSettings(account.settings as Record<string, unknown>);
+      if (!eventMatchesWebhook(settings, eventType)) continue;
+      const result = await this.createAndDeliverOutboundWebhook(account, { eventType, data });
+      results.push({
+        accountId: account.id,
+        deliveryId: result.delivery?.id ?? null,
+        status: result.delivery?.status ?? 'unknown',
+        duplicate: result.duplicate,
+      });
+    }
+    return { success: true, data: results };
+  }
+
+  async emitTestOutboundWebhook(id: string, userEmail?: string) {
+    const account = await this.getAccountOrThrow(id);
+    if (account.provider !== INTEGRATION_PROVIDER.WEBHOOK) throw new BadRequestException('Ce compte n’est pas un webhook sortant');
+    if (!account.enabled) throw new BadRequestException('Compte webhook désactivé');
+    const result = await this.createAndDeliverOutboundWebhook(account, {
+      eventType: 'komuno.webhook.test',
+      eventId: `komuno.webhook.test:${Date.now()}`,
+      data: { source: 'admin_test', accountId: account.id },
+    });
+    this.audit({
+      actorEmail: userEmail ?? null,
+      action: 'integrations.webhook.test',
+      entityType: 'integration_account',
+      entityId: account.id,
+      organizationId: account.organizationId,
+      metadata: { deliveryId: result.delivery?.id ?? null, status: result.delivery?.status ?? null },
+    });
+    return { success: true, data: { delivery: result.delivery ? this.safeOutboundDelivery(result.delivery) : null, duplicate: result.duplicate } };
+  }
+
+  async retryDueOutboundWebhooks(limit = 20) {
+    const rows = await db.select().from(integrationOutboundWebhookDeliveries)
+      .where(and(
+        inArray(integrationOutboundWebhookDeliveries.status, [INTEGRATION_OUTBOUND_WEBHOOK_STATUS.PENDING, INTEGRATION_OUTBOUND_WEBHOOK_STATUS.RETRYING]),
+        or(isNull(integrationOutboundWebhookDeliveries.nextAttemptAt), lte(integrationOutboundWebhookDeliveries.nextAttemptAt, new Date())),
+      ))
+      .orderBy(integrationOutboundWebhookDeliveries.createdAt)
+      .limit(Math.min(Math.max(limit, 1), 100));
+
+    const results = [] as Array<{ deliveryId: string; status: string }>;
+    for (const delivery of rows) {
+      if (!delivery.accountId) continue;
+      const account = await this.getAccountOrThrow(delivery.accountId);
+      if (!account.enabled || account.provider !== INTEGRATION_PROVIDER.WEBHOOK) continue;
+      const updated = await this.deliverOutboundWebhookDelivery(account, delivery);
+      results.push({ deliveryId: updated.id, status: updated.status });
+    }
+    return { success: true, data: results };
   }
 
   private async runProviderSync(account: IntegrationAccount): Promise<{ operation: string; metadata: Record<string, unknown> }> {
@@ -398,6 +617,11 @@ export class IntegrationsService {
         apiKey: this.decryptAccountSecret(account),
       });
       return { operation: 'stripe_catalog_sync', metadata };
+    }
+
+    if (account.provider === INTEGRATION_PROVIDER.WEBHOOK) {
+      const retryResult = await this.retryDueOutboundWebhooks();
+      return { operation: 'outbound_webhook_retry_due', metadata: { retried: retryResult.data.length, results: retryResult.data } };
     }
 
     throw new BadRequestException(`La synchronisation manuelle n'est pas encore disponible pour ${account.provider}`);

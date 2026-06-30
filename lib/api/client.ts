@@ -188,6 +188,7 @@ export const queryKeys = {
     providers: () => ['integrations', 'providers'] as const,
     accounts: (params?: Record<string, unknown>) => ['integrations', 'accounts', params] as const,
     syncRuns: (params?: Record<string, unknown>) => ['integrations', 'syncRuns', params] as const,
+    webhookDeliveries: (params?: Record<string, unknown>) => ['integrations', 'webhookDeliveries', params] as const,
   },
 
   // Financial

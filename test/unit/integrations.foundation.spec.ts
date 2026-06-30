@@ -15,6 +15,14 @@ import {
   syncHelloAssoCatalog,
   testHelloAssoConnection,
 } from '../../server/src/integrations/providers/helloasso';
+import {
+  buildOutboundWebhookPayload,
+  deliverOutboundWebhook,
+  eventMatchesWebhook,
+  parseOutboundWebhookSecret,
+  parseOutboundWebhookSettings,
+  signOutboundWebhook,
+} from '../../server/src/integrations/providers/outbound-webhook';
 import { syncStripeCatalog, testStripeConnection } from '../../server/src/integrations/providers/stripe';
 import {
   hasPermission,
@@ -198,6 +206,38 @@ describe('Intégrations — socle sécurisé', () => {
 
   it('refuse Stripe si le mode configuré ne correspond pas à la clé', async () => {
     await expect(testStripeConnection({ settings: { mode: 'live' }, apiKey: 'sk_test_secret', fetchImpl: async () => { throw new Error('no call'); } })).rejects.toThrow('Mode Stripe incohérent');
+  });
+
+  it('signe les webhooks sortants et interdit les cibles non HTTPS/locales', async () => {
+    const settings = parseOutboundWebhookSettings({ events: ['member.created'], timeoutMs: 3000, maxAttempts: 4 });
+    expect(eventMatchesWebhook(settings, 'member.created')).toBe(true);
+    expect(eventMatchesWebhook(settings, 'event.created')).toBe(false);
+    expect(() => parseOutboundWebhookSecret('http://example.org/hook')).toThrow('HTTPS obligatoire');
+    expect(() => parseOutboundWebhookSecret('https://localhost/hook')).toThrow('cible locale interdite');
+
+    const parsedSecret = parseOutboundWebhookSecret('{"targetUrl":"https://hooks.example.org/komuno","signingSecret":"0123456789abcdef"}');
+    expect(parsedSecret).toMatchObject({ targetUrl: 'https://hooks.example.org/komuno', secretMode: 'json' });
+
+    const payload = buildOutboundWebhookPayload({ id: 'evt_1', type: 'member.created', data: { memberId: 'member-1' }, createdAt: '2026-06-30T16:00:00.000Z' });
+    const signature = signOutboundWebhook(JSON.stringify(payload), parsedSecret.signingSecret, 1770000000);
+    expect(signature.header).toMatch(/^t=1770000000,v1=[a-f0-9]{64}$/);
+
+    const calls: Array<{ input: string; headers?: Record<string, string>; body?: string }> = [];
+    const result = await deliverOutboundWebhook({
+      targetUrl: parsedSecret.targetUrl,
+      signingSecret: parsedSecret.signingSecret,
+      eventType: 'member.created',
+      payload,
+      fetchImpl: async (input: string, init?: RequestInit) => {
+        calls.push({ input, headers: init?.headers as Record<string, string>, body: init?.body?.toString() });
+        return { ok: true, status: 204, statusText: 'No Content', json: async () => ({}), text: async () => '' } as any;
+      },
+    });
+
+    expect(result).toEqual({ ok: true, status: 204, responseBody: '' });
+    expect(calls[0].headers?.['x-komuno-event']).toBe('member.created');
+    expect(calls[0].headers?.['x-komuno-signature']).toMatch(/^t=\d+,v1=[a-f0-9]{64}$/);
+    expect(calls[0].body).toContain('member.created');
   });
 
   it('génère un calendrier ICS valide et échappe les champs texte', () => {

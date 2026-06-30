@@ -68,6 +68,30 @@ export class IntegrationsController {
     return await this.integrationsService.syncAccount(id, user.email);
   }
 
+  @Post('accounts/:id/webhooks/test')
+  @Permissions('integrations.write')
+  @ApiOperation({ summary: 'Émettre un webhook sortant de test signé' })
+  @ApiParam({ name: 'id' })
+  async emitTestOutboundWebhook(@Param('id') id: string, @User() user: { email?: string }) {
+    return await this.integrationsService.emitTestOutboundWebhook(id, user.email);
+  }
+
+  @Get('webhook-deliveries')
+  @Permissions('integrations.view')
+  @ApiOperation({ summary: 'Lister les derniers webhooks sortants livrés ou en échec' })
+  @ApiQuery({ name: 'accountId', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  async listOutboundWebhookDeliveries(@Query('accountId') accountId?: string, @Query('status') status?: string) {
+    return await this.integrationsService.listOutboundWebhookDeliveries({ accountId, status });
+  }
+
+  @Post('webhook-deliveries/retry-due')
+  @Permissions('integrations.write')
+  @ApiOperation({ summary: 'Réessayer les webhooks sortants arrivés à échéance' })
+  async retryDueOutboundWebhooks() {
+    return await this.integrationsService.retryDueOutboundWebhooks();
+  }
+
   @Get('sync-runs')
   @Permissions('integrations.view')
   @ApiOperation({ summary: 'Lister les derniers runs de synchronisation intégrations' })

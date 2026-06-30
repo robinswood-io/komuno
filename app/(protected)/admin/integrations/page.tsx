@@ -57,6 +57,21 @@ interface SyncRun {
   metadata?: Record<string, unknown>;
 }
 
+interface WebhookDelivery {
+  id: string;
+  accountId: string;
+  eventId: string;
+  eventType: string;
+  status: string;
+  attemptCount: number;
+  maxAttempts: number;
+  responseStatus?: number | null;
+  error?: string | null;
+  createdAt: string;
+  lastAttemptAt?: string | null;
+  nextAttemptAt?: string | null;
+}
+
 const providerLabels: Record<Provider, string> = {
   helloasso: 'HelloAsso',
   stripe: 'Stripe',
@@ -68,7 +83,7 @@ const providerLabels: Record<Provider, string> = {
 };
 
 function statusVariant(status: string): 'default' | 'secondary' | 'destructive' {
-  if (status === 'connected' || status === 'success') return 'default';
+  if (status === 'connected' || status === 'success' || status === 'delivered') return 'default';
   if (status === 'error' || status === 'failed') return 'destructive';
   return 'secondary';
 }
@@ -102,10 +117,15 @@ export default function AdminIntegrationsPage() {
     queryKey: queryKeys.integrations.syncRuns(),
     queryFn: () => api.get('/api/admin/integrations/sync-runs'),
   });
+  const webhookDeliveriesQuery = useQuery<ApiResponse<WebhookDelivery[]>>({
+    queryKey: queryKeys.integrations.webhookDeliveries(),
+    queryFn: () => api.get('/api/admin/integrations/webhook-deliveries'),
+  });
 
   const providers = providersQuery.data?.data ?? [];
   const accounts = accountsQuery.data?.data ?? [];
   const syncRuns = syncRunsQuery.data?.data ?? [];
+  const webhookDeliveries = webhookDeliveriesQuery.data?.data ?? [];
 
   const currentProvider = useMemo(() => providers.find((item) => item.provider === provider), [provider, providers]);
 
@@ -147,6 +167,24 @@ export default function AdminIntegrationsPage() {
     onError: (error) => toast({ title: 'Synchronisation impossible', description: error instanceof Error ? error.message : 'Erreur inconnue', variant: 'destructive' }),
   });
 
+  const webhookTestMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/api/admin/integrations/accounts/${id}/webhooks/test`),
+    onSuccess: async () => {
+      toast({ title: 'Webhook de test envoyé', description: 'La delivery signée est visible dans l’onglet deliveries.' });
+      await invalidateIntegrations();
+    },
+    onError: (error) => toast({ title: 'Webhook impossible', description: error instanceof Error ? error.message : 'Erreur inconnue', variant: 'destructive' }),
+  });
+
+  const retryWebhookMutation = useMutation({
+    mutationFn: () => api.post('/api/admin/integrations/webhook-deliveries/retry-due'),
+    onSuccess: async () => {
+      toast({ title: 'Retries lancés', description: 'Les webhooks arrivés à échéance ont été rejoués.' });
+      await invalidateIntegrations();
+    },
+    onError: (error) => toast({ title: 'Retry impossible', description: error instanceof Error ? error.message : 'Erreur inconnue', variant: 'destructive' }),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/admin/integrations/accounts/${id}`),
     onSuccess: async () => {
@@ -166,7 +204,9 @@ export default function AdminIntegrationsPage() {
         ? '{\n  "baseUrl": "https://api.brevo.com/v3",\n  "senderName": "Komuno",\n  "senderEmail": "notifications@example.org",\n  "pageSize": 50\n}'
         : nextProvider === 'stripe'
           ? '{\n  "baseUrl": "https://api.stripe.com",\n  "mode": "test",\n  "pageSize": 25,\n  "syncProductsEnabled": true,\n  "syncPricesEnabled": true,\n  "syncCustomersEnabled": false\n}'
-          : '{}');
+          : nextProvider === 'webhook'
+            ? '{\n  "events": ["member.created", "event.created", "form.response.created", "payment.received"],\n  "timeoutMs": 5000,\n  "maxAttempts": 3\n}'
+            : '{}');
   };
 
   return (
@@ -188,6 +228,7 @@ export default function AdminIntegrationsPage() {
           <TabsTrigger value="catalog">Catalogue</TabsTrigger>
           <TabsTrigger value="accounts">Comptes</TabsTrigger>
           <TabsTrigger value="runs">Runs</TabsTrigger>
+          <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
         </TabsList>
 
         <TabsContent value="catalog" className="grid gap-4 lg:grid-cols-[1fr_380px]">
@@ -268,6 +309,11 @@ export default function AdminIntegrationsPage() {
                     Stripe v1 : coller une <strong>clé secrète/restreinte serveur</strong> sk_/rk_ dans le champ secret. Le sync récupère produits/prix et, si activé, un compteur clients sans payload client.
                   </p>
                 )}
+                {provider === 'webhook' && (
+                  <p className="text-xs text-muted-foreground">
+                    Webhook sortant : coller dans le champ secret soit l’URL HTTPS Make/n8n/Zapier, soit un JSON chiffré {`{"targetUrl":"https://...","signingSecret":"..."}`}. Les requêtes sont signées via <code>x-komuno-signature</code>.
+                  </p>
+                )}
                 {currentProvider && <p className="text-xs text-muted-foreground">Recommandé : {currentProvider.capabilities.join(', ')}</p>}
               </div>
               <div className="flex items-center justify-between rounded-lg border p-3">
@@ -309,6 +355,11 @@ export default function AdminIntegrationsPage() {
                   <Button size="sm" variant="outline" onClick={() => syncMutation.mutate(account.id)} disabled={syncMutation.isPending}>
                     <RefreshCw className="mr-2 h-4 w-4" /> Sync
                   </Button>
+                  {account.provider === 'webhook' && (
+                    <Button size="sm" variant="outline" onClick={() => webhookTestMutation.mutate(account.id)} disabled={webhookTestMutation.isPending}>
+                      <RefreshCw className="mr-2 h-4 w-4" /> Test signé
+                    </Button>
+                  )}
                   <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(account.id)} disabled={deleteMutation.isPending}>
                     <Trash2 className="mr-2 h-4 w-4" /> Supprimer
                   </Button>
@@ -330,6 +381,29 @@ export default function AdminIntegrationsPage() {
                   {run.error && <div className="text-xs text-destructive">{run.error}</div>}
                 </div>
                 <Badge variant={statusVariant(run.status)}>{run.status}</Badge>
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="deliveries" className="space-y-3">
+          <div className="flex justify-end">
+            <Button size="sm" variant="outline" onClick={() => retryWebhookMutation.mutate()} disabled={retryWebhookMutation.isPending}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Rejouer les retries dus
+            </Button>
+          </div>
+          {webhookDeliveriesQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : webhookDeliveries.length === 0 ? (
+            <Card><CardContent className="p-8 text-center text-muted-foreground">Aucune delivery webhook sortant.</CardContent></Card>
+          ) : webhookDeliveries.map((delivery) => (
+            <Card key={delivery.id}>
+              <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="font-medium">{delivery.eventType}</div>
+                  <div className="text-xs text-muted-foreground">Tentatives {delivery.attemptCount}/{delivery.maxAttempts} · créée {new Date(delivery.createdAt).toLocaleString('fr-FR')}</div>
+                  {delivery.responseStatus && <div className="text-xs text-muted-foreground">HTTP {delivery.responseStatus}</div>}
+                  {delivery.error && <div className="text-xs text-destructive">{delivery.error}</div>}
+                </div>
+                <Badge variant={statusVariant(delivery.status)}>{delivery.status}</Badge>
               </CardContent>
             </Card>
           ))}

@@ -34,6 +34,7 @@ __export(schema_exports, {
   FORECAST_CONFIDENCE: () => FORECAST_CONFIDENCE,
   IDEA_STATUS: () => IDEA_STATUS,
   INTEGRATION_AUTH_TYPE: () => INTEGRATION_AUTH_TYPE,
+  INTEGRATION_OUTBOUND_WEBHOOK_STATUS: () => INTEGRATION_OUTBOUND_WEBHOOK_STATUS,
   INTEGRATION_PROVIDER: () => INTEGRATION_PROVIDER,
   INTEGRATION_STATUS: () => INTEGRATION_STATUS,
   INTEGRATION_SYNC_STATUS: () => INTEGRATION_SYNC_STATUS,
@@ -120,6 +121,7 @@ __export(schema_exports, {
   insertIdeaSchema: () => insertIdeaSchema,
   insertInscriptionSchema: () => insertInscriptionSchema,
   insertIntegrationAccountSchema: () => insertIntegrationAccountSchema,
+  insertIntegrationOutboundWebhookDeliverySchema: () => insertIntegrationOutboundWebhookDeliverySchema,
   insertIntegrationSyncRunSchema: () => insertIntegrationSyncRunSchema,
   insertIntegrationWebhookEventSchema: () => insertIntegrationWebhookEventSchema,
   insertLoanItemSchema: () => insertLoanItemSchema,
@@ -153,6 +155,7 @@ __export(schema_exports, {
   insertUserSchema: () => insertUserSchema,
   insertVoteSchema: () => insertVoteSchema,
   integrationAccounts: () => integrationAccounts,
+  integrationOutboundWebhookDeliveries: () => integrationOutboundWebhookDeliveries,
   integrationSyncRuns: () => integrationSyncRuns,
   integrationWebhookEvents: () => integrationWebhookEvents,
   loanItems: () => loanItems,
@@ -386,6 +389,13 @@ const INTEGRATION_WEBHOOK_STATUS = {
   PROCESSED: "processed",
   IGNORED: "ignored",
   FAILED: "failed"
+};
+const INTEGRATION_OUTBOUND_WEBHOOK_STATUS = {
+  PENDING: "pending",
+  DELIVERED: "delivered",
+  FAILED: "failed",
+  RETRYING: "retrying",
+  SKIPPED: "skipped"
 };
 const ideas = (0, import_pg_core.pgTable)("ideas", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -835,6 +845,33 @@ const integrationWebhookEvents = (0, import_pg_core.pgTable)("integration_webhoo
   statusIdx: (0, import_pg_core.index)("integration_webhook_events_status_idx").on(table.status),
   receivedIdx: (0, import_pg_core.index)("integration_webhook_events_received_idx").on(table.receivedAt),
   payloadIdx: (0, import_pg_core.index)("integration_webhook_events_payload_gin_idx").using("gin", table.payload)
+}));
+const integrationOutboundWebhookDeliveries = (0, import_pg_core.pgTable)("integration_outbound_webhook_deliveries", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  accountId: (0, import_pg_core.varchar)("account_id").references(() => integrationAccounts.id, { onDelete: "cascade" }),
+  eventId: (0, import_pg_core.text)("event_id").notNull(),
+  eventType: (0, import_pg_core.text)("event_type").notNull(),
+  payloadHash: (0, import_pg_core.text)("payload_hash").notNull(),
+  payload: (0, import_pg_core.jsonb)("payload").$type().default({}).notNull(),
+  status: (0, import_pg_core.text)("status").default(INTEGRATION_OUTBOUND_WEBHOOK_STATUS.PENDING).notNull(),
+  attemptCount: (0, import_pg_core.integer)("attempt_count").default(0).notNull(),
+  maxAttempts: (0, import_pg_core.integer)("max_attempts").default(3).notNull(),
+  nextAttemptAt: (0, import_pg_core.timestamp)("next_attempt_at"),
+  lastAttemptAt: (0, import_pg_core.timestamp)("last_attempt_at"),
+  deliveredAt: (0, import_pg_core.timestamp)("delivered_at"),
+  responseStatus: (0, import_pg_core.integer)("response_status"),
+  responseBody: (0, import_pg_core.text)("response_body"),
+  error: (0, import_pg_core.text)("error"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  accountEventUniqueIdx: (0, import_pg_core.uniqueIndex)("integration_outbound_webhook_deliveries_account_event_unique").on(table.accountId, table.eventId),
+  accountIdx: (0, import_pg_core.index)("integration_outbound_webhook_deliveries_account_idx").on(table.accountId),
+  eventTypeIdx: (0, import_pg_core.index)("integration_outbound_webhook_deliveries_event_type_idx").on(table.eventType),
+  statusIdx: (0, import_pg_core.index)("integration_outbound_webhook_deliveries_status_idx").on(table.status),
+  nextAttemptIdx: (0, import_pg_core.index)("integration_outbound_webhook_deliveries_next_attempt_idx").on(table.nextAttemptAt),
+  createdAtIdx: (0, import_pg_core.index)("integration_outbound_webhook_deliveries_created_at_idx").on(table.createdAt),
+  payloadIdx: (0, import_pg_core.index)("integration_outbound_webhook_deliveries_payload_gin_idx").using("gin", table.payload)
 }));
 const loanItems = (0, import_pg_core.pgTable)("loan_items", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -2016,6 +2053,7 @@ const integrationStatusSchema = import_zod.z.enum(["disconnected", "connected", 
 const integrationAuthTypeSchema = import_zod.z.enum(["none", "api_key", "oauth", "webhook_secret"]);
 const integrationSyncStatusSchema = import_zod.z.enum(["pending", "running", "success", "failed", "partial"]);
 const integrationWebhookStatusSchema = import_zod.z.enum(["received", "processed", "ignored", "failed"]);
+const integrationOutboundWebhookStatusSchema = import_zod.z.enum(["pending", "delivered", "failed", "retrying", "skipped"]);
 const insertIntegrationAccountSchema = import_zod.z.object({
   provider: integrationProviderSchema,
   label: import_zod.z.string().min(2).max(200).transform(sanitizeText),
@@ -2052,6 +2090,17 @@ const insertIntegrationWebhookEventSchema = import_zod.z.object({
   payloadHash: import_zod.z.string().min(16).max(128).transform(sanitizeText),
   payload: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
   status: integrationWebhookStatusSchema.default("received")
+});
+const insertIntegrationOutboundWebhookDeliverySchema = import_zod.z.object({
+  accountId: import_zod.z.string().uuid(),
+  eventId: import_zod.z.string().min(1).max(300).transform(sanitizeText),
+  eventType: import_zod.z.string().min(1).max(200).transform(sanitizeText),
+  payloadHash: import_zod.z.string().min(16).max(128).transform(sanitizeText),
+  payload: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
+  status: integrationOutboundWebhookStatusSchema.default("pending"),
+  attemptCount: import_zod.z.number().int().min(0).default(0),
+  maxAttempts: import_zod.z.number().int().min(1).max(10).default(3),
+  error: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
 });
 const insertInscriptionSchema = import_zod.z.object({
   eventId: import_zod.z.string().uuid("L'identifiant de l'\xE9v\xE9nement n'est pas valide").transform(sanitizeText),
@@ -3197,6 +3246,7 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   FORECAST_CONFIDENCE,
   IDEA_STATUS,
   INTEGRATION_AUTH_TYPE,
+  INTEGRATION_OUTBOUND_WEBHOOK_STATUS,
   INTEGRATION_PROVIDER,
   INTEGRATION_STATUS,
   INTEGRATION_SYNC_STATUS,
@@ -3283,6 +3333,7 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   insertIdeaSchema,
   insertInscriptionSchema,
   insertIntegrationAccountSchema,
+  insertIntegrationOutboundWebhookDeliverySchema,
   insertIntegrationSyncRunSchema,
   insertIntegrationWebhookEventSchema,
   insertLoanItemSchema,
@@ -3316,6 +3367,7 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   insertUserSchema,
   insertVoteSchema,
   integrationAccounts,
+  integrationOutboundWebhookDeliveries,
   integrationSyncRuns,
   integrationWebhookEvents,
   loanItems,

@@ -139,6 +139,14 @@ export const INTEGRATION_WEBHOOK_STATUS = {
   FAILED: "failed",
 } as const;
 
+export const INTEGRATION_OUTBOUND_WEBHOOK_STATUS = {
+  PENDING: "pending",
+  DELIVERED: "delivered",
+  FAILED: "failed",
+  RETRYING: "retrying",
+  SKIPPED: "skipped",
+} as const;
+
 // Ideas table - Flexible status workflow management
 export const ideas = pgTable("ideas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -603,6 +611,34 @@ export const integrationWebhookEvents = pgTable("integration_webhook_events", {
   statusIdx: index("integration_webhook_events_status_idx").on(table.status),
   receivedIdx: index("integration_webhook_events_received_idx").on(table.receivedAt),
   payloadIdx: index("integration_webhook_events_payload_gin_idx").using("gin", table.payload),
+}));
+
+export const integrationOutboundWebhookDeliveries = pgTable("integration_outbound_webhook_deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").references(() => integrationAccounts.id, { onDelete: "cascade" }),
+  eventId: text("event_id").notNull(),
+  eventType: text("event_type").notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
+  status: text("status").default(INTEGRATION_OUTBOUND_WEBHOOK_STATUS.PENDING).notNull(),
+  attemptCount: integer("attempt_count").default(0).notNull(),
+  maxAttempts: integer("max_attempts").default(3).notNull(),
+  nextAttemptAt: timestamp("next_attempt_at"),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  deliveredAt: timestamp("delivered_at"),
+  responseStatus: integer("response_status"),
+  responseBody: text("response_body"),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  accountEventUniqueIdx: uniqueIndex("integration_outbound_webhook_deliveries_account_event_unique").on(table.accountId, table.eventId),
+  accountIdx: index("integration_outbound_webhook_deliveries_account_idx").on(table.accountId),
+  eventTypeIdx: index("integration_outbound_webhook_deliveries_event_type_idx").on(table.eventType),
+  statusIdx: index("integration_outbound_webhook_deliveries_status_idx").on(table.status),
+  nextAttemptIdx: index("integration_outbound_webhook_deliveries_next_attempt_idx").on(table.nextAttemptAt),
+  createdAtIdx: index("integration_outbound_webhook_deliveries_created_at_idx").on(table.createdAt),
+  payloadIdx: index("integration_outbound_webhook_deliveries_payload_gin_idx").using("gin", table.payload),
 }));
 
 // Loan items table - Matériel disponible au prêt
@@ -1892,6 +1928,7 @@ const integrationStatusSchema = z.enum(["disconnected", "connected", "error", "d
 const integrationAuthTypeSchema = z.enum(["none", "api_key", "oauth", "webhook_secret"]);
 const integrationSyncStatusSchema = z.enum(["pending", "running", "success", "failed", "partial"]);
 const integrationWebhookStatusSchema = z.enum(["received", "processed", "ignored", "failed"]);
+const integrationOutboundWebhookStatusSchema = z.enum(["pending", "delivered", "failed", "retrying", "skipped"]);
 
 export const insertIntegrationAccountSchema = z.object({
   provider: integrationProviderSchema,
@@ -1933,6 +1970,18 @@ export const insertIntegrationWebhookEventSchema = z.object({
   payloadHash: z.string().min(16).max(128).transform(sanitizeText),
   payload: z.record(z.string(), z.unknown()).default({}),
   status: integrationWebhookStatusSchema.default("received"),
+});
+
+export const insertIntegrationOutboundWebhookDeliverySchema = z.object({
+  accountId: z.string().uuid(),
+  eventId: z.string().min(1).max(300).transform(sanitizeText),
+  eventType: z.string().min(1).max(200).transform(sanitizeText),
+  payloadHash: z.string().min(16).max(128).transform(sanitizeText),
+  payload: z.record(z.string(), z.unknown()).default({}),
+  status: integrationOutboundWebhookStatusSchema.default("pending"),
+  attemptCount: z.number().int().min(0).default(0),
+  maxAttempts: z.number().int().min(1).max(10).default(3),
+  error: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
 });
 
 // Pure Zod v4 schema
@@ -2782,6 +2831,8 @@ export type IntegrationSyncRun = typeof integrationSyncRuns.$inferSelect;
 export type InsertIntegrationSyncRun = z.infer<typeof insertIntegrationSyncRunSchema>;
 export type IntegrationWebhookEvent = typeof integrationWebhookEvents.$inferSelect;
 export type InsertIntegrationWebhookEvent = z.infer<typeof insertIntegrationWebhookEventSchema>;
+export type IntegrationOutboundWebhookDelivery = typeof integrationOutboundWebhookDeliveries.$inferSelect;
+export type InsertIntegrationOutboundWebhookDelivery = z.infer<typeof insertIntegrationOutboundWebhookDeliverySchema>;
 
 export type LoanItem = typeof loanItems.$inferSelect;
 export type InsertLoanItem = z.infer<typeof insertLoanItemSchema>;
