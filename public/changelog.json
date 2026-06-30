@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.18.1",
+    "version": "2.19.0",
     "releasedAt": "2026-06-30",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
-      "corrections": [
-        "Use configured Traefik network"
+      "nouveautes": [
+        "Add Stripe connector"
       ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.19.0",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add Stripe connector"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.18.1",
       "releasedAt": "2026-06-30",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 2
-    },
-    {
-      "version": "2.4.2",
-      "releasedAt": "2026-06-22",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Validate ingest token before payload"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-30T15:46:42.360Z",
+  "generatedAt": "2026-06-30T16:05:12.297Z",
   "source": "conventional-commits"
 }
