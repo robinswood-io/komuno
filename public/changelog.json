@@ -1,12 +1,12 @@
 {
   "latest": {
-    "version": "2.17.0",
+    "version": "2.18.0",
     "releasedAt": "2026-06-30",
     "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [
-        "Add scoped organization admin onboarding"
+        "Add organization invite acceptance routes"
       ],
       "corrections": [],
       "ameliorations": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.18.0",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add organization invite acceptance routes"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.17.0",
       "releasedAt": "2026-06-30",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.4.0",
-      "releasedAt": "2026-06-22",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Sync events across instances"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-30T15:03:19.971Z",
+  "generatedAt": "2026-06-30T15:03:50.218Z",
   "source": "conventional-commits"
 }
