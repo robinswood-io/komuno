@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { StorageService } from '../common/storage/storage.service';
+import { IntegrationsService } from '../integrations/integrations.service';
 import {
   proposeMemberSchema,
   insertMemberSchema,
@@ -35,7 +36,16 @@ import { inArray, sql, and, eq, asc, desc, ilike, or } from 'drizzle-orm';
  */
 @Injectable()
 export class MembersService {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(
+    private readonly storageService: StorageService,
+    private readonly integrationsService?: IntegrationsService,
+  ) {}
+
+  private emitOutboundEventBestEffort(eventType: string, data: Record<string, unknown>) {
+    void this.integrationsService?.emitOutboundEvent(eventType, data).catch((error) => {
+      logger.warn('Outbound webhook emission failed', { eventType, error });
+    });
+  }
 
   // ===== Routes publiques =====
 
@@ -146,6 +156,14 @@ export class MembersService {
           adminEmail: creatorEmail,
           toEmail: assignedTo,
         }).catch((err) => logger.error('Failed to create ownership history entry', { error: err }));
+        this.emitOutboundEventBestEffort('member.created', {
+          id: result.data.email,
+          email: result.data.email,
+          status: result.data.status,
+          prospectionStatus: result.data.prospectionStatus,
+          createdBy: creatorEmail,
+          assignedTo,
+        });
       }
 
       return { success: true, data: result.data };

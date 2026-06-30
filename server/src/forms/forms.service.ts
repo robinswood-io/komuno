@@ -5,6 +5,7 @@ import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
 import { AuditService } from '../audit/audit.service';
+import { IntegrationsService } from '../integrations/integrations.service';
 import {
   SURVEY_FORM_STATUS,
   insertSurveyFormSchema,
@@ -41,7 +42,16 @@ import {
 export class FormsService {
   private readonly logger = new Logger(FormsService.name);
 
-  constructor(private readonly auditService?: AuditService) {}
+  constructor(
+    private readonly auditService?: AuditService,
+    private readonly integrationsService?: IntegrationsService,
+  ) {}
+
+  private emitOutboundEventBestEffort(eventType: string, data: Record<string, unknown>) {
+    void this.integrationsService?.emitOutboundEvent(eventType, data).catch((error) => {
+      this.logger.warn(`Outbound webhook emission failed for ${eventType}: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
 
   private audit(input: Parameters<AuditService['record']>[0]) {
     void this.auditService?.record(input);
@@ -437,6 +447,17 @@ export class FormsService {
         formSnapshot: this.buildFormSnapshot(form, questions),
         consentAccepted: Boolean(validated.consentAccepted),
       }).returning();
+
+      this.emitOutboundEventBestEffort('form.response.created', {
+        id: response.id,
+        formId: form.id,
+        formSlug: form.slug,
+        formTitle: form.title,
+        formVersion: form.version,
+        submittedAt: response.submittedAt,
+        respondentEmail: validated.respondentEmail ?? null,
+        consentAccepted: Boolean(validated.consentAccepted),
+      });
 
       return {
         success: true,

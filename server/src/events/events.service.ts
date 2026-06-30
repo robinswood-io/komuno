@@ -20,13 +20,21 @@ import { emailNotificationService } from '../../email-notification-service';
 import { asc, count, eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { buildIcsCalendar } from '../integrations/integrations.utils';
+import { IntegrationsService } from '../integrations/integrations.service';
 
 @Injectable()
 export class EventsService {
   constructor(
     private readonly storageService: StorageService,
     private readonly federationService: FederationService,
+    private readonly integrationsService?: IntegrationsService,
   ) {}
+
+  private emitOutboundEventBestEffort(eventType: string, data: Record<string, unknown>) {
+    void this.integrationsService?.emitOutboundEvent(eventType, data).catch((error) => {
+      logger.warn('Outbound webhook emission failed', { eventType, error });
+    });
+  }
 
   private async autoShareEventToParentBestEffort(eventId: string, userEmail?: string) {
     try {
@@ -108,6 +116,14 @@ export class EventsService {
         logger.warn('Event notification failed', { eventId: result.data.id, error: notifError });
       }
 
+      this.emitOutboundEventBestEffort('event.created', {
+        id: result.data.id,
+        title: result.data.title,
+        status: result.data.status,
+        date: result.data.date,
+        location: result.data.location ?? null,
+        createdBy: user?.email ?? null,
+      });
       await this.autoShareEventToParentBestEffort(result.data.id, user?.email);
       return result.data;
     } catch (error) {
@@ -153,6 +169,15 @@ export class EventsService {
         logger.warn('Event notification failed', { eventId: result.data.event.id, error: notifError });
       }
 
+      this.emitOutboundEventBestEffort('event.created', {
+        id: result.data.event.id,
+        title: result.data.event.title,
+        status: result.data.event.status,
+        date: result.data.event.date,
+        location: result.data.event.location ?? null,
+        createdBy: user?.email ?? null,
+        initialInscriptionsCount: result.data.inscriptions?.length ?? 0,
+      });
       await this.autoShareEventToParentBestEffort(result.data.event.id, user?.email);
       return result.data;
     } catch (error) {
