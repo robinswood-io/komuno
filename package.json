@@ -1,6 +1,6 @@
 {
   "name": "komuno",
-  "version": "2.14.0",
+  "version": "2.15.0",
   "license": "MIT",
   "scripts": {
     "version:auto": "node scripts/auto-version-changelog.mjs",
