@@ -35,6 +35,12 @@ services:
       - "traefik.http.routers.${APP_NAME:-app}.tls=true"
       - "traefik.http.routers.${APP_NAME:-app}.tls.certresolver=letsencrypt"
       - "traefik.http.services.${APP_NAME:-app}.loadbalancer.server.port=3000"
+      - "traefik.http.routers.${APP_NAME:-app}-komuno-saas.rule=Host(`app.komuno.org`) && PathPrefix(`/o/`)"
+      - "traefik.http.routers.${APP_NAME:-app}-komuno-saas.entrypoints=websecure"
+      - "traefik.http.routers.${APP_NAME:-app}-komuno-saas.tls=true"
+      - "traefik.http.routers.${APP_NAME:-app}-komuno-saas.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${APP_NAME:-app}-komuno-saas.priority=100"
+      - "traefik.http.routers.${APP_NAME:-app}-komuno-saas.service=${APP_NAME:-app}"
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
       interval: 30s

@@ -1501,6 +1501,13 @@ const sanitizeText = (text: string) => text
 const optionalSanitizedText = (max: number = 5000) =>
   z.string().max(max).optional().nullable().transform(val => val ? sanitizeText(val) : undefined);
 
+const clearableSanitizedText = (max: number = 5000) =>
+  z.string().max(max).optional().nullable().transform((val) => {
+    if (val === undefined) return undefined;
+    const sanitized = sanitizeText(val ?? '');
+    return sanitized.length > 0 ? sanitized : null;
+  });
+
 const isHttpUrl = (url: string | null | undefined) => {
   if (!url) return true;
   try {
@@ -2456,17 +2463,17 @@ export const insertMemberActivitySchema = z.object({
 export const updateMemberSchema = z.object({
   firstName: z.string().min(2).max(100).transform(sanitizeText).optional(),
   lastName: z.string().min(2).max(100).transform(sanitizeText).optional(),
-  company: z.string().max(200).transform(sanitizeText).optional(),
-  department: z.string().max(100).transform(sanitizeText).optional(),
-  city: z.string().max(100).transform(sanitizeText).optional(),
-  postalCode: z.string().max(20).transform(sanitizeText).optional(),
-  firstContactDate: z.union([z.string().datetime(), z.date()]).optional(),
-  meetingDate: z.union([z.string().datetime(), z.date()]).optional(),
-  sector: z.string().max(200).transform(sanitizeText).optional(),
-  phone: z.string().max(20).transform(sanitizeText).optional(),
-  role: z.string().max(100).transform(sanitizeText).optional(),
-  cjdRole: z.string().max(100).transform(sanitizeText).optional(),
-  notes: z.string().max(2000).transform(sanitizeText).optional(),
+  company: clearableSanitizedText(200),
+  department: clearableSanitizedText(100),
+  city: clearableSanitizedText(100),
+  postalCode: clearableSanitizedText(20),
+  firstContactDate: z.union([z.string().datetime(), z.date(), z.null()]).optional().transform((val) => val === null ? null : val),
+  meetingDate: z.union([z.string().datetime(), z.date(), z.null()]).optional().transform((val) => val === null ? null : val),
+  sector: clearableSanitizedText(200),
+  phone: clearableSanitizedText(20),
+  role: clearableSanitizedText(100),
+  cjdRole: clearableSanitizedText(100),
+  notes: clearableSanitizedText(2000),
   status: z.enum([
     MEMBER_STATUS.ACTIVE,
     MEMBER_STATUS.PROPOSED,
@@ -2482,8 +2489,8 @@ export const updateMemberSchema = z.object({
     PROSPECTION_STAGES.REFUSE,
     PROSPECTION_STAGES.SIGNE,
   ]).nullable().optional(),
-  soncasProfile: z.enum(SONCAS_PROFILES).optional(),
-  assignedTo: z.string().email().optional().transform(val => val ? sanitizeText(val) : undefined),
+  soncasProfile: z.enum(SONCAS_PROFILES).nullable().optional(),
+  assignedTo: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : val),
 });
 
 export const assignMemberSchema = z.object({

@@ -79,6 +79,21 @@ interface EditMemberFormData {
   notes?: string;
 }
 
+const normalizeEditableMemberValue = (value?: string) => {
+  const trimmed = value?.trim() ?? '';
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const buildEditMemberPayload = (formData: EditMemberFormData) => ({
+  firstName: formData.firstName.trim(),
+  lastName: formData.lastName.trim(),
+  company: normalizeEditableMemberValue(formData.company),
+  phone: normalizeEditableMemberValue(formData.phone),
+  role: normalizeEditableMemberValue(formData.role),
+  cjdRole: normalizeEditableMemberValue(formData.cjdRole),
+  notes: normalizeEditableMemberValue(formData.notes),
+});
+
 interface MemberTag {
   id: string;
   name: string;
@@ -317,7 +332,7 @@ export default function AdminMembersPage() {
   // Mutation pour mettre à jour un membre
   const updateMutation = useMutation({
     mutationFn: (email: string) =>
-      api.patch(`/api/admin/members/${encodeURIComponent(email)}`, editFormData),
+      api.patch(`/api/admin/members/${encodeURIComponent(email)}`, buildEditMemberPayload(editFormData)),
     onSuccess: () => {
       toast({
         title: 'Membre modifié',
@@ -627,14 +642,33 @@ export default function AdminMembersPage() {
 
   useEffect(() => {
     const editEmail = searchParams.get('edit');
-    if (!editEmail || membersOnly.length === 0) return;
+    if (!editEmail) return;
 
-    const targetMember = membersOnly.find((member) => member.email === editEmail);
-    if (!targetMember) return;
+    let cancelled = false;
+    const openMemberEditDialog = async () => {
+      try {
+        const targetMember = membersOnly.find((member) => member.email === editEmail)
+          ?? (await api.get<{ success: boolean; data: Member }>(`/api/admin/members/${encodeURIComponent(editEmail)}`)).data;
+        if (cancelled || !targetMember) return;
+        handleOpenEditDialog(targetMember);
+      } catch (error) {
+        if (!cancelled) {
+          toast({
+            title: 'Membre introuvable',
+            description: error instanceof Error ? error.message : 'Impossible d’ouvrir la fiche membre en édition',
+            variant: 'destructive',
+          });
+        }
+      } finally {
+        if (!cancelled) router.replace('/admin/members');
+      }
+    };
 
-    handleOpenEditDialog(targetMember);
-    router.replace('/admin/members');
-  }, [searchParams, membersOnly, router]);
+    void openMemberEditDialog();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, membersOnly, router, toast]);
 
   // Filtrés les membres selon les statuts sélectionnés
   const filteredMembers = membersOnly.filter(member => {

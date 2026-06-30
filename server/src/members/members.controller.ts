@@ -327,7 +327,7 @@ export class AdminMembersController {
   }
 
   @Patch(':email')
-  @Permissions('admin.view')
+  @Permissions('admin.edit')
   @ApiOperation({ summary: 'Mettre à jour les informations d\'un membre' })
   @ApiParam({ name: 'email', description: 'Email du membre', example: 'jean.dupont@example.com' })
   @ApiBody({

@@ -1740,6 +1740,11 @@ const isValidDomain = (email) => {
 };
 const sanitizeText = (text2) => text2.replace(/[<>]/g, "").trim().slice(0, 5e3);
 const optionalSanitizedText = (max = 5e3) => import_zod.z.string().max(max).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0);
+const clearableSanitizedText = (max = 5e3) => import_zod.z.string().max(max).optional().nullable().transform((val) => {
+  if (val === void 0) return void 0;
+  const sanitized = sanitizeText(val ?? "");
+  return sanitized.length > 0 ? sanitized : null;
+});
 const isHttpUrl = (url) => {
   if (!url) return true;
   try {
@@ -2289,17 +2294,17 @@ const insertMemberActivitySchema = import_zod.z.object({
 const updateMemberSchema = import_zod.z.object({
   firstName: import_zod.z.string().min(2).max(100).transform(sanitizeText).optional(),
   lastName: import_zod.z.string().min(2).max(100).transform(sanitizeText).optional(),
-  company: import_zod.z.string().max(200).transform(sanitizeText).optional(),
-  department: import_zod.z.string().max(100).transform(sanitizeText).optional(),
-  city: import_zod.z.string().max(100).transform(sanitizeText).optional(),
-  postalCode: import_zod.z.string().max(20).transform(sanitizeText).optional(),
-  firstContactDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date()]).optional(),
-  meetingDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date()]).optional(),
-  sector: import_zod.z.string().max(200).transform(sanitizeText).optional(),
-  phone: import_zod.z.string().max(20).transform(sanitizeText).optional(),
-  role: import_zod.z.string().max(100).transform(sanitizeText).optional(),
-  cjdRole: import_zod.z.string().max(100).transform(sanitizeText).optional(),
-  notes: import_zod.z.string().max(2e3).transform(sanitizeText).optional(),
+  company: clearableSanitizedText(200),
+  department: clearableSanitizedText(100),
+  city: clearableSanitizedText(100),
+  postalCode: clearableSanitizedText(20),
+  firstContactDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date(), import_zod.z.null()]).optional().transform((val) => val === null ? null : val),
+  meetingDate: import_zod.z.union([import_zod.z.string().datetime(), import_zod.z.date(), import_zod.z.null()]).optional().transform((val) => val === null ? null : val),
+  sector: clearableSanitizedText(200),
+  phone: clearableSanitizedText(20),
+  role: clearableSanitizedText(100),
+  cjdRole: clearableSanitizedText(100),
+  notes: clearableSanitizedText(2e3),
   status: import_zod.z.enum([
     MEMBER_STATUS.ACTIVE,
     MEMBER_STATUS.PROPOSED,
@@ -2315,8 +2320,8 @@ const updateMemberSchema = import_zod.z.object({
     PROSPECTION_STAGES.REFUSE,
     PROSPECTION_STAGES.SIGNE
   ]).nullable().optional(),
-  soncasProfile: import_zod.z.enum(SONCAS_PROFILES).optional(),
-  assignedTo: import_zod.z.string().email().optional().transform((val) => val ? sanitizeText(val) : void 0)
+  soncasProfile: import_zod.z.enum(SONCAS_PROFILES).nullable().optional(),
+  assignedTo: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : val)
 });
 const assignMemberSchema = import_zod.z.object({
   assignedTo: import_zod.z.string().email("Email de l'admin invalide").transform(sanitizeText),
