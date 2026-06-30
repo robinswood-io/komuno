@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.12.1",
-    "releasedAt": "2026-06-29",
-    "summary": "Cette version apporte 1 correction(s).",
+    "version": "2.13.0",
+    "releasedAt": "2026-06-30",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
-      "corrections": [
-        "Harden edge cases and duplicate urls"
+      "nouveautes": [
+        "Add integration foundation and calendar feeds"
       ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.13.0",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add integration foundation and calendar feeds"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.12.1",
       "releasedAt": "2026-06-29",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.1.15",
-      "releasedAt": "2026-05-06",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Rendre les smoke tests publics REP stricts (404 interdit)"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-29T14:05:05.052Z",
+  "generatedAt": "2026-06-30T13:04:53.521Z",
   "source": "conventional-commits"
 }

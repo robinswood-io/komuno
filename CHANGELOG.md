@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.13.0] - 2026-06-30
+
+### En bref
+
+- Cette version apporte 1 nouveaute(s).
+
+### Nouveautes
+
+- Add integration foundation and calendar feeds
+
 ## [2.12.1] - 2026-06-29
 
 ### En bref
