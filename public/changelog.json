@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.21.2",
+    "version": "2.22.0",
     "releasedAt": "2026-06-30",
-    "summary": "Cette version apporte des ajustements techniques.",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
+      "nouveautes": [
+        "Emit core outbound webhook events"
+      ],
       "corrections": [],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Upgrade GitHub actions runtimes"
-      ]
+      "maintenance": []
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.22.0",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Emit core outbound webhook events"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.21.2",
       "releasedAt": "2026-06-30",
@@ -479,24 +495,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.8.0",
-      "releasedAt": "2026-06-26",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add surveys and structured responses"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-30T17:43:14.052Z",
+  "generatedAt": "2026-06-30T17:48:24.669Z",
   "source": "conventional-commits"
 }
