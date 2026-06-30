@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.18.0",
+    "version": "2.18.1",
     "releasedAt": "2026-06-30",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Add organization invite acceptance routes"
+      "nouveautes": [],
+      "corrections": [
+        "Use configured Traefik network"
       ],
-      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.18.1",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Use configured Traefik network"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.18.0",
       "releasedAt": "2026-06-30",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.4.1",
-      "releasedAt": "2026-06-22",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Handle invalid ingest payloads"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-30T15:03:50.218Z",
+  "generatedAt": "2026-06-30T15:46:42.360Z",
   "source": "conventional-commits"
 }
