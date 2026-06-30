@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.16.0",
+    "version": "2.16.1",
     "releasedAt": "2026-06-30",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte des ajustements techniques.",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Add SaaS organization tenant route"
-      ],
+      "nouveautes": [],
       "corrections": [],
       "ameliorations": [],
       "securite": [],
-      "maintenance": []
+      "maintenance": [
+        "Route app tenant paths to Komuno"
+      ]
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.16.1",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte des ajustements techniques.",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Route app tenant paths to Komuno"
+        ]
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.16.0",
       "releasedAt": "2026-06-30",
@@ -484,24 +500,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.3.1",
-      "releasedAt": "2026-06-22",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Remove orphan CJD seed from standalone instances"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-30T14:49:21.721Z",
+  "generatedAt": "2026-06-30T14:49:58.394Z",
   "source": "conventional-commits"
 }
