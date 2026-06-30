@@ -182,6 +182,14 @@ export const queryKeys = {
     agenda: (params?: Record<string, unknown>) => ['federation', 'agenda', params] as const,
   },
 
+  // Integrations
+  integrations: {
+    all: ['integrations'] as const,
+    providers: () => ['integrations', 'providers'] as const,
+    accounts: (params?: Record<string, unknown>) => ['integrations', 'accounts', params] as const,
+    syncRuns: (params?: Record<string, unknown>) => ['integrations', 'syncRuns', params] as const,
+  },
+
   // Financial
   financial: {
     all: ['financial'] as const,

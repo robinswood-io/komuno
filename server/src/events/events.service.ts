@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { StorageService } from '../common/storage/storage.service';
 import { FederationService } from '../federation/federation.service';
 import {
+  EVENT_STATUS,
   insertEventSchema,
   createEventWithInscriptionsSchema,
   insertInscriptionSchema,
@@ -16,8 +17,9 @@ import { fromZodError } from 'zod-validation-error';
 import { logger } from '../../lib/logger';
 import { notificationService } from '../../notification-service';
 import { emailNotificationService } from '../../email-notification-service';
-import { sql, count } from 'drizzle-orm';
+import { asc, count, eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
+import { buildIcsCalendar } from '../integrations/integrations.utils';
 
 @Injectable()
 export class EventsService {
@@ -36,6 +38,45 @@ export class EventsService {
 
   async getEvents(page: number = 1, limit: number = 20) {
     return await this.storageService.instance.getEvents({ page, limit });
+  }
+
+  private publicEventUrl(eventId: string): string | null {
+    const baseUrl = process.env.PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || (process.env.DOMAIN ? `https://${process.env.DOMAIN}` : null);
+    return baseUrl ? `${baseUrl.replace(/\/$/, '')}/events#${eventId}` : null;
+  }
+
+  async getEventsCalendarIcs() {
+    const publishedEvents = await db.select().from(events)
+      .where(eq(events.status, EVENT_STATUS.PUBLISHED))
+      .orderBy(asc(events.date))
+      .limit(500);
+
+    return buildIcsCalendar(publishedEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      date: event.date,
+      location: event.location,
+      updatedAt: event.updatedAt,
+      url: this.publicEventUrl(event.id),
+    })), { calendarName: 'Événements Komuno' });
+  }
+
+  async getEventCalendarIcs(id: string) {
+    const [event] = await db.select().from(events)
+      .where(eq(events.id, id))
+      .limit(1);
+    if (!event || event.status !== EVENT_STATUS.PUBLISHED) throw new NotFoundException('Événement introuvable ou non publié');
+
+    return buildIcsCalendar([{ 
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      date: event.date,
+      location: event.location,
+      updatedAt: event.updatedAt,
+      url: this.publicEventUrl(event.id),
+    }], { calendarName: event.title });
   }
 
   async createEvent(data: unknown, user?: { firstName?: string; lastName?: string; email?: string }) {

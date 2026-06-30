@@ -100,6 +100,45 @@ export const SURVEY_QUESTION_TYPE = {
   RATING: "rating",
 } as const;
 
+export const INTEGRATION_PROVIDER = {
+  HELLOASSO: "helloasso",
+  STRIPE: "stripe",
+  BREVO: "brevo",
+  GOOGLE_CALENDAR: "google_calendar",
+  MICROSOFT_CALENDAR: "microsoft_calendar",
+  ICS: "ics",
+  WEBHOOK: "webhook",
+} as const;
+
+export const INTEGRATION_STATUS = {
+  DISCONNECTED: "disconnected",
+  CONNECTED: "connected",
+  ERROR: "error",
+  DISABLED: "disabled",
+} as const;
+
+export const INTEGRATION_AUTH_TYPE = {
+  NONE: "none",
+  API_KEY: "api_key",
+  OAUTH: "oauth",
+  WEBHOOK_SECRET: "webhook_secret",
+} as const;
+
+export const INTEGRATION_SYNC_STATUS = {
+  PENDING: "pending",
+  RUNNING: "running",
+  SUCCESS: "success",
+  FAILED: "failed",
+  PARTIAL: "partial",
+} as const;
+
+export const INTEGRATION_WEBHOOK_STATUS = {
+  RECEIVED: "received",
+  PROCESSED: "processed",
+  IGNORED: "ignored",
+  FAILED: "failed",
+} as const;
+
 // Ideas table - Flexible status workflow management
 export const ideas = pgTable("ideas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -492,6 +531,78 @@ export const surveyFormResponseSummaries = pgTable("survey_form_response_summari
   targetIdx: index("survey_form_response_summaries_target_idx").on(table.targetOrganizationId),
   updatedAtIdx: index("survey_form_response_summaries_updated_at_idx").on(table.updatedAt),
   questionSummariesIdx: index("survey_form_response_summaries_question_summaries_gin_idx").using("gin", table.questionSummaries),
+}));
+
+
+export const integrationAccounts = pgTable("integration_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull(),
+  label: text("label").notNull(),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  status: text("status").default(INTEGRATION_STATUS.DISCONNECTED).notNull(),
+  authType: text("auth_type").default(INTEGRATION_AUTH_TYPE.NONE).notNull(),
+  scopes: jsonb("scopes").$type<string[]>().default([]).notNull(),
+  settings: jsonb("settings").$type<Record<string, unknown>>().default({}).notNull(),
+  secretFingerprint: text("secret_fingerprint"),
+  secretEncrypted: boolean("secret_encrypted").default(false).notNull(),
+  secretEncryptedPayload: text("secret_encrypted_payload"),
+  secretEncryptionKeyId: text("secret_encryption_key_id"),
+  secretEncryptedAt: timestamp("secret_encrypted_at"),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastError: text("last_error"),
+  enabled: boolean("enabled").default(true).notNull(),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  providerOrgUniqueIdx: uniqueIndex("integration_accounts_provider_org_unique").on(table.provider, table.organizationId),
+  providerIdx: index("integration_accounts_provider_idx").on(table.provider),
+  statusIdx: index("integration_accounts_status_idx").on(table.status),
+  enabledIdx: index("integration_accounts_enabled_idx").on(table.enabled),
+}));
+
+export const integrationSyncRuns = pgTable("integration_sync_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  accountId: varchar("account_id").references(() => integrationAccounts.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  operation: text("operation").notNull(),
+  status: text("status").default(INTEGRATION_SYNC_STATUS.PENDING).notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  finishedAt: timestamp("finished_at"),
+  pulledCount: integer("pulled_count").default(0).notNull(),
+  pushedCount: integer("pushed_count").default(0).notNull(),
+  skippedCount: integer("skipped_count").default(0).notNull(),
+  errorCount: integer("error_count").default(0).notNull(),
+  error: text("error"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  accountIdx: index("integration_sync_runs_account_idx").on(table.accountId),
+  providerIdx: index("integration_sync_runs_provider_idx").on(table.provider),
+  statusIdx: index("integration_sync_runs_status_idx").on(table.status),
+  startedIdx: index("integration_sync_runs_started_idx").on(table.startedAt),
+}));
+
+export const integrationWebhookEvents = pgTable("integration_webhook_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  provider: text("provider").notNull(),
+  accountId: varchar("account_id").references(() => integrationAccounts.id, { onDelete: "set null" }),
+  externalEventId: text("external_event_id").notNull(),
+  eventType: text("event_type").notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
+  status: text("status").default(INTEGRATION_WEBHOOK_STATUS.RECEIVED).notNull(),
+  processedAt: timestamp("processed_at"),
+  retryCount: integer("retry_count").default(0).notNull(),
+  error: text("error"),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  providerExternalUniqueIdx: uniqueIndex("integration_webhook_events_provider_external_unique").on(table.provider, table.externalEventId),
+  providerIdx: index("integration_webhook_events_provider_idx").on(table.provider),
+  statusIdx: index("integration_webhook_events_status_idx").on(table.status),
+  receivedIdx: index("integration_webhook_events_received_idx").on(table.receivedAt),
+  payloadIdx: index("integration_webhook_events_payload_gin_idx").using("gin", table.payload),
 }));
 
 // Loan items table - Matériel disponible au prêt
@@ -1768,6 +1879,55 @@ export const submitSurveyResponseSchema = z.object({
   consentAccepted: z.boolean().optional().default(false),
 });
 
+
+const integrationProviderSchema = z.enum(["helloasso", "stripe", "brevo", "google_calendar", "microsoft_calendar", "ics", "webhook"]);
+const integrationStatusSchema = z.enum(["disconnected", "connected", "error", "disabled"]);
+const integrationAuthTypeSchema = z.enum(["none", "api_key", "oauth", "webhook_secret"]);
+const integrationSyncStatusSchema = z.enum(["pending", "running", "success", "failed", "partial"]);
+const integrationWebhookStatusSchema = z.enum(["received", "processed", "ignored", "failed"]);
+
+export const insertIntegrationAccountSchema = z.object({
+  provider: integrationProviderSchema,
+  label: z.string().min(2).max(200).transform(sanitizeText),
+  organizationId: z.string().uuid().optional().nullable(),
+  status: integrationStatusSchema.default("disconnected"),
+  authType: integrationAuthTypeSchema.default("none"),
+  scopes: z.array(z.string().max(120).transform(sanitizeText)).default([]),
+  settings: z.record(z.string(), z.unknown()).default({}),
+  secretFingerprint: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  secretEncrypted: z.boolean().default(false),
+  enabled: z.boolean().default(true),
+});
+
+export const updateIntegrationAccountSchema = insertIntegrationAccountSchema.partial();
+
+export const insertIntegrationSyncRunSchema = z.object({
+  accountId: z.string().uuid().optional().nullable(),
+  provider: integrationProviderSchema,
+  operation: z.string().min(2).max(120).transform(sanitizeText),
+  status: integrationSyncStatusSchema.default("pending"),
+  pulledCount: z.number().int().min(0).default(0),
+  pushedCount: z.number().int().min(0).default(0),
+  skippedCount: z.number().int().min(0).default(0),
+  errorCount: z.number().int().min(0).default(0),
+  error: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const updateIntegrationSyncRunSchema = insertIntegrationSyncRunSchema.partial().extend({
+  status: integrationSyncStatusSchema.optional(),
+});
+
+export const insertIntegrationWebhookEventSchema = z.object({
+  provider: integrationProviderSchema,
+  accountId: z.string().uuid().optional().nullable(),
+  externalEventId: z.string().min(1).max(300).transform(sanitizeText),
+  eventType: z.string().min(1).max(200).transform(sanitizeText),
+  payloadHash: z.string().min(16).max(128).transform(sanitizeText),
+  payload: z.record(z.string(), z.unknown()).default({}),
+  status: integrationWebhookStatusSchema.default("received"),
+});
+
 // Pure Zod v4 schema
 export const insertInscriptionSchema = z.object({
   eventId: z.string()
@@ -2608,6 +2768,14 @@ export type SubmitSurveyResponse = z.infer<typeof submitSurveyResponseSchema>;
 export type InsertSurveyFormSyndication = z.infer<typeof insertSurveyFormSyndicationSchema>;
 export type UpdateSurveyFormSyndication = z.infer<typeof updateSurveyFormSyndicationSchema>;
 
+export type IntegrationAccount = typeof integrationAccounts.$inferSelect;
+export type InsertIntegrationAccount = z.infer<typeof insertIntegrationAccountSchema>;
+export type UpdateIntegrationAccount = z.infer<typeof updateIntegrationAccountSchema>;
+export type IntegrationSyncRun = typeof integrationSyncRuns.$inferSelect;
+export type InsertIntegrationSyncRun = z.infer<typeof insertIntegrationSyncRunSchema>;
+export type IntegrationWebhookEvent = typeof integrationWebhookEvents.$inferSelect;
+export type InsertIntegrationWebhookEvent = z.infer<typeof insertIntegrationWebhookEventSchema>;
+
 export type LoanItem = typeof loanItems.$inferSelect;
 export type InsertLoanItem = z.infer<typeof insertLoanItemSchema>;
 
@@ -2752,6 +2920,11 @@ export const hasPermission = (userRole: string, permission: string): boolean => 
     case 'forms.export':
     case 'forms.manage':
       return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
+    case 'integrations.view':
+      return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
+    case 'integrations.write':
+    case 'integrations.manage':
+      return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
     case 'admin.view':
       // Tous les admins peuvent voir les membres
       return true;
@@ -2791,11 +2964,11 @@ export const getRolePermissions = (role: string): string[] => {
     case ADMIN_ROLES.IDEAS_READER:
       return ['Consultation des idées', 'Consultation des formulaires'];
     case ADMIN_ROLES.IDEAS_MANAGER:
-      return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes', 'Gestion des formulaires'];
+      return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes', 'Gestion des formulaires', 'Gestion des intégrations'];
     case ADMIN_ROLES.EVENTS_READER:
       return ['Consultation des événements', 'Consultation des formulaires'];
     case ADMIN_ROLES.EVENTS_MANAGER:
-      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences', 'Gestion des formulaires'];
+      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences', 'Gestion des formulaires', 'Gestion des intégrations'];
     default:
       return [];
   }

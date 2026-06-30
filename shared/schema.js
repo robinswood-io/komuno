@@ -33,6 +33,11 @@ __export(schema_exports, {
   FORECAST_BASED_ON: () => FORECAST_BASED_ON,
   FORECAST_CONFIDENCE: () => FORECAST_CONFIDENCE,
   IDEA_STATUS: () => IDEA_STATUS,
+  INTEGRATION_AUTH_TYPE: () => INTEGRATION_AUTH_TYPE,
+  INTEGRATION_PROVIDER: () => INTEGRATION_PROVIDER,
+  INTEGRATION_STATUS: () => INTEGRATION_STATUS,
+  INTEGRATION_SYNC_STATUS: () => INTEGRATION_SYNC_STATUS,
+  INTEGRATION_WEBHOOK_STATUS: () => INTEGRATION_WEBHOOK_STATUS,
   LOAN_STATUS: () => LOAN_STATUS,
   MEMBER_GROUP_TYPES: () => MEMBER_GROUP_TYPES,
   MEMBER_GROUP_TYPE_LABELS: () => MEMBER_GROUP_TYPE_LABELS,
@@ -114,6 +119,9 @@ __export(schema_exports, {
   insertIdeaPatronProposalSchema: () => insertIdeaPatronProposalSchema,
   insertIdeaSchema: () => insertIdeaSchema,
   insertInscriptionSchema: () => insertInscriptionSchema,
+  insertIntegrationAccountSchema: () => insertIntegrationAccountSchema,
+  insertIntegrationSyncRunSchema: () => insertIntegrationSyncRunSchema,
+  insertIntegrationWebhookEventSchema: () => insertIntegrationWebhookEventSchema,
   insertLoanItemSchema: () => insertLoanItemSchema,
   insertMemberActivitySchema: () => insertMemberActivitySchema,
   insertMemberContactSchema: () => insertMemberContactSchema,
@@ -144,6 +152,9 @@ __export(schema_exports, {
   insertUnsubscriptionSchema: () => insertUnsubscriptionSchema,
   insertUserSchema: () => insertUserSchema,
   insertVoteSchema: () => insertVoteSchema,
+  integrationAccounts: () => integrationAccounts,
+  integrationSyncRuns: () => integrationSyncRuns,
+  integrationWebhookEvents: () => integrationWebhookEvents,
   loanItems: () => loanItems,
   memberActivities: () => memberActivities,
   memberActivitiesRelations: () => memberActivitiesRelations,
@@ -221,6 +232,8 @@ __export(schema_exports, {
   updateIdeaPatronProposalSchema: () => updateIdeaPatronProposalSchema,
   updateIdeaSchema: () => updateIdeaSchema,
   updateIdeaStatusSchema: () => updateIdeaStatusSchema,
+  updateIntegrationAccountSchema: () => updateIntegrationAccountSchema,
+  updateIntegrationSyncRunSchema: () => updateIntegrationSyncRunSchema,
   updateLoanItemSchema: () => updateLoanItemSchema,
   updateLoanItemStatusSchema: () => updateLoanItemStatusSchema,
   updateMemberContactSchema: () => updateMemberContactSchema,
@@ -339,6 +352,40 @@ const SURVEY_QUESTION_TYPE = {
   MULTISELECT: "multiselect",
   CHECKBOX: "checkbox",
   RATING: "rating"
+};
+const INTEGRATION_PROVIDER = {
+  HELLOASSO: "helloasso",
+  STRIPE: "stripe",
+  BREVO: "brevo",
+  GOOGLE_CALENDAR: "google_calendar",
+  MICROSOFT_CALENDAR: "microsoft_calendar",
+  ICS: "ics",
+  WEBHOOK: "webhook"
+};
+const INTEGRATION_STATUS = {
+  DISCONNECTED: "disconnected",
+  CONNECTED: "connected",
+  ERROR: "error",
+  DISABLED: "disabled"
+};
+const INTEGRATION_AUTH_TYPE = {
+  NONE: "none",
+  API_KEY: "api_key",
+  OAUTH: "oauth",
+  WEBHOOK_SECRET: "webhook_secret"
+};
+const INTEGRATION_SYNC_STATUS = {
+  PENDING: "pending",
+  RUNNING: "running",
+  SUCCESS: "success",
+  FAILED: "failed",
+  PARTIAL: "partial"
+};
+const INTEGRATION_WEBHOOK_STATUS = {
+  RECEIVED: "received",
+  PROCESSED: "processed",
+  IGNORED: "ignored",
+  FAILED: "failed"
 };
 const ideas = (0, import_pg_core.pgTable)("ideas", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -720,6 +767,74 @@ const surveyFormResponseSummaries = (0, import_pg_core.pgTable)("survey_form_res
   targetIdx: (0, import_pg_core.index)("survey_form_response_summaries_target_idx").on(table.targetOrganizationId),
   updatedAtIdx: (0, import_pg_core.index)("survey_form_response_summaries_updated_at_idx").on(table.updatedAt),
   questionSummariesIdx: (0, import_pg_core.index)("survey_form_response_summaries_question_summaries_gin_idx").using("gin", table.questionSummaries)
+}));
+const integrationAccounts = (0, import_pg_core.pgTable)("integration_accounts", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  provider: (0, import_pg_core.text)("provider").notNull(),
+  label: (0, import_pg_core.text)("label").notNull(),
+  organizationId: (0, import_pg_core.varchar)("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  status: (0, import_pg_core.text)("status").default(INTEGRATION_STATUS.DISCONNECTED).notNull(),
+  authType: (0, import_pg_core.text)("auth_type").default(INTEGRATION_AUTH_TYPE.NONE).notNull(),
+  scopes: (0, import_pg_core.jsonb)("scopes").$type().default([]).notNull(),
+  settings: (0, import_pg_core.jsonb)("settings").$type().default({}).notNull(),
+  secretFingerprint: (0, import_pg_core.text)("secret_fingerprint"),
+  secretEncrypted: (0, import_pg_core.boolean)("secret_encrypted").default(false).notNull(),
+  secretEncryptedPayload: (0, import_pg_core.text)("secret_encrypted_payload"),
+  secretEncryptionKeyId: (0, import_pg_core.text)("secret_encryption_key_id"),
+  secretEncryptedAt: (0, import_pg_core.timestamp)("secret_encrypted_at"),
+  lastSyncAt: (0, import_pg_core.timestamp)("last_sync_at"),
+  lastError: (0, import_pg_core.text)("last_error"),
+  enabled: (0, import_pg_core.boolean)("enabled").default(true).notNull(),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  providerOrgUniqueIdx: (0, import_pg_core.uniqueIndex)("integration_accounts_provider_org_unique").on(table.provider, table.organizationId),
+  providerIdx: (0, import_pg_core.index)("integration_accounts_provider_idx").on(table.provider),
+  statusIdx: (0, import_pg_core.index)("integration_accounts_status_idx").on(table.status),
+  enabledIdx: (0, import_pg_core.index)("integration_accounts_enabled_idx").on(table.enabled)
+}));
+const integrationSyncRuns = (0, import_pg_core.pgTable)("integration_sync_runs", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  accountId: (0, import_pg_core.varchar)("account_id").references(() => integrationAccounts.id, { onDelete: "cascade" }),
+  provider: (0, import_pg_core.text)("provider").notNull(),
+  operation: (0, import_pg_core.text)("operation").notNull(),
+  status: (0, import_pg_core.text)("status").default(INTEGRATION_SYNC_STATUS.PENDING).notNull(),
+  startedAt: (0, import_pg_core.timestamp)("started_at").defaultNow().notNull(),
+  finishedAt: (0, import_pg_core.timestamp)("finished_at"),
+  pulledCount: (0, import_pg_core.integer)("pulled_count").default(0).notNull(),
+  pushedCount: (0, import_pg_core.integer)("pushed_count").default(0).notNull(),
+  skippedCount: (0, import_pg_core.integer)("skipped_count").default(0).notNull(),
+  errorCount: (0, import_pg_core.integer)("error_count").default(0).notNull(),
+  error: (0, import_pg_core.text)("error"),
+  metadata: (0, import_pg_core.jsonb)("metadata").$type().default({}).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  accountIdx: (0, import_pg_core.index)("integration_sync_runs_account_idx").on(table.accountId),
+  providerIdx: (0, import_pg_core.index)("integration_sync_runs_provider_idx").on(table.provider),
+  statusIdx: (0, import_pg_core.index)("integration_sync_runs_status_idx").on(table.status),
+  startedIdx: (0, import_pg_core.index)("integration_sync_runs_started_idx").on(table.startedAt)
+}));
+const integrationWebhookEvents = (0, import_pg_core.pgTable)("integration_webhook_events", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  provider: (0, import_pg_core.text)("provider").notNull(),
+  accountId: (0, import_pg_core.varchar)("account_id").references(() => integrationAccounts.id, { onDelete: "set null" }),
+  externalEventId: (0, import_pg_core.text)("external_event_id").notNull(),
+  eventType: (0, import_pg_core.text)("event_type").notNull(),
+  payloadHash: (0, import_pg_core.text)("payload_hash").notNull(),
+  payload: (0, import_pg_core.jsonb)("payload").$type().default({}).notNull(),
+  status: (0, import_pg_core.text)("status").default(INTEGRATION_WEBHOOK_STATUS.RECEIVED).notNull(),
+  processedAt: (0, import_pg_core.timestamp)("processed_at"),
+  retryCount: (0, import_pg_core.integer)("retry_count").default(0).notNull(),
+  error: (0, import_pg_core.text)("error"),
+  receivedAt: (0, import_pg_core.timestamp)("received_at").defaultNow().notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  providerExternalUniqueIdx: (0, import_pg_core.uniqueIndex)("integration_webhook_events_provider_external_unique").on(table.provider, table.externalEventId),
+  providerIdx: (0, import_pg_core.index)("integration_webhook_events_provider_idx").on(table.provider),
+  statusIdx: (0, import_pg_core.index)("integration_webhook_events_status_idx").on(table.status),
+  receivedIdx: (0, import_pg_core.index)("integration_webhook_events_received_idx").on(table.receivedAt),
+  payloadIdx: (0, import_pg_core.index)("integration_webhook_events_payload_gin_idx").using("gin", table.payload)
 }));
 const loanItems = (0, import_pg_core.pgTable)("loan_items", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -1891,6 +2006,48 @@ const submitSurveyResponseSchema = import_zod.z.object({
   answers: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
   consentAccepted: import_zod.z.boolean().optional().default(false)
 });
+const integrationProviderSchema = import_zod.z.enum(["helloasso", "stripe", "brevo", "google_calendar", "microsoft_calendar", "ics", "webhook"]);
+const integrationStatusSchema = import_zod.z.enum(["disconnected", "connected", "error", "disabled"]);
+const integrationAuthTypeSchema = import_zod.z.enum(["none", "api_key", "oauth", "webhook_secret"]);
+const integrationSyncStatusSchema = import_zod.z.enum(["pending", "running", "success", "failed", "partial"]);
+const integrationWebhookStatusSchema = import_zod.z.enum(["received", "processed", "ignored", "failed"]);
+const insertIntegrationAccountSchema = import_zod.z.object({
+  provider: integrationProviderSchema,
+  label: import_zod.z.string().min(2).max(200).transform(sanitizeText),
+  organizationId: import_zod.z.string().uuid().optional().nullable(),
+  status: integrationStatusSchema.default("disconnected"),
+  authType: integrationAuthTypeSchema.default("none"),
+  scopes: import_zod.z.array(import_zod.z.string().max(120).transform(sanitizeText)).default([]),
+  settings: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
+  secretFingerprint: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  secretEncrypted: import_zod.z.boolean().default(false),
+  enabled: import_zod.z.boolean().default(true)
+});
+const updateIntegrationAccountSchema = insertIntegrationAccountSchema.partial();
+const insertIntegrationSyncRunSchema = import_zod.z.object({
+  accountId: import_zod.z.string().uuid().optional().nullable(),
+  provider: integrationProviderSchema,
+  operation: import_zod.z.string().min(2).max(120).transform(sanitizeText),
+  status: integrationSyncStatusSchema.default("pending"),
+  pulledCount: import_zod.z.number().int().min(0).default(0),
+  pushedCount: import_zod.z.number().int().min(0).default(0),
+  skippedCount: import_zod.z.number().int().min(0).default(0),
+  errorCount: import_zod.z.number().int().min(0).default(0),
+  error: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  metadata: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({})
+});
+const updateIntegrationSyncRunSchema = insertIntegrationSyncRunSchema.partial().extend({
+  status: integrationSyncStatusSchema.optional()
+});
+const insertIntegrationWebhookEventSchema = import_zod.z.object({
+  provider: integrationProviderSchema,
+  accountId: import_zod.z.string().uuid().optional().nullable(),
+  externalEventId: import_zod.z.string().min(1).max(300).transform(sanitizeText),
+  eventType: import_zod.z.string().min(1).max(200).transform(sanitizeText),
+  payloadHash: import_zod.z.string().min(16).max(128).transform(sanitizeText),
+  payload: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
+  status: integrationWebhookStatusSchema.default("received")
+});
 const insertInscriptionSchema = import_zod.z.object({
   eventId: import_zod.z.string().uuid("L'identifiant de l'\xE9v\xE9nement n'est pas valide").transform(sanitizeText),
   name: import_zod.z.string().min(2, "Votre nom doit contenir au moins 2 caract\xE8res").max(100, "Votre nom est trop long (maximum 100 caract\xE8res)").transform(sanitizeText),
@@ -2402,6 +2559,11 @@ const hasPermission = (userRole, permission) => {
     case "forms.export":
     case "forms.manage":
       return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "integrations.view":
+      return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "integrations.write":
+    case "integrations.manage":
+      return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
     case "admin.view":
       return true;
     case "admin.edit":
@@ -2435,11 +2597,11 @@ const getRolePermissions = (role) => {
     case ADMIN_ROLES.IDEAS_READER:
       return ["Consultation des id\xE9es", "Consultation des formulaires"];
     case ADMIN_ROLES.IDEAS_MANAGER:
-      return ["Consultation des id\xE9es", "Modification des id\xE9es", "Suppression des id\xE9es", "Gestion des votes", "Gestion des formulaires"];
+      return ["Consultation des id\xE9es", "Modification des id\xE9es", "Suppression des id\xE9es", "Gestion des votes", "Gestion des formulaires", "Gestion des int\xE9grations"];
     case ADMIN_ROLES.EVENTS_READER:
       return ["Consultation des \xE9v\xE9nements", "Consultation des formulaires"];
     case ADMIN_ROLES.EVENTS_MANAGER:
-      return ["Consultation des \xE9v\xE9nements", "Modification des \xE9v\xE9nements", "Suppression des \xE9v\xE9nements", "Gestion des inscriptions et absences", "Gestion des formulaires"];
+      return ["Consultation des \xE9v\xE9nements", "Modification des \xE9v\xE9nements", "Suppression des \xE9v\xE9nements", "Gestion des inscriptions et absences", "Gestion des formulaires", "Gestion des int\xE9grations"];
     default:
       return [];
   }
@@ -3029,6 +3191,11 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   FORECAST_BASED_ON,
   FORECAST_CONFIDENCE,
   IDEA_STATUS,
+  INTEGRATION_AUTH_TYPE,
+  INTEGRATION_PROVIDER,
+  INTEGRATION_STATUS,
+  INTEGRATION_SYNC_STATUS,
+  INTEGRATION_WEBHOOK_STATUS,
   LOAN_STATUS,
   MEMBER_GROUP_TYPES,
   MEMBER_GROUP_TYPE_LABELS,
@@ -3110,6 +3277,9 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   insertIdeaPatronProposalSchema,
   insertIdeaSchema,
   insertInscriptionSchema,
+  insertIntegrationAccountSchema,
+  insertIntegrationSyncRunSchema,
+  insertIntegrationWebhookEventSchema,
   insertLoanItemSchema,
   insertMemberActivitySchema,
   insertMemberContactSchema,
@@ -3140,6 +3310,9 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   insertUnsubscriptionSchema,
   insertUserSchema,
   insertVoteSchema,
+  integrationAccounts,
+  integrationSyncRuns,
+  integrationWebhookEvents,
   loanItems,
   memberActivities,
   memberActivitiesRelations,
@@ -3217,6 +3390,8 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   updateIdeaPatronProposalSchema,
   updateIdeaSchema,
   updateIdeaStatusSchema,
+  updateIntegrationAccountSchema,
+  updateIntegrationSyncRunSchema,
   updateLoanItemSchema,
   updateLoanItemStatusSchema,
   updateMemberContactSchema,

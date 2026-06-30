@@ -10,7 +10,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import type { Response as ExpressResponse } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { EventsService } from './events.service';
@@ -52,6 +54,25 @@ export class EventsController {
       limit: result.data.limit,
       totalPages: Math.ceil(result.data.total / result.data.limit),
     };
+  }
+
+  @Get('calendar.ics')
+  @ApiOperation({ summary: 'Flux calendrier ICS public des événements publiés' })
+  async getEventsCalendar(@Res({ passthrough: true }) response: ExpressResponse) {
+    const content = await this.eventsService.getEventsCalendarIcs();
+    response.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    response.setHeader('Content-Disposition', 'inline; filename="komuno-events.ics"');
+    return content;
+  }
+
+  @Get(':id/calendar.ics')
+  @ApiOperation({ summary: 'Fichier ICS public pour un événement publié' })
+  @ApiParam({ name: 'id' })
+  async getEventCalendar(@Param('id') id: string, @Res({ passthrough: true }) response: ExpressResponse) {
+    const content = await this.eventsService.getEventCalendarIcs(id);
+    response.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    response.setHeader('Content-Disposition', `inline; filename="komuno-event-${id}.ics"`);
+    return content;
   }
 
   // Création d'événement - nécessite events.write (events_manager ou super_admin)

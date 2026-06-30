@@ -268,7 +268,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run critical tests
-        run: bun x vitest run test/unit/forms.v2.schema-and-service.spec.ts test/unit/federation.safety.spec.ts test/unit/security.hardening.spec.ts
+        run: bun x vitest run test/unit/forms.v2.schema-and-service.spec.ts test/unit/federation.safety.spec.ts test/unit/security.hardening.spec.ts test/unit/integrations.foundation.spec.ts
 
       - name: Critical tests summary
         if: always()
