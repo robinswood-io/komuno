@@ -8,6 +8,7 @@ import {
   sanitizeIntegrationSettings,
   withoutIntegrationSecret,
 } from '../../server/src/integrations/integrations.utils';
+import { syncBrevoLists, testBrevoConnection } from '../../server/src/integrations/providers/brevo';
 import {
   getHelloAssoBases,
   requestHelloAssoToken,
@@ -127,6 +128,26 @@ describe('Intégrations — socle sécurisé', () => {
     expect(JSON.stringify(syncResult)).not.toContain('pii@example.org');
     expect(calls.some((call) => call.includes('/organizations/cjd-amiens/forms'))).toBe(true);
     expect(calls.some((call) => call.includes('/organizations/cjd-amiens/orders'))).toBe(true);
+  });
+
+  it('teste Brevo et synchronise uniquement les métadonnées de listes', async () => {
+    const calls: Array<{ input: string; apiKey?: string }> = [];
+    const fetchImpl = async (input: string, init?: RequestInit) => {
+      calls.push({ input, apiKey: init?.headers ? (init.headers as Record<string, string>)['api-key'] : undefined });
+      if (input.endsWith('/account')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ organization_id: 'org_1', companyName: 'Association', email: 'private@example.org', plan: [{}], relay: { enabled: true } }) } as any;
+      if (input.includes('/contacts/lists')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ count: 1, lists: [{ id: 12, name: 'Membres', totalSubscribers: 42, folderId: 3 }] }) } as any;
+      throw new Error(`Unexpected call: ${input}`);
+    };
+
+    const settings = { baseUrl: 'https://api.brevo.com/v3', senderEmail: 'notifications@example.org' };
+    const testResult = await testBrevoConnection({ settings, apiKey: 'xkeysib-secret', fetchImpl });
+    const syncResult = await syncBrevoLists({ settings, apiKey: 'xkeysib-secret', fetchImpl });
+
+    expect(calls[0]).toEqual({ input: 'https://api.brevo.com/v3/account', apiKey: 'xkeysib-secret' });
+    expect(testResult.verifiedScopes).toEqual(['account_read']);
+    expect(JSON.stringify(testResult)).not.toContain('private@example.org');
+    expect(syncResult).toMatchObject({ listsCount: 1, totalCount: 1, contactsSyncMode: 'list_metadata_only_no_contact_payload' });
+    expect(JSON.stringify(syncResult)).not.toContain('private@example.org');
   });
 
   it('génère un calendrier ICS valide et échappe les champs texte', () => {

@@ -160,7 +160,11 @@ export default function AdminIntegrationsPage() {
     const next = providers.find((item) => item.provider === nextProvider);
     setLabel(next?.label ?? providerLabels[nextProvider]);
     setAuthType(next?.authType ?? 'none');
-    setSettings(nextProvider === 'helloasso' ? '{\n  "environment": "sandbox",\n  "clientId": "votre-client-id",\n  "organizationSlug": "votre-association",\n  "pageSize": 20,\n  "syncOrdersEnabled": false\n}' : '{}');
+    setSettings(nextProvider === 'helloasso'
+      ? '{\n  "environment": "sandbox",\n  "clientId": "votre-client-id",\n  "organizationSlug": "votre-association",\n  "pageSize": 20,\n  "syncOrdersEnabled": false\n}'
+      : nextProvider === 'brevo'
+        ? '{\n  "baseUrl": "https://api.brevo.com/v3",\n  "senderName": "Komuno",\n  "senderEmail": "notifications@example.org",\n  "pageSize": 50\n}'
+        : '{}');
   };
 
   return (
@@ -250,6 +254,11 @@ export default function AdminIntegrationsPage() {
                 {provider === 'helloasso' && (
                   <p className="text-xs text-muted-foreground">
                     HelloAsso v1 : stocker le <strong>clientId</strong> ici et coller le <strong>clientSecret</strong> dans le champ secret. Le sync commandes reste en compteur uniquement par défaut.
+                  </p>
+                )}
+                {provider === 'brevo' && (
+                  <p className="text-xs text-muted-foreground">
+                    Brevo v1 : coller la <strong>clé API</strong> dans le champ secret. Le sync récupère uniquement les métadonnées de listes, jamais les contacts.
                   </p>
                 )}
                 {currentProvider && <p className="text-xs text-muted-foreground">Recommandé : {currentProvider.capabilities.join(', ')}</p>}

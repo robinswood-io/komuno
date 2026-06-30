@@ -26,6 +26,7 @@ import {
   sanitizeIntegrationSettings,
   withoutIntegrationSecret,
 } from './integrations.utils';
+import { syncBrevoLists, testBrevoConnection } from './providers/brevo';
 import { syncHelloAssoCatalog, testHelloAssoConnection } from './providers/helloasso';
 
 const accountInputSchema = insertIntegrationAccountSchema.extend({
@@ -350,6 +351,14 @@ export class IntegrationsService {
       return { status: INTEGRATION_SYNC_STATUS.SUCCESS, error: null, metadata };
     }
 
+    if (account.provider === INTEGRATION_PROVIDER.BREVO) {
+      const metadata = await testBrevoConnection({
+        settings: account.settings as Record<string, unknown>,
+        apiKey: this.decryptAccountSecret(account),
+      });
+      return { status: INTEGRATION_SYNC_STATUS.SUCCESS, error: null, metadata };
+    }
+
     return {
       status: INTEGRATION_SYNC_STATUS.SUCCESS,
       error: null,
@@ -365,6 +374,15 @@ export class IntegrationsService {
       });
       return { operation: 'helloasso_catalog_sync', metadata };
     }
+
+    if (account.provider === INTEGRATION_PROVIDER.BREVO) {
+      const metadata = await syncBrevoLists({
+        settings: account.settings as Record<string, unknown>,
+        apiKey: this.decryptAccountSecret(account),
+      });
+      return { operation: 'brevo_lists_sync', metadata };
+    }
+
     throw new BadRequestException(`La synchronisation manuelle n'est pas encore disponible pour ${account.provider}`);
   }
 
