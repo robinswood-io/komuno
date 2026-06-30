@@ -58,21 +58,21 @@ export class EventsController {
 
   @Get('calendar.ics')
   @ApiOperation({ summary: 'Flux calendrier ICS public des événements publiés' })
-  async getEventsCalendar(@Res({ passthrough: true }) response: ExpressResponse) {
+  async getEventsCalendar(@Res() response: ExpressResponse) {
     const content = await this.eventsService.getEventsCalendarIcs();
     response.setHeader('Content-Type', 'text/calendar; charset=utf-8');
     response.setHeader('Content-Disposition', 'inline; filename="komuno-events.ics"');
-    return content;
+    response.send(content);
   }
 
   @Get(':id/calendar.ics')
   @ApiOperation({ summary: 'Fichier ICS public pour un événement publié' })
   @ApiParam({ name: 'id' })
-  async getEventCalendar(@Param('id') id: string, @Res({ passthrough: true }) response: ExpressResponse) {
+  async getEventCalendar(@Param('id') id: string, @Res() response: ExpressResponse) {
     const content = await this.eventsService.getEventCalendarIcs(id);
     response.setHeader('Content-Type', 'text/calendar; charset=utf-8');
     response.setHeader('Content-Disposition', `inline; filename="komuno-event-${id}.ics"`);
-    return content;
+    response.send(content);
   }
 
   // Création d'événement - nécessite events.write (events_manager ou super_admin)

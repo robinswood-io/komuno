@@ -283,19 +283,21 @@ export class IntegrationsService {
   }
 
   async recordWebhook(providerInput: string, payload: unknown, headers: Record<string, unknown> = {}) {
-    const provider = providerSchema.parse(providerInput);
-    const payloadRecord = typeof payload === 'object' && payload !== null && !Array.isArray(payload) ? payload as Record<string, unknown> : { value: payload };
-    const externalEventId = String(
+    let provider: z.infer<typeof providerSchema> | null = null;
+    let externalEventId = '';
+    try {
+      provider = providerSchema.parse(providerInput);
+      const payloadRecord = typeof payload === 'object' && payload !== null && !Array.isArray(payload) ? payload as Record<string, unknown> : { value: payload };
+      externalEventId = String(
       payloadRecord.id
       ?? payloadRecord.eventId
       ?? payloadRecord.event_id
       ?? headers['x-event-id']
       ?? createHash('sha256').update(JSON.stringify(payloadRecord)).digest('hex'),
     );
-    const eventType = String(payloadRecord.eventType ?? payloadRecord.event_type ?? payloadRecord.type ?? 'unknown');
-    const payloadHash = createHash('sha256').update(JSON.stringify(payloadRecord)).digest('hex');
+      const eventType = String(payloadRecord.eventType ?? payloadRecord.event_type ?? payloadRecord.type ?? 'unknown');
+      const payloadHash = createHash('sha256').update(JSON.stringify(payloadRecord)).digest('hex');
 
-    try {
       const validated = insertIntegrationWebhookEventSchema.parse({
         provider,
         externalEventId,
@@ -307,7 +309,7 @@ export class IntegrationsService {
       const [created] = await db.insert(integrationWebhookEvents).values(validated).returning();
       return { success: true, data: { id: created.id, status: created.status, duplicate: false } };
     } catch (error) {
-      if ((error as any)?.code === '23505') {
+      if ((error as any)?.code === '23505' && provider && externalEventId) {
         const [existing] = await db.select().from(integrationWebhookEvents)
           .where(and(eq(integrationWebhookEvents.provider, provider), eq(integrationWebhookEvents.externalEventId, externalEventId)))
           .limit(1);
