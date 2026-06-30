@@ -25,11 +25,11 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - traefik_public
+      - traefik
       - backend
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik_public"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik}"
       - "traefik.http.routers.${APP_NAME:-app}.rule=Host(`${DOMAIN}`) || Host(`www.repicardie.fr`)"
       - "traefik.http.routers.${APP_NAME:-app}.entrypoints=websecure"
       - "traefik.http.routers.${APP_NAME:-app}.tls=true"
@@ -108,7 +108,8 @@ services:
       retries: 3
 
 networks:
-  traefik_public:
+  traefik:
+    name: ${TRAEFIK_NETWORK:-traefik}
     external: true
   backend:
     driver: bridge
