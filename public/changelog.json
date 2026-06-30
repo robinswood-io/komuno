@@ -1,12 +1,12 @@
 {
   "latest": {
-    "version": "2.20.0",
+    "version": "2.21.0",
     "releasedAt": "2026-06-30",
     "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [
-        "Add outbound webhooks"
+        "Add audit log UI"
       ],
       "corrections": [],
       "ameliorations": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.21.0",
+      "releasedAt": "2026-06-30",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add audit log UI"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.20.0",
       "releasedAt": "2026-06-30",
@@ -479,27 +495,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.6.0",
-      "releasedAt": "2026-06-25",
-      "summary": "Cette version apporte 2 nouveaute(s), 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Automate demo updates from GitHub",
-          "Seed Komuno demo environment"
-        ],
-        "corrections": [
-          "Harden Komuno demo reset deployment"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 3
     }
   ],
-  "generatedAt": "2026-06-30T16:36:31.499Z",
+  "generatedAt": "2026-06-30T16:59:53.053Z",
   "source": "conventional-commits"
 }

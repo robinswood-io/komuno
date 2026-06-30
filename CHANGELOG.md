@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.21.0] - 2026-06-30
+
+### En bref
+
+- Cette version apporte 1 nouveaute(s).
+
+### Nouveautes
+
+- Add audit log UI
+
 ## [2.20.0] - 2026-06-30
 
 ### En bref
