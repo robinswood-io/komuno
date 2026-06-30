@@ -164,7 +164,9 @@ export default function AdminIntegrationsPage() {
       ? '{\n  "environment": "sandbox",\n  "clientId": "votre-client-id",\n  "organizationSlug": "votre-association",\n  "pageSize": 20,\n  "syncOrdersEnabled": false\n}'
       : nextProvider === 'brevo'
         ? '{\n  "baseUrl": "https://api.brevo.com/v3",\n  "senderName": "Komuno",\n  "senderEmail": "notifications@example.org",\n  "pageSize": 50\n}'
-        : '{}');
+        : nextProvider === 'stripe'
+          ? '{\n  "baseUrl": "https://api.stripe.com",\n  "mode": "test",\n  "pageSize": 25,\n  "syncProductsEnabled": true,\n  "syncPricesEnabled": true,\n  "syncCustomersEnabled": false\n}'
+          : '{}');
   };
 
   return (
@@ -259,6 +261,11 @@ export default function AdminIntegrationsPage() {
                 {provider === 'brevo' && (
                   <p className="text-xs text-muted-foreground">
                     Brevo v1 : coller la <strong>clé API</strong> dans le champ secret. Le sync récupère uniquement les métadonnées de listes, jamais les contacts.
+                  </p>
+                )}
+                {provider === 'stripe' && (
+                  <p className="text-xs text-muted-foreground">
+                    Stripe v1 : coller une <strong>clé secrète/restreinte serveur</strong> sk_/rk_ dans le champ secret. Le sync récupère produits/prix et, si activé, un compteur clients sans payload client.
                   </p>
                 )}
                 {currentProvider && <p className="text-xs text-muted-foreground">Recommandé : {currentProvider.capabilities.join(', ')}</p>}

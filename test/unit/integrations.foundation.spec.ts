@@ -15,6 +15,7 @@ import {
   syncHelloAssoCatalog,
   testHelloAssoConnection,
 } from '../../server/src/integrations/providers/helloasso';
+import { syncStripeCatalog, testStripeConnection } from '../../server/src/integrations/providers/stripe';
 import {
   hasPermission,
   insertIntegrationAccountSchema,
@@ -148,6 +149,55 @@ describe('Intégrations — socle sécurisé', () => {
     expect(JSON.stringify(testResult)).not.toContain('private@example.org');
     expect(syncResult).toMatchObject({ listsCount: 1, totalCount: 1, contactsSyncMode: 'list_metadata_only_no_contact_payload' });
     expect(JSON.stringify(syncResult)).not.toContain('private@example.org');
+  });
+
+  it('teste Stripe et synchronise produits/prix sans payload client', async () => {
+    const calls: Array<{ input: string; authorization?: string }> = [];
+    const fetchImpl = async (input: string, init?: RequestInit) => {
+      calls.push({ input, authorization: init?.headers ? (init.headers as Record<string, string>).authorization : undefined });
+      if (input.endsWith('/v1/account')) {
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({
+            id: 'acct_123',
+            country: 'FR',
+            default_currency: 'eur',
+            charges_enabled: true,
+            payouts_enabled: false,
+            email: 'owner@example.org',
+          }),
+        } as any;
+      }
+      if (input.includes('/v1/products')) {
+        return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ id: 'prod_1', name: 'Cotisation', active: true, type: 'service', created: 1770000000 }], has_more: false }) } as any;
+      }
+      if (input.includes('/v1/prices')) {
+        return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ id: 'price_1', product: 'prod_1', active: true, currency: 'eur', unit_amount: 3000, recurring: { interval: 'year' }, type: 'recurring' }], has_more: false }) } as any;
+      }
+      if (input.includes('/v1/customers')) throw new Error('Customer payload must not be fetched by default');
+      throw new Error(`Unexpected call: ${input}`);
+    };
+
+    const settings = { baseUrl: 'https://api.stripe.com', mode: 'test', pageSize: 25 };
+    const testResult = await testStripeConnection({ settings, apiKey: 'sk_test_secret', fetchImpl });
+    const syncResult = await syncStripeCatalog({ settings, apiKey: 'sk_test_secret', fetchImpl });
+
+    expect(calls[0].authorization).toMatch(/^Basic /);
+    expect(testResult.verifiedScopes).toEqual(['account_read']);
+    expect(JSON.stringify(testResult)).not.toContain('owner@example.org');
+    expect(syncResult).toMatchObject({
+      mode: 'test',
+      productsCount: 1,
+      pricesCount: 1,
+      customersSyncMode: 'disabled',
+    });
+    expect(JSON.stringify(syncResult)).not.toContain('owner@example.org');
+  });
+
+  it('refuse Stripe si le mode configuré ne correspond pas à la clé', async () => {
+    await expect(testStripeConnection({ settings: { mode: 'live' }, apiKey: 'sk_test_secret', fetchImpl: async () => { throw new Error('no call'); } })).rejects.toThrow('Mode Stripe incohérent');
   });
 
   it('génère un calendrier ICS valide et échappe les champs texte', () => {
