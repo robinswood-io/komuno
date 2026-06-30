@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import type { FetchLike } from './helloasso';
 
@@ -13,6 +14,12 @@ const stripeSettingsSchema = z.object({
 
 export type StripeSettings = z.infer<typeof stripeSettingsSchema>;
 
+export type StripeCredentials = {
+  apiKey: string;
+  webhookSigningSecret?: string;
+  secretMode: 'api_key' | 'json';
+};
+
 export function parseStripeSettings(settings: Record<string, unknown>): StripeSettings {
   try {
     const parsed = stripeSettingsSchema.parse(settings ?? {});
@@ -24,12 +31,63 @@ export function parseStripeSettings(settings: Record<string, unknown>): StripeSe
   }
 }
 
+export function parseStripeCredentials(secret: string | null | undefined): StripeCredentials {
+  if (!secret) throw new BadRequestException('Clé API Stripe absente ou indéchiffrable');
+  const trimmed = secret.trim();
+  if (trimmed.startsWith('{')) {
+    const schema = z.object({
+      apiKey: z.string().min(8),
+      webhookSigningSecret: z.string().startsWith('whsec_').optional(),
+    });
+    let parsed: z.infer<typeof schema>;
+    try {
+      parsed = schema.parse(JSON.parse(trimmed));
+    } catch {
+      throw new BadRequestException('Secret Stripe JSON invalide: utilisez {"apiKey":"sk_/rk_...","webhookSigningSecret":"whsec_..."}.');
+    }
+    return { apiKey: ensureApiKey(parsed.apiKey), webhookSigningSecret: parsed.webhookSigningSecret, secretMode: 'json' };
+  }
+  return { apiKey: ensureApiKey(trimmed), secretMode: 'api_key' };
+}
+
 function ensureApiKey(apiKey: string | null | undefined) {
   if (!apiKey) throw new BadRequestException('Clé API Stripe absente ou indéchiffrable');
   if (!/^(sk|rk)_(test|live)_/.test(apiKey)) {
     throw new BadRequestException('Clé API Stripe invalide: utilisez une clé secrète ou restreinte serveur sk_/rk_.');
   }
   return apiKey;
+}
+
+function parseStripeSignatureHeader(signatureHeader: string) {
+  const parts = signatureHeader.split(',').map((part) => part.trim()).filter(Boolean);
+  const timestamp = parts.find((part) => part.startsWith('t='))?.slice(2);
+  const signatures = parts.filter((part) => part.startsWith('v1=')).map((part) => part.slice(3));
+  return { timestamp: timestamp ? Number(timestamp) : NaN, signatures };
+}
+
+export function verifyStripeWebhookSignature(options: {
+  rawBody: string;
+  signatureHeader: string | null | undefined;
+  webhookSigningSecret: string;
+  toleranceSeconds?: number;
+  nowSeconds?: number;
+}) {
+  if (!options.signatureHeader) return false;
+  const { timestamp, signatures } = parseStripeSignatureHeader(options.signatureHeader);
+  if (!Number.isFinite(timestamp) || signatures.length === 0) return false;
+  const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
+  const tolerance = options.toleranceSeconds ?? 300;
+  if (Math.abs(now - timestamp) > tolerance) return false;
+  const expected = createHmac('sha256', options.webhookSigningSecret).update(`${timestamp}.${options.rawBody}`).digest('hex');
+  const expectedBuffer = Buffer.from(expected, 'hex');
+  return signatures.some((signature) => {
+    try {
+      const signatureBuffer = Buffer.from(signature, 'hex');
+      return signatureBuffer.length === expectedBuffer.length && timingSafeEqual(signatureBuffer, expectedBuffer);
+    } catch {
+      return false;
+    }
+  });
 }
 
 function expectedModeFromKey(apiKey: string): 'test' | 'live' {
@@ -109,7 +167,8 @@ export async function testStripeConnection(options: {
   fetchImpl?: FetchLike;
 }) {
   const settings = parseStripeSettings(options.settings);
-  const apiKey = ensureApiKey(options.apiKey);
+  const credentials = parseStripeCredentials(options.apiKey);
+  const apiKey = credentials.apiKey;
   const keyMode = expectedModeFromKey(apiKey);
   if (settings.mode !== keyMode) throw new BadRequestException(`Mode Stripe incohérent: clé ${keyMode}, configuration ${settings.mode}`);
   const account = await stripeGet({ settings, apiKey, path: '/v1/account', fetchImpl: options.fetchImpl });
@@ -118,6 +177,8 @@ export async function testStripeConnection(options: {
     mode: settings.mode,
     account: accountSummary(account),
     verifiedScopes: ['account_read'],
+    webhookSignatureConfigured: Boolean(credentials.webhookSigningSecret),
+    secretMode: credentials.secretMode,
   };
 }
 
@@ -127,7 +188,8 @@ export async function syncStripeCatalog(options: {
   fetchImpl?: FetchLike;
 }) {
   const settings = parseStripeSettings(options.settings);
-  const apiKey = ensureApiKey(options.apiKey);
+  const credentials = parseStripeCredentials(options.apiKey);
+  const apiKey = credentials.apiKey;
   const keyMode = expectedModeFromKey(apiKey);
   if (settings.mode !== keyMode) throw new BadRequestException(`Mode Stripe incohérent: clé ${keyMode}, configuration ${settings.mode}`);
 

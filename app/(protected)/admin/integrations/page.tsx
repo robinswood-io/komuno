@@ -306,7 +306,7 @@ export default function AdminIntegrationsPage() {
                 )}
                 {provider === 'stripe' && (
                   <p className="text-xs text-muted-foreground">
-                    Stripe v1 : coller une <strong>clé secrète/restreinte serveur</strong> sk_/rk_ dans le champ secret. Le sync récupère produits/prix et, si activé, un compteur clients sans payload client.
+                    Stripe v1 : coller une <strong>clé secrète/restreinte serveur</strong> sk_/rk_, ou un JSON chiffré {`{"apiKey":"sk_/rk_...","webhookSigningSecret":"whsec_..."}`}. Le sync récupère produits/prix et les webhooks Stripe sont vérifiés si <code>whsec_</code> est configuré.
                   </p>
                 )}
                 {provider === 'webhook' && (

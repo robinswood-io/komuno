@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { IntegrationsService } from './integrations.service';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
@@ -115,7 +116,8 @@ export class IntegrationWebhooksController {
     @Param('provider') provider: string,
     @Body() body: unknown,
     @Headers() headers: Record<string, unknown>,
+    @Req() req: Request & { rawBody?: string | Buffer },
   ) {
-    return await this.integrationsService.recordWebhook(provider, body, headers);
+    return await this.integrationsService.recordWebhook(provider, body, headers, { rawBody: req.rawBody });
   }
 }

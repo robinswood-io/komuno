@@ -1,3 +1,4 @@
+import { createHmac } from 'crypto';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -23,7 +24,7 @@ import {
   parseOutboundWebhookSettings,
   signOutboundWebhook,
 } from '../../server/src/integrations/providers/outbound-webhook';
-import { syncStripeCatalog, testStripeConnection } from '../../server/src/integrations/providers/stripe';
+import { parseStripeCredentials, syncStripeCatalog, testStripeConnection, verifyStripeWebhookSignature } from '../../server/src/integrations/providers/stripe';
 import {
   hasPermission,
   insertIntegrationAccountSchema,
@@ -206,6 +207,23 @@ describe('Intégrations — socle sécurisé', () => {
 
   it('refuse Stripe si le mode configuré ne correspond pas à la clé', async () => {
     await expect(testStripeConnection({ settings: { mode: 'live' }, apiKey: 'sk_test_secret', fetchImpl: async () => { throw new Error('no call'); } })).rejects.toThrow('Mode Stripe incohérent');
+  });
+
+  it('vérifie les signatures de webhooks entrants Stripe avec raw body exact', () => {
+    const rawBody = '{"id":"evt_123","type":"checkout.session.completed"}';
+    const webhookSigningSecret = 'whsec_test_secret';
+    const timestamp = 1770000000;
+    const signedPayload = `${timestamp}.${rawBody}`;
+    const signature = createHmac('sha256', webhookSigningSecret).update(signedPayload).digest('hex');
+
+    expect(parseStripeCredentials('{"apiKey":"sk_test_secret","webhookSigningSecret":"whsec_test_secret"}')).toMatchObject({
+      apiKey: 'sk_test_secret',
+      webhookSigningSecret,
+      secretMode: 'json',
+    });
+    expect(verifyStripeWebhookSignature({ rawBody, signatureHeader: `t=${timestamp},v1=${signature}`, webhookSigningSecret, nowSeconds: timestamp })).toBe(true);
+    expect(verifyStripeWebhookSignature({ rawBody: JSON.stringify(JSON.parse(rawBody), null, 2), signatureHeader: `t=${timestamp},v1=${signature}`, webhookSigningSecret, nowSeconds: timestamp })).toBe(false);
+    expect(verifyStripeWebhookSignature({ rawBody, signatureHeader: `t=${timestamp - 999},v1=${signature}`, webhookSigningSecret, nowSeconds: timestamp })).toBe(false);
   });
 
   it('signe les webhooks sortants et interdit les cibles non HTTPS/locales', async () => {

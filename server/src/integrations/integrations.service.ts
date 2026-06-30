@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { and, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
@@ -38,7 +38,7 @@ import {
   parseOutboundWebhookSecret,
   parseOutboundWebhookSettings,
 } from './providers/outbound-webhook';
-import { syncStripeCatalog, testStripeConnection } from './providers/stripe';
+import { parseStripeCredentials, syncStripeCatalog, testStripeConnection, verifyStripeWebhookSignature } from './providers/stripe';
 
 const accountInputSchema = insertIntegrationAccountSchema.extend({
   secret: z.string().min(8).max(5000).optional(),
@@ -627,11 +627,53 @@ export class IntegrationsService {
     throw new BadRequestException(`La synchronisation manuelle n'est pas encore disponible pour ${account.provider}`);
   }
 
-  async recordWebhook(providerInput: string, payload: unknown, headers: Record<string, unknown> = {}) {
+  private headerValue(headers: Record<string, unknown>, name: string) {
+    const value = headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()];
+    if (Array.isArray(value)) return String(value[0] ?? '');
+    return value === undefined || value === null ? '' : String(value);
+  }
+
+  private rawBodyToString(rawBody?: string | Buffer | null) {
+    if (typeof rawBody === 'string') return rawBody;
+    if (rawBody instanceof Buffer) return rawBody.toString('utf8');
+    return '';
+  }
+
+  private async verifyInboundWebhookSignature(provider: string, headers: Record<string, unknown>, rawBody?: string | Buffer | null) {
+    if (provider !== INTEGRATION_PROVIDER.STRIPE) return { accountId: null, signatureVerified: false };
+    const stripeSignature = this.headerValue(headers, 'stripe-signature');
+    const rawBodyString = this.rawBodyToString(rawBody);
+    if (!stripeSignature || !rawBodyString) throw new UnauthorizedException('Signature Stripe manquante ou body brut absent');
+
+    const accounts = await db.select().from(integrationAccounts).where(and(
+      eq(integrationAccounts.provider, INTEGRATION_PROVIDER.STRIPE),
+      eq(integrationAccounts.enabled, true),
+    ));
+
+    let configuredSecrets = 0;
+    for (const account of accounts) {
+      const rawSecret = this.decryptAccountSecret(account);
+      if (!rawSecret) continue;
+      const credentials = parseStripeCredentials(rawSecret);
+      if (!credentials.webhookSigningSecret) continue;
+      configuredSecrets += 1;
+      const valid = verifyStripeWebhookSignature({
+        rawBody: rawBodyString,
+        signatureHeader: stripeSignature,
+        webhookSigningSecret: credentials.webhookSigningSecret,
+      });
+      if (valid) return { accountId: account.id, signatureVerified: true };
+    }
+
+    throw new UnauthorizedException(configuredSecrets > 0 ? 'Signature Stripe invalide' : 'Secret de signature Stripe non configuré');
+  }
+
+  async recordWebhook(providerInput: string, payload: unknown, headers: Record<string, unknown> = {}, options: { rawBody?: string | Buffer | null } = {}) {
     let provider: z.infer<typeof providerSchema> | null = null;
     let externalEventId = '';
     try {
       provider = providerSchema.parse(providerInput);
+      const signature = await this.verifyInboundWebhookSignature(provider, headers, options.rawBody);
       const payloadRecord = typeof payload === 'object' && payload !== null && !Array.isArray(payload) ? payload as Record<string, unknown> : { value: payload };
       externalEventId = String(
       payloadRecord.id
@@ -645,10 +687,11 @@ export class IntegrationsService {
 
       const validated = insertIntegrationWebhookEventSchema.parse({
         provider,
+        accountId: signature.accountId,
         externalEventId,
         eventType,
         payloadHash,
-        payload: payloadRecord,
+        payload: { ...payloadRecord, _komuno: { signatureVerified: signature.signatureVerified } },
         status: INTEGRATION_WEBHOOK_STATUS.RECEIVED,
       });
       const [created] = await db.insert(integrationWebhookEvents).values(validated).returning();
