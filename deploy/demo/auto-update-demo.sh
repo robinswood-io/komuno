@@ -55,16 +55,21 @@ if [ -s "$LAST_ATTEMPT_FILE" ]; then
   LAST_ATTEMPT=$(cat "$LAST_ATTEMPT_FILE" 2>/dev/null || echo 0)
 fi
 AGE=$((NOW - LAST_ATTEMPT))
+APP_STATUS=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' komuno-demo-app 2>/dev/null || true)
+
+if [ "$FORCE_UPDATE" != "true" ] && [ "$LAST_ATTEMPT" -gt 0 ] && [ "$AGE" -lt "$MIN_INTERVAL_SECONDS" ] && [ "$APP_STATUS" = "healthy" ]; then
+  REMAINING=$((MIN_INTERVAL_SECONDS - AGE))
+  log "skipped: rate limit active (${REMAINING}s remaining), remote=$REMOTE_SHA deployed=${DEPLOYED_SHA:-none} app_status=$APP_STATUS"
+  exit 0
+fi
 
 if [ "$FORCE_UPDATE" != "true" ] && [ "$LAST_ATTEMPT" -gt 0 ] && [ "$AGE" -lt "$MIN_INTERVAL_SECONDS" ]; then
-  REMAINING=$((MIN_INTERVAL_SECONDS - AGE))
-  log "skipped: rate limit active (${REMAINING}s remaining), remote=$REMOTE_SHA deployed=${DEPLOYED_SHA:-none}"
-  exit 0
+  log "rate-limit bypass: app not healthy, remote=$REMOTE_SHA deployed=${DEPLOYED_SHA:-none} app_status=${APP_STATUS:-missing}"
 fi
 
 printf '%s\n' "$NOW" > "$LAST_ATTEMPT_FILE"
 
-log "start: remote=$REMOTE_SHA deployed=${DEPLOYED_SHA:-none} branch=$BRANCH"
+log "start: remote=$REMOTE_SHA deployed=${DEPLOYED_SHA:-none} branch=$BRANCH app_status=${APP_STATUS:-missing}"
 
 # Build on the server. Dockerfile.demo repulls the latest published Komuno image
 # from GHCR and creates the local demo image used by docker-compose.demo.yml.

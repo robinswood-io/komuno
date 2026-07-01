@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { logger } from '../../lib/logger';
+import { isProductionDemoStack } from './demo-mode';
 
 /**
  * Schéma de validation des variables d'environnement
@@ -53,13 +54,19 @@ const envSchema = z.object({
 
   // Sécurité
   CORS_ORIGIN: z.string().optional(),
+  APP_NAME: z.string().optional(),
+  COMPOSE_PROJECT_NAME: z.string().optional(),
+  DOMAIN: z.string().optional(),
+  PUBLIC_APP_URL: z.string().optional(),
+  NEXT_PUBLIC_APP_URL: z.string().optional(),
+  APP_URL: z.string().optional(),
   KOMUNO_DEMO_MODE: z.string().optional(),
 }).superRefine((env, ctx) => {
-  if (env.NODE_ENV === 'production' && env.KOMUNO_DEMO_MODE === 'true') {
+  if (env.NODE_ENV === 'production' && env.KOMUNO_DEMO_MODE === 'true' && !isProductionDemoStack(env)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['KOMUNO_DEMO_MODE'],
-      message: 'KOMUNO_DEMO_MODE ne doit jamais être activé en production',
+      message: 'KOMUNO_DEMO_MODE est réservé à la stack demo.komuno.org identifiée',
     });
   }
 });

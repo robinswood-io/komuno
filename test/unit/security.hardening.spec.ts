@@ -19,8 +19,10 @@ describe('Sécurité — durcissement transversal', () => {
     expect(csp).not.toContain('default-src *');
   });
 
-  it('désactive toujours le demo-mode en production', () => {
+  it('limite le demo-mode production à la stack demo officielle', () => {
     expect(isDemoModeEnabled({ NODE_ENV: 'production', KOMUNO_DEMO_MODE: 'true' } as NodeJS.ProcessEnv)).toBe(false);
+    expect(isDemoModeEnabled({ NODE_ENV: 'production', KOMUNO_DEMO_MODE: 'true', APP_NAME: 'komuno-demo', DOMAIN: 'demo.komuno.org' } as NodeJS.ProcessEnv)).toBe(true);
+    expect(isDemoModeEnabled({ NODE_ENV: 'production', KOMUNO_DEMO_MODE: 'true', APP_NAME: 'komuno-demo', DOMAIN: 'cjd80.fr' } as NodeJS.ProcessEnv)).toBe(false);
     expect(isDemoModeEnabled({ NODE_ENV: 'development', KOMUNO_DEMO_MODE: 'true' } as NodeJS.ProcessEnv)).toBe(true);
   });
 

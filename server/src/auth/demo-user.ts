@@ -1,7 +1,8 @@
 import type { Admin } from '../../../shared/schema';
+import { isDemoModeAllowed } from '../config/demo-mode';
 
 export function isDemoModeEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.KOMUNO_DEMO_MODE === 'true' && env.NODE_ENV !== 'production';
+  return isDemoModeAllowed(env);
 }
 
 export function getDemoAdminUser(): Admin {
