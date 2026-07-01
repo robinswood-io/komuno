@@ -10,9 +10,17 @@ UPDATER_NAME="${KOMUNO_DEMO_UPDATER_NAME:-komuno-demo-updater}"
 RESET_INTERVAL_SECONDS="${KOMUNO_DEMO_RESET_INTERVAL_SECONDS:-3600}"
 UPDATE_CHECK_INTERVAL_SECONDS="${KOMUNO_DEMO_UPDATE_CHECK_INTERVAL_SECONDS:-3600}"
 MIN_UPDATE_INTERVAL_SECONDS="${KOMUNO_DEMO_MIN_INTERVAL_SECONDS:-86400}"
-DOCKER_CONFIG_DIR="${KOMUNO_DEMO_DOCKER_CONFIG_DIR:-/root/.docker}"
+DOCKER_CONFIG_DIR="${KOMUNO_DEMO_DOCKER_CONFIG_DIR:-}"
+if [ -z "$DOCKER_CONFIG_DIR" ]; then
+  for candidate in /root/.docker /home/*/.docker; do
+    if [ -f "$candidate/config.json" ]; then
+      DOCKER_CONFIG_DIR="$candidate"
+      break
+    fi
+  done
+fi
 DOCKER_CONFIG_ARGS=""
-if [ -d "$DOCKER_CONFIG_DIR" ]; then
+if [ -n "$DOCKER_CONFIG_DIR" ] && [ -d "$DOCKER_CONFIG_DIR" ]; then
   DOCKER_CONFIG_ARGS="-v $DOCKER_CONFIG_DIR:/root/.docker:ro"
 fi
 
