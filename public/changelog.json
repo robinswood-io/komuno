@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.22.1",
+    "version": "2.22.2",
     "releasedAt": "2026-07-01",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Restore production demo stack"
+        "Detect docker credentials for updater"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.22.2",
+      "releasedAt": "2026-07-01",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Detect docker credentials for updater"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.22.1",
       "releasedAt": "2026-07-01",
@@ -479,24 +495,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.10.0",
-      "releasedAt": "2026-06-28",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Harden surveys v2"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-01T06:29:35.173Z",
+  "generatedAt": "2026-07-01T06:55:26.788Z",
   "source": "conventional-commits"
 }
