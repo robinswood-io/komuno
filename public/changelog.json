@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.22.0",
-    "releasedAt": "2026-06-30",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "version": "2.22.1",
+    "releasedAt": "2026-07-01",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Emit core outbound webhook events"
+      "nouveautes": [],
+      "corrections": [
+        "Restore production demo stack"
       ],
-      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.22.1",
+      "releasedAt": "2026-07-01",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Restore production demo stack"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.22.0",
       "releasedAt": "2026-06-30",
@@ -479,24 +495,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.9.0",
-      "releasedAt": "2026-06-27",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Harden survey responses workflow"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-06-30T17:48:24.669Z",
+  "generatedAt": "2026-07-01T06:29:35.173Z",
   "source": "conventional-commits"
 }
