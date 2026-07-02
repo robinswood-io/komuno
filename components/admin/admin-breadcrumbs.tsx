@@ -17,7 +17,7 @@ interface BreadcrumbSegment {
   href: string;
 }
 
-const settingsChildSegments = new Set(['audit', 'development-requests', 'tracking']);
+const settingsChildSegments = new Set(['audit', 'automations', 'development-requests', 'tracking']);
 
 const pathLabels: Record<string, string> = {
   admin: 'Administration',
@@ -37,6 +37,7 @@ const pathLabels: Record<string, string> = {
   federation: 'Fédération',
   settings: 'Paramètres',
   tracking: 'Tracking',
+  automations: 'Automations',
   audit: 'Audit',
   'development-requests': 'Demandes dev',
   crm: 'CRM',

@@ -30,6 +30,7 @@ import { TrackingModule } from './tracking/tracking.module';
 import { FeaturesModule } from './features/features.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { AutomationsModule } from './automations/automations.module';
 import { MinIOModule } from './integrations/minio/minio.module';
 import { EmailModule } from './common/email/email.module';
 import { SchedulerModule } from './common/scheduler/scheduler.module';
@@ -81,6 +82,7 @@ const throttlerLimit = isDevelopment ? 10000 : 1000;
     FeaturesModule,
     NotificationsModule,
     IntegrationsModule,
+    AutomationsModule,
     MinIOModule,
     EmailModule,
     SchedulerModule,

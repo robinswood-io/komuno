@@ -147,6 +147,38 @@ export const INTEGRATION_OUTBOUND_WEBHOOK_STATUS = {
   SKIPPED: "skipped",
 } as const;
 
+export const AUTOMATION_WORKFLOW_STATUS = {
+  DRAFT: "draft",
+  ACTIVE: "active",
+  PAUSED: "paused",
+  ARCHIVED: "archived",
+} as const;
+
+export const AUTOMATION_RUN_STATUS = {
+  QUEUED: "queued",
+  RUNNING: "running",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+  SKIPPED: "skipped",
+  CANCELLED: "cancelled",
+} as const;
+
+export const AUTOMATION_STEP_STATUS = {
+  QUEUED: "queued",
+  RUNNING: "running",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+  SKIPPED: "skipped",
+} as const;
+
+export const AUTOMATION_STEP_TYPE = {
+  CONDITION: "condition",
+  WEBHOOK_EMIT: "action.webhook.emit",
+  MEMBER_TASK_CREATE: "action.member_task.create",
+  AUDIT_RECORD: "action.audit.record",
+  NOOP: "action.noop",
+} as const;
+
 // Ideas table - Flexible status workflow management
 export const ideas = pgTable("ideas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -639,6 +671,106 @@ export const integrationOutboundWebhookDeliveries = pgTable("integration_outboun
   nextAttemptIdx: index("integration_outbound_webhook_deliveries_next_attempt_idx").on(table.nextAttemptAt),
   createdAtIdx: index("integration_outbound_webhook_deliveries_created_at_idx").on(table.createdAt),
   payloadIdx: index("integration_outbound_webhook_deliveries_payload_gin_idx").using("gin", table.payload),
+}));
+
+export const automationWorkflows = pgTable("automation_workflows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").default(AUTOMATION_WORKFLOW_STATUS.DRAFT).notNull(),
+  triggerType: text("trigger_type").notNull(),
+  draftDefinition: jsonb("draft_definition").$type<Record<string, unknown>>().default({}).notNull(),
+  currentVersion: integer("current_version").default(0).notNull(),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  organizationIdx: index("automation_workflows_org_idx").on(table.organizationId),
+  statusIdx: index("automation_workflows_status_idx").on(table.status),
+  triggerIdx: index("automation_workflows_trigger_idx").on(table.triggerType),
+  updatedAtIdx: index("automation_workflows_updated_at_idx").on(table.updatedAt),
+}));
+
+export const automationWorkflowVersions = pgTable("automation_workflow_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workflowId: varchar("workflow_id").references(() => automationWorkflows.id, { onDelete: "cascade" }).notNull(),
+  version: integer("version").notNull(),
+  triggerType: text("trigger_type").notNull(),
+  definitionHash: text("definition_hash").notNull(),
+  definition: jsonb("definition").$type<Record<string, unknown>>().default({}).notNull(),
+  publishedBy: text("published_by"),
+  publishedAt: timestamp("published_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  workflowVersionUniqueIdx: uniqueIndex("automation_workflow_versions_workflow_version_unique").on(table.workflowId, table.version),
+  workflowIdx: index("automation_workflow_versions_workflow_idx").on(table.workflowId),
+  triggerIdx: index("automation_workflow_versions_trigger_idx").on(table.triggerType),
+  hashIdx: index("automation_workflow_versions_hash_idx").on(table.definitionHash),
+}));
+
+export const automationEvents = pgTable("automation_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventType: text("event_type").notNull(),
+  eventId: text("event_id").notNull(),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  source: text("source").default("internal").notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().default({}).notNull(),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  typeEventUniqueIdx: uniqueIndex("automation_events_type_event_unique").on(table.eventType, table.eventId),
+  organizationIdx: index("automation_events_org_idx").on(table.organizationId),
+  typeIdx: index("automation_events_type_idx").on(table.eventType),
+  receivedIdx: index("automation_events_received_idx").on(table.receivedAt),
+  payloadIdx: index("automation_events_payload_gin_idx").using("gin", table.payload),
+}));
+
+export const automationRuns = pgTable("automation_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workflowId: varchar("workflow_id").references(() => automationWorkflows.id, { onDelete: "cascade" }).notNull(),
+  workflowVersionId: varchar("workflow_version_id").references(() => automationWorkflowVersions.id, { onDelete: "cascade" }).notNull(),
+  automationEventId: varchar("automation_event_id").references(() => automationEvents.id, { onDelete: "set null" }),
+  status: text("status").default(AUTOMATION_RUN_STATUS.QUEUED).notNull(),
+  input: jsonb("input").$type<Record<string, unknown>>().default({}).notNull(),
+  output: jsonb("output").$type<Record<string, unknown>>().default({}).notNull(),
+  error: text("error"),
+  attemptCount: integer("attempt_count").default(0).notNull(),
+  maxAttempts: integer("max_attempts").default(3).notNull(),
+  nextAttemptAt: timestamp("next_attempt_at"),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  versionEventUniqueIdx: uniqueIndex("automation_runs_version_event_unique").on(table.workflowVersionId, table.automationEventId),
+  workflowIdx: index("automation_runs_workflow_idx").on(table.workflowId),
+  versionIdx: index("automation_runs_version_idx").on(table.workflowVersionId),
+  eventIdx: index("automation_runs_event_idx").on(table.automationEventId),
+  statusIdx: index("automation_runs_status_idx").on(table.status),
+  nextAttemptIdx: index("automation_runs_next_attempt_idx").on(table.nextAttemptAt),
+  createdAtIdx: index("automation_runs_created_at_idx").on(table.createdAt),
+}));
+
+export const automationStepRuns = pgTable("automation_step_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  runId: varchar("run_id").references(() => automationRuns.id, { onDelete: "cascade" }).notNull(),
+  stepId: text("step_id").notNull(),
+  stepType: text("step_type").notNull(),
+  status: text("status").default(AUTOMATION_STEP_STATUS.QUEUED).notNull(),
+  input: jsonb("input").$type<Record<string, unknown>>().default({}).notNull(),
+  output: jsonb("output").$type<Record<string, unknown>>().default({}).notNull(),
+  error: text("error"),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  runIdx: index("automation_step_runs_run_idx").on(table.runId),
+  stepIdx: index("automation_step_runs_step_idx").on(table.stepId),
+  statusIdx: index("automation_step_runs_status_idx").on(table.status),
+  createdAtIdx: index("automation_step_runs_created_at_idx").on(table.createdAt),
 }));
 
 // Loan items table - Matériel disponible au prêt
@@ -1681,6 +1813,97 @@ export const insertBusinessAuditLogSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).default({}),
   ipAddress: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
   userAgent: z.string().max(500).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+});
+
+const automationStepTypeValues = [
+  AUTOMATION_STEP_TYPE.CONDITION,
+  AUTOMATION_STEP_TYPE.WEBHOOK_EMIT,
+  AUTOMATION_STEP_TYPE.MEMBER_TASK_CREATE,
+  AUTOMATION_STEP_TYPE.AUDIT_RECORD,
+  AUTOMATION_STEP_TYPE.NOOP,
+] as const;
+
+const automationRunStatusValues = [
+  AUTOMATION_RUN_STATUS.QUEUED,
+  AUTOMATION_RUN_STATUS.RUNNING,
+  AUTOMATION_RUN_STATUS.SUCCEEDED,
+  AUTOMATION_RUN_STATUS.FAILED,
+  AUTOMATION_RUN_STATUS.SKIPPED,
+  AUTOMATION_RUN_STATUS.CANCELLED,
+] as const;
+
+const automationWorkflowStatusValues = [
+  AUTOMATION_WORKFLOW_STATUS.DRAFT,
+  AUTOMATION_WORKFLOW_STATUS.ACTIVE,
+  AUTOMATION_WORKFLOW_STATUS.PAUSED,
+  AUTOMATION_WORKFLOW_STATUS.ARCHIVED,
+] as const;
+
+export const automationConditionSchema = z.object({
+  path: z.string().min(1).max(240).transform(sanitizeText),
+  operator: z.enum(['equals', 'not_equals', 'contains', 'exists', 'not_exists', 'gt', 'gte', 'lt', 'lte', 'in']),
+  value: z.unknown().optional(),
+});
+
+export const automationStepSchema = z.object({
+  id: z.string().min(1).max(80).regex(/^[a-zA-Z0-9_.:-]+$/).transform(sanitizeText),
+  type: z.enum(automationStepTypeValues),
+  label: z.string().max(160).optional().transform(val => val ? sanitizeText(val) : undefined),
+  config: z.record(z.string(), z.unknown()).default({}),
+  onError: z.enum(['fail', 'continue']).default('fail'),
+});
+
+export const automationDefinitionSchema = z.object({
+  trigger: z.object({
+    type: z.string().min(2).max(120).transform(sanitizeText),
+    config: z.record(z.string(), z.unknown()).default({}),
+  }),
+  steps: z.array(automationStepSchema).min(1).max(25),
+}).superRefine((definition, ctx) => {
+  const ids = new Set<string>();
+  for (const [index, step] of definition.steps.entries()) {
+    if (ids.has(step.id)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['steps', index, 'id'], message: 'Identifiant de step dupliqué' });
+    }
+    ids.add(step.id);
+  }
+});
+
+export const insertAutomationWorkflowSchema = z.object({
+  name: z.string().min(3).max(160).transform(sanitizeText),
+  description: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  organizationId: z.string().uuid().optional().nullable(),
+  triggerType: z.string().min(2).max(120).transform(sanitizeText),
+  draftDefinition: automationDefinitionSchema,
+});
+
+export const updateAutomationWorkflowSchema = z.object({
+  name: z.string().min(3).max(160).optional().transform(val => val ? sanitizeText(val) : undefined),
+  description: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  organizationId: z.string().uuid().optional().nullable(),
+  triggerType: z.string().min(2).max(120).optional().transform(val => val ? sanitizeText(val) : undefined),
+  draftDefinition: automationDefinitionSchema.optional(),
+});
+
+export const publishAutomationWorkflowSchema = z.object({
+  definition: automationDefinitionSchema.optional(),
+});
+
+export const updateAutomationWorkflowStatusSchema = z.object({
+  status: z.enum(automationWorkflowStatusValues),
+});
+
+export const insertAutomationEventSchema = z.object({
+  eventType: z.string().min(2).max(120).transform(sanitizeText),
+  eventId: z.string().min(2).max(240).transform(sanitizeText),
+  organizationId: z.string().uuid().optional().nullable(),
+  source: z.string().min(2).max(80).default('internal').transform(sanitizeText),
+  payloadHash: z.string().min(16).max(128).transform(sanitizeText),
+  payload: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const updateAutomationRunStatusSchema = z.object({
+  status: z.enum(automationRunStatusValues),
 });
 
 // Ultra-secure insert schemas with validation - Pure Zod v4 schema (avoiding drizzle-zod type recursion)
@@ -2834,6 +3057,17 @@ export type InsertIntegrationWebhookEvent = z.infer<typeof insertIntegrationWebh
 export type IntegrationOutboundWebhookDelivery = typeof integrationOutboundWebhookDeliveries.$inferSelect;
 export type InsertIntegrationOutboundWebhookDelivery = z.infer<typeof insertIntegrationOutboundWebhookDeliverySchema>;
 
+export type AutomationWorkflow = typeof automationWorkflows.$inferSelect;
+export type AutomationWorkflowVersion = typeof automationWorkflowVersions.$inferSelect;
+export type AutomationEvent = typeof automationEvents.$inferSelect;
+export type AutomationRun = typeof automationRuns.$inferSelect;
+export type AutomationStepRun = typeof automationStepRuns.$inferSelect;
+export type AutomationDefinition = z.infer<typeof automationDefinitionSchema>;
+export type AutomationStep = z.infer<typeof automationStepSchema>;
+export type InsertAutomationWorkflow = z.infer<typeof insertAutomationWorkflowSchema>;
+export type UpdateAutomationWorkflow = z.infer<typeof updateAutomationWorkflowSchema>;
+export type InsertAutomationEvent = z.infer<typeof insertAutomationEventSchema>;
+
 export type LoanItem = typeof loanItems.$inferSelect;
 export type InsertLoanItem = z.infer<typeof insertLoanItemSchema>;
 
@@ -2983,6 +3217,11 @@ export const hasPermission = (userRole: string, permission: string): boolean => 
     case 'integrations.write':
     case 'integrations.manage':
       return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
+    case 'automations.view':
+      return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
+    case 'automations.write':
+    case 'automations.manage':
+      return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
     case 'admin.view':
       // Tous les admins peuvent voir les membres
       return true;
@@ -3022,11 +3261,11 @@ export const getRolePermissions = (role: string): string[] => {
     case ADMIN_ROLES.IDEAS_READER:
       return ['Consultation des idées', 'Consultation des formulaires'];
     case ADMIN_ROLES.IDEAS_MANAGER:
-      return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes', 'Gestion des formulaires', 'Gestion des intégrations'];
+      return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes', 'Gestion des formulaires', 'Gestion des intégrations', 'Gestion des automations'];
     case ADMIN_ROLES.EVENTS_READER:
       return ['Consultation des événements', 'Consultation des formulaires'];
     case ADMIN_ROLES.EVENTS_MANAGER:
-      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences', 'Gestion des formulaires', 'Gestion des intégrations'];
+      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences', 'Gestion des formulaires', 'Gestion des intégrations', 'Gestion des automations'];
     default:
       return [];
   }

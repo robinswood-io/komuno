@@ -6,6 +6,7 @@ import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
 import { AuditService } from '../audit/audit.service';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { AutomationsService } from '../automations/automations.service';
 import {
   SURVEY_FORM_STATUS,
   insertSurveyFormSchema,
@@ -45,11 +46,18 @@ export class FormsService {
   constructor(
     private readonly auditService?: AuditService,
     private readonly integrationsService?: IntegrationsService,
+    private readonly automationsService?: AutomationsService,
   ) {}
 
   private emitOutboundEventBestEffort(eventType: string, data: Record<string, unknown>) {
     void this.integrationsService?.emitOutboundEvent(eventType, data).catch((error) => {
       this.logger.warn(`Outbound webhook emission failed for ${eventType}: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
+
+  private emitAutomationEventBestEffort(eventType: string, data: Record<string, unknown>) {
+    void this.automationsService?.emitEvent(eventType, data).catch((error) => {
+      this.logger.warn(`Automation event emission failed for ${eventType}: ${error instanceof Error ? error.message : String(error)}`);
     });
   }
 
@@ -448,7 +456,7 @@ export class FormsService {
         consentAccepted: Boolean(validated.consentAccepted),
       }).returning();
 
-      this.emitOutboundEventBestEffort('form.response.created', {
+      const minimalResponsePayload = {
         id: response.id,
         formId: form.id,
         formSlug: form.slug,
@@ -457,6 +465,11 @@ export class FormsService {
         submittedAt: response.submittedAt,
         respondentEmail: validated.respondentEmail ?? null,
         consentAccepted: Boolean(validated.consentAccepted),
+      };
+      this.emitOutboundEventBestEffort('form.response.created', minimalResponsePayload);
+      this.emitAutomationEventBestEffort('form.response.created', {
+        ...minimalResponsePayload,
+        answers: sanitizedAnswers,
       });
 
       return {

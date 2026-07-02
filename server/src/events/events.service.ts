@@ -21,6 +21,7 @@ import { asc, count, eq, sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { buildIcsCalendar } from '../integrations/integrations.utils';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { AutomationsService } from '../automations/automations.service';
 
 @Injectable()
 export class EventsService {
@@ -28,11 +29,18 @@ export class EventsService {
     private readonly storageService: StorageService,
     private readonly federationService: FederationService,
     private readonly integrationsService?: IntegrationsService,
+    private readonly automationsService?: AutomationsService,
   ) {}
 
   private emitOutboundEventBestEffort(eventType: string, data: Record<string, unknown>) {
     void this.integrationsService?.emitOutboundEvent(eventType, data).catch((error) => {
       logger.warn('Outbound webhook emission failed', { eventType, error });
+    });
+  }
+
+  private emitAutomationEventBestEffort(eventType: string, data: Record<string, unknown>) {
+    void this.automationsService?.emitEvent(eventType, data).catch((error) => {
+      logger.warn('Automation event emission failed', { eventType, error });
     });
   }
 
@@ -116,14 +124,16 @@ export class EventsService {
         logger.warn('Event notification failed', { eventId: result.data.id, error: notifError });
       }
 
-      this.emitOutboundEventBestEffort('event.created', {
+      const automationPayload = {
         id: result.data.id,
         title: result.data.title,
         status: result.data.status,
         date: result.data.date,
         location: result.data.location ?? null,
         createdBy: user?.email ?? null,
-      });
+      };
+      this.emitOutboundEventBestEffort('event.created', automationPayload);
+      this.emitAutomationEventBestEffort('event.created', automationPayload);
       await this.autoShareEventToParentBestEffort(result.data.id, user?.email);
       return result.data;
     } catch (error) {
@@ -169,7 +179,7 @@ export class EventsService {
         logger.warn('Event notification failed', { eventId: result.data.event.id, error: notifError });
       }
 
-      this.emitOutboundEventBestEffort('event.created', {
+      const automationPayload = {
         id: result.data.event.id,
         title: result.data.event.title,
         status: result.data.event.status,
@@ -177,7 +187,9 @@ export class EventsService {
         location: result.data.event.location ?? null,
         createdBy: user?.email ?? null,
         initialInscriptionsCount: result.data.inscriptions?.length ?? 0,
-      });
+      };
+      this.emitOutboundEventBestEffort('event.created', automationPayload);
+      this.emitAutomationEventBestEffort('event.created', automationPayload);
       await this.autoShareEventToParentBestEffort(result.data.event.id, user?.email);
       return result.data;
     } catch (error) {

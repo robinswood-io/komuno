@@ -20,6 +20,10 @@ var schema_exports = {};
 __export(schema_exports, {
   ADMIN_ROLES: () => ADMIN_ROLES,
   ADMIN_STATUS: () => ADMIN_STATUS,
+  AUTOMATION_RUN_STATUS: () => AUTOMATION_RUN_STATUS,
+  AUTOMATION_STEP_STATUS: () => AUTOMATION_STEP_STATUS,
+  AUTOMATION_STEP_TYPE: () => AUTOMATION_STEP_TYPE,
+  AUTOMATION_WORKFLOW_STATUS: () => AUTOMATION_WORKFLOW_STATUS,
   CJD_ROLES: () => CJD_ROLES,
   CJD_ROLE_LABELS: () => CJD_ROLE_LABELS,
   DatabaseError: () => DatabaseError,
@@ -66,6 +70,14 @@ __export(schema_exports, {
   assignMemberSchema: () => assignMemberSchema,
   assignMemberTagSchema: () => assignMemberTagSchema,
   assignSubscriptionSchema: () => assignSubscriptionSchema,
+  automationConditionSchema: () => automationConditionSchema,
+  automationDefinitionSchema: () => automationDefinitionSchema,
+  automationEvents: () => automationEvents,
+  automationRuns: () => automationRuns,
+  automationStepRuns: () => automationStepRuns,
+  automationStepSchema: () => automationStepSchema,
+  automationWorkflowVersions: () => automationWorkflowVersions,
+  automationWorkflows: () => automationWorkflows,
   brandingConfig: () => brandingConfig,
   businessAuditLogs: () => businessAuditLogs,
   createEventWithInscriptionsSchema: () => createEventWithInscriptionsSchema,
@@ -103,6 +115,8 @@ __export(schema_exports, {
   inscriptionsRelations: () => inscriptionsRelations,
   insertAdminSchema: () => insertAdminSchema,
   insertAdminUserSchema: () => insertAdminUserSchema,
+  insertAutomationEventSchema: () => insertAutomationEventSchema,
+  insertAutomationWorkflowSchema: () => insertAutomationWorkflowSchema,
   insertBrandingConfigSchema: () => insertBrandingConfigSchema,
   insertBusinessAuditLogSchema: () => insertBusinessAuditLogSchema,
   insertDevelopmentRequestSchema: () => insertDevelopmentRequestSchema,
@@ -195,6 +209,7 @@ __export(schema_exports, {
   patrons: () => patrons,
   patronsRelations: () => patronsRelations,
   proposeMemberSchema: () => proposeMemberSchema,
+  publishAutomationWorkflowSchema: () => publishAutomationWorkflowSchema,
   pushSubscriptions: () => pushSubscriptions,
   renewSubscriptionSchema: () => renewSubscriptionSchema,
   statusCheckSchema: () => statusCheckSchema,
@@ -221,6 +236,9 @@ __export(schema_exports, {
   updateAdminInfoSchema: () => updateAdminInfoSchema,
   updateAdminPasswordSchema: () => updateAdminPasswordSchema,
   updateAdminSchema: () => updateAdminSchema,
+  updateAutomationRunStatusSchema: () => updateAutomationRunStatusSchema,
+  updateAutomationWorkflowSchema: () => updateAutomationWorkflowSchema,
+  updateAutomationWorkflowStatusSchema: () => updateAutomationWorkflowStatusSchema,
   updateDevelopmentRequestSchema: () => updateDevelopmentRequestSchema,
   updateDevelopmentRequestStatusSchema: () => updateDevelopmentRequestStatusSchema,
   updateEventSchema: () => updateEventSchema,
@@ -396,6 +414,34 @@ const INTEGRATION_OUTBOUND_WEBHOOK_STATUS = {
   FAILED: "failed",
   RETRYING: "retrying",
   SKIPPED: "skipped"
+};
+const AUTOMATION_WORKFLOW_STATUS = {
+  DRAFT: "draft",
+  ACTIVE: "active",
+  PAUSED: "paused",
+  ARCHIVED: "archived"
+};
+const AUTOMATION_RUN_STATUS = {
+  QUEUED: "queued",
+  RUNNING: "running",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+  SKIPPED: "skipped",
+  CANCELLED: "cancelled"
+};
+const AUTOMATION_STEP_STATUS = {
+  QUEUED: "queued",
+  RUNNING: "running",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+  SKIPPED: "skipped"
+};
+const AUTOMATION_STEP_TYPE = {
+  CONDITION: "condition",
+  WEBHOOK_EMIT: "action.webhook.emit",
+  MEMBER_TASK_CREATE: "action.member_task.create",
+  AUDIT_RECORD: "action.audit.record",
+  NOOP: "action.noop"
 };
 const ideas = (0, import_pg_core.pgTable)("ideas", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -872,6 +918,101 @@ const integrationOutboundWebhookDeliveries = (0, import_pg_core.pgTable)("integr
   nextAttemptIdx: (0, import_pg_core.index)("integration_outbound_webhook_deliveries_next_attempt_idx").on(table.nextAttemptAt),
   createdAtIdx: (0, import_pg_core.index)("integration_outbound_webhook_deliveries_created_at_idx").on(table.createdAt),
   payloadIdx: (0, import_pg_core.index)("integration_outbound_webhook_deliveries_payload_gin_idx").using("gin", table.payload)
+}));
+const automationWorkflows = (0, import_pg_core.pgTable)("automation_workflows", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  organizationId: (0, import_pg_core.varchar)("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  name: (0, import_pg_core.text)("name").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  status: (0, import_pg_core.text)("status").default(AUTOMATION_WORKFLOW_STATUS.DRAFT).notNull(),
+  triggerType: (0, import_pg_core.text)("trigger_type").notNull(),
+  draftDefinition: (0, import_pg_core.jsonb)("draft_definition").$type().default({}).notNull(),
+  currentVersion: (0, import_pg_core.integer)("current_version").default(0).notNull(),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  organizationIdx: (0, import_pg_core.index)("automation_workflows_org_idx").on(table.organizationId),
+  statusIdx: (0, import_pg_core.index)("automation_workflows_status_idx").on(table.status),
+  triggerIdx: (0, import_pg_core.index)("automation_workflows_trigger_idx").on(table.triggerType),
+  updatedAtIdx: (0, import_pg_core.index)("automation_workflows_updated_at_idx").on(table.updatedAt)
+}));
+const automationWorkflowVersions = (0, import_pg_core.pgTable)("automation_workflow_versions", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  workflowId: (0, import_pg_core.varchar)("workflow_id").references(() => automationWorkflows.id, { onDelete: "cascade" }).notNull(),
+  version: (0, import_pg_core.integer)("version").notNull(),
+  triggerType: (0, import_pg_core.text)("trigger_type").notNull(),
+  definitionHash: (0, import_pg_core.text)("definition_hash").notNull(),
+  definition: (0, import_pg_core.jsonb)("definition").$type().default({}).notNull(),
+  publishedBy: (0, import_pg_core.text)("published_by"),
+  publishedAt: (0, import_pg_core.timestamp)("published_at").defaultNow().notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  workflowVersionUniqueIdx: (0, import_pg_core.uniqueIndex)("automation_workflow_versions_workflow_version_unique").on(table.workflowId, table.version),
+  workflowIdx: (0, import_pg_core.index)("automation_workflow_versions_workflow_idx").on(table.workflowId),
+  triggerIdx: (0, import_pg_core.index)("automation_workflow_versions_trigger_idx").on(table.triggerType),
+  hashIdx: (0, import_pg_core.index)("automation_workflow_versions_hash_idx").on(table.definitionHash)
+}));
+const automationEvents = (0, import_pg_core.pgTable)("automation_events", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventType: (0, import_pg_core.text)("event_type").notNull(),
+  eventId: (0, import_pg_core.text)("event_id").notNull(),
+  organizationId: (0, import_pg_core.varchar)("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  source: (0, import_pg_core.text)("source").default("internal").notNull(),
+  payloadHash: (0, import_pg_core.text)("payload_hash").notNull(),
+  payload: (0, import_pg_core.jsonb)("payload").$type().default({}).notNull(),
+  receivedAt: (0, import_pg_core.timestamp)("received_at").defaultNow().notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  typeEventUniqueIdx: (0, import_pg_core.uniqueIndex)("automation_events_type_event_unique").on(table.eventType, table.eventId),
+  organizationIdx: (0, import_pg_core.index)("automation_events_org_idx").on(table.organizationId),
+  typeIdx: (0, import_pg_core.index)("automation_events_type_idx").on(table.eventType),
+  receivedIdx: (0, import_pg_core.index)("automation_events_received_idx").on(table.receivedAt),
+  payloadIdx: (0, import_pg_core.index)("automation_events_payload_gin_idx").using("gin", table.payload)
+}));
+const automationRuns = (0, import_pg_core.pgTable)("automation_runs", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  workflowId: (0, import_pg_core.varchar)("workflow_id").references(() => automationWorkflows.id, { onDelete: "cascade" }).notNull(),
+  workflowVersionId: (0, import_pg_core.varchar)("workflow_version_id").references(() => automationWorkflowVersions.id, { onDelete: "cascade" }).notNull(),
+  automationEventId: (0, import_pg_core.varchar)("automation_event_id").references(() => automationEvents.id, { onDelete: "set null" }),
+  status: (0, import_pg_core.text)("status").default(AUTOMATION_RUN_STATUS.QUEUED).notNull(),
+  input: (0, import_pg_core.jsonb)("input").$type().default({}).notNull(),
+  output: (0, import_pg_core.jsonb)("output").$type().default({}).notNull(),
+  error: (0, import_pg_core.text)("error"),
+  attemptCount: (0, import_pg_core.integer)("attempt_count").default(0).notNull(),
+  maxAttempts: (0, import_pg_core.integer)("max_attempts").default(3).notNull(),
+  nextAttemptAt: (0, import_pg_core.timestamp)("next_attempt_at"),
+  startedAt: (0, import_pg_core.timestamp)("started_at"),
+  finishedAt: (0, import_pg_core.timestamp)("finished_at"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  versionEventUniqueIdx: (0, import_pg_core.uniqueIndex)("automation_runs_version_event_unique").on(table.workflowVersionId, table.automationEventId),
+  workflowIdx: (0, import_pg_core.index)("automation_runs_workflow_idx").on(table.workflowId),
+  versionIdx: (0, import_pg_core.index)("automation_runs_version_idx").on(table.workflowVersionId),
+  eventIdx: (0, import_pg_core.index)("automation_runs_event_idx").on(table.automationEventId),
+  statusIdx: (0, import_pg_core.index)("automation_runs_status_idx").on(table.status),
+  nextAttemptIdx: (0, import_pg_core.index)("automation_runs_next_attempt_idx").on(table.nextAttemptAt),
+  createdAtIdx: (0, import_pg_core.index)("automation_runs_created_at_idx").on(table.createdAt)
+}));
+const automationStepRuns = (0, import_pg_core.pgTable)("automation_step_runs", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  runId: (0, import_pg_core.varchar)("run_id").references(() => automationRuns.id, { onDelete: "cascade" }).notNull(),
+  stepId: (0, import_pg_core.text)("step_id").notNull(),
+  stepType: (0, import_pg_core.text)("step_type").notNull(),
+  status: (0, import_pg_core.text)("status").default(AUTOMATION_STEP_STATUS.QUEUED).notNull(),
+  input: (0, import_pg_core.jsonb)("input").$type().default({}).notNull(),
+  output: (0, import_pg_core.jsonb)("output").$type().default({}).notNull(),
+  error: (0, import_pg_core.text)("error"),
+  startedAt: (0, import_pg_core.timestamp)("started_at"),
+  finishedAt: (0, import_pg_core.timestamp)("finished_at"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  runIdx: (0, import_pg_core.index)("automation_step_runs_run_idx").on(table.runId),
+  stepIdx: (0, import_pg_core.index)("automation_step_runs_step_idx").on(table.stepId),
+  statusIdx: (0, import_pg_core.index)("automation_step_runs_status_idx").on(table.status),
+  createdAtIdx: (0, import_pg_core.index)("automation_step_runs_created_at_idx").on(table.createdAt)
 }));
 const loanItems = (0, import_pg_core.pgTable)("loan_items", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -1908,6 +2049,85 @@ const insertBusinessAuditLogSchema = import_zod.z.object({
   ipAddress: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
   userAgent: import_zod.z.string().max(500).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
 });
+const automationStepTypeValues = [
+  AUTOMATION_STEP_TYPE.CONDITION,
+  AUTOMATION_STEP_TYPE.WEBHOOK_EMIT,
+  AUTOMATION_STEP_TYPE.MEMBER_TASK_CREATE,
+  AUTOMATION_STEP_TYPE.AUDIT_RECORD,
+  AUTOMATION_STEP_TYPE.NOOP
+];
+const automationRunStatusValues = [
+  AUTOMATION_RUN_STATUS.QUEUED,
+  AUTOMATION_RUN_STATUS.RUNNING,
+  AUTOMATION_RUN_STATUS.SUCCEEDED,
+  AUTOMATION_RUN_STATUS.FAILED,
+  AUTOMATION_RUN_STATUS.SKIPPED,
+  AUTOMATION_RUN_STATUS.CANCELLED
+];
+const automationWorkflowStatusValues = [
+  AUTOMATION_WORKFLOW_STATUS.DRAFT,
+  AUTOMATION_WORKFLOW_STATUS.ACTIVE,
+  AUTOMATION_WORKFLOW_STATUS.PAUSED,
+  AUTOMATION_WORKFLOW_STATUS.ARCHIVED
+];
+const automationConditionSchema = import_zod.z.object({
+  path: import_zod.z.string().min(1).max(240).transform(sanitizeText),
+  operator: import_zod.z.enum(["equals", "not_equals", "contains", "exists", "not_exists", "gt", "gte", "lt", "lte", "in"]),
+  value: import_zod.z.unknown().optional()
+});
+const automationStepSchema = import_zod.z.object({
+  id: import_zod.z.string().min(1).max(80).regex(/^[a-zA-Z0-9_.:-]+$/).transform(sanitizeText),
+  type: import_zod.z.enum(automationStepTypeValues),
+  label: import_zod.z.string().max(160).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  config: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({}),
+  onError: import_zod.z.enum(["fail", "continue"]).default("fail")
+});
+const automationDefinitionSchema = import_zod.z.object({
+  trigger: import_zod.z.object({
+    type: import_zod.z.string().min(2).max(120).transform(sanitizeText),
+    config: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({})
+  }),
+  steps: import_zod.z.array(automationStepSchema).min(1).max(25)
+}).superRefine((definition, ctx) => {
+  const ids = /* @__PURE__ */ new Set();
+  for (const [index2, step] of definition.steps.entries()) {
+    if (ids.has(step.id)) {
+      ctx.addIssue({ code: import_zod.z.ZodIssueCode.custom, path: ["steps", index2, "id"], message: "Identifiant de step dupliqu\xE9" });
+    }
+    ids.add(step.id);
+  }
+});
+const insertAutomationWorkflowSchema = import_zod.z.object({
+  name: import_zod.z.string().min(3).max(160).transform(sanitizeText),
+  description: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  organizationId: import_zod.z.string().uuid().optional().nullable(),
+  triggerType: import_zod.z.string().min(2).max(120).transform(sanitizeText),
+  draftDefinition: automationDefinitionSchema
+});
+const updateAutomationWorkflowSchema = import_zod.z.object({
+  name: import_zod.z.string().min(3).max(160).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  description: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  organizationId: import_zod.z.string().uuid().optional().nullable(),
+  triggerType: import_zod.z.string().min(2).max(120).optional().transform((val) => val ? sanitizeText(val) : void 0),
+  draftDefinition: automationDefinitionSchema.optional()
+});
+const publishAutomationWorkflowSchema = import_zod.z.object({
+  definition: automationDefinitionSchema.optional()
+});
+const updateAutomationWorkflowStatusSchema = import_zod.z.object({
+  status: import_zod.z.enum(automationWorkflowStatusValues)
+});
+const insertAutomationEventSchema = import_zod.z.object({
+  eventType: import_zod.z.string().min(2).max(120).transform(sanitizeText),
+  eventId: import_zod.z.string().min(2).max(240).transform(sanitizeText),
+  organizationId: import_zod.z.string().uuid().optional().nullable(),
+  source: import_zod.z.string().min(2).max(80).default("internal").transform(sanitizeText),
+  payloadHash: import_zod.z.string().min(16).max(128).transform(sanitizeText),
+  payload: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({})
+});
+const updateAutomationRunStatusSchema = import_zod.z.object({
+  status: import_zod.z.enum(automationRunStatusValues)
+});
 const insertAdminSchema = import_zod.z.object({
   email: import_zod.z.string().email("Email invalide").min(5, "Email trop court").max(100, "Email trop long").transform(sanitizeText),
   firstName: import_zod.z.string().min(1, "Le pr\xE9nom est obligatoire").max(50, "Le pr\xE9nom ne peut pas d\xE9passer 50 caract\xE8res").transform(sanitizeText),
@@ -2618,6 +2838,11 @@ const hasPermission = (userRole, permission) => {
     case "integrations.write":
     case "integrations.manage":
       return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "automations.view":
+      return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "automations.write":
+    case "automations.manage":
+      return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
     case "admin.view":
       return true;
     case "admin.edit":
@@ -2651,11 +2876,11 @@ const getRolePermissions = (role) => {
     case ADMIN_ROLES.IDEAS_READER:
       return ["Consultation des id\xE9es", "Consultation des formulaires"];
     case ADMIN_ROLES.IDEAS_MANAGER:
-      return ["Consultation des id\xE9es", "Modification des id\xE9es", "Suppression des id\xE9es", "Gestion des votes", "Gestion des formulaires", "Gestion des int\xE9grations"];
+      return ["Consultation des id\xE9es", "Modification des id\xE9es", "Suppression des id\xE9es", "Gestion des votes", "Gestion des formulaires", "Gestion des int\xE9grations", "Gestion des automations"];
     case ADMIN_ROLES.EVENTS_READER:
       return ["Consultation des \xE9v\xE9nements", "Consultation des formulaires"];
     case ADMIN_ROLES.EVENTS_MANAGER:
-      return ["Consultation des \xE9v\xE9nements", "Modification des \xE9v\xE9nements", "Suppression des \xE9v\xE9nements", "Gestion des inscriptions et absences", "Gestion des formulaires", "Gestion des int\xE9grations"];
+      return ["Consultation des \xE9v\xE9nements", "Modification des \xE9v\xE9nements", "Suppression des \xE9v\xE9nements", "Gestion des inscriptions et absences", "Gestion des formulaires", "Gestion des int\xE9grations", "Gestion des automations"];
     default:
       return [];
   }
@@ -3232,6 +3457,10 @@ const insertNetworkConnectionSchema = import_zod.z.object({
 0 && (module.exports = {
   ADMIN_ROLES,
   ADMIN_STATUS,
+  AUTOMATION_RUN_STATUS,
+  AUTOMATION_STEP_STATUS,
+  AUTOMATION_STEP_TYPE,
+  AUTOMATION_WORKFLOW_STATUS,
   CJD_ROLES,
   CJD_ROLE_LABELS,
   DatabaseError,
@@ -3278,6 +3507,14 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   assignMemberSchema,
   assignMemberTagSchema,
   assignSubscriptionSchema,
+  automationConditionSchema,
+  automationDefinitionSchema,
+  automationEvents,
+  automationRuns,
+  automationStepRuns,
+  automationStepSchema,
+  automationWorkflowVersions,
+  automationWorkflows,
   brandingConfig,
   businessAuditLogs,
   createEventWithInscriptionsSchema,
@@ -3315,6 +3552,8 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   inscriptionsRelations,
   insertAdminSchema,
   insertAdminUserSchema,
+  insertAutomationEventSchema,
+  insertAutomationWorkflowSchema,
   insertBrandingConfigSchema,
   insertBusinessAuditLogSchema,
   insertDevelopmentRequestSchema,
@@ -3407,6 +3646,7 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   patrons,
   patronsRelations,
   proposeMemberSchema,
+  publishAutomationWorkflowSchema,
   pushSubscriptions,
   renewSubscriptionSchema,
   statusCheckSchema,
@@ -3433,6 +3673,9 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   updateAdminInfoSchema,
   updateAdminPasswordSchema,
   updateAdminSchema,
+  updateAutomationRunStatusSchema,
+  updateAutomationWorkflowSchema,
+  updateAutomationWorkflowStatusSchema,
   updateDevelopmentRequestSchema,
   updateDevelopmentRequestStatusSchema,
   updateEventSchema,

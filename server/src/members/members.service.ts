@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { StorageService } from '../common/storage/storage.service';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { AutomationsService } from '../automations/automations.service';
 import {
   proposeMemberSchema,
   insertMemberSchema,
@@ -39,11 +40,18 @@ export class MembersService {
   constructor(
     private readonly storageService: StorageService,
     private readonly integrationsService?: IntegrationsService,
+    private readonly automationsService?: AutomationsService,
   ) {}
 
   private emitOutboundEventBestEffort(eventType: string, data: Record<string, unknown>) {
     void this.integrationsService?.emitOutboundEvent(eventType, data).catch((error) => {
       logger.warn('Outbound webhook emission failed', { eventType, error });
+    });
+  }
+
+  private emitAutomationEventBestEffort(eventType: string, data: Record<string, unknown>) {
+    void this.automationsService?.emitEvent(eventType, data).catch((error) => {
+      logger.warn('Automation event emission failed', { eventType, error });
     });
   }
 
@@ -156,14 +164,16 @@ export class MembersService {
           adminEmail: creatorEmail,
           toEmail: assignedTo,
         }).catch((err) => logger.error('Failed to create ownership history entry', { error: err }));
-        this.emitOutboundEventBestEffort('member.created', {
+        const automationPayload = {
           id: result.data.email,
           email: result.data.email,
           status: result.data.status,
           prospectionStatus: result.data.prospectionStatus,
           createdBy: creatorEmail,
           assignedTo,
-        });
+        };
+        this.emitOutboundEventBestEffort('member.created', automationPayload);
+        this.emitAutomationEventBestEffort('member.created', automationPayload);
       }
 
       return { success: true, data: result.data };

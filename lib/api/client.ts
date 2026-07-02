@@ -196,6 +196,14 @@ export const queryKeys = {
     webhookDeliveries: (params?: Record<string, unknown>) => ['integrations', 'webhookDeliveries', params] as const,
   },
 
+  // Automations
+  automations: {
+    all: ['automations'] as const,
+    workflows: (params?: Record<string, unknown>) => ['automations', 'workflows', params] as const,
+    runs: (params?: Record<string, unknown>) => ['automations', 'runs', params] as const,
+    run: (id: string) => ['automations', 'runs', id] as const,
+  },
+
   // Financial
   financial: {
     all: ['financial'] as const,

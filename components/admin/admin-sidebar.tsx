@@ -31,6 +31,7 @@ import {
   FileQuestion,
   PlugZap,
   ScrollText,
+  Workflow,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -167,6 +168,11 @@ const navItems: (NavItem | NavSection)[] = [
         title: 'Tracking',
         href: '/admin/tracking',
         icon: Activity,
+      },
+      {
+        title: 'Automations',
+        href: '/admin/automations',
+        icon: Workflow,
       },
       {
         title: 'Audit',
