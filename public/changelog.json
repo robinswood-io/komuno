@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.22.3",
+    "version": "2.23.0",
     "releasedAt": "2026-07-02",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
-      "corrections": [
-        "Move ops pages under settings"
+      "nouveautes": [
+        "Add workflow foundation"
       ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.23.0",
+      "releasedAt": "2026-07-02",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add workflow foundation"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.22.3",
       "releasedAt": "2026-07-02",
@@ -479,24 +495,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.10.2",
-      "releasedAt": "2026-06-28",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Use default ssh port for hdf deploy"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-02T07:54:50.093Z",
+  "generatedAt": "2026-07-02T12:19:13.311Z",
   "source": "conventional-commits"
 }
