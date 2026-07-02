@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.25.2] - 2026-07-02
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Remove remaining unsafe any casts
+
 ## [2.25.1] - 2026-07-02
 
 ### En bref

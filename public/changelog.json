@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.25.1",
+    "version": "2.25.2",
     "releasedAt": "2026-07-02",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Remove lint violations and unsafe casts"
+        "Remove remaining unsafe any casts"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.25.2",
+      "releasedAt": "2026-07-02",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Remove remaining unsafe any casts"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.25.1",
       "releasedAt": "2026-07-02",
