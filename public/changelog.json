@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.24.1",
+    "version": "2.25.0",
     "releasedAt": "2026-07-02",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
-      "corrections": [
-        "Fail closed on federated ingest"
+      "nouveautes": [
+        "Add event operations planning"
       ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.25.0",
+      "releasedAt": "2026-07-02",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add event operations planning"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.24.1",
       "releasedAt": "2026-07-02",
@@ -479,41 +495,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.11.1",
-      "releasedAt": "2026-06-28",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Encrypt outbound relation tokens"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
-    },
-    {
-      "version": "2.11.0",
-      "releasedAt": "2026-06-28",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Secure tokens and federate forms"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-02T14:07:47.738Z",
-  "source": "conventional-commits",
-  "changes": []
+  "generatedAt": "2026-07-02T16:08:25.291Z",
+  "source": "conventional-commits"
 }
