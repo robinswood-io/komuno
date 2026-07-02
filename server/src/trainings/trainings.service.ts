@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
@@ -609,6 +609,7 @@ export class TrainingsService {
 
   async ingestFederatedCatalog(data: unknown, token?: string) {
     try {
+      if (!token?.trim()) throw new UnauthorizedException('Token de fédération manquant');
       const payload = federatedTrainingCatalogPayloadSchema.parse(data);
       const context = await this.federationService.verifyFederationIngestContext({
         token,
@@ -781,6 +782,7 @@ export class TrainingsService {
 
   async ingestFederatedInterest(data: unknown, token?: string) {
     try {
+      if (!token?.trim()) throw new UnauthorizedException('Token de fédération manquant');
       const payload = federatedTrainingInterestPayloadSchema.parse(data);
       const context = await this.federationService.verifyFederationIngestContext({
         token,
