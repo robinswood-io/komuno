@@ -43,7 +43,7 @@ class MockStorageService {
 
 describe('PatronsService (Unit Tests)', () => {
   let storageService: MockStorageService;
-  let patronsService: any;
+  let patronsService: unknown;
 
   // Données mock
   const mockPatron = {

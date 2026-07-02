@@ -4,8 +4,8 @@ import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
-  let mockExecutionContext: any;
-  let mockRequest: any;
+  let mockExecutionContext: unknown;
+  let mockRequest: unknown;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -19,12 +19,12 @@ describe('JwtAuthGuard', () => {
     vi.clearAllMocks();
   });
 
-  const createMockContext = (request: any): ExecutionContext => {
+  const createMockContext = (request: unknown): ExecutionContext => {
     return {
       switchToHttp: () => ({
         getRequest: () => request,
       }),
-    } as any;
+    } as unknown;
   };
 
   describe('canActivate', () => {

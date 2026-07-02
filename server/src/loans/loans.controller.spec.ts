@@ -68,7 +68,7 @@ function getUploadPhotoFileFilter(): UploadFileFilter {
 
 describe('LoansController', () => {
   let controller: LoansController;
-  let loansService: any;
+  let loansService: unknown;
 
   const mockLoanItem = {
     id: 'loan-1',
@@ -93,7 +93,7 @@ describe('LoansController', () => {
     };
 
     // Create controller with mocked service
-    controller = new LoansController(loansService as any);
+    controller = new LoansController(loansService as unknown);
   });
 
   describe('Public Routes', () => {
@@ -212,7 +212,7 @@ describe('LoansController', () => {
 
 describe('AdminLoansController', () => {
   let controller: AdminLoansController;
-  let loansService: any;
+  let loansService: unknown;
 
   const mockLoanItem = {
     id: 'loan-1',
@@ -240,7 +240,7 @@ describe('AdminLoansController', () => {
       uploadLoanItemPhoto: vi.fn(),
     };
 
-    controller = new AdminLoansController(loansService as any);
+    controller = new AdminLoansController(loansService as unknown);
   });
 
   describe('GET /api/admin/loan-items', () => {
@@ -507,7 +507,7 @@ describe('AdminLoansController', () => {
 
       const result = await controller.uploadLoanItemPhoto(
         'loan-1',
-        mockFile as any,
+        mockFile as unknown,
       );
 
       expect(result.success).toBe(true);
@@ -519,7 +519,7 @@ describe('AdminLoansController', () => {
 
     it('should reject if no file provided', async () => {
       await expect(
-        controller.uploadLoanItemPhoto('loan-1', undefined as any),
+        controller.uploadLoanItemPhoto('loan-1', undefined as unknown),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -535,7 +535,7 @@ describe('AdminLoansController', () => {
         data: mockLoanItem,
       });
 
-      await controller.uploadLoanItemPhoto('loan-1', mockFile as any);
+      await controller.uploadLoanItemPhoto('loan-1', mockFile as unknown);
 
       expect(loansService.uploadLoanItemPhoto).toHaveBeenCalled();
     });
@@ -552,7 +552,7 @@ describe('AdminLoansController', () => {
         data: mockLoanItem,
       });
 
-      await controller.uploadLoanItemPhoto('loan-1', mockFile as any);
+      await controller.uploadLoanItemPhoto('loan-1', mockFile as unknown);
 
       expect(loansService.uploadLoanItemPhoto).toHaveBeenCalled();
     });
@@ -569,7 +569,7 @@ describe('AdminLoansController', () => {
         data: mockLoanItem,
       });
 
-      await controller.uploadLoanItemPhoto('loan-1', mockFile as any);
+      await controller.uploadLoanItemPhoto('loan-1', mockFile as unknown);
 
       expect(loansService.uploadLoanItemPhoto).toHaveBeenCalled();
     });
@@ -588,7 +588,7 @@ describe('AdminLoansController', () => {
         data: mockLoanItem,
       });
 
-      await controller.uploadLoanItemPhoto('loan-1', mockFile as any);
+      await controller.uploadLoanItemPhoto('loan-1', mockFile as unknown);
 
       expect(loansService.uploadLoanItemPhoto).toHaveBeenCalled();
     });
@@ -607,7 +607,7 @@ describe('AdminLoansController', () => {
       );
 
       await expect(
-        controller.uploadLoanItemPhoto('loan-1', mockFile as any),
+        controller.uploadLoanItemPhoto('loan-1', mockFile as unknown),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -623,7 +623,7 @@ describe('AdminLoansController', () => {
       );
 
       await expect(
-        controller.uploadLoanItemPhoto('non-existent', mockFile as any),
+        controller.uploadLoanItemPhoto('non-existent', mockFile as unknown),
       ).rejects.toThrow(NotFoundException);
     });
 

@@ -22,9 +22,9 @@ vi.mock('../../server/lib/logger', () => ({
 }));
 
 class PatronsService {
-  constructor(private storageService: any) {}
+  constructor(private storageService: unknown) {}
 
-  async proposePatron(data: any, userEmail?: string) {
+  async proposePatron(data: unknown, userEmail?: string) {
     const result = await this.storageService.storage.createPatron(data);
     if (result.success) {
       await this.storageService.storage.createTrackingMetric({
@@ -41,14 +41,14 @@ class PatronsService {
     return this.storageService.storage.getPatrons({ page, limit, status, search });
   }
 
-  async createPatronDonation(data: any) {
+  async createPatronDonation(data: unknown) {
     if (!data.amount || data.amount <= 0) {
       throw new Error('Invalid donation amount');
     }
     return this.storageService.storage.createPatronDonation(data);
   }
 
-  async createEventSponsorship(data: any) {
+  async createEventSponsorship(data: unknown) {
     if (!data.patronId || !data.eventId) {
       throw new Error('Patron and event are required');
     }

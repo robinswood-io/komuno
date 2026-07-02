@@ -22,13 +22,13 @@ vi.mock('../../server/lib/logger', () => ({
 }));
 
 class FinancialService {
-  constructor(private storageService: any) {}
+  constructor(private storageService: unknown) {}
 
   async getBudgets(options: { period?: string; year?: number; category?: string } = {}) {
     return this.storageService.storage.getBudgets(options);
   }
 
-  async createBudget(data: any) {
+  async createBudget(data: unknown) {
     if (!data.name || !data.amount || data.amount <= 0) {
       throw new Error('Name and positive amount are required');
     }
@@ -39,8 +39,8 @@ class FinancialService {
     const budgets = await this.storageService.storage.getBudgets({ period, year });
     const expenses = await this.storageService.storage.getExpenses({ period, year });
     
-    const totalBudget = budgets.data?.reduce((sum: number, b: any) => sum + b.amount, 0) || 0;
-    const totalExpenses = expenses.data?.reduce((sum: number, e: any) => sum + e.amount, 0) || 0;
+    const totalBudget = budgets.data?.reduce((sum: number, b: unknown) => sum + b.amount, 0) || 0;
+    const totalExpenses = expenses.data?.reduce((sum: number, e: unknown) => sum + e.amount, 0) || 0;
 
     return {
       success: true,
@@ -53,7 +53,7 @@ class FinancialService {
     };
   }
 
-  async createExpense(data: any) {
+  async createExpense(data: unknown) {
     if (!data.budgetId || !data.amount || data.amount <= 0) {
       throw new Error('Budget ID and positive amount are required');
     }
@@ -64,7 +64,7 @@ class FinancialService {
     return this.storageService.storage.getCategories();
   }
 
-  async createForecast(data: any) {
+  async createForecast(data: unknown) {
     if (!data.budgetId || !data.projectedAmount) {
       throw new Error('Budget ID and projected amount are required');
     }

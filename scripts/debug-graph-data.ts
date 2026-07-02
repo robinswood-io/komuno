@@ -29,7 +29,7 @@ async function debugGraphData() {
       const reactRoot = document.querySelector('#__next');
 
       // Essayer de trouver les props du composant via React DevTools fiber
-      const findReactProps = (element: any): any => {
+      const findReactProps = (element: unknown): unknown => {
         for (const key in element) {
           if (key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance')) {
             const fiber = element[key];
@@ -67,14 +67,14 @@ async function debugGraphData() {
 
     if (graphData.nodes && graphData.nodes.length > 0) {
       console.log('\n=== NŒUDS ===');
-      graphData.nodes.forEach((node: any, idx: number) => {
+      graphData.nodes.forEach((node: unknown, idx: number) => {
         console.log(`[${idx}] ID: ${node.id}, Label: ${node.label}, Size: ${node.size}, Fill: ${node.fill}`);
       });
     }
 
     if (graphData.edges && graphData.edges.length > 0) {
       console.log('\n=== ARÊTES ===');
-      graphData.edges.forEach((edge: any, idx: number) => {
+      graphData.edges.forEach((edge: unknown, idx: number) => {
         console.log(`[${idx}] ${edge.source} → ${edge.target} (${edge.label || 'no label'})`);
       });
     }
@@ -103,7 +103,7 @@ async function debugGraphData() {
 
     if (apiResponses.relations && apiResponses.relations.length > 0) {
       console.log('\n=== RELATIONS API ===');
-      apiResponses.relations.forEach((rel: any, idx: number) => {
+      apiResponses.relations.forEach((rel: unknown, idx: number) => {
         console.log(`[${idx}] ${rel.memberEmail} → ${rel.relatedMemberEmail} (${rel.relationType})`);
       });
     }

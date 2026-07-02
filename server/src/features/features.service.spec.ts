@@ -64,7 +64,7 @@ describe('FeaturesService', () => {
       const mockBuilder = {
         from: vi.fn().mockResolvedValue(mockFeatures),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.getAllFeatures();
       const byKey = new Map(result.map((feature) => [feature.featureKey, feature.enabled]));
@@ -85,7 +85,7 @@ describe('FeaturesService', () => {
       const mockBuilder = {
         from: vi.fn().mockResolvedValue([]),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.getAllFeatures();
 
@@ -103,7 +103,7 @@ describe('FeaturesService', () => {
       const mockBuilder = {
         from: vi.fn().mockRejectedValue(new Error('Database connection failed')),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.getAllFeatures();
 
@@ -116,7 +116,7 @@ describe('FeaturesService', () => {
       const mockBuilder = {
         from: vi.fn().mockResolvedValue([]),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.getAllFeatures();
 
@@ -143,7 +143,7 @@ describe('FeaturesService', () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([mockFeature]),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.getFeature('ideas');
 
@@ -158,7 +158,7 @@ describe('FeaturesService', () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([]),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.getFeature('ideas');
 
@@ -173,7 +173,7 @@ describe('FeaturesService', () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([]),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.getFeature('unknownFeature');
 
@@ -186,7 +186,7 @@ describe('FeaturesService', () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockRejectedValue(new Error('Database error')),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.getFeature('ideas');
 
@@ -199,7 +199,7 @@ describe('FeaturesService', () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([]),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       await service.getFeature('loan');
 
@@ -217,8 +217,8 @@ describe('FeaturesService', () => {
         set: vi.fn().mockReturnThis(),
       };
 
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
-      vi.mocked(db.update).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.updateFeature('ideas', false, 'admin@example.com');
 
@@ -238,8 +238,8 @@ describe('FeaturesService', () => {
         values: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.insert).mockReturnValue(insertBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.insert).mockReturnValue(insertBuilder as unknown);
 
       const result = await service.updateFeature('newFeature', true, 'admin@example.com');
 
@@ -260,8 +260,8 @@ describe('FeaturesService', () => {
         where: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.update).mockReturnValue(updateBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(updateBuilder as unknown);
 
       await service.updateFeature('loan', false, 'admin@test.com');
 
@@ -285,8 +285,8 @@ describe('FeaturesService', () => {
         where: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.update).mockReturnValue(updateBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(updateBuilder as unknown);
 
       await service.updateFeature('events', true, 'manager@example.com');
 
@@ -307,8 +307,8 @@ describe('FeaturesService', () => {
         where: vi.fn().mockRejectedValue(new Error('Update failed')),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.update).mockReturnValue(updateBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(updateBuilder as unknown);
 
       await expect(
         service.updateFeature('ideas', false, 'admin@example.com')
@@ -327,8 +327,8 @@ describe('FeaturesService', () => {
         where: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.update).mockReturnValue(updateBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(updateBuilder as unknown);
 
       const result = await service.updateFeature('patrons', false, 'admin@example.com');
 
@@ -348,8 +348,8 @@ describe('FeaturesService', () => {
         where: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.update).mockReturnValue(updateBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(updateBuilder as unknown);
 
       const result = await service.updateFeature('financial', true, 'admin@example.com');
 
@@ -368,8 +368,8 @@ describe('FeaturesService', () => {
         values: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.insert).mockReturnValue(insertBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.insert).mockReturnValue(insertBuilder as unknown);
 
       await service.initializeDefaultFeatures();
 
@@ -382,7 +382,7 @@ describe('FeaturesService', () => {
         from: vi.fn().mockResolvedValue([{ featureKey: 'ideas', enabled: true }]),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
 
       await service.initializeDefaultFeatures();
 
@@ -398,8 +398,8 @@ describe('FeaturesService', () => {
         values: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.insert).mockReturnValue(insertBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.insert).mockReturnValue(insertBuilder as unknown);
 
       await service.initializeDefaultFeatures();
 
@@ -427,8 +427,8 @@ describe('FeaturesService', () => {
         values: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.insert).mockReturnValue(insertBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.insert).mockReturnValue(insertBuilder as unknown);
 
       await service.initializeDefaultFeatures();
 
@@ -447,8 +447,8 @@ describe('FeaturesService', () => {
         values: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.insert).mockReturnValue(insertBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.insert).mockReturnValue(insertBuilder as unknown);
 
       await service.initializeDefaultFeatures();
 
@@ -463,7 +463,7 @@ describe('FeaturesService', () => {
         from: vi.fn().mockRejectedValue(new Error('Database error')),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
 
       await expect(service.initializeDefaultFeatures()).resolves.not.toThrow();
     });
@@ -477,8 +477,8 @@ describe('FeaturesService', () => {
         values: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.insert).mockReturnValue(insertBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.insert).mockReturnValue(insertBuilder as unknown);
 
       await service.initializeDefaultFeatures();
 
@@ -509,8 +509,8 @@ describe('FeaturesService', () => {
         where: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.update).mockReturnValue(updateBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(updateBuilder as unknown);
 
       await service.updateFeature('ideas', false, 'admin@example.com');
       await service.updateFeature('ideas', true, 'admin@example.com');
@@ -531,8 +531,8 @@ describe('FeaturesService', () => {
         where: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.update).mockReturnValue(updateBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(updateBuilder as unknown);
 
       await service.updateFeature('events', false, 'manager@company.com');
 
@@ -552,8 +552,8 @@ describe('FeaturesService', () => {
         where: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.update).mockReturnValue(updateBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(updateBuilder as unknown);
 
       const updatedFeature = await service.updateFeature('loan', true, 'admin@example.com');
 
@@ -573,7 +573,7 @@ describe('FeaturesService', () => {
       const mockBuilder = {
         from: vi.fn().mockResolvedValue(mockFeatures),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result = await service.getAllFeatures();
 
@@ -594,7 +594,7 @@ describe('FeaturesService', () => {
         where: vi.fn().mockReturnThis(),
         limit: vi.fn().mockResolvedValue([mockFeature]),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       const result1 = await service.getFeature('ideas');
       const result2 = await service.getFeature('ideas');
@@ -617,8 +617,8 @@ describe('FeaturesService', () => {
         where: vi.fn().mockResolvedValue(undefined),
       };
 
-      vi.mocked(db.select).mockReturnValue(selectBuilder as any);
-      vi.mocked(db.update).mockReturnValue(updateBuilder as any);
+      vi.mocked(db.select).mockReturnValue(selectBuilder as unknown);
+      vi.mocked(db.update).mockReturnValue(updateBuilder as unknown);
 
       await service.updateFeature('tracking', false, 'admin@example.com');
 
@@ -629,7 +629,7 @@ describe('FeaturesService', () => {
       const mockBuilder = {
         from: vi.fn().mockResolvedValue([]),
       };
-      vi.mocked(db.select).mockReturnValue(mockBuilder as any);
+      vi.mocked(db.select).mockReturnValue(mockBuilder as unknown);
 
       await service.getAllFeatures();
 

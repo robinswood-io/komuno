@@ -35,7 +35,7 @@ class MockPatronsService {
 
 describe('PatronsController (Unit Tests)', () => {
   let service: MockPatronsService;
-  let controller: any;
+  let controller: unknown;
 
   const mockPatron = {
     id: 'patron-123',

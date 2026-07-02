@@ -104,7 +104,7 @@ function updateEvents(event: { type: string; role?: string; detail?: string; pay
   const data = loadJson<{
     version: string;
     lastUpdated: string;
-    events: any[];
+    events: unknown[];
     metadata: {
       totalEvents: number;
       eventsByType: Record<string, number>;

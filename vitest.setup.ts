@@ -10,7 +10,7 @@ beforeAll(() => {
 // Suppress console errors during tests
 const originalError = console.error;
 beforeAll(() => {
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     if (
       args[0]?.toString().includes('DATABASE_URL') ||
       args[0]?.toString().includes('database')

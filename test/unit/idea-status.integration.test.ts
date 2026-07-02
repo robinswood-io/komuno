@@ -36,7 +36,7 @@ describe('Idea Status API Integration', () => {
     app.use(passport.initialize());
     app.use(passport.session());
 
-    passport.serializeUser((user: any, done) => done(null, user.id));
+    passport.serializeUser((user: unknown, done) => done(null, user.id));
     passport.deserializeUser((id: string, done) => {
       done(null, { id, email: 'admin@test.com', role: 'SUPER_ADMIN' });
     });

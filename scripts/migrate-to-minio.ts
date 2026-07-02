@@ -60,7 +60,7 @@ async function main() {
       console.log('   Les fichiers en erreur n\'ont pas été migrés');
       process.exit(1);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('\n❌ Erreur lors de la migration:', error.message);
     if (error.stack) {
       console.error('Stack:', error.stack);

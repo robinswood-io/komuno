@@ -17,13 +17,13 @@ vi.mock('../../server/lib/logger', () => ({
 }));
 
 class LoansService {
-  constructor(private storageService: any, private minioService: any) {}
+  constructor(private storageService: unknown, private minioService: unknown) {}
 
   async getLoanItems(page = 1, limit = 20, search?: string) {
     return this.storageService.storage.getLoanItems({ page, limit, search });
   }
 
-  async createLoanItem(data: any) {
+  async createLoanItem(data: unknown) {
     if (!data.name || !data.lenderName || !data.lenderEmail) {
       throw new Error('Name, lender name, and email are required');
     }
@@ -38,7 +38,7 @@ class LoansService {
     return this.storageService.storage.updateLoanItemStatus(id, status);
   }
 
-  async uploadLoanItemImage(id: string, file: any) {
+  async uploadLoanItemImage(id: string, file: unknown) {
     const result = await this.minioService.uploadFile(file);
     if (result.success) {
       return this.storageService.storage.updateLoanItem(id, { imageUrl: result.url });

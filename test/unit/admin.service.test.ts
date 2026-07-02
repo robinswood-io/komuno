@@ -36,7 +36,7 @@ vi.mock('../../server/lib/logger', () => ({
 
 // Simulated AdminService
 class AdminService {
-  constructor(private storageService: any) {}
+  constructor(private storageService: unknown) {}
 
   async getAllIdeas(page = 1, limit = 20) {
     return this.storageService.storage.getAllIdeas({ page, limit });
@@ -50,7 +50,7 @@ class AdminService {
     return this.storageService.storage.getAllAdmins();
   }
 
-  async createAdministrator(data: any, addedBy: string) {
+  async createAdministrator(data: unknown, addedBy: string) {
     return this.storageService.storage.createUser({
       ...data,
       addedBy,
@@ -88,8 +88,8 @@ class AdminService {
     return this.storageService.storage.approveAdmin(email, role);
   }
 
-  async bulkCreateInscriptions(eventId: string, inscriptions: any[]) {
-    const results = { success: 0, errors: 0, data: [] as any[] };
+  async bulkCreateInscriptions(eventId: string, inscriptions: unknown[]) {
+    const results = { success: 0, errors: 0, data: [] as unknown[] };
     for (const inscription of inscriptions) {
       try {
         const result = await this.storageService.storage.createInscription({

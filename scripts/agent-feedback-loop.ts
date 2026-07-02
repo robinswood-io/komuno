@@ -85,7 +85,7 @@ function recalcMetadata(queue: TaskEntry[]) {
   };
 }
 
-function ensureTask(queueData: any, item: FeedbackItem) {
+function ensureTask(queueData: unknown, item: FeedbackItem) {
   if (queueData.queue.some((task: TaskEntry) => task.title === item.title)) {
     return;
   }
@@ -182,7 +182,7 @@ async function collectFeedback(): Promise<FeedbackItem[]> {
 
 async function main() {
   const feedbackItems = await collectFeedback();
-  const queueData = loadJson<any>(TASKS_FILE, {
+  const queueData = loadJson<unknown>(TASKS_FILE, {
     version: "2.0.0",
     lastUpdated: new Date().toISOString(),
     queue: [],

@@ -29,8 +29,8 @@ vi.mock('../../lib/logger', () => ({
 
 describe('LoansService', () => {
   let service: LoansService;
-  let storageService: any;
-  let minioService: any;
+  let storageService: unknown;
+  let minioService: unknown;
 
   const mockLoanItem = {
     id: 'loan-1',
@@ -71,8 +71,8 @@ describe('LoansService', () => {
 
     // Create service instance with mocks
     service = new LoansService(
-      storageService as any,
-      minioService as any,
+      storageService as unknown,
+      minioService as unknown,
     );
   });
 
@@ -831,7 +831,7 @@ describe('LoansService', () => {
         data: { ...mockLoanItem, photoUrl: 'https://minio.example.com/photo.jpg' },
       });
 
-      const result = await service.uploadLoanItemPhoto('loan-1', file as any);
+      const result = await service.uploadLoanItemPhoto('loan-1', file as unknown);
 
       expect(minioService.uploadFile).toHaveBeenCalled();
       expect(result.success).toBe(true);
@@ -858,7 +858,7 @@ describe('LoansService', () => {
         data: { ...mockLoanItem, photoUrl: 'https://minio.example.com/new-photo.jpg' },
       });
 
-      await service.uploadLoanItemPhoto('loan-1', file as any);
+      await service.uploadLoanItemPhoto('loan-1', file as unknown);
 
       expect(minioService.deleteFile).toHaveBeenCalledWith('photos', 'photo.jpg');
     });
@@ -876,7 +876,7 @@ describe('LoansService', () => {
       });
 
       await expect(
-        service.uploadLoanItemPhoto('non-existent', file as any),
+        service.uploadLoanItemPhoto('non-existent', file as unknown),
       ).rejects.toThrow(NotFoundException);
     });
   });

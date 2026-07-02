@@ -15,7 +15,7 @@ describe('LocalStrategy', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    localStrategy = new LocalStrategy(mockStorageService as any, mockPasswordService as any);
+    localStrategy = new LocalStrategy(mockStorageService as unknown, mockPasswordService as unknown);
   });
 
   describe('validate', () => {

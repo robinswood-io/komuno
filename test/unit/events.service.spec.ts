@@ -65,7 +65,7 @@ vi.mock('../../shared/schema', async () => {
 
 describe('EventsService', () => {
   let eventsService: EventsService;
-  let mockStorageService: any;
+  let mockStorageService: unknown;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -280,7 +280,7 @@ describe('EventsService', () => {
     it('devrait lever NotFoundException si l\'événement n\'existe pas', async () => {
       // Créer un objet erreur avec la propriété name
       const notFoundError = new Error('Not found');
-      (notFoundError as any).name = 'NotFoundError';
+      (notFoundError as unknown).name = 'NotFoundError';
 
       mockStorageService.instance.updateEvent.mockResolvedValue({
         success: false,

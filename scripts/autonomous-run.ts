@@ -65,9 +65,9 @@ function parseArgs(): CliOptions {
   };
 
   const disableMetrics = opts["no-update-metrics"] !== undefined;
-  const updateMetricsFlag = disableMetrics ? false : parseBoolean((opts["update-metrics"] ?? opts["updateMetrics"]) as any);
+  const updateMetricsFlag = disableMetrics ? false : parseBoolean((opts["update-metrics"] ?? opts["updateMetrics"]) as unknown);
   const historyLimit = opts["history-limit"] ? Number(opts["history-limit"]) : undefined;
-  const skipTests = parseBoolean((opts["skip-tests"] ?? opts["skipTests"]) as any);
+  const skipTests = parseBoolean((opts["skip-tests"] ?? opts["skipTests"]) as unknown);
 
   return {
     action: (opts.action as Action) ?? "status",
@@ -77,7 +77,7 @@ function parseArgs(): CliOptions {
     priority: (opts.priority as CliOptions["priority"]) ?? "high",
     phase: opts.phase as CliOptions["phase"],
     sessionId: opts.sessionId as string | undefined,
-    historySync: parseBoolean((opts["history-sync"] ?? opts["historySync"]) as any),
+    historySync: parseBoolean((opts["history-sync"] ?? opts["historySync"]) as unknown),
     historyLimit: Number.isFinite(historyLimit) ? historyLimit : undefined,
     skipTests,
     updateMetrics: updateMetricsFlag,
@@ -90,22 +90,22 @@ const PRIORITY_WEIGHT: Record<Priority, number> = {
   low: 1,
 };
 
-function recalcQueueMetadata(queue: any[]) {
+function recalcQueueMetadata(queue: unknown[]) {
   const now = Date.now();
-  const byId = new Map(queue.map((task: any) => [task.id, task]));
-  const isBlocked = (task: any) => {
+  const byId = new Map(queue.map((task: unknown) => [task.id, task]));
+  const isBlocked = (task: unknown) => {
     if (!task?.dependencies || task.dependencies.length === 0) return false;
     return task.dependencies.some((depId: string) => {
       const dep = byId.get(depId);
       return !dep || dep.status !== "completed";
     });
   };
-  const isOverdue = (task: any) => {
+  const isOverdue = (task: unknown) => {
     if (!task?.dueAt || task.status === "completed") return false;
     const dueDate = new Date(task.dueAt).getTime();
     return Number.isFinite(dueDate) && dueDate < now;
   };
-  const slaBreaches = (task: any) => {
+  const slaBreaches = (task: unknown) => {
     if (!task?.slaHours) return false;
     const start = new Date(task.createdAt).getTime();
     const end = task.completedAt ? new Date(task.completedAt).getTime() : now;
@@ -141,7 +141,7 @@ function readTasksData() {
   if (!fs.existsSync(TASKS_FILE)) {
     return fallback;
   }
-  const data = loadJson<any>(TASKS_FILE);
+  const data = loadJson<unknown>(TASKS_FILE);
   if (!Array.isArray(data.queue)) {
     data.queue = [];
   }
@@ -150,19 +150,19 @@ function readTasksData() {
   return data;
 }
 
-function saveTasksData(data: any) {
+function saveTasksData(data: unknown) {
   data.metadata = recalcQueueMetadata(data.queue);
   data.lastUpdated = new Date().toISOString();
   saveJson(TASKS_FILE, data);
 }
 
-function selectPendingTask(queueData: any) {
-  const pending = queueData.queue.filter((task: any) => task.status === "pending");
+function selectPendingTask(queueData: unknown) {
+  const pending = queueData.queue.filter((task: unknown) => task.status === "pending");
   if (!pending.length) return null;
   const now = Date.now();
-  const byId = new Map(queueData.queue.map((task: any) => [task.id, task]));
+  const byId = new Map(queueData.queue.map((task: unknown) => [task.id, task]));
 
-  const isReady = (task: any) => {
+  const isReady = (task: unknown) => {
     if (!task?.dependencies || task.dependencies.length === 0) return true;
     return task.dependencies.every((depId: string) => {
       const dep = byId.get(depId);
@@ -170,16 +170,16 @@ function selectPendingTask(queueData: any) {
     });
   };
 
-  const readyTasks = pending.filter((task: any) => isReady(task));
+  const readyTasks = pending.filter((task: unknown) => isReady(task));
   if (!readyTasks.length) return null;
 
-  const isOverdue = (task: any) => {
+  const isOverdue = (task: unknown) => {
     if (!task?.dueAt) return false;
     const dueDate = new Date(task.dueAt).getTime();
     return Number.isFinite(dueDate) && dueDate <= now;
   };
 
-  readyTasks.sort((a: any, b: any) => {
+  readyTasks.sort((a: unknown, b: unknown) => {
     const overdueDiff = Number(isOverdue(b)) - Number(isOverdue(a));
     if (overdueDiff !== 0) return overdueDiff;
 
@@ -214,7 +214,7 @@ function updateEvents(event: { type: string; role?: string; phase?: string; deta
   const events = loadJson<{
     version: string;
     lastUpdated: string;
-    events: any[];
+    events: unknown[];
     metadata: {
       totalEvents: number;
       eventsByType: Record<string, number>;
@@ -252,7 +252,7 @@ function requireState() {
   }
 }
 
-async function maybeSyncHistory(options: CliOptions, state: any) {
+async function maybeSyncHistory(options: CliOptions, state: unknown) {
   if (options.historySync === false) {
     return;
   }
@@ -300,7 +300,7 @@ function runPlaywrightTests(projectPath: string) {
 
 async function startRun(options: CliOptions) {
   requireState();
-  const state = loadJson<any>(STATE_FILE);
+  const state = loadJson<unknown>(STATE_FILE);
   const now = new Date().toISOString();
   const sessionId = options.sessionId ?? `auto-${randomUUID()}`;
   const defaultTitle = options.task ?? `Autonomous run ${sessionId}`;
@@ -309,7 +309,7 @@ async function startRun(options: CliOptions) {
 
   const tasksData = readTasksData();
   let queueEntry = options.taskId
-    ? tasksData.queue.find((task: any) => task.id === options.taskId)
+    ? tasksData.queue.find((task: unknown) => task.id === options.taskId)
     : undefined;
 
   if (!queueEntry && !options.task) {
@@ -397,7 +397,7 @@ function advancePhase(options: CliOptions) {
     throw new Error(`Phase ${phase} inconnue`);
   }
   requireState();
-  const state = loadJson<any>(STATE_FILE);
+  const state = loadJson<unknown>(STATE_FILE);
   const now = new Date().toISOString();
 
   state.autonomy.currentPhase = phase;
@@ -447,7 +447,7 @@ function advancePhase(options: CliOptions) {
 
 async function completeRun(options: CliOptions) {
   requireState();
-  const state = loadJson<any>(STATE_FILE);
+  const state = loadJson<unknown>(STATE_FILE);
   const tasksData = readTasksData();
   const now = new Date().toISOString();
 
@@ -462,7 +462,7 @@ async function completeRun(options: CliOptions) {
   state.state.currentTaskId = null;
 
   if (taskId) {
-    const entry = tasksData.queue.find((task: any) => task.id === taskId);
+    const entry = tasksData.queue.find((task: unknown) => task.id === taskId);
     if (entry) {
       entry.status = "completed";
       entry.completedAt = now;
@@ -489,7 +489,7 @@ async function completeRun(options: CliOptions) {
 
 function showStatus() {
   requireState();
-  const state = loadJson<any>(STATE_FILE);
+  const state = loadJson<unknown>(STATE_FILE);
   console.log("📊 État actuel de l'autonomie:");
   console.log(JSON.stringify(state, null, 2));
 }

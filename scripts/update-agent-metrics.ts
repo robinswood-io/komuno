@@ -73,11 +73,11 @@ function humanize(ms: number) {
 }
 
 export async function updateMetrics() {
-  const state = loadJson<any>(STATE_FILE);
+  const state = loadJson<unknown>(STATE_FILE);
   const eventsData = loadJson<{ events: EventEntry[] }>(EVENTS_FILE);
-  const tasksData = fs.existsSync(TASKS_FILE) ? loadJson<any>(TASKS_FILE) : null;
+  const tasksData = fs.existsSync(TASKS_FILE) ? loadJson<unknown>(TASKS_FILE) : null;
   const previousMetrics = fs.existsSync(METRICS_FILE)
-    ? loadJson<any>(METRICS_FILE)
+    ? loadJson<unknown>(METRICS_FILE)
     : { history: { totalRuns: 0, successRuns: 0, lastSessionId: null } };
 
   const now = new Date().toISOString();

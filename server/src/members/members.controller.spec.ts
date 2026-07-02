@@ -6,8 +6,8 @@ import {
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 describe('MembersController (Public)', () => {
-  let controller: any;
-  let mockService: any;
+  let controller: unknown;
+  let mockService: unknown;
 
   beforeEach(() => {
     mockService = {
@@ -42,8 +42,8 @@ describe('MembersController (Public)', () => {
 });
 
 describe('AdminMembersController - CRUD & Pagination', () => {
-  let controller: any;
-  let mockService: any;
+  let controller: unknown;
+  let mockService: unknown;
 
   beforeEach(() => {
     mockService = {
@@ -326,8 +326,8 @@ describe('AdminMembersController - CRUD & Pagination', () => {
 });
 
 describe('AdminMemberTagsController', () => {
-  let controller: any;
-  let mockService: any;
+  let controller: unknown;
+  let mockService: unknown;
 
   beforeEach(() => {
     mockService = {
@@ -434,8 +434,8 @@ describe('AdminMemberTagsController', () => {
 });
 
 describe('AdminMemberTasksController', () => {
-  let controller: any;
-  let mockService: any;
+  let controller: unknown;
+  let mockService: unknown;
 
   beforeEach(() => {
     mockService = {
@@ -496,8 +496,8 @@ describe('AdminMemberTasksController', () => {
 });
 
 describe('AdminMemberRelationsController', () => {
-  let controller: any;
-  let mockService: any;
+  let controller: unknown;
+  let mockService: unknown;
 
   beforeEach(() => {
     mockService = {

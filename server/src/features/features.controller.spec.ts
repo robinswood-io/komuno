@@ -14,7 +14,7 @@ describe('FeaturesController', () => {
       getFeature: vi.fn(),
       updateFeature: vi.fn(),
       initializeDefaultFeatures: vi.fn(),
-    } as any;
+    } as unknown;
 
     controller = new FeaturesController(service);
   });
@@ -184,7 +184,7 @@ describe('FeaturesController', () => {
       const mockUser = { email: 'admin@example.com' };
 
       await expect(
-        controller.updateFeature('ideas', { enabled: 'yes' } as any, mockUser)
+        controller.updateFeature('ideas', { enabled: 'yes' } as unknown, mockUser)
       ).rejects.toThrow(HttpException);
     });
 
@@ -192,7 +192,7 @@ describe('FeaturesController', () => {
       const mockUser = { email: 'admin@example.com' };
 
       await expect(
-        controller.updateFeature('ideas', { enabled: null } as any, mockUser)
+        controller.updateFeature('ideas', { enabled: null } as unknown, mockUser)
       ).rejects.toThrow(HttpException);
     });
 
@@ -248,7 +248,7 @@ describe('FeaturesController', () => {
       const mockUser = { email: 'admin@example.com' };
 
       try {
-        await controller.updateFeature('ideas', { enabled: 'true' } as any, mockUser);
+        await controller.updateFeature('ideas', { enabled: 'true' } as unknown, mockUser);
         expect.fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(HttpException);
@@ -419,7 +419,7 @@ describe('FeaturesController', () => {
 
       for (const input of invalidInputs) {
         await expect(
-          controller.updateFeature('ideas', input as any, mockUser)
+          controller.updateFeature('ideas', input as unknown, mockUser)
         ).rejects.toThrow(HttpException);
       }
     });

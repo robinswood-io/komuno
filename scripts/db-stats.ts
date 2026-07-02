@@ -93,7 +93,7 @@ async function getActiveConnections(): Promise<ConnectionInfo[]> {
   return result.rows as ConnectionInfo[];
 }
 
-async function getSlowQueries(): Promise<any[]> {
+async function getSlowQueries(): Promise<unknown[]> {
   const result = await db.execute(sql`
     SELECT 
       LEFT(query, 200) as query,

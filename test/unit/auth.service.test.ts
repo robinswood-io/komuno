@@ -15,7 +15,7 @@ describe('AuthService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    authService = new AuthService(mockStorageService as any);
+    authService = new AuthService(mockStorageService as unknown);
   });
 
   afterEach(() => {
@@ -72,13 +72,13 @@ describe('AuthService', () => {
   describe('serializeUser', () => {
     it('should return user email', () => {
       const user = { email: 'test@example.com', firstName: 'Test', lastName: 'User' };
-      const result = authService.serializeUser(user as any);
+      const result = authService.serializeUser(user as unknown);
       expect(result).toBe('test@example.com');
     });
 
     it('should handle user with special characters in email', () => {
       const user = { email: 'test+alias@example.com', firstName: 'Test', lastName: 'User' };
-      const result = authService.serializeUser(user as any);
+      const result = authService.serializeUser(user as unknown);
       expect(result).toBe('test+alias@example.com');
     });
   });

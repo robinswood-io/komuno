@@ -16,7 +16,7 @@ vi.mock('../../server/lib/logger', () => ({
 }));
 
 class TrackingService {
-  constructor(private storageService: any) {}
+  constructor(private storageService: unknown) {}
 
   async getTrackingDashboard() {
     const metrics = await this.storageService.storage.getTrackingMetrics({ limit: 100 });
@@ -32,22 +32,22 @@ class TrackingService {
     };
   }
 
-  async getTrackingMetrics(options: any) {
+  async getTrackingMetrics(options: unknown) {
     return this.storageService.storage.getTrackingMetrics(options);
   }
 
-  async createTrackingMetric(data: any, userEmail: string) {
+  async createTrackingMetric(data: unknown, userEmail: string) {
     if (!data.entityType || !data.metricType) {
       throw new Error('Entity type and metric type are required');
     }
     return this.storageService.storage.createTrackingMetric({ ...data, createdBy: userEmail });
   }
 
-  async getTrackingAlerts(options: any) {
+  async getTrackingAlerts(options: unknown) {
     return this.storageService.storage.getTrackingAlerts(options);
   }
 
-  async updateTrackingAlert(id: string, data: any) {
+  async updateTrackingAlert(id: string, data: unknown) {
     return this.storageService.storage.updateTrackingAlert(id, data);
   }
 

@@ -106,7 +106,7 @@ function mergeConnections(central: CentralFile, additions: Connection[]) {
     for (const field of fields) {
       const incomingValue = incoming[field];
       if (incomingValue && !current[field]) {
-        current[field] = incomingValue as any;
+        current[field] = incomingValue as unknown;
         changed = true;
       }
     }

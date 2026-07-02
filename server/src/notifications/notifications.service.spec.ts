@@ -72,7 +72,7 @@ describe('NotificationsService', () => {
           returning: vi.fn().mockResolvedValue([{ id: 'notif-1' }]),
         }),
       }),
-    } as any;
+    } as unknown;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -237,7 +237,7 @@ describe('NotificationsService', () => {
 
       vi
         .spyOn(service, 'getNotificationsByUser')
-        .mockResolvedValue(mockNotifications as any);
+        .mockResolvedValue(mockNotifications as unknown);
 
       const result = await service.getGroupedNotifications(userId, 'project');
 
@@ -278,7 +278,7 @@ describe('NotificationsService', () => {
 
       vi
         .spyOn(service, 'getNotificationsByUser')
-        .mockResolvedValue(mockNotifications as any);
+        .mockResolvedValue(mockNotifications as unknown);
 
       const result = await service.getGroupedNotifications(userId, 'offer');
 

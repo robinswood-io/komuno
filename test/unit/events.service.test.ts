@@ -31,19 +31,19 @@ vi.mock('../../server/lib/logger', () => ({
 // Simulated EventsService
 class EventsService {
   constructor(
-    private storageService: any,
-    private notificationService: any
+    private storageService: unknown,
+    private notificationService: unknown
   ) {}
 
   async getEvents(page = 1, limit = 20) {
     return this.storageService.storage.getEvents({ page, limit });
   }
 
-  async createEvent(data: any) {
+  async createEvent(data: unknown) {
     return this.storageService.storage.createEvent(data);
   }
 
-  async createEventWithInscriptions(data: any, inscriptions: any[]) {
+  async createEventWithInscriptions(data: unknown, inscriptions: unknown[]) {
     return this.storageService.storage.createEventWithInscriptions(data, inscriptions);
   }
 
@@ -55,7 +55,7 @@ class EventsService {
     return this.storageService.storage.updateEventStatus(id, status);
   }
 
-  async createInscription(data: any) {
+  async createInscription(data: unknown) {
     const alreadyRegistered = await this.storageService.storage.hasUserRegistered(
       data.eventId,
       data.email
@@ -66,7 +66,7 @@ class EventsService {
     return this.storageService.storage.createInscription(data);
   }
 
-  async createUnsubscription(data: any) {
+  async createUnsubscription(data: unknown) {
     return this.storageService.storage.createUnsubscription(data);
   }
 }

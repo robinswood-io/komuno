@@ -181,7 +181,7 @@ async function addTestRelations() {
 
     console.log(`\n📊 RÉSUMÉ FINAL:`);
     console.log(`   Total relations: ${finalCount[0].count}`);
-    byType.forEach((row: any) => {
+    byType.forEach((row: unknown) => {
       console.log(`   - ${row.relation_type}: ${row.count}`);
     });
 

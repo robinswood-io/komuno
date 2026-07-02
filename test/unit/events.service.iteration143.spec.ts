@@ -41,14 +41,14 @@ describe('EventsService iteration143', () => {
         createEvent: vi.fn(),
       },
     };
-    eventsService = new EventsService(mockStorageService as any);
+    eventsService = new EventsService(mockStorageService as unknown);
   });
 
   it('uses fallback organizerName from user.email and keeps success on notification warning path', async () => {
     const { notificationService } = await import('../../server/notification-service');
     const { emailNotificationService } = await import('../../server/email-notification-service');
 
-    (notificationService.notifyNewEvent as any).mockRejectedValueOnce(new Error('notif-fail-143'));
+    (notificationService.notifyNewEvent as unknown).mockRejectedValueOnce(new Error('notif-fail-143'));
 
     const eventDate = new Date('2099-02-20T18:30:00.000Z');
     mockStorageService.instance.createEvent.mockResolvedValue({
@@ -78,8 +78,8 @@ describe('EventsService iteration143', () => {
     const { notificationService } = await import('../../server/notification-service');
     const { emailNotificationService } = await import('../../server/email-notification-service');
 
-    (notificationService.notifyNewEvent as any).mockResolvedValueOnce(undefined);
-    (emailNotificationService.notifyNewEvent as any).mockResolvedValueOnce({ success: true });
+    (notificationService.notifyNewEvent as unknown).mockResolvedValueOnce(undefined);
+    (emailNotificationService.notifyNewEvent as unknown).mockResolvedValueOnce({ success: true });
 
     const eventDate = new Date('2099-04-10T10:15:00.000Z');
     mockStorageService.instance.createEvent.mockResolvedValue({
@@ -111,8 +111,8 @@ describe('EventsService iteration143', () => {
     const { notificationService } = await import('../../server/notification-service');
     const { emailNotificationService } = await import('../../server/email-notification-service');
 
-    (notificationService.notifyNewEvent as any).mockResolvedValueOnce(undefined);
-    (emailNotificationService.notifyNewEvent as any).mockResolvedValueOnce({ success: true });
+    (notificationService.notifyNewEvent as unknown).mockResolvedValueOnce(undefined);
+    (emailNotificationService.notifyNewEvent as unknown).mockResolvedValueOnce({ success: true });
 
     const eventDate = new Date('2099-05-11T09:00:00.000Z');
     mockStorageService.instance.createEvent.mockResolvedValue({

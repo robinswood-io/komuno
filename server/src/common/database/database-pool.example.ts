@@ -84,7 +84,7 @@ export class DatabasePoolExampleService {
   /**
    * EXEMPLE 3: Requête complexe (INSERT/UPDATE/DELETE)
    */
-  async exampleComplexQuery(userData: any) {
+  async exampleComplexQuery(userData: unknown) {
     try {
       // Requête complexe (10s timeout, avec retry)
       const result = await runDbQuery(

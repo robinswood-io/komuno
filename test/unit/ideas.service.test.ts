@@ -30,16 +30,16 @@ vi.mock('../../server/lib/logger', () => ({
 // Simulated IdeasService
 class IdeasService {
   constructor(
-    private storageService: any,
-    private notificationService: any,
-    private emailNotificationService: any
+    private storageService: unknown,
+    private notificationService: unknown,
+    private emailNotificationService: unknown
   ) {}
 
   async getIdeas(page = 1, limit = 20) {
     return this.storageService.storage.getIdeas({ page, limit });
   }
 
-  async createIdea(data: any) {
+  async createIdea(data: unknown) {
     const isDuplicate = await this.storageService.storage.isDuplicateIdea(data.title);
     if (isDuplicate) {
       throw new Error('Duplicate idea');
@@ -63,7 +63,7 @@ class IdeasService {
     return this.storageService.storage.getVotesByIdea(ideaId);
   }
 
-  async createVote(data: any) {
+  async createVote(data: unknown) {
     return this.storageService.storage.createVote(data);
   }
 }

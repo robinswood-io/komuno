@@ -221,12 +221,12 @@ describe('PermissionGuard', () => {
     });
 
     it('should handle null-like role', () => {
-      const result = hasPermission(null as any, 'ideas.read');
+      const result = hasPermission(null as unknown, 'ideas.read');
       expect(result).toBe(false);
     });
 
     it('should handle undefined permission', () => {
-      const result = hasPermission(ADMIN_ROLES.SUPER_ADMIN, undefined as any);
+      const result = hasPermission(ADMIN_ROLES.SUPER_ADMIN, undefined as unknown);
       expect(result).toBe(true); // Super admin has access to anything
     });
   });

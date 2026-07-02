@@ -102,7 +102,7 @@ describe('Intégrations — socle sécurisé', () => {
     const calls: Array<{ input: string; body?: string }> = [];
     const fetchImpl = async (input: string, init?: RequestInit) => {
       calls.push({ input, body: init?.body?.toString() });
-      return { ok: true, status: 200, statusText: 'OK', json: async () => ({ access_token: 'access-token', token_type: 'Bearer', expires_in: 1800 }) } as any;
+      return { ok: true, status: 200, statusText: 'OK', json: async () => ({ access_token: 'access-token', token_type: 'Bearer', expires_in: 1800 }) } as unknown;
     };
 
     const result = await requestHelloAssoToken({
@@ -122,9 +122,9 @@ describe('Intégrations — socle sécurisé', () => {
     const calls: string[] = [];
     const fetchImpl = async (input: string) => {
       calls.push(input);
-      if (input.endsWith('/oauth2/token')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ access_token: 'access-token' }) } as any;
-      if (input.includes('/forms?')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ title: 'Billetterie', formSlug: 'billetterie', formType: 'Event', state: 'Public' }], pagination: { continuationToken: 'next-forms' } }) } as any;
-      if (input.includes('/orders?')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ payer: { email: 'pii@example.org' } }], pagination: { continuationToken: 'next-orders' } }) } as any;
+      if (input.endsWith('/oauth2/token')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ access_token: 'access-token' }) } as unknown;
+      if (input.includes('/forms?')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ title: 'Billetterie', formSlug: 'billetterie', formType: 'Event', state: 'Public' }], pagination: { continuationToken: 'next-forms' } }) } as unknown;
+      if (input.includes('/orders?')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ payer: { email: 'pii@example.org' } }], pagination: { continuationToken: 'next-orders' } }) } as unknown;
       throw new Error(`Unexpected call: ${input}`);
     };
 
@@ -144,8 +144,8 @@ describe('Intégrations — socle sécurisé', () => {
     const calls: Array<{ input: string; apiKey?: string }> = [];
     const fetchImpl = async (input: string, init?: RequestInit) => {
       calls.push({ input, apiKey: init?.headers ? (init.headers as Record<string, string>)['api-key'] : undefined });
-      if (input.endsWith('/account')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ organization_id: 'org_1', companyName: 'Association', email: 'private@example.org', plan: [{}], relay: { enabled: true } }) } as any;
-      if (input.includes('/contacts/lists')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ count: 1, lists: [{ id: 12, name: 'Membres', totalSubscribers: 42, folderId: 3 }] }) } as any;
+      if (input.endsWith('/account')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ organization_id: 'org_1', companyName: 'Association', email: 'private@example.org', plan: [{}], relay: { enabled: true } }) } as unknown;
+      if (input.includes('/contacts/lists')) return { ok: true, status: 200, statusText: 'OK', json: async () => ({ count: 1, lists: [{ id: 12, name: 'Membres', totalSubscribers: 42, folderId: 3 }] }) } as unknown;
       throw new Error(`Unexpected call: ${input}`);
     };
 
@@ -177,13 +177,13 @@ describe('Intégrations — socle sécurisé', () => {
             payouts_enabled: false,
             email: 'owner@example.org',
           }),
-        } as any;
+        } as unknown;
       }
       if (input.includes('/v1/products')) {
-        return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ id: 'prod_1', name: 'Cotisation', active: true, type: 'service', created: 1770000000 }], has_more: false }) } as any;
+        return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ id: 'prod_1', name: 'Cotisation', active: true, type: 'service', created: 1770000000 }], has_more: false }) } as unknown;
       }
       if (input.includes('/v1/prices')) {
-        return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ id: 'price_1', product: 'prod_1', active: true, currency: 'eur', unit_amount: 3000, recurring: { interval: 'year' }, type: 'recurring' }], has_more: false }) } as any;
+        return { ok: true, status: 200, statusText: 'OK', json: async () => ({ data: [{ id: 'price_1', product: 'prod_1', active: true, currency: 'eur', unit_amount: 3000, recurring: { interval: 'year' }, type: 'recurring' }], has_more: false }) } as unknown;
       }
       if (input.includes('/v1/customers')) throw new Error('Customer payload must not be fetched by default');
       throw new Error(`Unexpected call: ${input}`);
@@ -248,7 +248,7 @@ describe('Intégrations — socle sécurisé', () => {
       payload,
       fetchImpl: async (input: string, init?: RequestInit) => {
         calls.push({ input, headers: init?.headers as Record<string, string>, body: init?.body?.toString() });
-        return { ok: true, status: 204, statusText: 'No Content', json: async () => ({}), text: async () => '' } as any;
+        return { ok: true, status: 204, statusText: 'No Content', json: async () => ({}), text: async () => '' } as unknown;
       },
     });
 

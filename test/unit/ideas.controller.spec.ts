@@ -17,7 +17,7 @@ const mockPermissionGuard = vi.fn();
 
 // Simulated IdeasController matching real implementation
 class IdeasController {
-  constructor(private readonly ideasService: any) {}
+  constructor(private readonly ideasService: unknown) {}
 
   async getIdeas(page?: string, limit?: string) {
     const pageNum = parseInt(page || '1', 10);
@@ -76,7 +76,7 @@ class IdeasController {
 
 // Simulated VotesController
 class VotesController {
-  constructor(private readonly ideasService: any) {}
+  constructor(private readonly ideasService: unknown) {}
 
   async createVote(body: unknown) {
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -277,7 +277,7 @@ describe('IdeasController', () => {
     });
 
     it('should reject null id', async () => {
-      await expect(ideasController.deleteIdea(null as any)).rejects.toThrow(BadRequestException);
+      await expect(ideasController.deleteIdea(null as unknown)).rejects.toThrow(BadRequestException);
     });
 
     it('should reject whitespace-only id', async () => {
@@ -340,7 +340,7 @@ describe('IdeasController', () => {
     });
 
     it('should reject null body', async () => {
-      await expect(ideasController.updateIdeaStatus('idea-123', null as any)).rejects.toThrow(
+      await expect(ideasController.updateIdeaStatus('idea-123', null as unknown)).rejects.toThrow(
         BadRequestException
       );
     });

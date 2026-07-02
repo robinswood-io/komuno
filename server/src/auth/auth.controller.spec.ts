@@ -164,7 +164,7 @@ describe('AuthController', () => {
 
   describe('Session management', () => {
     it('should handle returnTo session parameter', () => {
-      const session: any = {};
+      const session: unknown = {};
       const returnTo = '/admin/dashboard';
 
       session.returnTo = returnTo;
@@ -172,14 +172,14 @@ describe('AuthController', () => {
     });
 
     it('should clear returnTo after use', () => {
-      const session: any = { returnTo: '/admin/dashboard' };
+      const session: unknown = { returnTo: '/admin/dashboard' };
 
       delete session.returnTo;
       expect(session.returnTo).toBeUndefined();
     });
 
     it('should default to /admin if no returnTo', () => {
-      const session: any = {};
+      const session: unknown = {};
       const defaultPath = '/admin';
 
       const redirectPath = session.returnTo || defaultPath;
@@ -248,13 +248,13 @@ describe('AuthController', () => {
     });
 
     it('should handle returnTo parameter', () => {
-      const session: any = { returnTo: '/admin/ideas' };
+      const session: unknown = { returnTo: '/admin/ideas' };
 
       expect(session.returnTo).toBe('/admin/ideas');
     });
 
     it('should redirect to default path if no returnTo', () => {
-      const session: any = {};
+      const session: unknown = {};
       const defaultPath = '/admin';
 
       const redirectPath = session.returnTo || defaultPath;

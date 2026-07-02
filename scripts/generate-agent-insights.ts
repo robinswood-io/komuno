@@ -49,7 +49,7 @@ function sparkline(values: number[]) {
 }
 
 function buildInsights() {
-  const metrics = loadJson<any>(METRICS_FILE);
+  const metrics = loadJson<unknown>(METRICS_FILE);
   const events = loadJson<{ events: Array<{ type: string; timestamp: string }> }>(EVENTS_FILE);
   const now = new Date().toISOString();
 
@@ -67,7 +67,7 @@ function buildInsights() {
   const series = recentDays.map((day) => eventsPerDay[day]);
 
   const topRoles = Object.entries(roleStats)
-    .map(([role, stats]: any) => ({
+    .map(([role, stats]: unknown) => ({
       role,
       completed: stats.completed ?? 0,
       successRate: stats.successRate ?? 0,
@@ -77,7 +77,7 @@ function buildInsights() {
     .slice(0, 5);
 
   const phaseTable = Object.entries(phaseDurations)
-    .map(([phase, entry]: any) => {
+    .map(([phase, entry]: unknown) => {
       const durationMs = entry.durationMs ?? 0;
       return `| ${phase} | ${formatDuration(durationMs)} |`;
     })

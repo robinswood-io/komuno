@@ -26,9 +26,9 @@ vi.mock('../../server/lib/logger', () => ({
 }));
 
 class MembersService {
-  constructor(private storageService: any) {}
+  constructor(private storageService: unknown) {}
 
-  async proposeMember(data: any) {
+  async proposeMember(data: unknown) {
     if (!data.firstName || !data.lastName || !data.email) {
       throw new Error('First name, last name, and email are required');
     }
@@ -48,14 +48,14 @@ class MembersService {
     return this.storageService.storage.getMembers({ page, limit, status, search });
   }
 
-  async createMemberSubscription(data: any) {
+  async createMemberSubscription(data: unknown) {
     if (!data.memberId || !data.startDate) {
       throw new Error('Member ID and start date are required');
     }
     return this.storageService.storage.createMemberSubscription(data);
   }
 
-  async createMemberTag(data: any) {
+  async createMemberTag(data: unknown) {
     if (!data.name) {
       throw new Error('Tag name is required');
     }
@@ -66,14 +66,14 @@ class MembersService {
     return this.storageService.storage.assignMemberTag({ memberId, tagId });
   }
 
-  async createMemberTask(data: any) {
+  async createMemberTask(data: unknown) {
     if (!data.memberId || !data.title) {
       throw new Error('Member ID and title are required');
     }
     return this.storageService.storage.createMemberTask(data);
   }
 
-  async createMemberRelation(data: any) {
+  async createMemberRelation(data: unknown) {
     if (!data.memberId || !data.relatedMemberId || !data.relationType) {
       throw new Error('Member IDs and relation type are required');
     }

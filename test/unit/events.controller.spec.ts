@@ -18,7 +18,7 @@ const createMockEventsService = () => ({
 
 describe('EventsController', () => {
   let eventsController: EventsController;
-  let mockEventsService: any;
+  let mockEventsService: unknown;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -273,7 +273,7 @@ describe('EventsController', () => {
 
 describe('InscriptionsController', () => {
   let inscriptionsController: InscriptionsController;
-  let mockEventsService: any;
+  let mockEventsService: unknown;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -382,7 +382,7 @@ describe('InscriptionsController', () => {
 
 describe('UnsubscriptionsController', () => {
   let unsubscriptionsController: UnsubscriptionsController;
-  let mockEventsService: any;
+  let mockEventsService: unknown;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -474,7 +474,7 @@ describe('UnsubscriptionsController', () => {
 describe('Integration - Controllers with Service', () => {
   let eventsController: EventsController;
   let inscriptionsController: InscriptionsController;
-  let mockEventsService: any;
+  let mockEventsService: unknown;
 
   beforeEach(() => {
     vi.clearAllMocks();

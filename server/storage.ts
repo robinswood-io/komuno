@@ -452,18 +452,18 @@ export interface IStorage {
   updateFeatureConfig(featureKey: string, enabled: boolean, updatedBy: string): Promise<Result<FeatureConfig>>;
   
   // Tracking transversal - Suivi des membres potentiels et mécènes
-  createTrackingMetric(metric: { entityType: 'member' | 'patron'; entityId: string; entityEmail: string; metricType: 'status_change' | 'engagement' | 'contact' | 'conversion' | 'activity'; metricValue?: number; metricData?: string; description?: string; recordedBy?: string }): Promise<Result<any>>;
-  getTrackingMetrics(options?: { entityType?: 'member' | 'patron'; entityId?: string; entityEmail?: string; metricType?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<Result<any[]>>;
+  createTrackingMetric(metric: { entityType: 'member' | 'patron'; entityId: string; entityEmail: string; metricType: 'status_change' | 'engagement' | 'contact' | 'conversion' | 'activity'; metricValue?: number; metricData?: string; description?: string; recordedBy?: string }): Promise<Result<unknown>>;
+  getTrackingMetrics(options?: { entityType?: 'member' | 'patron'; entityId?: string; entityEmail?: string; metricType?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<Result<unknown[]>>;
   getTrackingDashboard(): Promise<Result<{
     members: { total: number; proposed: number; active: number; highPotential: number; stale: number };
     patrons: { total: number; proposed: number; active: number; highPotential: number; stale: number };
-    recentActivity: any[];
+    recentActivity: unknown[];
     conversionRate: { members: number; patrons: number };
     engagementTrends: { date: string; members: number; patrons: number }[];
   }>>;
-  createTrackingAlert(alert: { entityType: 'member' | 'patron'; entityId: string; entityEmail: string; alertType: 'stale' | 'high_potential' | 'needs_followup' | 'conversion_opportunity'; severity?: 'low' | 'medium' | 'high' | 'critical'; title: string; message: string; createdBy?: string; expiresAt?: Date }): Promise<Result<any>>;
-  getTrackingAlerts(options?: { entityType?: 'member' | 'patron'; entityId?: string; isRead?: boolean; isResolved?: boolean; severity?: string; limit?: number }): Promise<Result<any[]>>;
-  updateTrackingAlert(alertId: string, data: { isRead?: boolean; isResolved?: boolean; resolvedBy?: string }): Promise<Result<any>>;
+  createTrackingAlert(alert: { entityType: 'member' | 'patron'; entityId: string; entityEmail: string; alertType: 'stale' | 'high_potential' | 'needs_followup' | 'conversion_opportunity'; severity?: 'low' | 'medium' | 'high' | 'critical'; title: string; message: string; createdBy?: string; expiresAt?: Date }): Promise<Result<unknown>>;
+  getTrackingAlerts(options?: { entityType?: 'member' | 'patron'; entityId?: string; isRead?: boolean; isResolved?: boolean; severity?: string; limit?: number }): Promise<Result<unknown[]>>;
+  updateTrackingAlert(alertId: string, data: { isRead?: boolean; isResolved?: boolean; resolvedBy?: string }): Promise<Result<unknown>>;
   generateTrackingAlerts(): Promise<Result<{ created: number; errors: number }>>;
 
   // Financial budgets
@@ -1236,7 +1236,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const result = await db.transaction(async (tx) => {
-        const formattedData: any = {
+        const formattedData: unknown = {
           ...eventData,
           updatedAt: sql`NOW()`,
           updatedBy: "admin" // Could be improved with actual user
@@ -1792,7 +1792,7 @@ export class DatabaseStorage implements IStorage {
 
       const result = await db.transaction(async (tx) => {
         // Prepare update data with proper date conversion
-        const updateData: any = {
+        const updateData: unknown = {
           ...ideaData,
           updatedAt: sql`NOW()`,
           updatedBy: "admin"
@@ -2125,7 +2125,7 @@ export class DatabaseStorage implements IStorage {
       
       logger.info('Patron created', { patronId: newPatron.id, name: `${newPatron.firstName} ${newPatron.lastName}`, email: newPatron.email });
       return { success: true, data: newPatron };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.code === '23505' && error.constraint === 'patrons_email_unique') {
         return { success: false, error: new DuplicateError("Un mécène avec cet email existe déjà") };
       }
@@ -2181,7 +2181,7 @@ export class DatabaseStorage implements IStorage {
       const offset = (page - 1) * limit;
 
       // Construire les conditions WHERE
-      const conditions: any[] = [];
+      const conditions: unknown[] = [];
 
       // Filtre par statut
       if (options?.status && options.status !== 'all') {
@@ -2334,7 +2334,7 @@ export class DatabaseStorage implements IStorage {
 
       logger.info('Patron updated', { patronId: id, updates: Object.keys(data) });
       return { success: true, data: updatedPatron };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.code === '23505' && error.constraint === 'patrons_email_unique') {
         return { success: false, error: new DuplicateError("Un mécène avec cet email existe déjà") };
       }
@@ -2424,7 +2424,7 @@ export class DatabaseStorage implements IStorage {
         return { success: false, error: new NotFoundError("Don introuvable") };
       }
 
-      const updateData: any = { ...data };
+      const updateData: unknown = { ...data };
       if (data.donatedAt) {
         updateData.donatedAt = new Date(data.donatedAt);
       }
@@ -2555,7 +2555,7 @@ export class DatabaseStorage implements IStorage {
       
       logger.info('Idea-patron proposal created', { proposalId: newProposal.id, ideaId: newProposal.ideaId, patronId: newProposal.patronId });
       return { success: true, data: newProposal };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.code === '23505' && error.constraint === 'idea_patron_proposals_idea_id_patron_id_unique') {
         return { success: false, error: new DuplicateError("Une proposition existe déjà pour ce mécène et cette idée") };
       }
@@ -2647,7 +2647,7 @@ export class DatabaseStorage implements IStorage {
   async createEventSponsorship(sponsorship: InsertEventSponsorship): Promise<Result<EventSponsorship>> {
     try {
       // Build sponsorshipData without undefined/null fields
-      const sponsorshipData: any = {
+      const sponsorshipData: unknown = {
         eventId: sponsorship.eventId,
         patronId: sponsorship.patronId,
         level: sponsorship.level,
@@ -2803,7 +2803,7 @@ export class DatabaseStorage implements IStorage {
         return { success: false, error: new NotFoundError("Sponsoring introuvable") };
       }
 
-      const updateData: any = { ...data };
+      const updateData: unknown = { ...data };
       if (data.confirmedAt !== undefined) {
         updateData.confirmedAt = data.confirmedAt ? new Date(data.confirmedAt) : null;
       }
@@ -2906,7 +2906,7 @@ export class DatabaseStorage implements IStorage {
       const now = new Date();
 
       if (existingMember) {
-        const updateData: any = {
+        const updateData: unknown = {
           lastActivityAt: now,
           updatedAt: now
         };
@@ -3043,7 +3043,7 @@ export class DatabaseStorage implements IStorage {
       const offset = (page - 1) * limit;
 
       // Construire les conditions WHERE
-      const conditions: any[] = [];
+      const conditions: unknown[] = [];
 
       // Filtre par statut
       if (options?.status && options.status !== 'all') {
@@ -3544,7 +3544,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateTask(taskId: string, data: Partial<InsertMemberTask> & { completedAt?: string | null }): Promise<Result<MemberTask>> {
     try {
-      const updateData: any = {
+      const updateData: unknown = {
         ...data,
         updatedAt: sql`NOW()`,
       };
@@ -3962,7 +3962,7 @@ export class DatabaseStorage implements IStorage {
       const status = options?.status;
 
       // Construire les conditions
-      const conditions: any[] = [];
+      const conditions: unknown[] = [];
       
       // Si un statut spécifique est demandé, l'utiliser
       // Sinon, exclure les items en pending (afficher tous les items validés)
@@ -4017,7 +4017,7 @@ export class DatabaseStorage implements IStorage {
           limit
         }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Si la table n'existe pas, retourner une liste vide plutôt qu'une erreur
       const errorMessage = error?.message || String(error);
       if (errorMessage.includes('does not exist') || errorMessage.includes('relation') || errorMessage.includes('loan_items')) {
@@ -4174,7 +4174,7 @@ export class DatabaseStorage implements IStorage {
       const search = options?.search?.trim();
 
       // Construire les conditions
-      const conditions: any[] = [];
+      const conditions: unknown[] = [];
       
       if (search) {
         // Optimisation: utiliser LOWER pour la recherche insensible à la casse
@@ -4223,7 +4223,7 @@ export class DatabaseStorage implements IStorage {
           limit
         }
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Si la table n'existe pas, retourner une liste vide plutôt qu'une erreur
       const errorMessage = error?.message || String(error);
       if (errorMessage.includes('does not exist') || errorMessage.includes('relation') || errorMessage.includes('loan_items')) {
@@ -4320,37 +4320,37 @@ export class DatabaseStorage implements IStorage {
 
   async getTrackingMetrics(options?: { entityType?: 'member' | 'patron'; entityId?: string; entityEmail?: string; metricType?: string; startDate?: Date; endDate?: Date; limit?: number }): Promise<Result<TrackingMetric[]>> {
     try {
-      const conditions: any[] = [];
+      const conditions: unknown[] = [];
       
       if (options?.entityType) {
-        conditions.push(eq(trackingMetrics.entityType, options.entityType) as any);
+        conditions.push(eq(trackingMetrics.entityType, options.entityType) as unknown);
       }
       if (options?.entityId) {
-        conditions.push(eq(trackingMetrics.entityId, options.entityId) as any);
+        conditions.push(eq(trackingMetrics.entityId, options.entityId) as unknown);
       }
       if (options?.entityEmail) {
-        conditions.push(eq(trackingMetrics.entityEmail, options.entityEmail) as any);
+        conditions.push(eq(trackingMetrics.entityEmail, options.entityEmail) as unknown);
       }
       if (options?.metricType) {
-        conditions.push(eq(trackingMetrics.metricType, options.metricType) as any);
+        conditions.push(eq(trackingMetrics.metricType, options.metricType) as unknown);
       }
       if (options?.startDate) {
-        conditions.push(sql`${trackingMetrics.recordedAt} >= ${options.startDate}` as any);
+        conditions.push(sql`${trackingMetrics.recordedAt} >= ${options.startDate}` as unknown);
       }
       if (options?.endDate) {
-        conditions.push(sql`${trackingMetrics.recordedAt} <= ${options.endDate}` as any);
+        conditions.push(sql`${trackingMetrics.recordedAt} <= ${options.endDate}` as unknown);
       }
       
       let query = db.select().from(trackingMetrics);
       
       if (conditions.length > 0) {
-        query = query.where(and(...conditions)) as any;
+        query = query.where(and(...conditions)) as unknown;
       }
       
-      query = query.orderBy(desc(trackingMetrics.recordedAt)) as any;
+      query = query.orderBy(desc(trackingMetrics.recordedAt)) as unknown;
       
       if (options?.limit) {
-        query = query.limit(options.limit) as any;
+        query = query.limit(options.limit) as unknown;
       }
       
       const results = await query;
@@ -4363,7 +4363,7 @@ export class DatabaseStorage implements IStorage {
   async getTrackingDashboard(): Promise<Result<{
     members: { total: number; proposed: number; active: number; highPotential: number; stale: number };
     patrons: { total: number; proposed: number; active: number; highPotential: number; stale: number };
-    recentActivity: any[];
+    recentActivity: unknown[];
     conversionRate: { members: number; patrons: number };
     engagementTrends: { date: string; members: number; patrons: number }[];
   }>> {
@@ -4511,34 +4511,34 @@ export class DatabaseStorage implements IStorage {
 
   async getTrackingAlerts(options?: { entityType?: 'member' | 'patron'; entityId?: string; isRead?: boolean; isResolved?: boolean; severity?: string; limit?: number }): Promise<Result<TrackingAlert[]>> {
     try {
-      const conditions: any[] = [];
+      const conditions: unknown[] = [];
       
       if (options?.entityType) {
-        conditions.push(eq(trackingAlerts.entityType, options.entityType) as any);
+        conditions.push(eq(trackingAlerts.entityType, options.entityType) as unknown);
       }
       if (options?.entityId) {
-        conditions.push(eq(trackingAlerts.entityId, options.entityId) as any);
+        conditions.push(eq(trackingAlerts.entityId, options.entityId) as unknown);
       }
       if (options?.isRead !== undefined) {
-        conditions.push(eq(trackingAlerts.isRead, options.isRead) as any);
+        conditions.push(eq(trackingAlerts.isRead, options.isRead) as unknown);
       }
       if (options?.isResolved !== undefined) {
-        conditions.push(eq(trackingAlerts.isResolved, options.isResolved) as any);
+        conditions.push(eq(trackingAlerts.isResolved, options.isResolved) as unknown);
       }
       if (options?.severity) {
-        conditions.push(eq(trackingAlerts.severity, options.severity) as any);
+        conditions.push(eq(trackingAlerts.severity, options.severity) as unknown);
       }
       
       let query = db.select().from(trackingAlerts);
       
       if (conditions.length > 0) {
-        query = query.where(and(...conditions)) as any;
+        query = query.where(and(...conditions)) as unknown;
       }
       
-      query = query.orderBy(desc(trackingAlerts.createdAt)) as any;
+      query = query.orderBy(desc(trackingAlerts.createdAt)) as unknown;
       
       if (options?.limit) {
-        query = query.limit(options.limit) as any;
+        query = query.limit(options.limit) as unknown;
       }
       
       const results = await query;
@@ -4550,7 +4550,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateTrackingAlert(alertId: string, data: { isRead?: boolean; isResolved?: boolean; resolvedBy?: string }): Promise<Result<TrackingAlert>> {
     try {
-      const updateData: any = {};
+      const updateData: unknown = {};
       if (data.isRead !== undefined) updateData.isRead = data.isRead;
       if (data.isResolved !== undefined) {
         updateData.isResolved = data.isResolved;
@@ -5809,7 +5809,7 @@ export class DatabaseStorage implements IStorage {
       };
 
       return { success: true, data: formattedType };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.message?.includes('unique') || error.code === '23505') {
         return { success: false, error: new DuplicateError('Un type de cotisation avec ce nom existe déjà') };
       }
@@ -5843,7 +5843,7 @@ export class DatabaseStorage implements IStorage {
       };
 
       return { success: true, data: formattedType };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.message?.includes('unique') || error.code === '23505') {
         return { success: false, error: new DuplicateError('Un type de cotisation avec ce nom existe déjà') };
       }

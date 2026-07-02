@@ -49,7 +49,7 @@ vi.mock('../../server/email-notification-service', () => ({
 
 // Simulated IdeasService matching real implementation
 class IdeasService {
-  constructor(private storageService: any) {}
+  constructor(private storageService: unknown) {}
 
   async getIdeas(page: number = 1, limit: number = 20) {
     return await this.storageService.instance.getIdeas({ page, limit });
@@ -61,7 +61,7 @@ class IdeasService {
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid data');
       }
-      const validated = data as any;
+      const validated = data as unknown;
       if (!validated.title || validated.title.length < 3) {
         throw new BadRequestException('Title must be at least 3 characters');
       }
@@ -180,7 +180,7 @@ class IdeasService {
         throw new BadRequestException('Invalid data');
       }
 
-      const validated = data as any;
+      const validated = data as unknown;
       if (!validated.ideaId || !validated.voterEmail || !validated.voterName) {
         throw new BadRequestException('Missing required fields');
       }
