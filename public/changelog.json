@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.25.0",
+    "version": "2.25.1",
     "releasedAt": "2026-07-02",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Add event operations planning"
+      "nouveautes": [],
+      "corrections": [
+        "Remove lint violations and unsafe casts"
       ],
-      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.25.1",
+      "releasedAt": "2026-07-02",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Remove lint violations and unsafe casts"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.25.0",
       "releasedAt": "2026-07-02",
@@ -479,24 +495,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.11.2",
-      "releasedAt": "2026-06-28",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Harden app surface and dependencies"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-02T16:08:25.291Z",
+  "generatedAt": "2026-07-02T17:20:57.254Z",
   "source": "conventional-commits"
 }
