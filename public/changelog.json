@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.25.2",
+    "version": "2.25.3",
     "releasedAt": "2026-07-02",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Remove remaining unsafe any casts"
+        "Remove remaining any annotations"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.25.3",
+      "releasedAt": "2026-07-02",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Remove remaining any annotations"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.25.2",
       "releasedAt": "2026-07-02",
