@@ -213,6 +213,82 @@ export const TRAINING_SYNC_DIRECTION = {
   UPSTREAM_INTERESTS: "upstream_interests",
 } as const;
 
+export const EVENT_OPERATION_STATUS = {
+  PLANNING: "planning",
+  IN_PROGRESS: "in_progress",
+  READY: "ready",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+} as const;
+
+export const EVENT_OPERATION_RISK_LEVEL = {
+  LOW: "low",
+  NORMAL: "normal",
+  HIGH: "high",
+  CRITICAL: "critical",
+} as const;
+
+export const EVENT_WORKSTREAM_STATUS = {
+  TODO: "todo",
+  IN_PROGRESS: "in_progress",
+  BLOCKED: "blocked",
+  DONE: "done",
+  CANCELLED: "cancelled",
+} as const;
+
+export const EVENT_SUPPLIER_STATUS = {
+  IDENTIFIED: "identified",
+  CONTACTED: "contacted",
+  QUOTE_REQUESTED: "quote_requested",
+  SELECTED: "selected",
+  REJECTED: "rejected",
+  CANCELLED: "cancelled",
+} as const;
+
+export const EVENT_QUOTE_STATUS = {
+  REQUESTED: "requested",
+  RECEIVED: "received",
+  ACCEPTED: "accepted",
+  REJECTED: "rejected",
+  EXPIRED: "expired",
+} as const;
+
+export const EVENT_COMMITMENT_STATUS = {
+  PLANNED: "planned",
+  CONTRACTED: "contracted",
+  DELIVERED: "delivered",
+  PAID: "paid",
+  CANCELLED: "cancelled",
+} as const;
+
+export const EVENT_OBJECTIVE_TYPE = {
+  PARTICIPANTS: "participants",
+  REVENUE: "revenue",
+  MARGIN: "margin",
+  SPONSORS: "sponsors",
+  SATISFACTION: "satisfaction",
+  CUSTOM: "custom",
+} as const;
+
+export const EVENT_OBJECTIVE_STATUS = {
+  TRACKING: "tracking",
+  AT_RISK: "at_risk",
+  ACHIEVED: "achieved",
+  MISSED: "missed",
+} as const;
+
+export const EVENT_BUDGET_LINE_TYPE = {
+  INCOME: "income",
+  EXPENSE: "expense",
+} as const;
+
+export const EVENT_BUDGET_LINE_STATUS = {
+  PLANNED: "planned",
+  COMMITTED: "committed",
+  ACTUAL: "actual",
+  CANCELLED: "cancelled",
+} as const;
+
 // Ideas table - Flexible status workflow management
 export const ideas = pgTable("ideas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -468,6 +544,178 @@ export const eventSyndications = pgTable("event_syndications", {
   syncStatusIdx: index("event_syndications_sync_status_idx").on(table.syncStatus),
   remoteEventIdx: index("event_syndications_remote_event_idx").on(table.remoteEventId),
   remoteSyndicationIdx: index("event_syndications_remote_syndication_idx").on(table.remoteSyndicationId),
+}));
+
+export const eventOperationPlans = pgTable("event_operation_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  status: text("status").default(EVENT_OPERATION_STATUS.PLANNING).notNull(),
+  ownerEmail: text("owner_email"),
+  summary: text("summary"),
+  dueDate: date("due_date"),
+  riskLevel: text("risk_level").default(EVENT_OPERATION_RISK_LEVEL.NORMAL).notNull(),
+  notes: text("notes"),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  eventUniqueIdx: uniqueIndex("event_operation_plans_event_unique").on(table.eventId),
+  statusIdx: index("event_operation_plans_status_idx").on(table.status),
+  ownerIdx: index("event_operation_plans_owner_idx").on(table.ownerEmail),
+  dueDateIdx: index("event_operation_plans_due_date_idx").on(table.dueDate),
+}));
+
+export const eventWorkstreams = pgTable("event_workstreams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"),
+  status: text("status").default(EVENT_WORKSTREAM_STATUS.TODO).notNull(),
+  ownerEmail: text("owner_email"),
+  dueDate: date("due_date"),
+  priority: integer("priority").default(3).notNull(),
+  orderIndex: integer("order_index").default(0).notNull(),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: index("event_workstreams_event_idx").on(table.eventId),
+  statusIdx: index("event_workstreams_status_idx").on(table.status),
+  ownerIdx: index("event_workstreams_owner_idx").on(table.ownerEmail),
+  dueDateIdx: index("event_workstreams_due_date_idx").on(table.dueDate),
+  orderIdx: index("event_workstreams_order_idx").on(table.eventId, table.orderIndex),
+}));
+
+export const eventSupplierCandidates = pgTable("event_supplier_candidates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  workstreamId: varchar("workstream_id").references(() => eventWorkstreams.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  category: text("category"),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  website: text("website"),
+  status: text("status").default(EVENT_SUPPLIER_STATUS.IDENTIFIED).notNull(),
+  rating: integer("rating"),
+  notes: text("notes"),
+  selectedAt: timestamp("selected_at"),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: index("event_supplier_candidates_event_idx").on(table.eventId),
+  workstreamIdx: index("event_supplier_candidates_workstream_idx").on(table.workstreamId),
+  statusIdx: index("event_supplier_candidates_status_idx").on(table.status),
+  categoryIdx: index("event_supplier_candidates_category_idx").on(table.category),
+}));
+
+export const eventSupplierQuotes = pgTable("event_supplier_quotes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  supplierId: varchar("supplier_id").references(() => eventSupplierCandidates.id, { onDelete: "cascade" }).notNull(),
+  workstreamId: varchar("workstream_id").references(() => eventWorkstreams.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  amountInCents: integer("amount_in_cents").default(0).notNull(),
+  currency: varchar("currency", { length: 3 }).default("EUR").notNull(),
+  status: text("status").default(EVENT_QUOTE_STATUS.REQUESTED).notNull(),
+  validUntil: date("valid_until"),
+  documentUrl: text("document_url"),
+  terms: text("terms"),
+  notes: text("notes"),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: index("event_supplier_quotes_event_idx").on(table.eventId),
+  supplierIdx: index("event_supplier_quotes_supplier_idx").on(table.supplierId),
+  workstreamIdx: index("event_supplier_quotes_workstream_idx").on(table.workstreamId),
+  statusIdx: index("event_supplier_quotes_status_idx").on(table.status),
+  validUntilIdx: index("event_supplier_quotes_valid_until_idx").on(table.validUntil),
+}));
+
+export const eventSupplierCommitments = pgTable("event_supplier_commitments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  supplierId: varchar("supplier_id").references(() => eventSupplierCandidates.id, { onDelete: "restrict" }).notNull(),
+  quoteId: varchar("quote_id").references(() => eventSupplierQuotes.id, { onDelete: "set null" }),
+  workstreamId: varchar("workstream_id").references(() => eventWorkstreams.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  committedAmountInCents: integer("committed_amount_in_cents").default(0).notNull(),
+  actualAmountInCents: integer("actual_amount_in_cents"),
+  currency: varchar("currency", { length: 3 }).default("EUR").notNull(),
+  status: text("status").default(EVENT_COMMITMENT_STATUS.PLANNED).notNull(),
+  dueDate: date("due_date"),
+  paidAt: timestamp("paid_at"),
+  notes: text("notes"),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: index("event_supplier_commitments_event_idx").on(table.eventId),
+  supplierIdx: index("event_supplier_commitments_supplier_idx").on(table.supplierId),
+  quoteIdx: index("event_supplier_commitments_quote_idx").on(table.quoteId),
+  workstreamIdx: index("event_supplier_commitments_workstream_idx").on(table.workstreamId),
+  statusIdx: index("event_supplier_commitments_status_idx").on(table.status),
+  dueDateIdx: index("event_supplier_commitments_due_date_idx").on(table.dueDate),
+}));
+
+export const eventObjectives = pgTable("event_objectives", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  type: text("type").notNull(),
+  label: text("label").notNull(),
+  targetValue: integer("target_value").default(0).notNull(),
+  currentValue: integer("current_value").default(0).notNull(),
+  unit: text("unit"),
+  status: text("status").default(EVENT_OBJECTIVE_STATUS.TRACKING).notNull(),
+  notes: text("notes"),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: index("event_objectives_event_idx").on(table.eventId),
+  typeIdx: index("event_objectives_type_idx").on(table.type),
+  statusIdx: index("event_objectives_status_idx").on(table.status),
+}));
+
+export const eventBudgetLines = pgTable("event_budget_lines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  workstreamId: varchar("workstream_id").references(() => eventWorkstreams.id, { onDelete: "set null" }),
+  supplierId: varchar("supplier_id").references(() => eventSupplierCandidates.id, { onDelete: "set null" }),
+  quoteId: varchar("quote_id").references(() => eventSupplierQuotes.id, { onDelete: "set null" }),
+  commitmentId: varchar("commitment_id").references(() => eventSupplierCommitments.id, { onDelete: "set null" }),
+  financialBudgetId: varchar("financial_budget_id").references(() => financialBudgets.id, { onDelete: "set null" }),
+  financialExpenseId: varchar("financial_expense_id").references(() => financialExpenses.id, { onDelete: "set null" }),
+  financialRevenueId: varchar("financial_revenue_id").references(() => financialRevenues.id, { onDelete: "set null" }),
+  type: text("type").notNull(),
+  label: text("label").notNull(),
+  category: text("category"),
+  plannedAmountInCents: integer("planned_amount_in_cents").default(0).notNull(),
+  committedAmountInCents: integer("committed_amount_in_cents").default(0).notNull(),
+  actualAmountInCents: integer("actual_amount_in_cents").default(0).notNull(),
+  currency: varchar("currency", { length: 3 }).default("EUR").notNull(),
+  status: text("status").default(EVENT_BUDGET_LINE_STATUS.PLANNED).notNull(),
+  notes: text("notes"),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  eventIdx: index("event_budget_lines_event_idx").on(table.eventId),
+  workstreamIdx: index("event_budget_lines_workstream_idx").on(table.workstreamId),
+  supplierIdx: index("event_budget_lines_supplier_idx").on(table.supplierId),
+  typeIdx: index("event_budget_lines_type_idx").on(table.type),
+  statusIdx: index("event_budget_lines_status_idx").on(table.status),
+  financialBudgetIdx: index("event_budget_lines_financial_budget_idx").on(table.financialBudgetId),
 }));
 
 export const surveyForms = pgTable("survey_forms", {
@@ -1678,6 +1926,112 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   unsubscriptions: many(unsubscriptions),
   sponsorships: many(eventSponsorships),
   syndications: many(eventSyndications),
+  operationPlans: many(eventOperationPlans),
+  workstreams: many(eventWorkstreams),
+  supplierCandidates: many(eventSupplierCandidates),
+  supplierQuotes: many(eventSupplierQuotes),
+  supplierCommitments: many(eventSupplierCommitments),
+  objectives: many(eventObjectives),
+  budgetLines: many(eventBudgetLines),
+}));
+
+export const eventOperationPlansRelations = relations(eventOperationPlans, ({ one }) => ({
+  event: one(events, {
+    fields: [eventOperationPlans.eventId],
+    references: [events.id],
+  }),
+}));
+
+export const eventWorkstreamsRelations = relations(eventWorkstreams, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventWorkstreams.eventId],
+    references: [events.id],
+  }),
+  supplierCandidates: many(eventSupplierCandidates),
+  supplierQuotes: many(eventSupplierQuotes),
+  supplierCommitments: many(eventSupplierCommitments),
+  budgetLines: many(eventBudgetLines),
+}));
+
+export const eventSupplierCandidatesRelations = relations(eventSupplierCandidates, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventSupplierCandidates.eventId],
+    references: [events.id],
+  }),
+  workstream: one(eventWorkstreams, {
+    fields: [eventSupplierCandidates.workstreamId],
+    references: [eventWorkstreams.id],
+  }),
+  quotes: many(eventSupplierQuotes),
+  commitments: many(eventSupplierCommitments),
+  budgetLines: many(eventBudgetLines),
+}));
+
+export const eventSupplierQuotesRelations = relations(eventSupplierQuotes, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventSupplierQuotes.eventId],
+    references: [events.id],
+  }),
+  supplier: one(eventSupplierCandidates, {
+    fields: [eventSupplierQuotes.supplierId],
+    references: [eventSupplierCandidates.id],
+  }),
+  workstream: one(eventWorkstreams, {
+    fields: [eventSupplierQuotes.workstreamId],
+    references: [eventWorkstreams.id],
+  }),
+  commitments: many(eventSupplierCommitments),
+  budgetLines: many(eventBudgetLines),
+}));
+
+export const eventSupplierCommitmentsRelations = relations(eventSupplierCommitments, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventSupplierCommitments.eventId],
+    references: [events.id],
+  }),
+  supplier: one(eventSupplierCandidates, {
+    fields: [eventSupplierCommitments.supplierId],
+    references: [eventSupplierCandidates.id],
+  }),
+  quote: one(eventSupplierQuotes, {
+    fields: [eventSupplierCommitments.quoteId],
+    references: [eventSupplierQuotes.id],
+  }),
+  workstream: one(eventWorkstreams, {
+    fields: [eventSupplierCommitments.workstreamId],
+    references: [eventWorkstreams.id],
+  }),
+  budgetLines: many(eventBudgetLines),
+}));
+
+export const eventObjectivesRelations = relations(eventObjectives, ({ one }) => ({
+  event: one(events, {
+    fields: [eventObjectives.eventId],
+    references: [events.id],
+  }),
+}));
+
+export const eventBudgetLinesRelations = relations(eventBudgetLines, ({ one }) => ({
+  event: one(events, {
+    fields: [eventBudgetLines.eventId],
+    references: [events.id],
+  }),
+  workstream: one(eventWorkstreams, {
+    fields: [eventBudgetLines.workstreamId],
+    references: [eventWorkstreams.id],
+  }),
+  supplier: one(eventSupplierCandidates, {
+    fields: [eventBudgetLines.supplierId],
+    references: [eventSupplierCandidates.id],
+  }),
+  quote: one(eventSupplierQuotes, {
+    fields: [eventBudgetLines.quoteId],
+    references: [eventSupplierQuotes.id],
+  }),
+  commitment: one(eventSupplierCommitments, {
+    fields: [eventBudgetLines.commitmentId],
+    references: [eventSupplierCommitments.id],
+  }),
 }));
 
 export const eventSyndicationsRelations = relations(eventSyndications, ({ one }) => ({
@@ -2172,6 +2526,116 @@ export const insertTrainingSyncRunSchema = z.object({
   error: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
+
+const eventOperationStatusValues = Object.values(EVENT_OPERATION_STATUS) as [typeof EVENT_OPERATION_STATUS[keyof typeof EVENT_OPERATION_STATUS], ...Array<typeof EVENT_OPERATION_STATUS[keyof typeof EVENT_OPERATION_STATUS]>];
+const eventOperationRiskLevelValues = Object.values(EVENT_OPERATION_RISK_LEVEL) as [typeof EVENT_OPERATION_RISK_LEVEL[keyof typeof EVENT_OPERATION_RISK_LEVEL], ...Array<typeof EVENT_OPERATION_RISK_LEVEL[keyof typeof EVENT_OPERATION_RISK_LEVEL]>];
+const eventWorkstreamStatusValues = Object.values(EVENT_WORKSTREAM_STATUS) as [typeof EVENT_WORKSTREAM_STATUS[keyof typeof EVENT_WORKSTREAM_STATUS], ...Array<typeof EVENT_WORKSTREAM_STATUS[keyof typeof EVENT_WORKSTREAM_STATUS]>];
+const eventSupplierStatusValues = Object.values(EVENT_SUPPLIER_STATUS) as [typeof EVENT_SUPPLIER_STATUS[keyof typeof EVENT_SUPPLIER_STATUS], ...Array<typeof EVENT_SUPPLIER_STATUS[keyof typeof EVENT_SUPPLIER_STATUS]>];
+const eventQuoteStatusValues = Object.values(EVENT_QUOTE_STATUS) as [typeof EVENT_QUOTE_STATUS[keyof typeof EVENT_QUOTE_STATUS], ...Array<typeof EVENT_QUOTE_STATUS[keyof typeof EVENT_QUOTE_STATUS]>];
+const eventCommitmentStatusValues = Object.values(EVENT_COMMITMENT_STATUS) as [typeof EVENT_COMMITMENT_STATUS[keyof typeof EVENT_COMMITMENT_STATUS], ...Array<typeof EVENT_COMMITMENT_STATUS[keyof typeof EVENT_COMMITMENT_STATUS]>];
+const eventObjectiveTypeValues = Object.values(EVENT_OBJECTIVE_TYPE) as [typeof EVENT_OBJECTIVE_TYPE[keyof typeof EVENT_OBJECTIVE_TYPE], ...Array<typeof EVENT_OBJECTIVE_TYPE[keyof typeof EVENT_OBJECTIVE_TYPE]>];
+const eventObjectiveStatusValues = Object.values(EVENT_OBJECTIVE_STATUS) as [typeof EVENT_OBJECTIVE_STATUS[keyof typeof EVENT_OBJECTIVE_STATUS], ...Array<typeof EVENT_OBJECTIVE_STATUS[keyof typeof EVENT_OBJECTIVE_STATUS]>];
+const eventBudgetLineTypeValues = Object.values(EVENT_BUDGET_LINE_TYPE) as [typeof EVENT_BUDGET_LINE_TYPE[keyof typeof EVENT_BUDGET_LINE_TYPE], ...Array<typeof EVENT_BUDGET_LINE_TYPE[keyof typeof EVENT_BUDGET_LINE_TYPE]>];
+const eventBudgetLineStatusValues = Object.values(EVENT_BUDGET_LINE_STATUS) as [typeof EVENT_BUDGET_LINE_STATUS[keyof typeof EVENT_BUDGET_LINE_STATUS], ...Array<typeof EVENT_BUDGET_LINE_STATUS[keyof typeof EVENT_BUDGET_LINE_STATUS]>];
+
+const isoDateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const currencySchema = z.string().length(3).regex(/^[A-Z]{3}$/).default('EUR');
+const optionalSanitizedUrlSchema = z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : val);
+
+export const upsertEventOperationPlanSchema = z.object({
+  status: z.enum(eventOperationStatusValues).default(EVENT_OPERATION_STATUS.PLANNING),
+  ownerEmail: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  summary: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  dueDate: isoDateOnlySchema.optional().nullable(),
+  riskLevel: z.enum(eventOperationRiskLevelValues).default(EVENT_OPERATION_RISK_LEVEL.NORMAL),
+  notes: z.string().max(5000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+});
+
+export const insertEventWorkstreamSchema = z.object({
+  name: z.string().min(2).max(200).transform(sanitizeText),
+  description: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  category: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  status: z.enum(eventWorkstreamStatusValues).default(EVENT_WORKSTREAM_STATUS.TODO),
+  ownerEmail: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  dueDate: isoDateOnlySchema.optional().nullable(),
+  priority: z.number().int().min(1).max(5).default(3),
+  orderIndex: z.number().int().min(0).max(10000).default(0),
+});
+export const updateEventWorkstreamSchema = insertEventWorkstreamSchema.partial();
+
+export const insertEventSupplierCandidateSchema = z.object({
+  workstreamId: z.string().uuid().optional().nullable(),
+  name: z.string().min(2).max(240).transform(sanitizeText),
+  category: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  contactName: z.string().max(200).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  contactEmail: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  contactPhone: z.string().max(80).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  website: optionalSanitizedUrlSchema,
+  status: z.enum(eventSupplierStatusValues).default(EVENT_SUPPLIER_STATUS.IDENTIFIED),
+  rating: z.number().int().min(1).max(5).optional().nullable(),
+  notes: z.string().max(5000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+});
+export const updateEventSupplierCandidateSchema = insertEventSupplierCandidateSchema.partial();
+
+export const insertEventSupplierQuoteSchema = z.object({
+  supplierId: z.string().uuid(),
+  workstreamId: z.string().uuid().optional().nullable(),
+  title: z.string().min(2).max(240).transform(sanitizeText),
+  amountInCents: z.number().int().min(0).max(1000000000).default(0),
+  currency: currencySchema,
+  status: z.enum(eventQuoteStatusValues).default(EVENT_QUOTE_STATUS.REQUESTED),
+  validUntil: isoDateOnlySchema.optional().nullable(),
+  documentUrl: optionalSanitizedUrlSchema,
+  terms: z.string().max(5000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  notes: z.string().max(5000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+});
+export const updateEventSupplierQuoteSchema = insertEventSupplierQuoteSchema.partial();
+
+export const insertEventSupplierCommitmentSchema = z.object({
+  supplierId: z.string().uuid(),
+  quoteId: z.string().uuid().optional().nullable(),
+  workstreamId: z.string().uuid().optional().nullable(),
+  title: z.string().min(2).max(240).transform(sanitizeText),
+  committedAmountInCents: z.number().int().min(0).max(1000000000).default(0),
+  actualAmountInCents: z.number().int().min(0).max(1000000000).optional().nullable(),
+  currency: currencySchema,
+  status: z.enum(eventCommitmentStatusValues).default(EVENT_COMMITMENT_STATUS.PLANNED),
+  dueDate: isoDateOnlySchema.optional().nullable(),
+  paidAt: z.string().datetime().optional().nullable(),
+  notes: z.string().max(5000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+});
+export const updateEventSupplierCommitmentSchema = insertEventSupplierCommitmentSchema.partial();
+
+export const insertEventObjectiveSchema = z.object({
+  type: z.enum(eventObjectiveTypeValues),
+  label: z.string().min(2).max(200).transform(sanitizeText),
+  targetValue: z.number().int().min(0).max(1000000000).default(0),
+  currentValue: z.number().int().min(0).max(1000000000).default(0),
+  unit: z.string().max(80).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  status: z.enum(eventObjectiveStatusValues).default(EVENT_OBJECTIVE_STATUS.TRACKING),
+  notes: z.string().max(5000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+});
+export const updateEventObjectiveSchema = insertEventObjectiveSchema.partial();
+
+export const insertEventBudgetLineSchema = z.object({
+  workstreamId: z.string().uuid().optional().nullable(),
+  supplierId: z.string().uuid().optional().nullable(),
+  quoteId: z.string().uuid().optional().nullable(),
+  commitmentId: z.string().uuid().optional().nullable(),
+  financialBudgetId: z.string().uuid().optional().nullable(),
+  financialExpenseId: z.string().uuid().optional().nullable(),
+  financialRevenueId: z.string().uuid().optional().nullable(),
+  type: z.enum(eventBudgetLineTypeValues),
+  label: z.string().min(2).max(240).transform(sanitizeText),
+  category: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  plannedAmountInCents: z.number().int().min(0).max(1000000000).default(0),
+  committedAmountInCents: z.number().int().min(0).max(1000000000).default(0),
+  actualAmountInCents: z.number().int().min(0).max(1000000000).default(0),
+  currency: currencySchema,
+  status: z.enum(eventBudgetLineStatusValues).default(EVENT_BUDGET_LINE_STATUS.PLANNED),
+  notes: z.string().max(5000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+});
+export const updateEventBudgetLineSchema = insertEventBudgetLineSchema.partial();
 
 // Ultra-secure insert schemas with validation - Pure Zod v4 schema (avoiding drizzle-zod type recursion)
 export const insertAdminSchema = z.object({
@@ -3347,6 +3811,27 @@ export type SubmitTrainingInterest = z.infer<typeof submitTrainingInterestSchema
 export type InsertTrainingInterest = z.infer<typeof insertTrainingInterestSchema>;
 export type InsertTrainingSyncRun = z.infer<typeof insertTrainingSyncRunSchema>;
 
+export type EventOperationPlan = typeof eventOperationPlans.$inferSelect;
+export type EventWorkstream = typeof eventWorkstreams.$inferSelect;
+export type EventSupplierCandidate = typeof eventSupplierCandidates.$inferSelect;
+export type EventSupplierQuote = typeof eventSupplierQuotes.$inferSelect;
+export type EventSupplierCommitment = typeof eventSupplierCommitments.$inferSelect;
+export type EventObjective = typeof eventObjectives.$inferSelect;
+export type EventBudgetLine = typeof eventBudgetLines.$inferSelect;
+export type UpsertEventOperationPlan = z.infer<typeof upsertEventOperationPlanSchema>;
+export type InsertEventWorkstream = z.infer<typeof insertEventWorkstreamSchema>;
+export type UpdateEventWorkstream = z.infer<typeof updateEventWorkstreamSchema>;
+export type InsertEventSupplierCandidate = z.infer<typeof insertEventSupplierCandidateSchema>;
+export type UpdateEventSupplierCandidate = z.infer<typeof updateEventSupplierCandidateSchema>;
+export type InsertEventSupplierQuote = z.infer<typeof insertEventSupplierQuoteSchema>;
+export type UpdateEventSupplierQuote = z.infer<typeof updateEventSupplierQuoteSchema>;
+export type InsertEventSupplierCommitment = z.infer<typeof insertEventSupplierCommitmentSchema>;
+export type UpdateEventSupplierCommitment = z.infer<typeof updateEventSupplierCommitmentSchema>;
+export type InsertEventObjective = z.infer<typeof insertEventObjectiveSchema>;
+export type UpdateEventObjective = z.infer<typeof updateEventObjectiveSchema>;
+export type InsertEventBudgetLine = z.infer<typeof insertEventBudgetLineSchema>;
+export type UpdateEventBudgetLine = z.infer<typeof updateEventBudgetLineSchema>;
+
 export type LoanItem = typeof loanItems.$inferSelect;
 export type InsertLoanItem = z.infer<typeof insertLoanItemSchema>;
 
@@ -3483,6 +3968,12 @@ export const hasPermission = (userRole: string, permission: string): boolean => 
     case 'events.delete':
     case 'events.manage':
       return userRole === ADMIN_ROLES.EVENTS_MANAGER;
+    case 'event_ops.view':
+      return ([ADMIN_ROLES.EVENTS_READER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
+    case 'event_ops.write':
+    case 'event_ops.manage':
+    case 'event_ops.export':
+      return userRole === ADMIN_ROLES.EVENTS_MANAGER;
     case 'forms.view':
     case 'forms.read':
       return ([ADMIN_ROLES.IDEAS_READER, ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_READER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
@@ -3548,9 +4039,9 @@ export const getRolePermissions = (role: string): string[] => {
     case ADMIN_ROLES.IDEAS_MANAGER:
       return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes', 'Gestion des formulaires', 'Gestion des formations', 'Gestion des intégrations', 'Gestion des automations'];
     case ADMIN_ROLES.EVENTS_READER:
-      return ['Consultation des événements', 'Consultation des formulaires'];
+      return ['Consultation des événements', 'Consultation du pilotage événements', 'Consultation des formulaires'];
     case ADMIN_ROLES.EVENTS_MANAGER:
-      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences', 'Gestion des formulaires', 'Gestion des formations', 'Gestion des intégrations', 'Gestion des automations'];
+      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences', 'Pilotage opérationnel des événements', 'Gestion des formulaires', 'Gestion des formations', 'Gestion des intégrations', 'Gestion des automations'];
     default:
       return [];
   }

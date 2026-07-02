@@ -44,6 +44,9 @@ const triggerOptions = [
   { value: 'form.response.created', label: 'Réponse formulaire créée' },
   { value: 'member.created', label: 'Membre créé' },
   { value: 'event.created', label: 'Événement créé' },
+  { value: 'event_ops.plan.updated', label: 'Pilotage événement mis à jour' },
+  { value: 'event_ops.supplier.selected', label: 'Prestataire événement retenu' },
+  { value: 'event_ops.budget.threshold_exceeded', label: 'Budget événement dépassé' },
 ];
 
 const defaultDefinition = `{

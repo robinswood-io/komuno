@@ -113,6 +113,7 @@ export const queryKeys = {
     detail: (id: string) => ['events', 'detail', id] as const,
     inscriptions: (eventId: string) => ['events', 'inscriptions', eventId] as const,
     stats: () => ['events', 'stats'] as const,
+    operations: (eventId: string) => ['events', 'operations', eventId] as const,
   },
 
   // Loans

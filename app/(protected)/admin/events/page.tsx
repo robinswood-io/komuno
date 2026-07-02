@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys, type PaginatedResponse } from '@/lib/api/client';
@@ -18,7 +19,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Pencil, Trash2, Users, Calendar, MapPin, Eye } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Users, Calendar, MapPin, Eye, WalletCards } from 'lucide-react';
 import EventDetailModal from '@/components/event-detail-modal';
 import {
   Dialog,
@@ -515,6 +516,16 @@ export default function AdminEventsPage() {
                           title="Voir détails et inscriptions"
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                          title="Pilotage opérationnel"
+                        >
+                          <Link href={`/admin/events/${event.id}/operations`}>
+                            <WalletCards className="h-4 w-4" />
+                          </Link>
                         </Button>
                         <Button
                           variant="ghost"

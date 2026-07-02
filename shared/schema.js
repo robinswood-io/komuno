@@ -28,7 +28,17 @@ __export(schema_exports, {
   CJD_ROLE_LABELS: () => CJD_ROLE_LABELS,
   DatabaseError: () => DatabaseError,
   DuplicateError: () => DuplicateError,
+  EVENT_BUDGET_LINE_STATUS: () => EVENT_BUDGET_LINE_STATUS,
+  EVENT_BUDGET_LINE_TYPE: () => EVENT_BUDGET_LINE_TYPE,
+  EVENT_COMMITMENT_STATUS: () => EVENT_COMMITMENT_STATUS,
+  EVENT_OBJECTIVE_STATUS: () => EVENT_OBJECTIVE_STATUS,
+  EVENT_OBJECTIVE_TYPE: () => EVENT_OBJECTIVE_TYPE,
+  EVENT_OPERATION_RISK_LEVEL: () => EVENT_OPERATION_RISK_LEVEL,
+  EVENT_OPERATION_STATUS: () => EVENT_OPERATION_STATUS,
+  EVENT_QUOTE_STATUS: () => EVENT_QUOTE_STATUS,
   EVENT_STATUS: () => EVENT_STATUS,
+  EVENT_SUPPLIER_STATUS: () => EVENT_SUPPLIER_STATUS,
+  EVENT_WORKSTREAM_STATUS: () => EVENT_WORKSTREAM_STATUS,
   FEDERATION_STATUS: () => FEDERATION_STATUS,
   FEDERATION_SYNC_STATUS: () => FEDERATION_SYNC_STATUS,
   FEDERATION_VISIBILITY: () => FEDERATION_VISIBILITY,
@@ -89,11 +99,25 @@ __export(schema_exports, {
   developmentRequests: () => developmentRequests,
   duplicateMemberGroupSchema: () => duplicateMemberGroupSchema,
   emailConfig: () => emailConfig,
+  eventBudgetLines: () => eventBudgetLines,
+  eventBudgetLinesRelations: () => eventBudgetLinesRelations,
+  eventObjectives: () => eventObjectives,
+  eventObjectivesRelations: () => eventObjectivesRelations,
+  eventOperationPlans: () => eventOperationPlans,
+  eventOperationPlansRelations: () => eventOperationPlansRelations,
   eventRegistrations: () => eventRegistrations,
   eventSponsorships: () => eventSponsorships,
   eventSponsorshipsRelations: () => eventSponsorshipsRelations,
+  eventSupplierCandidates: () => eventSupplierCandidates,
+  eventSupplierCandidatesRelations: () => eventSupplierCandidatesRelations,
+  eventSupplierCommitments: () => eventSupplierCommitments,
+  eventSupplierCommitmentsRelations: () => eventSupplierCommitmentsRelations,
+  eventSupplierQuotes: () => eventSupplierQuotes,
+  eventSupplierQuotesRelations: () => eventSupplierQuotesRelations,
   eventSyndications: () => eventSyndications,
   eventSyndicationsRelations: () => eventSyndicationsRelations,
+  eventWorkstreams: () => eventWorkstreams,
+  eventWorkstreamsRelations: () => eventWorkstreamsRelations,
   events: () => events,
   eventsRelations: () => eventsRelations,
   featureConfig: () => featureConfig,
@@ -126,10 +150,16 @@ __export(schema_exports, {
   insertBusinessAuditLogSchema: () => insertBusinessAuditLogSchema,
   insertDevelopmentRequestSchema: () => insertDevelopmentRequestSchema,
   insertEmailConfigSchema: () => insertEmailConfigSchema,
+  insertEventBudgetLineSchema: () => insertEventBudgetLineSchema,
+  insertEventObjectiveSchema: () => insertEventObjectiveSchema,
   insertEventRegistrationSchema: () => insertEventRegistrationSchema,
   insertEventSchema: () => insertEventSchema,
   insertEventSponsorshipSchema: () => insertEventSponsorshipSchema,
+  insertEventSupplierCandidateSchema: () => insertEventSupplierCandidateSchema,
+  insertEventSupplierCommitmentSchema: () => insertEventSupplierCommitmentSchema,
+  insertEventSupplierQuoteSchema: () => insertEventSupplierQuoteSchema,
   insertEventSyndicationSchema: () => insertEventSyndicationSchema,
+  insertEventWorkstreamSchema: () => insertEventWorkstreamSchema,
   insertFeatureConfigSchema: () => insertFeatureConfigSchema,
   insertFinancialBudgetSchema: () => insertFinancialBudgetSchema,
   insertFinancialCategorySchema: () => insertFinancialCategorySchema,
@@ -256,10 +286,16 @@ __export(schema_exports, {
   updateAutomationWorkflowStatusSchema: () => updateAutomationWorkflowStatusSchema,
   updateDevelopmentRequestSchema: () => updateDevelopmentRequestSchema,
   updateDevelopmentRequestStatusSchema: () => updateDevelopmentRequestStatusSchema,
+  updateEventBudgetLineSchema: () => updateEventBudgetLineSchema,
+  updateEventObjectiveSchema: () => updateEventObjectiveSchema,
   updateEventSchema: () => updateEventSchema,
   updateEventSponsorshipSchema: () => updateEventSponsorshipSchema,
   updateEventStatusSchema: () => updateEventStatusSchema,
+  updateEventSupplierCandidateSchema: () => updateEventSupplierCandidateSchema,
+  updateEventSupplierCommitmentSchema: () => updateEventSupplierCommitmentSchema,
+  updateEventSupplierQuoteSchema: () => updateEventSupplierQuoteSchema,
   updateEventSyndicationSchema: () => updateEventSyndicationSchema,
+  updateEventWorkstreamSchema: () => updateEventWorkstreamSchema,
   updateFinancialBudgetSchema: () => updateFinancialBudgetSchema,
   updateFinancialCategorySchema: () => updateFinancialCategorySchema,
   updateFinancialExpenseSchema: () => updateFinancialExpenseSchema,
@@ -296,6 +332,7 @@ __export(schema_exports, {
   updateTrainingInterestStatusSchema: () => updateTrainingInterestStatusSchema,
   updateTrainingProgramSchema: () => updateTrainingProgramSchema,
   updateTrainingSessionSchema: () => updateTrainingSessionSchema,
+  upsertEventOperationPlanSchema: () => upsertEventOperationPlanSchema,
   users: () => users,
   votes: () => votes,
   votesRelations: () => votesRelations
@@ -489,6 +526,72 @@ const TRAINING_SYNC_STATUS = {
 const TRAINING_SYNC_DIRECTION = {
   DOWNSTREAM_CATALOG: "downstream_catalog",
   UPSTREAM_INTERESTS: "upstream_interests"
+};
+const EVENT_OPERATION_STATUS = {
+  PLANNING: "planning",
+  IN_PROGRESS: "in_progress",
+  READY: "ready",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled"
+};
+const EVENT_OPERATION_RISK_LEVEL = {
+  LOW: "low",
+  NORMAL: "normal",
+  HIGH: "high",
+  CRITICAL: "critical"
+};
+const EVENT_WORKSTREAM_STATUS = {
+  TODO: "todo",
+  IN_PROGRESS: "in_progress",
+  BLOCKED: "blocked",
+  DONE: "done",
+  CANCELLED: "cancelled"
+};
+const EVENT_SUPPLIER_STATUS = {
+  IDENTIFIED: "identified",
+  CONTACTED: "contacted",
+  QUOTE_REQUESTED: "quote_requested",
+  SELECTED: "selected",
+  REJECTED: "rejected",
+  CANCELLED: "cancelled"
+};
+const EVENT_QUOTE_STATUS = {
+  REQUESTED: "requested",
+  RECEIVED: "received",
+  ACCEPTED: "accepted",
+  REJECTED: "rejected",
+  EXPIRED: "expired"
+};
+const EVENT_COMMITMENT_STATUS = {
+  PLANNED: "planned",
+  CONTRACTED: "contracted",
+  DELIVERED: "delivered",
+  PAID: "paid",
+  CANCELLED: "cancelled"
+};
+const EVENT_OBJECTIVE_TYPE = {
+  PARTICIPANTS: "participants",
+  REVENUE: "revenue",
+  MARGIN: "margin",
+  SPONSORS: "sponsors",
+  SATISFACTION: "satisfaction",
+  CUSTOM: "custom"
+};
+const EVENT_OBJECTIVE_STATUS = {
+  TRACKING: "tracking",
+  AT_RISK: "at_risk",
+  ACHIEVED: "achieved",
+  MISSED: "missed"
+};
+const EVENT_BUDGET_LINE_TYPE = {
+  INCOME: "income",
+  EXPENSE: "expense"
+};
+const EVENT_BUDGET_LINE_STATUS = {
+  PLANNED: "planned",
+  COMMITTED: "committed",
+  ACTUAL: "actual",
+  CANCELLED: "cancelled"
 };
 const ideas = (0, import_pg_core.pgTable)("ideas", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -738,6 +841,171 @@ const eventSyndications = (0, import_pg_core.pgTable)("event_syndications", {
   syncStatusIdx: (0, import_pg_core.index)("event_syndications_sync_status_idx").on(table.syncStatus),
   remoteEventIdx: (0, import_pg_core.index)("event_syndications_remote_event_idx").on(table.remoteEventId),
   remoteSyndicationIdx: (0, import_pg_core.index)("event_syndications_remote_syndication_idx").on(table.remoteSyndicationId)
+}));
+const eventOperationPlans = (0, import_pg_core.pgTable)("event_operation_plans", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  status: (0, import_pg_core.text)("status").default(EVENT_OPERATION_STATUS.PLANNING).notNull(),
+  ownerEmail: (0, import_pg_core.text)("owner_email"),
+  summary: (0, import_pg_core.text)("summary"),
+  dueDate: (0, import_pg_core.date)("due_date"),
+  riskLevel: (0, import_pg_core.text)("risk_level").default(EVENT_OPERATION_RISK_LEVEL.NORMAL).notNull(),
+  notes: (0, import_pg_core.text)("notes"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  eventUniqueIdx: (0, import_pg_core.uniqueIndex)("event_operation_plans_event_unique").on(table.eventId),
+  statusIdx: (0, import_pg_core.index)("event_operation_plans_status_idx").on(table.status),
+  ownerIdx: (0, import_pg_core.index)("event_operation_plans_owner_idx").on(table.ownerEmail),
+  dueDateIdx: (0, import_pg_core.index)("event_operation_plans_due_date_idx").on(table.dueDate)
+}));
+const eventWorkstreams = (0, import_pg_core.pgTable)("event_workstreams", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  name: (0, import_pg_core.text)("name").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  category: (0, import_pg_core.text)("category"),
+  status: (0, import_pg_core.text)("status").default(EVENT_WORKSTREAM_STATUS.TODO).notNull(),
+  ownerEmail: (0, import_pg_core.text)("owner_email"),
+  dueDate: (0, import_pg_core.date)("due_date"),
+  priority: (0, import_pg_core.integer)("priority").default(3).notNull(),
+  orderIndex: (0, import_pg_core.integer)("order_index").default(0).notNull(),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  eventIdx: (0, import_pg_core.index)("event_workstreams_event_idx").on(table.eventId),
+  statusIdx: (0, import_pg_core.index)("event_workstreams_status_idx").on(table.status),
+  ownerIdx: (0, import_pg_core.index)("event_workstreams_owner_idx").on(table.ownerEmail),
+  dueDateIdx: (0, import_pg_core.index)("event_workstreams_due_date_idx").on(table.dueDate),
+  orderIdx: (0, import_pg_core.index)("event_workstreams_order_idx").on(table.eventId, table.orderIndex)
+}));
+const eventSupplierCandidates = (0, import_pg_core.pgTable)("event_supplier_candidates", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  workstreamId: (0, import_pg_core.varchar)("workstream_id").references(() => eventWorkstreams.id, { onDelete: "set null" }),
+  name: (0, import_pg_core.text)("name").notNull(),
+  category: (0, import_pg_core.text)("category"),
+  contactName: (0, import_pg_core.text)("contact_name"),
+  contactEmail: (0, import_pg_core.text)("contact_email"),
+  contactPhone: (0, import_pg_core.text)("contact_phone"),
+  website: (0, import_pg_core.text)("website"),
+  status: (0, import_pg_core.text)("status").default(EVENT_SUPPLIER_STATUS.IDENTIFIED).notNull(),
+  rating: (0, import_pg_core.integer)("rating"),
+  notes: (0, import_pg_core.text)("notes"),
+  selectedAt: (0, import_pg_core.timestamp)("selected_at"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  eventIdx: (0, import_pg_core.index)("event_supplier_candidates_event_idx").on(table.eventId),
+  workstreamIdx: (0, import_pg_core.index)("event_supplier_candidates_workstream_idx").on(table.workstreamId),
+  statusIdx: (0, import_pg_core.index)("event_supplier_candidates_status_idx").on(table.status),
+  categoryIdx: (0, import_pg_core.index)("event_supplier_candidates_category_idx").on(table.category)
+}));
+const eventSupplierQuotes = (0, import_pg_core.pgTable)("event_supplier_quotes", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  supplierId: (0, import_pg_core.varchar)("supplier_id").references(() => eventSupplierCandidates.id, { onDelete: "cascade" }).notNull(),
+  workstreamId: (0, import_pg_core.varchar)("workstream_id").references(() => eventWorkstreams.id, { onDelete: "set null" }),
+  title: (0, import_pg_core.text)("title").notNull(),
+  amountInCents: (0, import_pg_core.integer)("amount_in_cents").default(0).notNull(),
+  currency: (0, import_pg_core.varchar)("currency", { length: 3 }).default("EUR").notNull(),
+  status: (0, import_pg_core.text)("status").default(EVENT_QUOTE_STATUS.REQUESTED).notNull(),
+  validUntil: (0, import_pg_core.date)("valid_until"),
+  documentUrl: (0, import_pg_core.text)("document_url"),
+  terms: (0, import_pg_core.text)("terms"),
+  notes: (0, import_pg_core.text)("notes"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  eventIdx: (0, import_pg_core.index)("event_supplier_quotes_event_idx").on(table.eventId),
+  supplierIdx: (0, import_pg_core.index)("event_supplier_quotes_supplier_idx").on(table.supplierId),
+  workstreamIdx: (0, import_pg_core.index)("event_supplier_quotes_workstream_idx").on(table.workstreamId),
+  statusIdx: (0, import_pg_core.index)("event_supplier_quotes_status_idx").on(table.status),
+  validUntilIdx: (0, import_pg_core.index)("event_supplier_quotes_valid_until_idx").on(table.validUntil)
+}));
+const eventSupplierCommitments = (0, import_pg_core.pgTable)("event_supplier_commitments", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  supplierId: (0, import_pg_core.varchar)("supplier_id").references(() => eventSupplierCandidates.id, { onDelete: "restrict" }).notNull(),
+  quoteId: (0, import_pg_core.varchar)("quote_id").references(() => eventSupplierQuotes.id, { onDelete: "set null" }),
+  workstreamId: (0, import_pg_core.varchar)("workstream_id").references(() => eventWorkstreams.id, { onDelete: "set null" }),
+  title: (0, import_pg_core.text)("title").notNull(),
+  committedAmountInCents: (0, import_pg_core.integer)("committed_amount_in_cents").default(0).notNull(),
+  actualAmountInCents: (0, import_pg_core.integer)("actual_amount_in_cents"),
+  currency: (0, import_pg_core.varchar)("currency", { length: 3 }).default("EUR").notNull(),
+  status: (0, import_pg_core.text)("status").default(EVENT_COMMITMENT_STATUS.PLANNED).notNull(),
+  dueDate: (0, import_pg_core.date)("due_date"),
+  paidAt: (0, import_pg_core.timestamp)("paid_at"),
+  notes: (0, import_pg_core.text)("notes"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  eventIdx: (0, import_pg_core.index)("event_supplier_commitments_event_idx").on(table.eventId),
+  supplierIdx: (0, import_pg_core.index)("event_supplier_commitments_supplier_idx").on(table.supplierId),
+  quoteIdx: (0, import_pg_core.index)("event_supplier_commitments_quote_idx").on(table.quoteId),
+  workstreamIdx: (0, import_pg_core.index)("event_supplier_commitments_workstream_idx").on(table.workstreamId),
+  statusIdx: (0, import_pg_core.index)("event_supplier_commitments_status_idx").on(table.status),
+  dueDateIdx: (0, import_pg_core.index)("event_supplier_commitments_due_date_idx").on(table.dueDate)
+}));
+const eventObjectives = (0, import_pg_core.pgTable)("event_objectives", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  type: (0, import_pg_core.text)("type").notNull(),
+  label: (0, import_pg_core.text)("label").notNull(),
+  targetValue: (0, import_pg_core.integer)("target_value").default(0).notNull(),
+  currentValue: (0, import_pg_core.integer)("current_value").default(0).notNull(),
+  unit: (0, import_pg_core.text)("unit"),
+  status: (0, import_pg_core.text)("status").default(EVENT_OBJECTIVE_STATUS.TRACKING).notNull(),
+  notes: (0, import_pg_core.text)("notes"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  eventIdx: (0, import_pg_core.index)("event_objectives_event_idx").on(table.eventId),
+  typeIdx: (0, import_pg_core.index)("event_objectives_type_idx").on(table.type),
+  statusIdx: (0, import_pg_core.index)("event_objectives_status_idx").on(table.status)
+}));
+const eventBudgetLines = (0, import_pg_core.pgTable)("event_budget_lines", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  eventId: (0, import_pg_core.varchar)("event_id").references(() => events.id, { onDelete: "cascade" }).notNull(),
+  workstreamId: (0, import_pg_core.varchar)("workstream_id").references(() => eventWorkstreams.id, { onDelete: "set null" }),
+  supplierId: (0, import_pg_core.varchar)("supplier_id").references(() => eventSupplierCandidates.id, { onDelete: "set null" }),
+  quoteId: (0, import_pg_core.varchar)("quote_id").references(() => eventSupplierQuotes.id, { onDelete: "set null" }),
+  commitmentId: (0, import_pg_core.varchar)("commitment_id").references(() => eventSupplierCommitments.id, { onDelete: "set null" }),
+  financialBudgetId: (0, import_pg_core.varchar)("financial_budget_id").references(() => financialBudgets.id, { onDelete: "set null" }),
+  financialExpenseId: (0, import_pg_core.varchar)("financial_expense_id").references(() => financialExpenses.id, { onDelete: "set null" }),
+  financialRevenueId: (0, import_pg_core.varchar)("financial_revenue_id").references(() => financialRevenues.id, { onDelete: "set null" }),
+  type: (0, import_pg_core.text)("type").notNull(),
+  label: (0, import_pg_core.text)("label").notNull(),
+  category: (0, import_pg_core.text)("category"),
+  plannedAmountInCents: (0, import_pg_core.integer)("planned_amount_in_cents").default(0).notNull(),
+  committedAmountInCents: (0, import_pg_core.integer)("committed_amount_in_cents").default(0).notNull(),
+  actualAmountInCents: (0, import_pg_core.integer)("actual_amount_in_cents").default(0).notNull(),
+  currency: (0, import_pg_core.varchar)("currency", { length: 3 }).default("EUR").notNull(),
+  status: (0, import_pg_core.text)("status").default(EVENT_BUDGET_LINE_STATUS.PLANNED).notNull(),
+  notes: (0, import_pg_core.text)("notes"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  eventIdx: (0, import_pg_core.index)("event_budget_lines_event_idx").on(table.eventId),
+  workstreamIdx: (0, import_pg_core.index)("event_budget_lines_workstream_idx").on(table.workstreamId),
+  supplierIdx: (0, import_pg_core.index)("event_budget_lines_supplier_idx").on(table.supplierId),
+  typeIdx: (0, import_pg_core.index)("event_budget_lines_type_idx").on(table.type),
+  statusIdx: (0, import_pg_core.index)("event_budget_lines_status_idx").on(table.status),
+  financialBudgetIdx: (0, import_pg_core.index)("event_budget_lines_financial_budget_idx").on(table.financialBudgetId)
 }));
 const surveyForms = (0, import_pg_core.pgTable)("survey_forms", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -1965,7 +2233,106 @@ const eventsRelations = (0, import_drizzle_orm.relations)(events, ({ one, many }
   inscriptions: many(inscriptions),
   unsubscriptions: many(unsubscriptions),
   sponsorships: many(eventSponsorships),
-  syndications: many(eventSyndications)
+  syndications: many(eventSyndications),
+  operationPlans: many(eventOperationPlans),
+  workstreams: many(eventWorkstreams),
+  supplierCandidates: many(eventSupplierCandidates),
+  supplierQuotes: many(eventSupplierQuotes),
+  supplierCommitments: many(eventSupplierCommitments),
+  objectives: many(eventObjectives),
+  budgetLines: many(eventBudgetLines)
+}));
+const eventOperationPlansRelations = (0, import_drizzle_orm.relations)(eventOperationPlans, ({ one }) => ({
+  event: one(events, {
+    fields: [eventOperationPlans.eventId],
+    references: [events.id]
+  })
+}));
+const eventWorkstreamsRelations = (0, import_drizzle_orm.relations)(eventWorkstreams, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventWorkstreams.eventId],
+    references: [events.id]
+  }),
+  supplierCandidates: many(eventSupplierCandidates),
+  supplierQuotes: many(eventSupplierQuotes),
+  supplierCommitments: many(eventSupplierCommitments),
+  budgetLines: many(eventBudgetLines)
+}));
+const eventSupplierCandidatesRelations = (0, import_drizzle_orm.relations)(eventSupplierCandidates, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventSupplierCandidates.eventId],
+    references: [events.id]
+  }),
+  workstream: one(eventWorkstreams, {
+    fields: [eventSupplierCandidates.workstreamId],
+    references: [eventWorkstreams.id]
+  }),
+  quotes: many(eventSupplierQuotes),
+  commitments: many(eventSupplierCommitments),
+  budgetLines: many(eventBudgetLines)
+}));
+const eventSupplierQuotesRelations = (0, import_drizzle_orm.relations)(eventSupplierQuotes, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventSupplierQuotes.eventId],
+    references: [events.id]
+  }),
+  supplier: one(eventSupplierCandidates, {
+    fields: [eventSupplierQuotes.supplierId],
+    references: [eventSupplierCandidates.id]
+  }),
+  workstream: one(eventWorkstreams, {
+    fields: [eventSupplierQuotes.workstreamId],
+    references: [eventWorkstreams.id]
+  }),
+  commitments: many(eventSupplierCommitments),
+  budgetLines: many(eventBudgetLines)
+}));
+const eventSupplierCommitmentsRelations = (0, import_drizzle_orm.relations)(eventSupplierCommitments, ({ one, many }) => ({
+  event: one(events, {
+    fields: [eventSupplierCommitments.eventId],
+    references: [events.id]
+  }),
+  supplier: one(eventSupplierCandidates, {
+    fields: [eventSupplierCommitments.supplierId],
+    references: [eventSupplierCandidates.id]
+  }),
+  quote: one(eventSupplierQuotes, {
+    fields: [eventSupplierCommitments.quoteId],
+    references: [eventSupplierQuotes.id]
+  }),
+  workstream: one(eventWorkstreams, {
+    fields: [eventSupplierCommitments.workstreamId],
+    references: [eventWorkstreams.id]
+  }),
+  budgetLines: many(eventBudgetLines)
+}));
+const eventObjectivesRelations = (0, import_drizzle_orm.relations)(eventObjectives, ({ one }) => ({
+  event: one(events, {
+    fields: [eventObjectives.eventId],
+    references: [events.id]
+  })
+}));
+const eventBudgetLinesRelations = (0, import_drizzle_orm.relations)(eventBudgetLines, ({ one }) => ({
+  event: one(events, {
+    fields: [eventBudgetLines.eventId],
+    references: [events.id]
+  }),
+  workstream: one(eventWorkstreams, {
+    fields: [eventBudgetLines.workstreamId],
+    references: [eventWorkstreams.id]
+  }),
+  supplier: one(eventSupplierCandidates, {
+    fields: [eventBudgetLines.supplierId],
+    references: [eventSupplierCandidates.id]
+  }),
+  quote: one(eventSupplierQuotes, {
+    fields: [eventBudgetLines.quoteId],
+    references: [eventSupplierQuotes.id]
+  }),
+  commitment: one(eventSupplierCommitments, {
+    fields: [eventBudgetLines.commitmentId],
+    references: [eventSupplierCommitments.id]
+  })
 }));
 const eventSyndicationsRelations = (0, import_drizzle_orm.relations)(eventSyndications, ({ one }) => ({
   event: one(events, {
@@ -2392,6 +2759,107 @@ const insertTrainingSyncRunSchema = import_zod.z.object({
   error: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
   metadata: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({})
 });
+const eventOperationStatusValues = Object.values(EVENT_OPERATION_STATUS);
+const eventOperationRiskLevelValues = Object.values(EVENT_OPERATION_RISK_LEVEL);
+const eventWorkstreamStatusValues = Object.values(EVENT_WORKSTREAM_STATUS);
+const eventSupplierStatusValues = Object.values(EVENT_SUPPLIER_STATUS);
+const eventQuoteStatusValues = Object.values(EVENT_QUOTE_STATUS);
+const eventCommitmentStatusValues = Object.values(EVENT_COMMITMENT_STATUS);
+const eventObjectiveTypeValues = Object.values(EVENT_OBJECTIVE_TYPE);
+const eventObjectiveStatusValues = Object.values(EVENT_OBJECTIVE_STATUS);
+const eventBudgetLineTypeValues = Object.values(EVENT_BUDGET_LINE_TYPE);
+const eventBudgetLineStatusValues = Object.values(EVENT_BUDGET_LINE_STATUS);
+const isoDateOnlySchema = import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const currencySchema = import_zod.z.string().length(3).regex(/^[A-Z]{3}$/).default("EUR");
+const optionalSanitizedUrlSchema = import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : val);
+const upsertEventOperationPlanSchema = import_zod.z.object({
+  status: import_zod.z.enum(eventOperationStatusValues).default(EVENT_OPERATION_STATUS.PLANNING),
+  ownerEmail: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  summary: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  dueDate: isoDateOnlySchema.optional().nullable(),
+  riskLevel: import_zod.z.enum(eventOperationRiskLevelValues).default(EVENT_OPERATION_RISK_LEVEL.NORMAL),
+  notes: import_zod.z.string().max(5e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
+});
+const insertEventWorkstreamSchema = import_zod.z.object({
+  name: import_zod.z.string().min(2).max(200).transform(sanitizeText),
+  description: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  category: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  status: import_zod.z.enum(eventWorkstreamStatusValues).default(EVENT_WORKSTREAM_STATUS.TODO),
+  ownerEmail: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  dueDate: isoDateOnlySchema.optional().nullable(),
+  priority: import_zod.z.number().int().min(1).max(5).default(3),
+  orderIndex: import_zod.z.number().int().min(0).max(1e4).default(0)
+});
+const updateEventWorkstreamSchema = insertEventWorkstreamSchema.partial();
+const insertEventSupplierCandidateSchema = import_zod.z.object({
+  workstreamId: import_zod.z.string().uuid().optional().nullable(),
+  name: import_zod.z.string().min(2).max(240).transform(sanitizeText),
+  category: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  contactName: import_zod.z.string().max(200).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  contactEmail: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  contactPhone: import_zod.z.string().max(80).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  website: optionalSanitizedUrlSchema,
+  status: import_zod.z.enum(eventSupplierStatusValues).default(EVENT_SUPPLIER_STATUS.IDENTIFIED),
+  rating: import_zod.z.number().int().min(1).max(5).optional().nullable(),
+  notes: import_zod.z.string().max(5e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
+});
+const updateEventSupplierCandidateSchema = insertEventSupplierCandidateSchema.partial();
+const insertEventSupplierQuoteSchema = import_zod.z.object({
+  supplierId: import_zod.z.string().uuid(),
+  workstreamId: import_zod.z.string().uuid().optional().nullable(),
+  title: import_zod.z.string().min(2).max(240).transform(sanitizeText),
+  amountInCents: import_zod.z.number().int().min(0).max(1e9).default(0),
+  currency: currencySchema,
+  status: import_zod.z.enum(eventQuoteStatusValues).default(EVENT_QUOTE_STATUS.REQUESTED),
+  validUntil: isoDateOnlySchema.optional().nullable(),
+  documentUrl: optionalSanitizedUrlSchema,
+  terms: import_zod.z.string().max(5e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  notes: import_zod.z.string().max(5e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
+});
+const updateEventSupplierQuoteSchema = insertEventSupplierQuoteSchema.partial();
+const insertEventSupplierCommitmentSchema = import_zod.z.object({
+  supplierId: import_zod.z.string().uuid(),
+  quoteId: import_zod.z.string().uuid().optional().nullable(),
+  workstreamId: import_zod.z.string().uuid().optional().nullable(),
+  title: import_zod.z.string().min(2).max(240).transform(sanitizeText),
+  committedAmountInCents: import_zod.z.number().int().min(0).max(1e9).default(0),
+  actualAmountInCents: import_zod.z.number().int().min(0).max(1e9).optional().nullable(),
+  currency: currencySchema,
+  status: import_zod.z.enum(eventCommitmentStatusValues).default(EVENT_COMMITMENT_STATUS.PLANNED),
+  dueDate: isoDateOnlySchema.optional().nullable(),
+  paidAt: import_zod.z.string().datetime().optional().nullable(),
+  notes: import_zod.z.string().max(5e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
+});
+const updateEventSupplierCommitmentSchema = insertEventSupplierCommitmentSchema.partial();
+const insertEventObjectiveSchema = import_zod.z.object({
+  type: import_zod.z.enum(eventObjectiveTypeValues),
+  label: import_zod.z.string().min(2).max(200).transform(sanitizeText),
+  targetValue: import_zod.z.number().int().min(0).max(1e9).default(0),
+  currentValue: import_zod.z.number().int().min(0).max(1e9).default(0),
+  unit: import_zod.z.string().max(80).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  status: import_zod.z.enum(eventObjectiveStatusValues).default(EVENT_OBJECTIVE_STATUS.TRACKING),
+  notes: import_zod.z.string().max(5e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
+});
+const updateEventObjectiveSchema = insertEventObjectiveSchema.partial();
+const insertEventBudgetLineSchema = import_zod.z.object({
+  workstreamId: import_zod.z.string().uuid().optional().nullable(),
+  supplierId: import_zod.z.string().uuid().optional().nullable(),
+  quoteId: import_zod.z.string().uuid().optional().nullable(),
+  commitmentId: import_zod.z.string().uuid().optional().nullable(),
+  financialBudgetId: import_zod.z.string().uuid().optional().nullable(),
+  financialExpenseId: import_zod.z.string().uuid().optional().nullable(),
+  financialRevenueId: import_zod.z.string().uuid().optional().nullable(),
+  type: import_zod.z.enum(eventBudgetLineTypeValues),
+  label: import_zod.z.string().min(2).max(240).transform(sanitizeText),
+  category: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  plannedAmountInCents: import_zod.z.number().int().min(0).max(1e9).default(0),
+  committedAmountInCents: import_zod.z.number().int().min(0).max(1e9).default(0),
+  actualAmountInCents: import_zod.z.number().int().min(0).max(1e9).default(0),
+  currency: currencySchema,
+  status: import_zod.z.enum(eventBudgetLineStatusValues).default(EVENT_BUDGET_LINE_STATUS.PLANNED),
+  notes: import_zod.z.string().max(5e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
+});
+const updateEventBudgetLineSchema = insertEventBudgetLineSchema.partial();
 const insertAdminSchema = import_zod.z.object({
   email: import_zod.z.string().email("Email invalide").min(5, "Email trop court").max(100, "Email trop long").transform(sanitizeText),
   firstName: import_zod.z.string().min(1, "Le pr\xE9nom est obligatoire").max(50, "Le pr\xE9nom ne peut pas d\xE9passer 50 caract\xE8res").transform(sanitizeText),
@@ -3089,6 +3557,12 @@ const hasPermission = (userRole, permission) => {
     case "events.delete":
     case "events.manage":
       return userRole === ADMIN_ROLES.EVENTS_MANAGER;
+    case "event_ops.view":
+      return [ADMIN_ROLES.EVENTS_READER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "event_ops.write":
+    case "event_ops.manage":
+    case "event_ops.export":
+      return userRole === ADMIN_ROLES.EVENTS_MANAGER;
     case "forms.view":
     case "forms.read":
       return [ADMIN_ROLES.IDEAS_READER, ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_READER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
@@ -3148,9 +3622,9 @@ const getRolePermissions = (role) => {
     case ADMIN_ROLES.IDEAS_MANAGER:
       return ["Consultation des id\xE9es", "Modification des id\xE9es", "Suppression des id\xE9es", "Gestion des votes", "Gestion des formulaires", "Gestion des formations", "Gestion des int\xE9grations", "Gestion des automations"];
     case ADMIN_ROLES.EVENTS_READER:
-      return ["Consultation des \xE9v\xE9nements", "Consultation des formulaires"];
+      return ["Consultation des \xE9v\xE9nements", "Consultation du pilotage \xE9v\xE9nements", "Consultation des formulaires"];
     case ADMIN_ROLES.EVENTS_MANAGER:
-      return ["Consultation des \xE9v\xE9nements", "Modification des \xE9v\xE9nements", "Suppression des \xE9v\xE9nements", "Gestion des inscriptions et absences", "Gestion des formulaires", "Gestion des formations", "Gestion des int\xE9grations", "Gestion des automations"];
+      return ["Consultation des \xE9v\xE9nements", "Modification des \xE9v\xE9nements", "Suppression des \xE9v\xE9nements", "Gestion des inscriptions et absences", "Pilotage op\xE9rationnel des \xE9v\xE9nements", "Gestion des formulaires", "Gestion des formations", "Gestion des int\xE9grations", "Gestion des automations"];
     default:
       return [];
   }
@@ -3735,7 +4209,17 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   CJD_ROLE_LABELS,
   DatabaseError,
   DuplicateError,
+  EVENT_BUDGET_LINE_STATUS,
+  EVENT_BUDGET_LINE_TYPE,
+  EVENT_COMMITMENT_STATUS,
+  EVENT_OBJECTIVE_STATUS,
+  EVENT_OBJECTIVE_TYPE,
+  EVENT_OPERATION_RISK_LEVEL,
+  EVENT_OPERATION_STATUS,
+  EVENT_QUOTE_STATUS,
   EVENT_STATUS,
+  EVENT_SUPPLIER_STATUS,
+  EVENT_WORKSTREAM_STATUS,
   FEDERATION_STATUS,
   FEDERATION_SYNC_STATUS,
   FEDERATION_VISIBILITY,
@@ -3796,11 +4280,25 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   developmentRequests,
   duplicateMemberGroupSchema,
   emailConfig,
+  eventBudgetLines,
+  eventBudgetLinesRelations,
+  eventObjectives,
+  eventObjectivesRelations,
+  eventOperationPlans,
+  eventOperationPlansRelations,
   eventRegistrations,
   eventSponsorships,
   eventSponsorshipsRelations,
+  eventSupplierCandidates,
+  eventSupplierCandidatesRelations,
+  eventSupplierCommitments,
+  eventSupplierCommitmentsRelations,
+  eventSupplierQuotes,
+  eventSupplierQuotesRelations,
   eventSyndications,
   eventSyndicationsRelations,
+  eventWorkstreams,
+  eventWorkstreamsRelations,
   events,
   eventsRelations,
   featureConfig,
@@ -3833,10 +4331,16 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   insertBusinessAuditLogSchema,
   insertDevelopmentRequestSchema,
   insertEmailConfigSchema,
+  insertEventBudgetLineSchema,
+  insertEventObjectiveSchema,
   insertEventRegistrationSchema,
   insertEventSchema,
   insertEventSponsorshipSchema,
+  insertEventSupplierCandidateSchema,
+  insertEventSupplierCommitmentSchema,
+  insertEventSupplierQuoteSchema,
   insertEventSyndicationSchema,
+  insertEventWorkstreamSchema,
   insertFeatureConfigSchema,
   insertFinancialBudgetSchema,
   insertFinancialCategorySchema,
@@ -3963,10 +4467,16 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   updateAutomationWorkflowStatusSchema,
   updateDevelopmentRequestSchema,
   updateDevelopmentRequestStatusSchema,
+  updateEventBudgetLineSchema,
+  updateEventObjectiveSchema,
   updateEventSchema,
   updateEventSponsorshipSchema,
   updateEventStatusSchema,
+  updateEventSupplierCandidateSchema,
+  updateEventSupplierCommitmentSchema,
+  updateEventSupplierQuoteSchema,
   updateEventSyndicationSchema,
+  updateEventWorkstreamSchema,
   updateFinancialBudgetSchema,
   updateFinancialCategorySchema,
   updateFinancialExpenseSchema,
@@ -4003,6 +4513,7 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   updateTrainingInterestStatusSchema,
   updateTrainingProgramSchema,
   updateTrainingSessionSchema,
+  upsertEventOperationPlanSchema,
   users,
   votes,
   votesRelations
