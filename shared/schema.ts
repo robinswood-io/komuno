@@ -179,6 +179,40 @@ export const AUTOMATION_STEP_TYPE = {
   NOOP: "action.noop",
 } as const;
 
+export const TRAINING_PROGRAM_STATUS = {
+  DRAFT: "draft",
+  PUBLISHED: "published",
+  ARCHIVED: "archived",
+} as const;
+
+export const TRAINING_SESSION_STATUS = {
+  SCHEDULED: "scheduled",
+  FULL: "full",
+  CANCELLED: "cancelled",
+  COMPLETED: "completed",
+} as const;
+
+export const TRAINING_INTEREST_STATUS = {
+  NEW: "new",
+  CONTACTED: "contacted",
+  CONFIRMED: "confirmed",
+  DECLINED: "declined",
+  ARCHIVED: "archived",
+} as const;
+
+export const TRAINING_SYNC_STATUS = {
+  PENDING: "pending",
+  RUNNING: "running",
+  SUCCESS: "success",
+  FAILED: "failed",
+  PARTIAL: "partial",
+} as const;
+
+export const TRAINING_SYNC_DIRECTION = {
+  DOWNSTREAM_CATALOG: "downstream_catalog",
+  UPSTREAM_INTERESTS: "upstream_interests",
+} as const;
+
 // Ideas table - Flexible status workflow management
 export const ideas = pgTable("ideas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -771,6 +805,112 @@ export const automationStepRuns = pgTable("automation_step_runs", {
   stepIdx: index("automation_step_runs_step_idx").on(table.stepId),
   statusIdx: index("automation_step_runs_status_idx").on(table.status),
   createdAtIdx: index("automation_step_runs_created_at_idx").on(table.createdAt),
+}));
+
+export const trainingPrograms = pgTable("training_programs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  originOrganizationId: varchar("origin_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceInstanceUrl: text("source_instance_url"),
+  sourceTrainingId: varchar("source_training_id"),
+  slug: varchar("slug", { length: 140 }).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category"),
+  audience: text("audience"),
+  objectives: jsonb("objectives").$type<string[]>().default([]).notNull(),
+  status: text("status").default(TRAINING_PROGRAM_STATUS.DRAFT).notNull(),
+  federationVisibility: text("federation_visibility").default(FEDERATION_VISIBILITY.LOCAL).notNull(),
+  federationStatus: text("federation_status").default(FEDERATION_STATUS.LOCAL_ONLY).notNull(),
+  version: integer("version").default(1).notNull(),
+  isFederatedCopy: boolean("is_federated_copy").default(false).notNull(),
+  canonicalTrainingId: varchar("canonical_training_id"),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  slugOrgUniqueIdx: uniqueIndex("training_programs_slug_org_unique").on(table.slug, table.organizationId),
+  sourceUniqueIdx: uniqueIndex("training_programs_source_unique").on(table.sourceInstanceUrl, table.sourceTrainingId),
+  organizationIdx: index("training_programs_org_idx").on(table.organizationId),
+  statusIdx: index("training_programs_status_idx").on(table.status),
+  federationVisibilityIdx: index("training_programs_federation_visibility_idx").on(table.federationVisibility),
+  federationStatusIdx: index("training_programs_federation_status_idx").on(table.federationStatus),
+  updatedAtIdx: index("training_programs_updated_at_idx").on(table.updatedAt),
+}));
+
+export const trainingSessions = pgTable("training_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trainingId: varchar("training_id").references(() => trainingPrograms.id, { onDelete: "cascade" }).notNull(),
+  sourceSessionId: varchar("source_session_id"),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at"),
+  locationName: text("location_name"),
+  locationAddress: text("location_address"),
+  city: text("city"),
+  capacity: integer("capacity"),
+  status: text("status").default(TRAINING_SESSION_STATUS.SCHEDULED).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  sourceUniqueIdx: uniqueIndex("training_sessions_source_unique").on(table.trainingId, table.sourceSessionId),
+  trainingIdx: index("training_sessions_training_idx").on(table.trainingId),
+  startsAtIdx: index("training_sessions_starts_at_idx").on(table.startsAt),
+  statusIdx: index("training_sessions_status_idx").on(table.status),
+  cityIdx: index("training_sessions_city_idx").on(table.city),
+}));
+
+export const trainingInterests = pgTable("training_interests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trainingId: varchar("training_id").references(() => trainingPrograms.id, { onDelete: "cascade" }).notNull(),
+  sessionId: varchar("session_id").references(() => trainingSessions.id, { onDelete: "set null" }),
+  respondentName: text("respondent_name").notNull(),
+  respondentEmail: text("respondent_email").notNull(),
+  company: text("company"),
+  phone: text("phone"),
+  memberEmail: text("member_email").references(() => members.email, { onDelete: "set null" }),
+  sourceOrganizationId: varchar("source_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceInstanceUrl: text("source_instance_url"),
+  sourceInterestId: varchar("source_interest_id"),
+  consentAccepted: boolean("consent_accepted").default(false).notNull(),
+  message: text("message"),
+  status: text("status").default(TRAINING_INTEREST_STATUS.NEW).notNull(),
+  syncedToRegionAt: timestamp("synced_to_region_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  emailSessionUniqueIdx: uniqueIndex("training_interests_unique_email_session").on(table.trainingId, table.sessionId, table.respondentEmail, table.sourceOrganizationId),
+  sourceUniqueIdx: uniqueIndex("training_interests_source_unique").on(table.sourceInstanceUrl, table.sourceInterestId),
+  trainingIdx: index("training_interests_training_idx").on(table.trainingId),
+  sessionIdx: index("training_interests_session_idx").on(table.sessionId),
+  emailIdx: index("training_interests_email_idx").on(table.respondentEmail),
+  sourceOrganizationIdx: index("training_interests_source_org_idx").on(table.sourceOrganizationId),
+  statusIdx: index("training_interests_status_idx").on(table.status),
+  createdAtIdx: index("training_interests_created_at_idx").on(table.createdAt),
+}));
+
+export const trainingSyncRuns = pgTable("training_sync_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  direction: text("direction").notNull(),
+  status: text("status").default(TRAINING_SYNC_STATUS.PENDING).notNull(),
+  sourceOrganizationId: varchar("source_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  targetOrganizationId: varchar("target_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  relationId: varchar("relation_id").references(() => organizationRelations.id, { onDelete: "set null" }),
+  pushedCount: integer("pushed_count").default(0).notNull(),
+  pulledCount: integer("pulled_count").default(0).notNull(),
+  skippedCount: integer("skipped_count").default(0).notNull(),
+  errorCount: integer("error_count").default(0).notNull(),
+  error: text("error"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  finishedAt: timestamp("finished_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  directionIdx: index("training_sync_runs_direction_idx").on(table.direction),
+  statusIdx: index("training_sync_runs_status_idx").on(table.status),
+  sourceIdx: index("training_sync_runs_source_idx").on(table.sourceOrganizationId),
+  targetIdx: index("training_sync_runs_target_idx").on(table.targetOrganizationId),
+  startedAtIdx: index("training_sync_runs_started_at_idx").on(table.startedAt),
 }));
 
 // Loan items table - Matériel disponible au prêt
@@ -1932,6 +2072,105 @@ export const insertAutomationEventSchema = z.object({
 
 export const updateAutomationRunStatusSchema = z.object({
   status: z.enum(automationRunStatusValues),
+});
+
+const trainingProgramStatusValues = Object.values(TRAINING_PROGRAM_STATUS) as [typeof TRAINING_PROGRAM_STATUS[keyof typeof TRAINING_PROGRAM_STATUS], ...Array<typeof TRAINING_PROGRAM_STATUS[keyof typeof TRAINING_PROGRAM_STATUS]>];
+const trainingSessionStatusValues = Object.values(TRAINING_SESSION_STATUS) as [typeof TRAINING_SESSION_STATUS[keyof typeof TRAINING_SESSION_STATUS], ...Array<typeof TRAINING_SESSION_STATUS[keyof typeof TRAINING_SESSION_STATUS]>];
+const trainingInterestStatusValues = Object.values(TRAINING_INTEREST_STATUS) as [typeof TRAINING_INTEREST_STATUS[keyof typeof TRAINING_INTEREST_STATUS], ...Array<typeof TRAINING_INTEREST_STATUS[keyof typeof TRAINING_INTEREST_STATUS]>];
+const trainingSyncStatusValues = Object.values(TRAINING_SYNC_STATUS) as [typeof TRAINING_SYNC_STATUS[keyof typeof TRAINING_SYNC_STATUS], ...Array<typeof TRAINING_SYNC_STATUS[keyof typeof TRAINING_SYNC_STATUS]>];
+const trainingSyncDirectionValues = Object.values(TRAINING_SYNC_DIRECTION) as [typeof TRAINING_SYNC_DIRECTION[keyof typeof TRAINING_SYNC_DIRECTION], ...Array<typeof TRAINING_SYNC_DIRECTION[keyof typeof TRAINING_SYNC_DIRECTION]>];
+const federationVisibilityValues = Object.values(FEDERATION_VISIBILITY) as [typeof FEDERATION_VISIBILITY[keyof typeof FEDERATION_VISIBILITY], ...Array<typeof FEDERATION_VISIBILITY[keyof typeof FEDERATION_VISIBILITY]>];
+const federationStatusValues = Object.values(FEDERATION_STATUS) as [typeof FEDERATION_STATUS[keyof typeof FEDERATION_STATUS], ...Array<typeof FEDERATION_STATUS[keyof typeof FEDERATION_STATUS]>];
+
+export const trainingObjectiveSchema = z.string().min(1).max(240).transform(sanitizeText);
+
+export const insertTrainingProgramSchema = z.object({
+  organizationId: z.string().uuid().optional().nullable(),
+  originOrganizationId: z.string().uuid().optional().nullable(),
+  slug: z.string().min(3).max(140).regex(/^[a-z0-9-]+$/).optional(),
+  title: z.string().min(3).max(220).transform(sanitizeText),
+  description: z.string().max(5000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  category: z.string().max(160).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  audience: z.string().max(240).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  objectives: z.array(trainingObjectiveSchema).max(20).default([]),
+  status: z.enum(trainingProgramStatusValues).default(TRAINING_PROGRAM_STATUS.DRAFT),
+  federationVisibility: z.enum(federationVisibilityValues).default(FEDERATION_VISIBILITY.LOCAL),
+  federationStatus: z.enum(federationStatusValues).default(FEDERATION_STATUS.LOCAL_ONLY),
+  version: z.number().int().min(1).default(1),
+  isFederatedCopy: z.boolean().default(false),
+  sourceInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  sourceTrainingId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  canonicalTrainingId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+});
+
+export const updateTrainingProgramSchema = insertTrainingProgramSchema.partial().extend({
+  slug: z.string().min(3).max(140).regex(/^[a-z0-9-]+$/).optional(),
+});
+
+export const insertTrainingSessionSchema = z.object({
+  trainingId: z.string().uuid(),
+  sourceSessionId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime().optional().nullable(),
+  locationName: z.string().max(240).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  locationAddress: z.string().max(500).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  city: z.string().max(160).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  capacity: z.number().int().min(1).max(10000).optional().nullable(),
+  status: z.enum(trainingSessionStatusValues).default(TRAINING_SESSION_STATUS.SCHEDULED),
+});
+
+export const updateTrainingSessionSchema = insertTrainingSessionSchema.omit({ trainingId: true }).partial();
+
+export const submitTrainingInterestSchema = z.object({
+  trainingId: z.string().uuid(),
+  sessionIds: z.array(z.string().uuid()).max(20).default([]),
+  interestWithoutSession: z.boolean().default(false),
+  respondentName: z.string().min(2).max(200).transform(sanitizeText),
+  respondentEmail: z.string().email().max(240).transform(sanitizeText),
+  company: z.string().max(200).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  phone: z.string().max(80).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  memberEmail: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  sourceOrganizationId: z.string().uuid().optional().nullable(),
+  consentAccepted: z.boolean().refine(value => value === true, 'Le consentement est obligatoire'),
+  message: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+}).superRefine((value, ctx) => {
+  if (!value.interestWithoutSession && value.sessionIds.length === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['sessionIds'], message: 'Sélectionnez au moins une date ou cochez l’intérêt sans date précise' });
+  }
+});
+
+export const updateTrainingInterestStatusSchema = z.object({
+  status: z.enum(trainingInterestStatusValues),
+});
+
+export const insertTrainingInterestSchema = z.object({
+  trainingId: z.string().uuid(),
+  sessionId: z.string().uuid().optional().nullable(),
+  respondentName: z.string().min(2).max(200).transform(sanitizeText),
+  respondentEmail: z.string().email().max(240).transform(sanitizeText),
+  company: z.string().max(200).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  phone: z.string().max(80).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  memberEmail: z.string().email().optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  sourceOrganizationId: z.string().uuid().optional().nullable(),
+  sourceInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  sourceInterestId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  consentAccepted: z.boolean().default(false),
+  message: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  status: z.enum(trainingInterestStatusValues).default(TRAINING_INTEREST_STATUS.NEW),
+});
+
+export const insertTrainingSyncRunSchema = z.object({
+  direction: z.enum(trainingSyncDirectionValues),
+  status: z.enum(trainingSyncStatusValues).default(TRAINING_SYNC_STATUS.PENDING),
+  sourceOrganizationId: z.string().uuid().optional().nullable(),
+  targetOrganizationId: z.string().uuid().optional().nullable(),
+  relationId: z.string().uuid().optional().nullable(),
+  pushedCount: z.number().int().min(0).default(0),
+  pulledCount: z.number().int().min(0).default(0),
+  skippedCount: z.number().int().min(0).default(0),
+  errorCount: z.number().int().min(0).default(0),
+  error: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeText(val) : val),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
 // Ultra-secure insert schemas with validation - Pure Zod v4 schema (avoiding drizzle-zod type recursion)
@@ -3096,6 +3335,18 @@ export type InsertAutomationWorkflow = z.infer<typeof insertAutomationWorkflowSc
 export type UpdateAutomationWorkflow = z.infer<typeof updateAutomationWorkflowSchema>;
 export type InsertAutomationEvent = z.infer<typeof insertAutomationEventSchema>;
 
+export type TrainingProgram = typeof trainingPrograms.$inferSelect;
+export type TrainingSession = typeof trainingSessions.$inferSelect;
+export type TrainingInterest = typeof trainingInterests.$inferSelect;
+export type TrainingSyncRun = typeof trainingSyncRuns.$inferSelect;
+export type InsertTrainingProgram = z.infer<typeof insertTrainingProgramSchema>;
+export type UpdateTrainingProgram = z.infer<typeof updateTrainingProgramSchema>;
+export type InsertTrainingSession = z.infer<typeof insertTrainingSessionSchema>;
+export type UpdateTrainingSession = z.infer<typeof updateTrainingSessionSchema>;
+export type SubmitTrainingInterest = z.infer<typeof submitTrainingInterestSchema>;
+export type InsertTrainingInterest = z.infer<typeof insertTrainingInterestSchema>;
+export type InsertTrainingSyncRun = z.infer<typeof insertTrainingSyncRunSchema>;
+
 export type LoanItem = typeof loanItems.$inferSelect;
 export type InsertLoanItem = z.infer<typeof insertLoanItemSchema>;
 
@@ -3250,6 +3501,12 @@ export const hasPermission = (userRole: string, permission: string): boolean => 
     case 'automations.write':
     case 'automations.manage':
       return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
+    case 'trainings.view':
+      return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
+    case 'trainings.write':
+    case 'trainings.manage':
+    case 'trainings.export':
+      return ([ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER] as AdminRole[]).includes(userRole);
     case 'admin.view':
       // Tous les admins peuvent voir les membres
       return true;
@@ -3289,11 +3546,11 @@ export const getRolePermissions = (role: string): string[] => {
     case ADMIN_ROLES.IDEAS_READER:
       return ['Consultation des idées', 'Consultation des formulaires'];
     case ADMIN_ROLES.IDEAS_MANAGER:
-      return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes', 'Gestion des formulaires', 'Gestion des intégrations', 'Gestion des automations'];
+      return ['Consultation des idées', 'Modification des idées', 'Suppression des idées', 'Gestion des votes', 'Gestion des formulaires', 'Gestion des formations', 'Gestion des intégrations', 'Gestion des automations'];
     case ADMIN_ROLES.EVENTS_READER:
       return ['Consultation des événements', 'Consultation des formulaires'];
     case ADMIN_ROLES.EVENTS_MANAGER:
-      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences', 'Gestion des formulaires', 'Gestion des intégrations', 'Gestion des automations'];
+      return ['Consultation des événements', 'Modification des événements', 'Suppression des événements', 'Gestion des inscriptions et absences', 'Gestion des formulaires', 'Gestion des formations', 'Gestion des intégrations', 'Gestion des automations'];
     default:
       return [];
   }

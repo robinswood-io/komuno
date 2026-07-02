@@ -64,6 +64,11 @@ __export(schema_exports, {
   SURVEY_QUESTION_TYPE: () => SURVEY_QUESTION_TYPE,
   SYNDICATION_DIRECTION: () => SYNDICATION_DIRECTION,
   SYNDICATION_STATUS: () => SYNDICATION_STATUS,
+  TRAINING_INTEREST_STATUS: () => TRAINING_INTEREST_STATUS,
+  TRAINING_PROGRAM_STATUS: () => TRAINING_PROGRAM_STATUS,
+  TRAINING_SESSION_STATUS: () => TRAINING_SESSION_STATUS,
+  TRAINING_SYNC_DIRECTION: () => TRAINING_SYNC_DIRECTION,
+  TRAINING_SYNC_STATUS: () => TRAINING_SYNC_STATUS,
   ValidationError: () => ValidationError,
   adminUsers: () => adminUsers,
   admins: () => admins,
@@ -165,6 +170,10 @@ __export(schema_exports, {
   insertToolSchema: () => insertToolSchema,
   insertTrackingAlertSchema: () => insertTrackingAlertSchema,
   insertTrackingMetricSchema: () => insertTrackingMetricSchema,
+  insertTrainingInterestSchema: () => insertTrainingInterestSchema,
+  insertTrainingProgramSchema: () => insertTrainingProgramSchema,
+  insertTrainingSessionSchema: () => insertTrainingSessionSchema,
+  insertTrainingSyncRunSchema: () => insertTrainingSyncRunSchema,
   insertUnsubscriptionSchema: () => insertUnsubscriptionSchema,
   insertUserSchema: () => insertUserSchema,
   insertVoteSchema: () => insertVoteSchema,
@@ -215,6 +224,7 @@ __export(schema_exports, {
   statusCheckSchema: () => statusCheckSchema,
   statusResponseSchema: () => statusResponseSchema,
   submitSurveyResponseSchema: () => submitSurveyResponseSchema,
+  submitTrainingInterestSchema: () => submitTrainingInterestSchema,
   subscriptionTypeSchema: () => subscriptionTypeSchema,
   subscriptionTypes: () => subscriptionTypes,
   subscriptionTypesRelations: () => subscriptionTypesRelations,
@@ -231,6 +241,11 @@ __export(schema_exports, {
   toolsRelations: () => toolsRelations,
   trackingAlerts: () => trackingAlerts,
   trackingMetrics: () => trackingMetrics,
+  trainingInterests: () => trainingInterests,
+  trainingObjectiveSchema: () => trainingObjectiveSchema,
+  trainingPrograms: () => trainingPrograms,
+  trainingSessions: () => trainingSessions,
+  trainingSyncRuns: () => trainingSyncRuns,
   unsubscriptions: () => unsubscriptions,
   unsubscriptionsRelations: () => unsubscriptionsRelations,
   updateAdminInfoSchema: () => updateAdminInfoSchema,
@@ -278,6 +293,9 @@ __export(schema_exports, {
   updateToolCategorySchema: () => updateToolCategorySchema,
   updateToolSchema: () => updateToolSchema,
   updateTrackingAlertSchema: () => updateTrackingAlertSchema,
+  updateTrainingInterestStatusSchema: () => updateTrainingInterestStatusSchema,
+  updateTrainingProgramSchema: () => updateTrainingProgramSchema,
+  updateTrainingSessionSchema: () => updateTrainingSessionSchema,
   users: () => users,
   votes: () => votes,
   votesRelations: () => votesRelations
@@ -442,6 +460,35 @@ const AUTOMATION_STEP_TYPE = {
   MEMBER_TASK_CREATE: "action.member_task.create",
   AUDIT_RECORD: "action.audit.record",
   NOOP: "action.noop"
+};
+const TRAINING_PROGRAM_STATUS = {
+  DRAFT: "draft",
+  PUBLISHED: "published",
+  ARCHIVED: "archived"
+};
+const TRAINING_SESSION_STATUS = {
+  SCHEDULED: "scheduled",
+  FULL: "full",
+  CANCELLED: "cancelled",
+  COMPLETED: "completed"
+};
+const TRAINING_INTEREST_STATUS = {
+  NEW: "new",
+  CONTACTED: "contacted",
+  CONFIRMED: "confirmed",
+  DECLINED: "declined",
+  ARCHIVED: "archived"
+};
+const TRAINING_SYNC_STATUS = {
+  PENDING: "pending",
+  RUNNING: "running",
+  SUCCESS: "success",
+  FAILED: "failed",
+  PARTIAL: "partial"
+};
+const TRAINING_SYNC_DIRECTION = {
+  DOWNSTREAM_CATALOG: "downstream_catalog",
+  UPSTREAM_INTERESTS: "upstream_interests"
 };
 const ideas = (0, import_pg_core.pgTable)("ideas", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -1013,6 +1060,108 @@ const automationStepRuns = (0, import_pg_core.pgTable)("automation_step_runs", {
   stepIdx: (0, import_pg_core.index)("automation_step_runs_step_idx").on(table.stepId),
   statusIdx: (0, import_pg_core.index)("automation_step_runs_status_idx").on(table.status),
   createdAtIdx: (0, import_pg_core.index)("automation_step_runs_created_at_idx").on(table.createdAt)
+}));
+const trainingPrograms = (0, import_pg_core.pgTable)("training_programs", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  organizationId: (0, import_pg_core.varchar)("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  originOrganizationId: (0, import_pg_core.varchar)("origin_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceInstanceUrl: (0, import_pg_core.text)("source_instance_url"),
+  sourceTrainingId: (0, import_pg_core.varchar)("source_training_id"),
+  slug: (0, import_pg_core.varchar)("slug", { length: 140 }).notNull(),
+  title: (0, import_pg_core.text)("title").notNull(),
+  description: (0, import_pg_core.text)("description"),
+  category: (0, import_pg_core.text)("category"),
+  audience: (0, import_pg_core.text)("audience"),
+  objectives: (0, import_pg_core.jsonb)("objectives").$type().default([]).notNull(),
+  status: (0, import_pg_core.text)("status").default(TRAINING_PROGRAM_STATUS.DRAFT).notNull(),
+  federationVisibility: (0, import_pg_core.text)("federation_visibility").default(FEDERATION_VISIBILITY.LOCAL).notNull(),
+  federationStatus: (0, import_pg_core.text)("federation_status").default(FEDERATION_STATUS.LOCAL_ONLY).notNull(),
+  version: (0, import_pg_core.integer)("version").default(1).notNull(),
+  isFederatedCopy: (0, import_pg_core.boolean)("is_federated_copy").default(false).notNull(),
+  canonicalTrainingId: (0, import_pg_core.varchar)("canonical_training_id"),
+  createdBy: (0, import_pg_core.text)("created_by"),
+  updatedBy: (0, import_pg_core.text)("updated_by"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  slugOrgUniqueIdx: (0, import_pg_core.uniqueIndex)("training_programs_slug_org_unique").on(table.slug, table.organizationId),
+  sourceUniqueIdx: (0, import_pg_core.uniqueIndex)("training_programs_source_unique").on(table.sourceInstanceUrl, table.sourceTrainingId),
+  organizationIdx: (0, import_pg_core.index)("training_programs_org_idx").on(table.organizationId),
+  statusIdx: (0, import_pg_core.index)("training_programs_status_idx").on(table.status),
+  federationVisibilityIdx: (0, import_pg_core.index)("training_programs_federation_visibility_idx").on(table.federationVisibility),
+  federationStatusIdx: (0, import_pg_core.index)("training_programs_federation_status_idx").on(table.federationStatus),
+  updatedAtIdx: (0, import_pg_core.index)("training_programs_updated_at_idx").on(table.updatedAt)
+}));
+const trainingSessions = (0, import_pg_core.pgTable)("training_sessions", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  trainingId: (0, import_pg_core.varchar)("training_id").references(() => trainingPrograms.id, { onDelete: "cascade" }).notNull(),
+  sourceSessionId: (0, import_pg_core.varchar)("source_session_id"),
+  startsAt: (0, import_pg_core.timestamp)("starts_at").notNull(),
+  endsAt: (0, import_pg_core.timestamp)("ends_at"),
+  locationName: (0, import_pg_core.text)("location_name"),
+  locationAddress: (0, import_pg_core.text)("location_address"),
+  city: (0, import_pg_core.text)("city"),
+  capacity: (0, import_pg_core.integer)("capacity"),
+  status: (0, import_pg_core.text)("status").default(TRAINING_SESSION_STATUS.SCHEDULED).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  sourceUniqueIdx: (0, import_pg_core.uniqueIndex)("training_sessions_source_unique").on(table.trainingId, table.sourceSessionId),
+  trainingIdx: (0, import_pg_core.index)("training_sessions_training_idx").on(table.trainingId),
+  startsAtIdx: (0, import_pg_core.index)("training_sessions_starts_at_idx").on(table.startsAt),
+  statusIdx: (0, import_pg_core.index)("training_sessions_status_idx").on(table.status),
+  cityIdx: (0, import_pg_core.index)("training_sessions_city_idx").on(table.city)
+}));
+const trainingInterests = (0, import_pg_core.pgTable)("training_interests", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  trainingId: (0, import_pg_core.varchar)("training_id").references(() => trainingPrograms.id, { onDelete: "cascade" }).notNull(),
+  sessionId: (0, import_pg_core.varchar)("session_id").references(() => trainingSessions.id, { onDelete: "set null" }),
+  respondentName: (0, import_pg_core.text)("respondent_name").notNull(),
+  respondentEmail: (0, import_pg_core.text)("respondent_email").notNull(),
+  company: (0, import_pg_core.text)("company"),
+  phone: (0, import_pg_core.text)("phone"),
+  memberEmail: (0, import_pg_core.text)("member_email").references(() => members.email, { onDelete: "set null" }),
+  sourceOrganizationId: (0, import_pg_core.varchar)("source_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  sourceInstanceUrl: (0, import_pg_core.text)("source_instance_url"),
+  sourceInterestId: (0, import_pg_core.varchar)("source_interest_id"),
+  consentAccepted: (0, import_pg_core.boolean)("consent_accepted").default(false).notNull(),
+  message: (0, import_pg_core.text)("message"),
+  status: (0, import_pg_core.text)("status").default(TRAINING_INTEREST_STATUS.NEW).notNull(),
+  syncedToRegionAt: (0, import_pg_core.timestamp)("synced_to_region_at"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow().notNull()
+}, (table) => ({
+  emailSessionUniqueIdx: (0, import_pg_core.uniqueIndex)("training_interests_unique_email_session").on(table.trainingId, table.sessionId, table.respondentEmail, table.sourceOrganizationId),
+  sourceUniqueIdx: (0, import_pg_core.uniqueIndex)("training_interests_source_unique").on(table.sourceInstanceUrl, table.sourceInterestId),
+  trainingIdx: (0, import_pg_core.index)("training_interests_training_idx").on(table.trainingId),
+  sessionIdx: (0, import_pg_core.index)("training_interests_session_idx").on(table.sessionId),
+  emailIdx: (0, import_pg_core.index)("training_interests_email_idx").on(table.respondentEmail),
+  sourceOrganizationIdx: (0, import_pg_core.index)("training_interests_source_org_idx").on(table.sourceOrganizationId),
+  statusIdx: (0, import_pg_core.index)("training_interests_status_idx").on(table.status),
+  createdAtIdx: (0, import_pg_core.index)("training_interests_created_at_idx").on(table.createdAt)
+}));
+const trainingSyncRuns = (0, import_pg_core.pgTable)("training_sync_runs", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  direction: (0, import_pg_core.text)("direction").notNull(),
+  status: (0, import_pg_core.text)("status").default(TRAINING_SYNC_STATUS.PENDING).notNull(),
+  sourceOrganizationId: (0, import_pg_core.varchar)("source_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  targetOrganizationId: (0, import_pg_core.varchar)("target_organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  relationId: (0, import_pg_core.varchar)("relation_id").references(() => organizationRelations.id, { onDelete: "set null" }),
+  pushedCount: (0, import_pg_core.integer)("pushed_count").default(0).notNull(),
+  pulledCount: (0, import_pg_core.integer)("pulled_count").default(0).notNull(),
+  skippedCount: (0, import_pg_core.integer)("skipped_count").default(0).notNull(),
+  errorCount: (0, import_pg_core.integer)("error_count").default(0).notNull(),
+  error: (0, import_pg_core.text)("error"),
+  metadata: (0, import_pg_core.jsonb)("metadata").$type().default({}).notNull(),
+  startedAt: (0, import_pg_core.timestamp)("started_at").defaultNow().notNull(),
+  finishedAt: (0, import_pg_core.timestamp)("finished_at"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow().notNull()
+}, (table) => ({
+  directionIdx: (0, import_pg_core.index)("training_sync_runs_direction_idx").on(table.direction),
+  statusIdx: (0, import_pg_core.index)("training_sync_runs_status_idx").on(table.status),
+  sourceIdx: (0, import_pg_core.index)("training_sync_runs_source_idx").on(table.sourceOrganizationId),
+  targetIdx: (0, import_pg_core.index)("training_sync_runs_target_idx").on(table.targetOrganizationId),
+  startedAtIdx: (0, import_pg_core.index)("training_sync_runs_started_at_idx").on(table.startedAt)
 }));
 const loanItems = (0, import_pg_core.pgTable)("loan_items", {
   id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
@@ -2154,6 +2303,95 @@ const insertAutomationEventSchema = import_zod.z.object({
 const updateAutomationRunStatusSchema = import_zod.z.object({
   status: import_zod.z.enum(automationRunStatusValues)
 });
+const trainingProgramStatusValues = Object.values(TRAINING_PROGRAM_STATUS);
+const trainingSessionStatusValues = Object.values(TRAINING_SESSION_STATUS);
+const trainingInterestStatusValues = Object.values(TRAINING_INTEREST_STATUS);
+const trainingSyncStatusValues = Object.values(TRAINING_SYNC_STATUS);
+const trainingSyncDirectionValues = Object.values(TRAINING_SYNC_DIRECTION);
+const federationVisibilityValues = Object.values(FEDERATION_VISIBILITY);
+const federationStatusValues = Object.values(FEDERATION_STATUS);
+const trainingObjectiveSchema = import_zod.z.string().min(1).max(240).transform(sanitizeText);
+const insertTrainingProgramSchema = import_zod.z.object({
+  organizationId: import_zod.z.string().uuid().optional().nullable(),
+  originOrganizationId: import_zod.z.string().uuid().optional().nullable(),
+  slug: import_zod.z.string().min(3).max(140).regex(/^[a-z0-9-]+$/).optional(),
+  title: import_zod.z.string().min(3).max(220).transform(sanitizeText),
+  description: import_zod.z.string().max(5e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  category: import_zod.z.string().max(160).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  audience: import_zod.z.string().max(240).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  objectives: import_zod.z.array(trainingObjectiveSchema).max(20).default([]),
+  status: import_zod.z.enum(trainingProgramStatusValues).default(TRAINING_PROGRAM_STATUS.DRAFT),
+  federationVisibility: import_zod.z.enum(federationVisibilityValues).default(FEDERATION_VISIBILITY.LOCAL),
+  federationStatus: import_zod.z.enum(federationStatusValues).default(FEDERATION_STATUS.LOCAL_ONLY),
+  version: import_zod.z.number().int().min(1).default(1),
+  isFederatedCopy: import_zod.z.boolean().default(false),
+  sourceInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  sourceTrainingId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  canonicalTrainingId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
+});
+const updateTrainingProgramSchema = insertTrainingProgramSchema.partial().extend({
+  slug: import_zod.z.string().min(3).max(140).regex(/^[a-z0-9-]+$/).optional()
+});
+const insertTrainingSessionSchema = import_zod.z.object({
+  trainingId: import_zod.z.string().uuid(),
+  sourceSessionId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  startsAt: import_zod.z.string().datetime(),
+  endsAt: import_zod.z.string().datetime().optional().nullable(),
+  locationName: import_zod.z.string().max(240).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  locationAddress: import_zod.z.string().max(500).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  city: import_zod.z.string().max(160).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  capacity: import_zod.z.number().int().min(1).max(1e4).optional().nullable(),
+  status: import_zod.z.enum(trainingSessionStatusValues).default(TRAINING_SESSION_STATUS.SCHEDULED)
+});
+const updateTrainingSessionSchema = insertTrainingSessionSchema.omit({ trainingId: true }).partial();
+const submitTrainingInterestSchema = import_zod.z.object({
+  trainingId: import_zod.z.string().uuid(),
+  sessionIds: import_zod.z.array(import_zod.z.string().uuid()).max(20).default([]),
+  interestWithoutSession: import_zod.z.boolean().default(false),
+  respondentName: import_zod.z.string().min(2).max(200).transform(sanitizeText),
+  respondentEmail: import_zod.z.string().email().max(240).transform(sanitizeText),
+  company: import_zod.z.string().max(200).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  phone: import_zod.z.string().max(80).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  memberEmail: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  sourceOrganizationId: import_zod.z.string().uuid().optional().nullable(),
+  consentAccepted: import_zod.z.boolean().refine((value) => value === true, "Le consentement est obligatoire"),
+  message: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val)
+}).superRefine((value, ctx) => {
+  if (!value.interestWithoutSession && value.sessionIds.length === 0) {
+    ctx.addIssue({ code: import_zod.z.ZodIssueCode.custom, path: ["sessionIds"], message: "S\xE9lectionnez au moins une date ou cochez l\u2019int\xE9r\xEAt sans date pr\xE9cise" });
+  }
+});
+const updateTrainingInterestStatusSchema = import_zod.z.object({
+  status: import_zod.z.enum(trainingInterestStatusValues)
+});
+const insertTrainingInterestSchema = import_zod.z.object({
+  trainingId: import_zod.z.string().uuid(),
+  sessionId: import_zod.z.string().uuid().optional().nullable(),
+  respondentName: import_zod.z.string().min(2).max(200).transform(sanitizeText),
+  respondentEmail: import_zod.z.string().email().max(240).transform(sanitizeText),
+  company: import_zod.z.string().max(200).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  phone: import_zod.z.string().max(80).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  memberEmail: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  sourceOrganizationId: import_zod.z.string().uuid().optional().nullable(),
+  sourceInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  sourceInterestId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  consentAccepted: import_zod.z.boolean().default(false),
+  message: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  status: import_zod.z.enum(trainingInterestStatusValues).default(TRAINING_INTEREST_STATUS.NEW)
+});
+const insertTrainingSyncRunSchema = import_zod.z.object({
+  direction: import_zod.z.enum(trainingSyncDirectionValues),
+  status: import_zod.z.enum(trainingSyncStatusValues).default(TRAINING_SYNC_STATUS.PENDING),
+  sourceOrganizationId: import_zod.z.string().uuid().optional().nullable(),
+  targetOrganizationId: import_zod.z.string().uuid().optional().nullable(),
+  relationId: import_zod.z.string().uuid().optional().nullable(),
+  pushedCount: import_zod.z.number().int().min(0).default(0),
+  pulledCount: import_zod.z.number().int().min(0).default(0),
+  skippedCount: import_zod.z.number().int().min(0).default(0),
+  errorCount: import_zod.z.number().int().min(0).default(0),
+  error: import_zod.z.string().max(2e3).optional().nullable().transform((val) => val ? sanitizeText(val) : val),
+  metadata: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).default({})
+});
 const insertAdminSchema = import_zod.z.object({
   email: import_zod.z.string().email("Email invalide").min(5, "Email trop court").max(100, "Email trop long").transform(sanitizeText),
   firstName: import_zod.z.string().min(1, "Le pr\xE9nom est obligatoire").max(50, "Le pr\xE9nom ne peut pas d\xE9passer 50 caract\xE8res").transform(sanitizeText),
@@ -2869,6 +3107,12 @@ const hasPermission = (userRole, permission) => {
     case "automations.write":
     case "automations.manage":
       return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "trainings.view":
+      return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
+    case "trainings.write":
+    case "trainings.manage":
+    case "trainings.export":
+      return [ADMIN_ROLES.IDEAS_MANAGER, ADMIN_ROLES.EVENTS_MANAGER].includes(userRole);
     case "admin.view":
       return true;
     case "admin.edit":
@@ -2902,11 +3146,11 @@ const getRolePermissions = (role) => {
     case ADMIN_ROLES.IDEAS_READER:
       return ["Consultation des id\xE9es", "Consultation des formulaires"];
     case ADMIN_ROLES.IDEAS_MANAGER:
-      return ["Consultation des id\xE9es", "Modification des id\xE9es", "Suppression des id\xE9es", "Gestion des votes", "Gestion des formulaires", "Gestion des int\xE9grations", "Gestion des automations"];
+      return ["Consultation des id\xE9es", "Modification des id\xE9es", "Suppression des id\xE9es", "Gestion des votes", "Gestion des formulaires", "Gestion des formations", "Gestion des int\xE9grations", "Gestion des automations"];
     case ADMIN_ROLES.EVENTS_READER:
       return ["Consultation des \xE9v\xE9nements", "Consultation des formulaires"];
     case ADMIN_ROLES.EVENTS_MANAGER:
-      return ["Consultation des \xE9v\xE9nements", "Modification des \xE9v\xE9nements", "Suppression des \xE9v\xE9nements", "Gestion des inscriptions et absences", "Gestion des formulaires", "Gestion des int\xE9grations", "Gestion des automations"];
+      return ["Consultation des \xE9v\xE9nements", "Modification des \xE9v\xE9nements", "Suppression des \xE9v\xE9nements", "Gestion des inscriptions et absences", "Gestion des formulaires", "Gestion des formations", "Gestion des int\xE9grations", "Gestion des automations"];
     default:
       return [];
   }
@@ -3527,6 +3771,11 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   SURVEY_QUESTION_TYPE,
   SYNDICATION_DIRECTION,
   SYNDICATION_STATUS,
+  TRAINING_INTEREST_STATUS,
+  TRAINING_PROGRAM_STATUS,
+  TRAINING_SESSION_STATUS,
+  TRAINING_SYNC_DIRECTION,
+  TRAINING_SYNC_STATUS,
   ValidationError,
   adminUsers,
   admins,
@@ -3628,6 +3877,10 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   insertToolSchema,
   insertTrackingAlertSchema,
   insertTrackingMetricSchema,
+  insertTrainingInterestSchema,
+  insertTrainingProgramSchema,
+  insertTrainingSessionSchema,
+  insertTrainingSyncRunSchema,
   insertUnsubscriptionSchema,
   insertUserSchema,
   insertVoteSchema,
@@ -3678,6 +3931,7 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   statusCheckSchema,
   statusResponseSchema,
   submitSurveyResponseSchema,
+  submitTrainingInterestSchema,
   subscriptionTypeSchema,
   subscriptionTypes,
   subscriptionTypesRelations,
@@ -3694,6 +3948,11 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   toolsRelations,
   trackingAlerts,
   trackingMetrics,
+  trainingInterests,
+  trainingObjectiveSchema,
+  trainingPrograms,
+  trainingSessions,
+  trainingSyncRuns,
   unsubscriptions,
   unsubscriptionsRelations,
   updateAdminInfoSchema,
@@ -3741,6 +4000,9 @@ const insertNetworkConnectionSchema = import_zod.z.object({
   updateToolCategorySchema,
   updateToolSchema,
   updateTrackingAlertSchema,
+  updateTrainingInterestStatusSchema,
+  updateTrainingProgramSchema,
+  updateTrainingSessionSchema,
   users,
   votes,
   votesRelations

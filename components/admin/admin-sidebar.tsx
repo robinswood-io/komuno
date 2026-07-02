@@ -32,6 +32,7 @@ import {
   PlugZap,
   ScrollText,
   Workflow,
+  GraduationCap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -118,6 +119,11 @@ const navItems: (NavItem | NavSection)[] = [
         title: 'Formulaires',
         href: '/admin/forms',
         icon: FileQuestion,
+      },
+      {
+        title: 'Formations',
+        href: '/admin/trainings',
+        icon: GraduationCap,
       },
       {
         title: 'Idées',

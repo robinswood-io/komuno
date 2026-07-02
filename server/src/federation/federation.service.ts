@@ -1075,6 +1075,47 @@ export class FederationService {
     return await this.assertRelationAllowed(sourceOrganizationId, targetOrganizationId);
   }
 
+  async verifyFederationIngestContext(args: {
+    token?: string;
+    sourceOrganizationSlug: string;
+    targetOrganizationSlug: string;
+    direction: string;
+    sourceInstanceUrl?: string | null;
+  }) {
+    const providedToken = args.token?.trim();
+    if (!providedToken) throw new UnauthorizedException('Token de fédération manquant');
+
+    const [sourceOrganization, targetOrganization] = await Promise.all([
+      this.findOrganizationBySlugOrThrow(args.sourceOrganizationSlug, 'source'),
+      this.findOrganizationBySlugOrThrow(args.targetOrganizationSlug, 'target'),
+    ]);
+    const relation = await this.getRelationForSyndication(sourceOrganization.id, targetOrganization.id, args.direction);
+    if (!relation.syncEnabled) throw new ForbiddenException('Synchronisation désactivée sur cette relation');
+    if (!this.safeCompareRelationToken(relation, providedToken)) {
+      throw new UnauthorizedException('Token de fédération invalide');
+    }
+    const sourceInstanceUrl = this.normalizeInstanceUrl(args.sourceInstanceUrl) || this.normalizeInstanceUrl(sourceOrganization.instanceUrl);
+    if (!sourceInstanceUrl) throw new BadRequestException('sourceInstanceUrl invalide');
+
+    return { sourceOrganization, targetOrganization, relation, sourceInstanceUrl };
+  }
+
+  async getOutboundFederationTransport(args: {
+    sourceOrganizationId: string;
+    targetOrganizationId: string;
+    direction: string;
+  }) {
+    const [targetOrganization] = await db.select().from(organizations).where(eq(organizations.id, args.targetOrganizationId)).limit(1);
+    if (!targetOrganization) throw new NotFoundException('Organisation cible introuvable');
+    const relation = await this.getRelationForSyndication(args.sourceOrganizationId, args.targetOrganizationId, args.direction);
+    if (!relation.syncEnabled) throw new ForbiddenException('Synchronisation désactivée sur cette relation');
+    const token = await this.resolveOutboundFederationToken(relation);
+    if (!token) throw new BadRequestException('Jeton de fédération sortant manquant ou indéchiffrable sur la relation');
+    const targetInstanceUrl = this.normalizeInstanceUrl(targetOrganization.instanceUrl);
+    if (!targetInstanceUrl) throw new BadRequestException('URL d’instance cible invalide');
+    return { relation, targetOrganization, targetInstanceUrl, token };
+  }
+
   private buildFederatedEventPayload(args: {
     syndication: typeof eventSyndications.$inferSelect;
     event: typeof events.$inferSelect;

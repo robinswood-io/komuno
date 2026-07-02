@@ -169,6 +169,16 @@ export const queryKeys = {
     public: (slug: string) => ['forms', 'public', slug] as const,
   },
 
+  // Trainings
+  trainings: {
+    all: ['trainings'] as const,
+    list: (params?: Record<string, unknown>) => ['trainings', 'list', params] as const,
+    detail: (id: string) => ['trainings', 'detail', id] as const,
+    public: () => ['trainings', 'public'] as const,
+    interests: (params?: Record<string, unknown>) => ['trainings', 'interests', params] as const,
+    syncRuns: (params?: Record<string, unknown>) => ['trainings', 'sync-runs', params] as const,
+  },
+
   // Federation / regional network
   federation: {
     all: ['federation'] as const,
