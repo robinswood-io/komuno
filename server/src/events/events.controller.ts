@@ -188,6 +188,20 @@ export class EventsController {
 }
 
 @ApiTags('events')
+@Controller('api/public/events')
+export class PublicEventsController {
+  constructor(private readonly eventsService: EventsService) {}
+
+  @Get(':id/sponsorships')
+  @ApiOperation({ summary: 'Sponsors publics confirmés d’un événement' })
+  @ApiParam({ name: 'id', description: 'ID de l’événement' })
+  @ApiResponse({ status: 200, description: 'Liste des sponsors publics de l’événement' })
+  async getPublicEventSponsorships(@Param('id') id: string) {
+    return await this.eventsService.getPublicEventSponsorships(id);
+  }
+}
+
+@ApiTags('events')
 @Controller('api/inscriptions')
 export class InscriptionsController {
   constructor(private readonly eventsService: EventsService) {}

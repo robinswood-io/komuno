@@ -15,6 +15,8 @@ describe('Sécurité — durcissement transversal', () => {
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("base-uri 'self'");
+    expect(csp).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:");
+    expect(csp).toContain("worker-src 'self' blob:");
     expect(csp).toContain('upgrade-insecure-requests');
     expect(csp).not.toContain('default-src *');
   });

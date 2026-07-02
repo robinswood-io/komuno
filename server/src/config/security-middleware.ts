@@ -30,11 +30,12 @@ export class SecurityMiddleware implements NestMiddleware {
     if (process.env.NODE_ENV === 'production') {
       res.setHeader('Content-Security-Policy',
         "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; " +
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
         "img-src 'self' data: https:; " +
         "font-src 'self' data: https://fonts.gstatic.com; " +
         "connect-src 'self' https:; " +
+        "worker-src 'self' blob:; " +
         "frame-ancestors 'none';"
       );
     }
@@ -52,11 +53,12 @@ export function getHelmetConfig() {
     contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'blob:'],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         imgSrc: ["'self'", 'data:', 'https:'],
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         connectSrc: ["'self'", 'https:'],
+        workerSrc: ["'self'", 'blob:'],
         frameAncestors: ["'none'"],
       },
     } : false,

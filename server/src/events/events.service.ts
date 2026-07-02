@@ -56,6 +56,14 @@ export class EventsService {
     return await this.storageService.instance.getEvents({ page, limit });
   }
 
+  async getPublicEventSponsorships(eventId: string) {
+    const result = await this.storageService.instance.getPublicEventSponsorships(eventId);
+    if (!result.success) {
+      throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+    }
+    return { success: true, data: result.data };
+  }
+
   private publicEventUrl(eventId: string): string | null {
     const baseUrl = process.env.PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || (process.env.DOMAIN ? `https://${process.env.DOMAIN}` : null);
     return baseUrl ? `${baseUrl.replace(/\/$/, '')}/events#${eventId}` : null;

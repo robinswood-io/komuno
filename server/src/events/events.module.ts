@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { EventsController, InscriptionsController, UnsubscriptionsController } from './events.controller';
+import { EventsController, InscriptionsController, PublicEventsController, UnsubscriptionsController } from './events.controller';
 import { EventsService } from './events.service';
 import { StorageModule } from '../common/storage/storage.module';
 import { AuthModule } from '../auth/auth.module';
@@ -9,7 +9,7 @@ import { AutomationsModule } from '../automations/automations.module';
 
 @Module({
   imports: [StorageModule, AuthModule, FederationModule, IntegrationsModule, AutomationsModule],
-  controllers: [EventsController, InscriptionsController, UnsubscriptionsController],
+  controllers: [EventsController, PublicEventsController, InscriptionsController, UnsubscriptionsController],
   providers: [EventsService],
   exports: [EventsService],
 })
