@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.23.1",
+    "version": "2.24.0",
     "releasedAt": "2026-07-02",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte 1 nouveaute(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
-      "corrections": [
-        "Harden workflow definitions"
+      "nouveautes": [
+        "Add regional training module"
       ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.24.0",
+      "releasedAt": "2026-07-02",
+      "summary": "Cette version apporte 1 nouveaute(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add regional training module"
+        ],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.23.1",
       "releasedAt": "2026-07-02",
@@ -479,24 +495,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.10.4",
-      "releasedAt": "2026-06-28",
-      "summary": "Cette version apporte des ajustements techniques.",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": [
-          "Add federation safety coverage"
-        ]
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-02T12:49:16.717Z",
+  "generatedAt": "2026-07-02T14:07:47.738Z",
   "source": "conventional-commits"
 }
