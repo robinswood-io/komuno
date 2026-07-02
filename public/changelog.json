@@ -1,14 +1,14 @@
 {
   "latest": {
-    "version": "2.23.0",
+    "version": "2.23.1",
     "releasedAt": "2026-07-02",
-    "summary": "Cette version apporte 1 nouveaute(s).",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Add workflow foundation"
+      "nouveautes": [],
+      "corrections": [
+        "Harden workflow definitions"
       ],
-      "corrections": [],
       "ameliorations": [],
       "securite": [],
       "maintenance": []
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.23.1",
+      "releasedAt": "2026-07-02",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Harden workflow definitions"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.23.0",
       "releasedAt": "2026-07-02",
@@ -479,24 +495,8 @@
         ]
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.10.3",
-      "releasedAt": "2026-06-28",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Run hdf deploy on self-hosted runner"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-02T12:19:13.311Z",
+  "generatedAt": "2026-07-02T12:49:16.717Z",
   "source": "conventional-commits"
 }
