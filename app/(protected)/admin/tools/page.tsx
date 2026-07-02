@@ -443,7 +443,7 @@ export default function AdminToolsPage() {
                         </TableCell>
                         <TableCell className="text-center">
                           {tool.isFeatured ? (
-                            <Star className="w-4 h-4 text-yellow-500 mx-auto" />
+                            <Star className="w-4 h-4 text-warning-dark mx-auto" />
                           ) : (
                             <StarOff className="w-4 h-4 text-gray-300 mx-auto" />
                           )}

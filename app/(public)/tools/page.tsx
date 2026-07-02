@@ -105,7 +105,7 @@ export default function ToolsPage() {
       {featuredTools.length > 0 && (
         <div className="mb-12">
           <div className="flex items-center gap-2 mb-6">
-            <Star className="w-5 h-5 text-yellow-500" />
+            <Star className="w-5 h-5 text-warning-dark" />
             <h2 className="text-2xl font-bold text-gray-900">Outils recommandés</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -202,7 +202,7 @@ function ToolCard({ tool, featured = false }: { tool: ToolWithCategory; featured
           <div className="flex-1 min-w-0">
             <CardTitle className="text-lg flex items-center gap-2">
               {tool.name}
-              {featured && <Star className="w-4 h-4 text-yellow-500" />}
+              {featured && <Star className="w-4 h-4 text-warning-dark" />}
             </CardTitle>
             {tool.price && (
               <CardDescription className="text-primary font-medium">

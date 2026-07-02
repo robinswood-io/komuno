@@ -220,9 +220,29 @@ export class EventOperationsService {
 
   async deleteEntity(eventId: string, kind: EntityKind, id: string, actor?: Actor) {
     await this.ensureEvent(eventId);
-    const table = this.tableForKind(kind);
     await this.assertEntityBelongsToEvent(eventId, kind, id);
-    await db.delete(table as any).where(eq((table as any).id, id));
+    switch (kind) {
+      case 'workstreams':
+        await db.delete(eventWorkstreams).where(eq(eventWorkstreams.id, id));
+        break;
+      case 'suppliers':
+        await db.delete(eventSupplierCandidates).where(eq(eventSupplierCandidates.id, id));
+        break;
+      case 'quotes':
+        await db.delete(eventSupplierQuotes).where(eq(eventSupplierQuotes.id, id));
+        break;
+      case 'commitments':
+        await db.delete(eventSupplierCommitments).where(eq(eventSupplierCommitments.id, id));
+        break;
+      case 'objectives':
+        await db.delete(eventObjectives).where(eq(eventObjectives.id, id));
+        break;
+      case 'budget-lines':
+        await db.delete(eventBudgetLines).where(eq(eventBudgetLines.id, id));
+        break;
+      default:
+        throw new BadRequestException('Type d’élément de pilotage invalide');
+    }
     await this.audit(`event_ops.${kind.replace('-', '_')}.deleted`, actor, `event_${kind.replace('-', '_')}`, id, { eventId });
     return { success: true };
   }
@@ -316,20 +336,27 @@ export class EventOperationsService {
   }
 
   private async assertEntityBelongsToEvent(eventId: string, kind: EntityKind, id: string) {
-    const table = this.tableForKind(kind);
-    const [row] = await db.select({ id: (table as any).id }).from(table as any).where(and(eq((table as any).id, id), eq((table as any).eventId, eventId))).limit(1);
-    if (!row) throw new NotFoundException('Élément de pilotage introuvable pour cet événement');
-  }
-
-  private tableForKind(kind: EntityKind) {
     switch (kind) {
-      case 'workstreams': return eventWorkstreams;
-      case 'suppliers': return eventSupplierCandidates;
-      case 'quotes': return eventSupplierQuotes;
-      case 'commitments': return eventSupplierCommitments;
-      case 'objectives': return eventObjectives;
-      case 'budget-lines': return eventBudgetLines;
-      default: throw new BadRequestException('Type d’élément de pilotage invalide');
+      case 'workstreams':
+        await this.assertWorkstreamBelongsToEvent(eventId, id);
+        return;
+      case 'suppliers':
+        await this.assertSupplierBelongsToEvent(eventId, id);
+        return;
+      case 'quotes':
+        await this.assertQuoteBelongsToEvent(eventId, id);
+        return;
+      case 'commitments':
+        await this.assertCommitmentBelongsToEvent(eventId, id);
+        return;
+      case 'objectives':
+        await this.assertObjectiveBelongsToEvent(eventId, id);
+        return;
+      case 'budget-lines':
+        await this.assertBudgetLineBelongsToEvent(eventId, id);
+        return;
+      default:
+        throw new BadRequestException('Type d’élément de pilotage invalide');
     }
   }
 
@@ -384,7 +411,7 @@ export class EventOperationsService {
 
   private async emitAutomation(eventType: string, payload: Record<string, unknown>) {
     try {
-      await this.automationsService.emitEvent(eventType, payload as any, { source: 'event_operations', eventId: payload.id ? `${eventType}:${String(payload.id)}` : undefined });
+      await this.automationsService.emitEvent(eventType, payload, { source: 'event_operations', eventId: payload.id ? `${eventType}:${String(payload.id)}` : undefined });
     } catch (error) {
       this.logger.warn(`Automation EventOps non bloquante impossible: ${error instanceof Error ? error.message : String(error)}`);
     }

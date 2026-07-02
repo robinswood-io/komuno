@@ -25,7 +25,7 @@
     "start": "concurrently \"next start\" \"node dist/server/src/main.js\"",
     "check": "tsc -p tsconfig.json && tsc -p tsconfig.server.json",
     "check:colors": "bash scripts/find-hardcoded-colors.sh",
-    "lint": "eslint . --max-warnings 0 || true",
+    "lint": "npm run lint:colors && npm run check",
     "lint:colors": "./scripts/lint-semantic-colors.sh",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",

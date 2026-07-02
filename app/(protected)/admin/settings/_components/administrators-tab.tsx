@@ -364,7 +364,7 @@ export function AdministratorsTab() {
                         <Badge variant="secondary">✗ Inactif</Badge>
                       )}
                       {admin.status === 'pending' && (
-                        <Badge className="bg-orange-50 text-orange-900 border-orange-200">
+                        <Badge className="bg-warning-light text-warning-dark border-warning">
                           ○ En attente
                         </Badge>
                       )}

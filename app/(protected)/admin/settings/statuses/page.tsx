@@ -70,16 +70,16 @@ interface StatusFormData {
 }
 
 const AVAILABLE_COLORS = [
-  { value: 'green', label: 'Vert', class: 'bg-green-500' },
-  { value: 'red', label: 'Rouge', class: 'bg-red-500' },
-  { value: 'blue', label: 'Bleu', class: 'bg-blue-500' },
-  { value: 'yellow', label: 'Jaune', class: 'bg-yellow-500' },
+  { value: 'green', label: 'Vert', class: 'bg-success-light0' },
+  { value: 'red', label: 'Rouge', class: 'bg-error-light0' },
+  { value: 'blue', label: 'Bleu', class: 'bg-info-light0' },
+  { value: 'yellow', label: 'Jaune', class: 'bg-warning' },
   { value: 'purple', label: 'Violet', class: 'bg-purple-500' },
   { value: 'cyan', label: 'Cyan', class: 'bg-cyan-500' },
   { value: 'pink', label: 'Rose', class: 'bg-pink-500' },
   { value: 'indigo', label: 'Indigo', class: 'bg-indigo-500' },
   { value: 'gray', label: 'Gris', class: 'bg-gray-500' },
-  { value: 'orange', label: 'Orange', class: 'bg-orange-500' },
+  { value: 'orange', label: 'Orange', class: 'bg-warning-light0' },
 ];
 
 /**
@@ -243,16 +243,16 @@ export default function MemberStatusesPage() {
 
   const getColorClass = (color: string) => {
     const colorMap: Record<string, string> = {
-      green: 'bg-green-100 text-green-800 border-green-300',
-      red: 'bg-red-100 text-red-800 border-red-300',
-      blue: 'bg-blue-100 text-blue-800 border-blue-300',
-      yellow: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      green: 'bg-success-light text-success-dark border-success',
+      red: 'bg-error-light text-error-dark border-error',
+      blue: 'bg-info-light text-info-dark border-info',
+      yellow: 'bg-warning-light text-warning-dark border-warning',
       purple: 'bg-purple-100 text-purple-800 border-purple-300',
       cyan: 'bg-cyan-100 text-cyan-800 border-cyan-300',
       pink: 'bg-pink-100 text-pink-800 border-pink-300',
       indigo: 'bg-indigo-100 text-indigo-800 border-indigo-300',
       gray: 'bg-gray-100 text-gray-800 border-gray-300',
-      orange: 'bg-orange-100 text-orange-800 border-orange-300',
+      orange: 'bg-warning-light text-warning-dark border-warning',
     };
     return colorMap[color] || colorMap.blue;
   };

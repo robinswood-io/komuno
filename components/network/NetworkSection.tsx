@@ -189,7 +189,7 @@ export function NetworkSection(props: NetworkSectionProps) {
               <span
                 className={cn(
                   'w-1.5 h-1.5 rounded-full shrink-0',
-                  conn.connectedType === 'member' ? 'bg-blue-500' : 'bg-emerald-500',
+                  conn.connectedType === 'member' ? 'bg-info-light0' : 'bg-emerald-500',
                 )}
               />
               <span className="text-xs">
@@ -220,7 +220,7 @@ export function NetworkSection(props: NetworkSectionProps) {
               <span
                 className={cn(
                   'w-1.5 h-1.5 rounded-full shrink-0',
-                  conn.type === 'member' ? 'bg-blue-500' : 'bg-emerald-500',
+                  conn.type === 'member' ? 'bg-info-light0' : 'bg-emerald-500',
                 )}
               />
               <span className="text-xs">
@@ -287,7 +287,7 @@ export function NetworkSection(props: NetworkSectionProps) {
                           value={`${e.firstName} ${e.lastName} ${e.email}`}
                           onSelect={() => handleSelect(e)}
                         >
-                          <span className="w-2 h-2 rounded-full bg-blue-500 mr-2 shrink-0 mt-0.5" />
+                          <span className="w-2 h-2 rounded-full bg-info-light0 mr-2 shrink-0 mt-0.5" />
                           <div>
                             <div className="text-sm">
                               {e.firstName} {e.lastName}
@@ -334,7 +334,7 @@ export function NetworkSection(props: NetworkSectionProps) {
       {/* Legend */}
       <div className="flex gap-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-blue-500" />
+          <span className="w-2 h-2 rounded-full bg-info-light0" />
           Membre
         </div>
         <div className="flex items-center gap-1.5">

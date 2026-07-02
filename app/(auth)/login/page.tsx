@@ -86,19 +86,19 @@ export default function LoginPage() {
 
                 {/* Comptes de test en mode développement */}
                 {process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true' && (
-                  <Alert className="bg-blue-50 border-blue-200">
-                    <Shield className="h-4 w-4 text-blue-600" />
-                    <AlertTitle className="text-blue-900">Mode Dev Login Actif</AlertTitle>
-                    <AlertDescription className="text-blue-800 text-xs space-y-1">
+                  <Alert className="bg-info-light border-info">
+                    <Shield className="h-4 w-4 text-info-dark" />
+                    <AlertTitle className="text-info-dark">Mode Dev Login Actif</AlertTitle>
+                    <AlertDescription className="text-info-dark text-xs space-y-1">
                       <div>Comptes de test (mot de passe: n'importe quoi):</div>
                       <div className="font-mono space-y-0.5 mt-1">
-                        <div className="cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setEmail('admin@test.local')}>
+                        <div className="cursor-pointer hover:bg-info-light p-1 rounded" onClick={() => setEmail('admin@test.local')}>
                           • admin@test.local (super_admin)
                         </div>
-                        <div className="cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setEmail('manager@test.local')}>
+                        <div className="cursor-pointer hover:bg-info-light p-1 rounded" onClick={() => setEmail('manager@test.local')}>
                           • manager@test.local (events_manager)
                         </div>
-                        <div className="cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setEmail('reader@test.local')}>
+                        <div className="cursor-pointer hover:bg-info-light p-1 rounded" onClick={() => setEmail('reader@test.local')}>
                           • reader@test.local (events_reader)
                         </div>
                       </div>

@@ -82,8 +82,8 @@ const statusLabels: Record<MemberTask['status'], string> = {
 };
 
 const statusColors: Record<MemberTask['status'], string> = {
-  'todo': 'bg-orange-50 text-orange-900 border-orange-200',
-  'in_progress': 'bg-blue-50 text-blue-900 border-blue-200',
+  'todo': 'bg-warning-light text-warning-dark border-warning',
+  'in_progress': 'bg-info-light text-info-dark border-info',
   'completed': 'bg-success/10 text-success-dark border-success/30',
   'cancelled': 'bg-gray-50 text-gray-900 border-gray-200',
 };
@@ -94,6 +94,28 @@ const taskTypeLabels: Record<MemberTask['taskType'], string> = {
   'meeting': 'Réunion',
   'custom': 'Autre',
 };
+
+type StatusFilter = 'all' | MemberTask['status'];
+type TaskTypeFilter = 'all' | MemberTask['taskType'];
+
+const statusFilterValues: readonly StatusFilter[] = ['all', 'todo', 'in_progress', 'completed', 'cancelled'];
+const taskTypeFilterValues: readonly TaskTypeFilter[] = ['all', 'call', 'email', 'meeting', 'custom'];
+
+function toStatusFilter(value: string): StatusFilter {
+  return statusFilterValues.includes(value as StatusFilter) ? (value as StatusFilter) : 'all';
+}
+
+function toTaskTypeFilter(value: string): TaskTypeFilter {
+  return taskTypeFilterValues.includes(value as TaskTypeFilter) ? (value as TaskTypeFilter) : 'all';
+}
+
+function toTaskStatus(value: string): MemberTask['status'] {
+  return value === 'todo' || value === 'in_progress' || value === 'completed' || value === 'cancelled' ? value : 'todo';
+}
+
+function toTaskType(value: string): MemberTask['taskType'] {
+  return value === 'call' || value === 'email' || value === 'meeting' || value === 'custom' ? value : 'call';
+}
 
 /**
  * Page Gestion Tâches Membres
@@ -109,8 +131,8 @@ export default function AdminMemberTasksPage() {
   const [selectedTask, setSelectedTask] = useState<MemberTask | null>(null);
 
   // Filtres
-  const [statusFilter, setStatusFilter] = useState<'all' | MemberTask['status']>('all');
-  const [taskTypeFilter, setTaskTypeFilter] = useState<'all' | MemberTask['taskType']>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>('all');
   const [memberFilter, setMemberFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
@@ -429,7 +451,7 @@ export default function AdminMemberTasksPage() {
               {/* Filtre Statut */}
               <div className="flex flex-col gap-2">
                 <Label className="text-xs font-medium text-muted-foreground">Statut</Label>
-                <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val as any)}>
+                <Select value={statusFilter} onValueChange={(val) => setStatusFilter(toStatusFilter(val))}>
                   <SelectTrigger className="w-40">
                     <SelectValue />
                   </SelectTrigger>
@@ -446,7 +468,7 @@ export default function AdminMemberTasksPage() {
               {/* Filtre Type de tâche */}
               <div className="flex flex-col gap-2">
                 <Label className="text-xs font-medium text-muted-foreground">Type</Label>
-                <Select value={taskTypeFilter} onValueChange={(val) => setTaskTypeFilter(val as any)}>
+                <Select value={taskTypeFilter} onValueChange={(val) => setTaskTypeFilter(toTaskTypeFilter(val))}>
                   <SelectTrigger className="w-40">
                     <SelectValue />
                   </SelectTrigger>
@@ -538,9 +560,9 @@ export default function AdminMemberTasksPage() {
                         {dueDate ? (
                           <div className="flex items-center gap-2">
                             {isOverdue && (
-                              <AlertCircle className="h-4 w-4 text-red-500" />
+                              <AlertCircle className="h-4 w-4 text-error-dark" />
                             )}
-                            <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
+                            <span className={isOverdue ? 'text-error-dark font-medium' : ''}>
                               {dueDate.toLocaleDateString('fr-FR')}
                             </span>
                           </div>
@@ -767,7 +789,7 @@ export default function AdminMemberTasksPage() {
                 <Select
                   value={editFormData.taskType}
                   onValueChange={(value) =>
-                    setEditFormData((prev) => ({ ...prev, taskType: value as any }))
+                    setEditFormData((prev) => ({ ...prev, taskType: toTaskType(value) }))
                   }
                 >
                   <SelectTrigger id="edit-taskType">
@@ -788,7 +810,7 @@ export default function AdminMemberTasksPage() {
                 <Select
                   value={editFormData.status}
                   onValueChange={(value) =>
-                    setEditFormData((prev) => ({ ...prev, status: value as any }))
+                    setEditFormData((prev) => ({ ...prev, status: toTaskStatus(value) }))
                   }
                 >
                   <SelectTrigger id="edit-status">

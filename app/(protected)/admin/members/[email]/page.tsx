@@ -104,10 +104,10 @@ interface MemberContact {
 }
 
 const CONTACT_TYPE_CONFIG: Record<MemberContact['type'], { label: string; className: string }> = {
-  meeting: { label: 'Réunion', className: 'bg-blue-100 text-blue-800' },
-  call: { label: 'Appel', className: 'bg-green-100 text-green-800' },
+  meeting: { label: 'Réunion', className: 'bg-info-light text-info-dark' },
+  call: { label: 'Appel', className: 'bg-success-light text-success-dark' },
   email: { label: 'Email', className: 'bg-gray-100 text-gray-800' },
-  lunch: { label: 'Déjeuner', className: 'bg-orange-100 text-orange-800' },
+  lunch: { label: 'Déjeuner', className: 'bg-warning-light text-warning-dark' },
   event: { label: 'Événement', className: 'bg-purple-100 text-purple-800' },
 };
 
@@ -234,7 +234,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ email: 
       case 'active':
         return <Badge className="bg-success/10 text-success-dark">Actif</Badge>;
       case 'proposed':
-        return <Badge className="bg-orange-50 text-orange-700">Prospect</Badge>;
+        return <Badge className="bg-warning-light text-warning-dark">Prospect</Badge>;
       case 'inactive':
         return <Badge variant="outline">Inactif</Badge>;
       default:

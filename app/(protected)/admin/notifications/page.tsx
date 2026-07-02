@@ -50,11 +50,11 @@ interface Notification {
 }
 
 const NOTIFICATION_TYPES = {
-  'idea_update': { label: 'Idée', icon: Lightbulb, color: 'text-yellow-600' },
-  'event_update': { label: 'Événement', icon: Calendar, color: 'text-blue-600' },
+  'idea_update': { label: 'Idée', icon: Lightbulb, color: 'text-warning-dark' },
+  'event_update': { label: 'Événement', icon: Calendar, color: 'text-info-dark' },
   'loan_update': { label: 'Prêt', icon: Package, color: 'text-success' },
   'member_update': { label: 'Membre', icon: UserCheck, color: 'text-purple-600' },
-  'task_reminder': { label: 'Tâche', icon: AlertCircle, color: 'text-orange-600' },
+  'task_reminder': { label: 'Tâche', icon: AlertCircle, color: 'text-warning-dark' },
   'system': { label: 'Système', icon: Info, color: 'text-gray-600' },
 };
 
@@ -257,7 +257,7 @@ export default function AdminNotificationsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{unreadCount || 0}</div>
+            <div className="text-2xl font-bold text-warning-dark">{unreadCount || 0}</div>
           </CardContent>
         </Card>
         <Card>

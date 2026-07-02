@@ -1164,8 +1164,8 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-50">
-                  <Server className="h-5 w-5 text-blue-600" />
+                <div className="p-2 rounded-lg bg-info-light">
+                  <Server className="h-5 w-5 text-info-dark" />
                 </div>
                 <div>
                   <CardTitle>Serveur d'envoi (SMTP)</CardTitle>
@@ -1273,12 +1273,12 @@ export default function SettingsPage() {
 
               {/* Test result */}
               {emailTestResult && (
-                <Alert className={emailTestResult.ok ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+                <Alert className={emailTestResult.ok ? 'border-success bg-success-light' : 'border-error bg-error-light'}>
                   {emailTestResult.ok
-                    ? <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    : <XCircle className="h-4 w-4 text-red-600" />
+                    ? <CheckCircle2 className="h-4 w-4 text-success-dark" />
+                    : <XCircle className="h-4 w-4 text-error-dark" />
                   }
-                  <AlertDescription className={emailTestResult.ok ? 'text-green-800' : 'text-red-800'}>
+                  <AlertDescription className={emailTestResult.ok ? 'text-success-dark' : 'text-error-dark'}>
                     {emailTestResult.message}
                   </AlertDescription>
                 </Alert>

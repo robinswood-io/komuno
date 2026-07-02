@@ -98,7 +98,7 @@ const RELATION_TYPE_ICONS: Record<string, string> = {
 
 const getRelationBadgeColor = (type: string) => {
   const colors: Record<string, string> = {
-    sponsor: 'bg-blue-50 text-blue-900 border-blue-200',
+    sponsor: 'bg-info-light text-info-dark border-info',
     team: 'bg-success/10 text-success-dark border-success/30',
     custom: 'bg-purple-50 text-purple-900 border-purple-200',
   };

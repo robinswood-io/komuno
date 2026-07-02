@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Pencil, Trash2, Users, Calendar, MapPin, Eye, WalletCards } from 'lucide-react';
-import EventDetailModal from '@/components/event-detail-modal';
+import EventDetailModal, { type EventWithInscriptions } from '@/components/event-detail-modal';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +40,13 @@ import { useModuleStatus } from '@/hooks/use-module-guard';
 import { ModuleDisabledAlert } from '@/components/admin/module-disabled-alert';
 
 type EventStatus = 'draft' | 'published' | 'cancelled' | 'postponed' | 'completed';
+type ButtonMode = 'subscribe' | 'unsubscribe' | 'both' | 'custom';
+
+const buttonModes: readonly ButtonMode[] = ['subscribe', 'unsubscribe', 'both', 'custom'];
+
+function toButtonMode(value: string): ButtonMode {
+  return buttonModes.includes(value as ButtonMode) ? (value as ButtonMode) : 'subscribe';
+}
 
 interface Event {
   id: string;
@@ -56,7 +63,7 @@ interface Event {
   showAvailableSeats?: boolean;
   allowUnsubscribe?: boolean;
   redUnsubscribeButton?: boolean;
-  buttonMode?: 'subscribe' | 'unsubscribe' | 'both' | 'custom';
+  buttonMode?: ButtonMode;
   customButtonText?: string;
 }
 
@@ -67,6 +74,29 @@ interface Inscription {
   company?: string;
   phone?: string;
   createdAt: string;
+}
+
+function toEventDetail(event: Event): EventWithInscriptions {
+  return {
+    ...event,
+    inscriptionCount: event.inscriptionCount ?? 0,
+    unsubscriptionCount: event.unsubscriptionCount ?? 0,
+  };
+}
+
+function fromEventDetail(event: EventWithInscriptions): Event {
+  return {
+    id: event.id,
+    title: event.title,
+    description: event.description ?? undefined,
+    date: event.date instanceof Date ? event.date.toISOString() : event.date,
+    location: event.location ?? undefined,
+    maxParticipants: event.maxParticipants ?? undefined,
+    helloAssoLink: event.helloAssoLink ?? undefined,
+    status: (event.status as EventStatus | undefined) ?? 'published',
+    inscriptionCount: event.inscriptionCount,
+    unsubscriptionCount: event.unsubscriptionCount,
+  };
 }
 
 /**
@@ -97,7 +127,7 @@ export default function AdminEventsPage() {
     showAvailableSeats: true,
     allowUnsubscribe: false,
     redUnsubscribeButton: false,
-    buttonMode: 'subscribe' as 'subscribe' | 'unsubscribe' | 'both' | 'custom',
+    buttonMode: 'subscribe' as ButtonMode,
     customButtonText: '',
   });
 
@@ -277,10 +307,10 @@ export default function AdminEventsPage() {
       status: event.status,
       showInscriptionsCount: event.showInscriptionsCount ?? true,
       showAvailableSeats: event.showAvailableSeats ?? true,
-      allowUnsubscribe: (event as any).allowUnsubscribe ?? false,
-      redUnsubscribeButton: (event as any).redUnsubscribeButton ?? false,
-      buttonMode: ((event as any).buttonMode as 'subscribe' | 'unsubscribe' | 'both' | 'custom') ?? 'subscribe',
-      customButtonText: (event as any).customButtonText ?? '',
+      allowUnsubscribe: event.allowUnsubscribe ?? false,
+      redUnsubscribeButton: event.redUnsubscribeButton ?? false,
+      buttonMode: event.buttonMode ?? 'subscribe',
+      customButtonText: event.customButtonText ?? '',
     });
     setShowEditModal(true);
   };
@@ -486,7 +516,7 @@ export default function AdminEventsPage() {
                         </Button>
                         {(event.unsubscriptionCount ?? 0) > 0 && (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground pl-1">
-                            <span className="text-red-500">✗</span>
+                            <span className="text-error-dark">✗</span>
                             <span>{event.unsubscriptionCount}</span>
                             <span>absence{(event.unsubscriptionCount ?? 0) > 1 ? 's' : ''}</span>
                           </div>
@@ -740,7 +770,7 @@ export default function AdminEventsPage() {
                 <select
                   id="buttonMode"
                   value={formData.buttonMode}
-                  onChange={(e) => setFormData({ ...formData, buttonMode: e.target.value as any })}
+                  onChange={(e) => setFormData({ ...formData, buttonMode: toButtonMode(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
                   <option value="subscribe">Inscription uniquement</option>
@@ -927,7 +957,7 @@ export default function AdminEventsPage() {
                 <select
                   id="edit-buttonMode"
                   value={formData.buttonMode}
-                  onChange={(e) => setFormData({ ...formData, buttonMode: e.target.value as any })}
+                  onChange={(e) => setFormData({ ...formData, buttonMode: toButtonMode(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
                   <option value="subscribe">Inscription uniquement</option>
@@ -1010,10 +1040,10 @@ export default function AdminEventsPage() {
       <EventDetailModal
         open={showDetailModal}
         onOpenChange={setShowDetailModal}
-        event={selectedEvent as any}
+        event={selectedEvent ? toEventDetail(selectedEvent) : null}
         onEdit={(event) => {
           setShowDetailModal(false);
-          openEditModal(event as unknown as Event);
+          openEditModal(fromEventDetail(event));
         }}
       />
     </div>

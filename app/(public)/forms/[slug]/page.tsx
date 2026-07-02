@@ -184,7 +184,7 @@ export default function PublicSurveyFormPage() {
       <main className="container mx-auto max-w-3xl px-4 py-12">
         <Card>
           <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-            <CheckCircle2 className="h-12 w-12 text-green-600" />
+            <CheckCircle2 className="h-12 w-12 text-success-dark" />
             <h1 className="text-2xl font-bold">Réponse enregistrée</h1>
             <p className="text-muted-foreground">{submittedMessage}</p>
             {form.allowMultipleSubmissions && <Button onClick={() => setSubmittedMessage(null)}>Envoyer une autre réponse</Button>}

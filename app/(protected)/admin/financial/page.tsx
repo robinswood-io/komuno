@@ -142,6 +142,20 @@ export interface SubscriptionStats {
   byType: Array<{ type: string; count: number; total: number }>;
 }
 
+type SubscriptionKind = MemberSubscription['subscriptionType'];
+type SubscriptionDuration = MemberSubscription['durationType'];
+
+const subscriptionKinds: readonly SubscriptionKind[] = ['adherent', 'parrain', 'bienfaiteur', 'autre'];
+const subscriptionDurations: readonly SubscriptionDuration[] = ['monthly', 'quarterly', 'yearly'];
+
+function toSubscriptionKind(value: string): SubscriptionKind {
+  return subscriptionKinds.includes(value as SubscriptionKind) ? (value as SubscriptionKind) : 'adherent';
+}
+
+function toSubscriptionDuration(value: string): SubscriptionDuration {
+  return subscriptionDurations.includes(value as SubscriptionDuration) ? (value as SubscriptionDuration) : 'yearly';
+}
+
 interface DashboardOverview {
   subscriptions: {
     total: number;
@@ -1380,9 +1394,9 @@ export default function AdminFinancialPage() {
       case 'active':
         return 'bg-success/20 text-success-dark';
       case 'expired':
-        return 'bg-red-100 text-red-800';
+        return 'bg-error-light text-error-dark';
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-warning-light text-warning-dark';
       default:
         return '';
     }
@@ -2080,7 +2094,7 @@ export default function AdminFinancialPage() {
                     <CardTitle className="text-sm font-medium">Montant Total</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">
+                    <div className="text-2xl font-bold text-info-dark">
                       {formatCurrency((subscriptionStats?.totalAmount ?? 0) / 100)}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -2108,7 +2122,7 @@ export default function AdminFinancialPage() {
                     <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-orange-600">
+                    <div className="text-2xl font-bold text-warning-dark">
                       {subscriptionStats?.expiringMembersCount ?? 0}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -2874,7 +2888,7 @@ export default function AdminFinancialPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="subscription-type">Type de Cotisation *</Label>
-                <Select value={subscriptionForm.subscriptionType} onValueChange={(val) => setSubscriptionForm({ ...subscriptionForm, subscriptionType: val as any })}>
+                <Select value={subscriptionForm.subscriptionType} onValueChange={(val) => setSubscriptionForm({ ...subscriptionForm, subscriptionType: toSubscriptionKind(val) })}>
                   <SelectTrigger id="subscription-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="adherent">Adherent</SelectItem>
@@ -2899,7 +2913,7 @@ export default function AdminFinancialPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="subscription-duration">Duree *</Label>
-                <Select value={subscriptionForm.durationType} onValueChange={(val) => setSubscriptionForm({ ...subscriptionForm, durationType: val as any })}>
+                <Select value={subscriptionForm.durationType} onValueChange={(val) => setSubscriptionForm({ ...subscriptionForm, durationType: toSubscriptionDuration(val) })}>
                   <SelectTrigger id="subscription-duration"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">Mensuel</SelectItem>
@@ -2986,7 +3000,7 @@ export default function AdminFinancialPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="edit-subscription-type">Type de Cotisation *</Label>
-                <Select value={editSubscriptionForm.subscriptionType} onValueChange={(val) => setEditSubscriptionForm({ ...editSubscriptionForm, subscriptionType: val as any })}>
+                <Select value={editSubscriptionForm.subscriptionType} onValueChange={(val) => setEditSubscriptionForm({ ...editSubscriptionForm, subscriptionType: toSubscriptionKind(val) })}>
                   <SelectTrigger id="edit-subscription-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="adherent">Adherent</SelectItem>
@@ -3011,7 +3025,7 @@ export default function AdminFinancialPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="edit-subscription-duration">Duree *</Label>
-                <Select value={editSubscriptionForm.durationType} onValueChange={(val) => setEditSubscriptionForm({ ...editSubscriptionForm, durationType: val as any })}>
+                <Select value={editSubscriptionForm.durationType} onValueChange={(val) => setEditSubscriptionForm({ ...editSubscriptionForm, durationType: toSubscriptionDuration(val) })}>
                   <SelectTrigger id="edit-subscription-duration"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">Mensuel</SelectItem>
@@ -3135,7 +3149,7 @@ export default function AdminFinancialPage() {
               </div>
               <div>
                 <Label htmlFor="type-duration">Durée *</Label>
-                <Select value={typeForm.durationType} onValueChange={(val) => setTypeForm({ ...typeForm, durationType: val as any })}>
+                <Select value={typeForm.durationType} onValueChange={(val) => setTypeForm({ ...typeForm, durationType: toSubscriptionDuration(val) })}>
                   <SelectTrigger id="type-duration"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">Mensuel</SelectItem>
@@ -3210,7 +3224,7 @@ export default function AdminFinancialPage() {
               </div>
               <div>
                 <Label htmlFor="edit-type-duration">Durée *</Label>
-                <Select value={typeForm.durationType} onValueChange={(val) => setTypeForm({ ...typeForm, durationType: val as any })}>
+                <Select value={typeForm.durationType} onValueChange={(val) => setTypeForm({ ...typeForm, durationType: toSubscriptionDuration(val) })}>
                   <SelectTrigger id="edit-type-duration"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">Mensuel</SelectItem>

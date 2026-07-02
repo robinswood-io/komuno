@@ -90,10 +90,10 @@ const ACTIVE_STAGES = [
   {
     value: 'R1' as ProspectionStage,
     label: 'R1 — Premier RDV',
-    color: 'bg-blue-50 text-blue-700 border-blue-200',
+    color: 'bg-info-light text-info-dark border-info',
     headerClass: 'bg-gradient-to-r from-blue-500 to-blue-600',
     accent: 'border-l-blue-400',
-    avatarBg: 'bg-blue-100 text-blue-600',
+    avatarBg: 'bg-info-light text-info-dark',
     icon: Calendar,
   },
   {

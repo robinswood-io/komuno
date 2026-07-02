@@ -268,8 +268,8 @@ export function AddMemberDialog({ open, onOpenChange, defaultStatus }: AddMember
           {/* Informations de base */}
           <div className="space-y-4">
             <div className="flex items-center gap-2.5 pb-2 border-b border-border">
-              <div className="p-1.5 rounded-md bg-blue-50">
-                <User className="h-4 w-4 text-blue-600" />
+              <div className="p-1.5 rounded-md bg-info-light">
+                <User className="h-4 w-4 text-info-dark" />
               </div>
               <h3 className="font-semibold text-sm text-foreground">Informations de base</h3>
             </div>

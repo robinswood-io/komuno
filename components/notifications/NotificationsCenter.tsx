@@ -231,13 +231,13 @@ export const NotificationsCenter: React.FC<NotificationsCenterProps> = ({
             <TabsTrigger value="all">
               Tous
               {unreadCount > 0 && (
-                <Badge className="ml-2 bg-red-500">{unreadCount}</Badge>
+                <Badge className="ml-2 bg-error-light0">{unreadCount}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="projects">
               Par Projet
               {groupedByProject.reduce((sum, g) => sum + g.unreadCount, 0) > 0 && (
-                <Badge className="ml-2 bg-blue-500">
+                <Badge className="ml-2 bg-info-light0">
                   {groupedByProject.reduce((sum, g) => sum + g.unreadCount, 0)}
                 </Badge>
               )}
@@ -356,7 +356,7 @@ const NotificationGroup: React.FC<NotificationGroupProps> = ({
           <span className="font-medium">{group.groupId}</span>
           <Badge variant="outline">{group.count}</Badge>
           {group.unreadCount > 0 && (
-            <Badge variant="default" className="bg-red-500">
+            <Badge variant="default" className="bg-error-light0">
               {group.unreadCount} non lu(s)
             </Badge>
           )}
@@ -402,7 +402,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
       className={`p-3 rounded border ${
         notification.isRead
           ? 'bg-white border-gray-200'
-          : 'bg-blue-50 border-blue-200'
+          : 'bg-info-light border-info'
       }`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -410,7 +410,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
           <div className="flex items-center gap-2">
             <h4 className="font-semibold text-sm">{notification.title}</h4>
             {!notification.isRead && (
-              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <div className="w-2 h-2 rounded-full bg-info-light0" />
             )}
           </div>
           <p className="text-xs text-gray-600 mt-1">{notification.body}</p>
@@ -440,15 +440,15 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
             {notification.isRead ? (
               <EyeOff className="h-4 w-4 text-gray-400" />
             ) : (
-              <Eye className="h-4 w-4 text-blue-500" />
+              <Eye className="h-4 w-4 text-info-dark" />
             )}
           </button>
           <button
             onClick={() => onDelete(notification.id)}
-            className="p-1.5 hover:bg-red-50 rounded transition"
+            className="p-1.5 hover:bg-error-light rounded transition"
             title="Supprimer"
           >
-            <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+            <Trash2 className="h-4 w-4 text-gray-400 hover:text-error-dark" />
           </button>
         </div>
       </div>

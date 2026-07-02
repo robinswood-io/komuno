@@ -72,11 +72,11 @@ export const getStatusLabel = (status: string): string => {
 export const getStatusBadgeColor = (status: string): string => {
   switch (status) {
     case 'active':
-      return 'bg-green-100 text-green-800';
+      return 'bg-success-light text-success-dark';
     case 'expired':
-      return 'bg-red-100 text-red-800';
+      return 'bg-error-light text-error-dark';
     case 'pending':
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-warning-light text-warning-dark';
     default:
       return '';
   }

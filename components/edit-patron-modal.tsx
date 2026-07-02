@@ -187,7 +187,7 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Pencil className="w-5 h-5 text-blue-600" />
+            <Pencil className="w-5 h-5 text-info-dark" />
             Modifier le sponsor
           </DialogTitle>
           <DialogDescription>
@@ -410,7 +410,7 @@ export default function EditPatronModal({ open, onOpenChange, patron }: EditPatr
             <Button
               type="submit"
               disabled={updatePatronMutation.isPending || !firstName.trim() || !lastName.trim() || !email.trim()}
-              className="bg-blue-600 hover:bg-blue-700 px-6"
+              className="bg-info hover:bg-info-dark px-6"
             >
               {updatePatronMutation.isPending ? (
                 <>

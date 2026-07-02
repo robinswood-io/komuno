@@ -283,10 +283,10 @@ export default function MembersStatsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Prospects</CardTitle>
-            <Target className="h-4 w-4 text-orange-600" />
+            <Target className="h-4 w-4 text-warning-dark" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.totalProspects}</div>
+            <div className="text-2xl font-bold text-warning-dark">{stats.totalProspects}</div>
             <p className="text-xs text-muted-foreground mt-1">
               {stats.totalMembers > 0 ? ((stats.totalProspects / stats.totalMembers) * 100).toFixed(1) : 0}% des membres
             </p>
@@ -297,10 +297,10 @@ export default function MembersStatsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Conversion</CardTitle>
-            <div className="h-4 w-4 rounded-full bg-blue-600" />
+            <div className="h-4 w-4 rounded-full bg-info" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.conversionRate.toFixed(1)}%</div>
+            <div className="text-2xl font-bold text-info-dark">{stats.conversionRate.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground mt-1">
               Prospects → Actifs
             </p>
@@ -513,11 +513,11 @@ export default function MembersStatsPage() {
             {stats.monthlyGrowth >= 0 ? (
               <TrendingUp className="h-4 w-4 text-success" />
             ) : (
-              <TrendingDown className="h-4 w-4 text-red-600" />
+              <TrendingDown className="h-4 w-4 text-error-dark" />
             )}
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${stats.monthlyGrowth >= 0 ? 'text-success' : 'text-red-600'}`}>
+            <div className={`text-2xl font-bold ${stats.monthlyGrowth >= 0 ? 'text-success' : 'text-error-dark'}`}>
               {stats.monthlyGrowth >= 0 ? '+' : ''}{stats.monthlyGrowth.toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">

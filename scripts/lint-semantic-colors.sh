@@ -35,37 +35,39 @@ PATTERNS=(
   "text-orange-[0-9]"
 )
 
-# Suggestions de remplacement
-declare -A REPLACEMENTS=(
-  ["bg-green-"]="bg-success ou bg-cjd-green"
-  ["text-green-"]="text-success ou text-success-dark"
-  ["border-green-"]="border-success"
-  ["bg-red-"]="bg-error ou bg-destructive"
-  ["text-red-"]="text-error ou text-error-dark"
-  ["border-red-"]="border-error ou border-destructive"
-  ["bg-blue-"]="bg-info ou bg-accent"
-  ["text-blue-"]="text-info ou text-info-dark"
-  ["border-blue-"]="border-info"
-  ["bg-yellow-"]="bg-warning"
-  ["text-yellow-"]="text-warning ou text-warning-dark"
-  ["border-yellow-"]="border-warning"
-  ["bg-orange-"]="bg-warning"
-  ["text-orange-"]="text-warning"
-)
+replacement_for() {
+  case "$1" in
+    bg-green-) echo "bg-success ou bg-cjd-green" ;;
+    text-green-) echo "text-success ou text-success-dark" ;;
+    border-green-) echo "border-success" ;;
+    bg-red-) echo "bg-error ou bg-destructive" ;;
+    text-red-) echo "text-error ou text-error-dark" ;;
+    border-red-) echo "border-error ou border-destructive" ;;
+    bg-blue-) echo "bg-info ou bg-accent" ;;
+    text-blue-) echo "text-info ou text-info-dark" ;;
+    border-blue-) echo "border-info" ;;
+    bg-yellow-) echo "bg-warning" ;;
+    text-yellow-) echo "text-warning ou text-warning-dark" ;;
+    border-yellow-) echo "border-warning" ;;
+    bg-orange-) echo "bg-warning" ;;
+    text-orange-) echo "text-warning" ;;
+    *) echo "couleur sémantique équivalente" ;;
+  esac
+}
 
 echo "📁 Recherche dans: app/ components/ lib/ hooks/"
 echo ""
 
 for pattern in "${PATTERNS[@]}"; do
-  # Extraire le préfixe pour les suggestions
-  prefix="${pattern%-[0-9]}"
+  # Extraire le préfixe pour les suggestions en retirant le suffixe regex literal "[0-9]".
+  prefix="${pattern:0:${#pattern}-5}"
 
   # Chercher les occurrences
   results=$(grep -rn "$pattern" app/ components/ lib/ hooks/ --include="*.tsx" --include="*.ts" 2>/dev/null | grep -v node_modules || true)
 
   if [ -n "$results" ]; then
     echo -e "${RED}❌ Trouvé: $pattern${NC}"
-    echo -e "${YELLOW}   Suggestion: ${REPLACEMENTS[$prefix]}${NC}"
+    echo -e "${YELLOW}   Suggestion: $(replacement_for "$prefix")${NC}"
     echo "$results" | head -5
     echo ""
     ERRORS=$((ERRORS + 1))

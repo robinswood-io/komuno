@@ -125,11 +125,11 @@ const DEFAULT_COLORS = [
 // Colonnes du Kanban prospection
 const KANBAN_COLUMNS: { id: string; label: string; color: string }[] = [
   { id: 'Qualification', label: 'Qualification', color: 'bg-slate-100 border-slate-300' },
-  { id: 'R1', label: 'R1', color: 'bg-blue-50 border-blue-300' },
+  { id: 'R1', label: 'R1', color: 'bg-info-light border-info' },
   { id: 'R2', label: 'R2', color: 'bg-amber-50 border-amber-300' },
-  { id: 'Contractualisation', label: 'Contractualisation', color: 'bg-green-50 border-green-300' },
+  { id: 'Contractualisation', label: 'Contractualisation', color: 'bg-success-light border-success' },
   { id: 'active', label: 'Membre actif', color: 'bg-emerald-50 border-emerald-300' },
-  { id: 'Refusé', label: 'Refusé', color: 'bg-red-50 border-red-300' },
+  { id: 'Refusé', label: 'Refusé', color: 'bg-error-light border-error' },
 ];
 
 // Valeurs de statut disponibles pour les opérations en masse
@@ -796,23 +796,23 @@ export default function AdminMembersPage() {
       case 'active':
         return { bg: 'bg-success/10', text: 'text-success-dark', border: 'border-success/30', label: 'Actif' };
       case 'proposed':
-        return { bg: 'bg-orange-50', text: 'text-orange-900', border: 'border-orange-200', label: 'Proposé' };
+        return { bg: 'bg-warning-light', text: 'text-warning-dark', border: 'border-warning', label: 'Proposé' };
       case 'inactive':
         return { bg: 'bg-gray-50', text: 'text-gray-900', border: 'border-gray-200', label: 'Inactif' };
       case 'Qualification':
         return { bg: 'bg-slate-50', text: 'text-slate-900', border: 'border-slate-200', label: 'Qualification' };
       case 'R1':
-        return { bg: 'bg-blue-50', text: 'text-blue-900', border: 'border-blue-200', label: 'R1' };
+        return { bg: 'bg-info-light', text: 'text-info-dark', border: 'border-info', label: 'R1' };
       case 'R2':
         return { bg: 'bg-amber-50', text: 'text-amber-900', border: 'border-amber-200', label: 'R2' };
       case 'Contractualisation':
-        return { bg: 'bg-green-50', text: 'text-green-900', border: 'border-green-200', label: 'Contractualisation' };
+        return { bg: 'bg-success-light', text: 'text-success-dark', border: 'border-success', label: 'Contractualisation' };
       case 'Hors cible':
         return { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200', label: 'Hors cible' };
       case 'En réflexion':
         return { bg: 'bg-purple-50', text: 'text-purple-900', border: 'border-purple-200', label: 'En réflexion' };
       case 'Refusé':
-        return { bg: 'bg-red-50', text: 'text-red-900', border: 'border-red-200', label: 'Refusé' };
+        return { bg: 'bg-error-light', text: 'text-error-dark', border: 'border-error', label: 'Refusé' };
       case 'Signé':
         return { bg: 'bg-emerald-50', text: 'text-emerald-900', border: 'border-emerald-200', label: 'Signé' };
       default:
@@ -876,10 +876,10 @@ export default function AdminMembersPage() {
       </div>
 
       {/* Bandeau Prospects */}
-      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-800 text-sm">
+      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-info bg-info-light text-info-dark text-sm">
         <UserSearch className="h-4 w-4 flex-shrink-0" />
         <span>Le suivi des prospects et du pipeline CRM est disponible dans</span>
-        <Link href="/admin/prospects" className="font-semibold underline underline-offset-2 hover:text-blue-600">
+        <Link href="/admin/prospects" className="font-semibold underline underline-offset-2 hover:text-info-dark">
           Pipeline CRM →
         </Link>
       </div>

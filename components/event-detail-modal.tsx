@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
-import type { Event, Inscription, Unsubscription } from "@/shared/schema";
+import type { Inscription, Unsubscription } from "@/shared/schema";
 import {
   getSponsorshipLevelLabel,
   getSponsorshipLevelBadgeClass,
@@ -29,7 +29,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface EventWithInscriptions extends Omit<Event, "inscriptionCount"> {
+export interface EventWithInscriptions {
+  id: string;
+  title: string;
+  description?: string | null;
+  date: Date | string;
+  location?: string | null;
+  maxParticipants?: number | null;
+  helloAssoLink?: string | null;
+  status?: string;
   inscriptionCount: number;
   unsubscriptionCount: number;
 }
@@ -527,7 +535,7 @@ export default function EventDetailModal({
                                   }
                                 }}
                                 disabled={deleteInscriptionMutation.isPending}
-                                className="h-7 w-7 p-0 text-gray-400 hover:text-red-600"
+                                className="h-7 w-7 p-0 text-gray-400 hover:text-error-dark"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -653,7 +661,7 @@ export default function EventDetailModal({
                                   }
                                 }}
                                 disabled={deleteUnsubscriptionMutation.isPending}
-                                className="h-7 w-7 p-0 text-gray-400 hover:text-red-600"
+                                className="h-7 w-7 p-0 text-gray-400 hover:text-error-dark"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
