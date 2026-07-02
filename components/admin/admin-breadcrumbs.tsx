@@ -14,7 +14,7 @@ import { Home } from 'lucide-react';
 
 interface BreadcrumbSegment {
   label: string;
-  href: string;
+  href?: string;
 }
 
 const settingsChildSegments = new Set(['audit', 'automations', 'development-requests', 'tracking']);
@@ -60,8 +60,11 @@ export function AdminBreadcrumbs() {
 
   // Générer les breadcrumbs
   const breadcrumbs: BreadcrumbSegment[] = segments.map((segment, index) => {
-    const href = '/' + segments.slice(0, index + 1).join('/');
-    const label = pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1);
+    const isEventIdWithoutDetailPage = segments[0] === 'admin' && segments[1] === 'events' && index === 2;
+    const href = isEventIdWithoutDetailPage ? undefined : '/' + segments.slice(0, index + 1).join('/');
+    const label = isEventIdWithoutDetailPage
+      ? 'Événement'
+      : pathLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1);
 
     return {
       label,
@@ -99,10 +102,10 @@ export function AdminBreadcrumbs() {
           if (isAdmin) return null;
 
           return (
-            <div key={crumb.href} className="flex items-center">
+            <div key={crumb.href ?? `${crumb.label}-${index}`} className="flex items-center">
               <BreadcrumbSeparator />
               <BreadcrumbItem>
-                {isLast ? (
+                {isLast || !crumb.href ? (
                   <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>

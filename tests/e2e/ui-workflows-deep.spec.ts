@@ -140,11 +140,11 @@ test.describe('Deep UI workflows — demo/smoke', () => {
   test('public proposal tabs remain usable', async ({ page }) => {
     await collectPageIssues(page, '/propose interactions', async () => {
       await page.goto('/propose', { waitUntil: 'domcontentloaded' });
-      await expect(page.getByRole('heading', { name: /proposer/i }).first()).toBeVisible();
-      await page.getByRole('tab', { name: /formation/i }).click();
-      await expect(page.getByText(/formation/i).first()).toBeVisible();
-      await page.getByRole('tab', { name: /idée/i }).click();
-      await expect(page.getByText(/idée/i).first()).toBeVisible();
+      await expect(page.getByText('Proposer / Participer')).toBeVisible();
+      await page.getByRole('button', { name: /formation/i }).click();
+      await expect(page.getByText('Formation *')).toBeVisible();
+      await page.getByRole('button', { name: /idée/i }).click();
+      await expect(page.getByText('Titre de l’idée *')).toBeVisible();
     });
   });
 
@@ -194,7 +194,7 @@ test.describe('Deep UI workflows — demo/smoke', () => {
 
       await collectPageIssues(page, `/forms/${slug}`, async () => {
         await page.goto(`/forms/${slug}`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByRole('heading', { name: `Deep UI Form ${suffix}` })).toBeVisible();
+        await expect(page.getByText(`Deep UI Form ${suffix}`)).toBeVisible();
         const inputs = page.locator('input');
         await inputs.nth(0).fill('Répondant Deep UI');
         await inputs.nth(1).fill(`deep-ui-${suffix}@example.com`);
