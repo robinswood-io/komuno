@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.25.5] - 2026-07-02
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Avoid missing event detail prefetch
+
 ## [2.25.4] - 2026-07-02
 
 ### En bref

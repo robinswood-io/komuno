@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.25.4",
+    "version": "2.25.5",
     "releasedAt": "2026-07-02",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Restore UI workflow endpoints"
+        "Avoid missing event detail prefetch"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.25.5",
+      "releasedAt": "2026-07-02",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Avoid missing event detail prefetch"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.25.4",
       "releasedAt": "2026-07-02",
