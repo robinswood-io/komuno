@@ -17,6 +17,8 @@ interface BreadcrumbSegment {
   href: string;
 }
 
+const settingsChildSegments = new Set(['audit', 'development-requests', 'tracking']);
+
 const pathLabels: Record<string, string> = {
   admin: 'Administration',
   dashboard: 'Tableau de bord',
@@ -34,6 +36,9 @@ const pathLabels: Record<string, string> = {
   financial: 'Finance',
   federation: 'Fédération',
   settings: 'Paramètres',
+  tracking: 'Tracking',
+  audit: 'Audit',
+  'development-requests': 'Demandes dev',
   crm: 'CRM',
   content: 'Contenu',
   finance: 'Finance',
@@ -60,6 +65,13 @@ export function AdminBreadcrumbs() {
       href,
     };
   });
+
+  if (segments[0] === 'admin' && settingsChildSegments.has(segments[1])) {
+    breadcrumbs.splice(1, 0, {
+      label: 'Paramètres',
+      href: '/admin/settings',
+    });
+  }
 
   // Ne rien afficher si on est à la racine admin
   if (breadcrumbs.length <= 1) return null;

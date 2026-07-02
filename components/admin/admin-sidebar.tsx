@@ -144,11 +144,6 @@ const navItems: (NavItem | NavSection)[] = [
         icon: Bell,
       },
       {
-        title: 'Tracking',
-        href: '/admin/tracking',
-        icon: Activity,
-      },
-      {
         title: 'Fédération',
         href: '/admin/federation',
         icon: Network,
@@ -157,6 +152,21 @@ const navItems: (NavItem | NavSection)[] = [
         title: 'Intégrations',
         href: '/admin/integrations',
         icon: PlugZap,
+      },
+    ],
+  },
+  {
+    title: 'Paramètres',
+    items: [
+      {
+        title: 'Paramètres',
+        href: '/admin/settings',
+        icon: Settings,
+      },
+      {
+        title: 'Tracking',
+        href: '/admin/tracking',
+        icon: Activity,
       },
       {
         title: 'Audit',
@@ -169,11 +179,6 @@ const navItems: (NavItem | NavSection)[] = [
         icon: ClipboardList,
       },
     ],
-  },
-  {
-    title: 'Paramètres',
-    href: '/admin/settings',
-    icon: Settings,
   },
 ];
 

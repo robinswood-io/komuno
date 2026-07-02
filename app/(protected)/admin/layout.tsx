@@ -39,6 +39,7 @@ export default function AdminLayout({
       content: 'Contenu',
       finance: 'Finance',
       tracking: 'Tracking',
+      audit: 'Audit',
       'development-requests': 'Demandes dev',
       branding: 'Branding',
       tools: 'Outils du Dirigeant',
