@@ -1,21 +1,37 @@
 {
   "latest": {
-    "version": "2.25.5",
+    "version": "2.25.6",
     "releasedAt": "2026-07-02",
-    "summary": "Cette version apporte 1 correction(s).",
+    "summary": "Cette version apporte des ajustements techniques.",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
-      "corrections": [
-        "Avoid missing event detail prefetch"
-      ],
+      "corrections": [],
       "ameliorations": [],
       "securite": [],
-      "maintenance": []
+      "maintenance": [
+        "Stabilize deep UI workflow checks"
+      ]
     },
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.25.6",
+      "releasedAt": "2026-07-02",
+      "summary": "Cette version apporte des ajustements techniques.",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Stabilize deep UI workflow checks"
+        ]
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.25.5",
       "releasedAt": "2026-07-02",
