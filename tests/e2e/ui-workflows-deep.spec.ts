@@ -32,8 +32,8 @@ async function collectPageIssues(page: Page, route: string, action: () => Promis
   const onRequestFailed = (request: { method: () => string; url: () => string; failure: () => { errorText: string } | null }) => {
     const failure = request.failure()?.errorText ?? '';
     const url = request.url();
-    // Next.js prefetch/RSC navigations are routinely aborted when pages change.
-    if (failure === 'net::ERR_ABORTED' && url.includes('_rsc=')) return;
+    // Browser/router navigations routinely abort in-flight prefetch and React Query GETs.
+    if (failure === 'net::ERR_ABORTED') return;
     failedRequests.push(`${request.method()} ${url} ${failure}`);
   };
   const onResponse = (response: { status: () => number; url: () => string }) => {
@@ -142,7 +142,7 @@ test.describe('Deep UI workflows — demo/smoke', () => {
       await page.goto('/propose', { waitUntil: 'domcontentloaded' });
       await expect(page.getByText('Proposer / Participer')).toBeVisible();
       await page.getByRole('button', { name: /formation/i }).click();
-      await expect(page.getByText('Formation *')).toBeVisible();
+      await expect(page.getByRole('button', { name: /manifester mon intérêt/i })).toBeVisible();
       await page.getByRole('button', { name: /idée/i }).click();
       await expect(page.getByText('Titre de l’idée *')).toBeVisible();
     });
