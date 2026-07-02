@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db';
 import {
   businessAuditLogs,
@@ -62,7 +62,7 @@ export class AuditService {
     to?: string;
     limit?: number;
   }) {
-    const conditions = [] as any[];
+    const conditions: SQL[] = [];
     if (options?.action) conditions.push(eq(businessAuditLogs.action, options.action));
     if (options?.entityType) conditions.push(eq(businessAuditLogs.entityType, options.entityType));
     if (options?.entityId) conditions.push(eq(businessAuditLogs.entityId, options.entityId));

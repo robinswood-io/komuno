@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, unique, uniqueIndex, index, serial, date, jsonb, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, unique, uniqueIndex, index, serial, date, jsonb, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -395,7 +395,7 @@ export const organizationNetworks = pgTable("organization_networks", {
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   networkId: varchar("network_id").references(() => organizationNetworks.id, { onDelete: "set null" }),
-  parentOrganizationId: varchar("parent_organization_id").references((): any => organizations.id, { onDelete: "set null" }),
+  parentOrganizationId: varchar("parent_organization_id").references((): AnyPgColumn => organizations.id, { onDelete: "set null" }),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   type: text("type").default(ORGANIZATION_TYPE.SECTION).notNull(),
@@ -3380,7 +3380,7 @@ export const insertEventSponsorshipSchema = z.object({
   { message: "Soit 'amountInCents' soit 'amount' doit être fourni" }
 ).transform((data) => {
   const { type, amountInCents, confirmedAt, ...rest } = data;
-  const result: any = {
+  const result: Record<string, unknown> = {
     ...rest,
     // Normalize to 'level' field for database
     level: data.level ?? data.type,
@@ -4055,7 +4055,7 @@ export const insertDevelopmentRequestSchema = createInsertSchema(developmentRequ
   priority: true,
   requestedBy: true,
   requestedByName: true,
-} as any).extend({
+} as const).extend({
   title: z.string()
     .min(5, "Le titre doit contenir au moins 5 caractères")
     .max(200, "Le titre ne peut pas dépasser 200 caractères")
@@ -4120,7 +4120,7 @@ export const insertMemberSubscriptionSchema = createInsertSchema(memberSubscript
   .omit({
     id: true,
     createdAt: true,
-  } as any)
+  } as const)
   .extend({
     subscriptionType: z.enum([
       SUBSCRIPTION_TYPES.MONTHLY,

@@ -4,6 +4,7 @@ import { and, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
+import { hasErrorCode } from '../common/utils/error-utils';
 import { AuditService } from '../audit/audit.service';
 import { StorageService } from '../common/storage/storage.service';
 import { IntegrationsService } from '../integrations/integrations.service';
@@ -353,7 +354,7 @@ export class AutomationsService {
     try {
       [event] = await db.insert(automationEvents).values(validatedEvent).returning();
     } catch (error) {
-      if ((error as any)?.code === '23505') {
+      if (hasErrorCode(error, '23505')) {
         [event] = await db.select().from(automationEvents)
           .where(and(eq(automationEvents.eventType, eventType), eq(automationEvents.eventId, eventId)))
           .limit(1);
@@ -449,7 +450,7 @@ export class AutomationsService {
       }).returning();
       return { workflowId: workflow.id, runId: run.id, status: run.status, duplicate: false };
     } catch (error) {
-      if ((error as any)?.code === '23505') {
+      if (hasErrorCode(error, '23505')) {
         const [run] = await db.select().from(automationRuns)
           .where(and(eq(automationRuns.workflowVersionId, version.id), eq(automationRuns.automationEventId, event.id)))
           .limit(1);

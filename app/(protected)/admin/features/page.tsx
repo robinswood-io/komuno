@@ -17,13 +17,14 @@ import {
   Shield,
   Palette,
   Sparkles,
+  type LucideIcon,
 } from 'lucide-react';
 
 interface Feature {
   id: string;
   name: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
   enabled: boolean;
   category: string;
 }
@@ -105,10 +106,10 @@ export default function AdminFeaturesPage() {
         title: 'Configuration sauvegardée',
         description: 'Les modifications des fonctionnalités ont été enregistrées',
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Erreur',
-        description: error.message || 'Impossible de sauvegarder',
+        description: error instanceof Error ? error.message : 'Impossible de sauvegarder',
         variant: 'destructive',
       });
     } finally {

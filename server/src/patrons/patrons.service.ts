@@ -185,7 +185,7 @@ export class PatronsService {
   async createPatron(data: unknown, userEmail: string) {
     try {
       const validatedData = insertPatronSchema.parse({
-        ...(data as Record<string, any>),
+        ...(data as Record<string, unknown>),
         createdBy: userEmail,
       });
 
@@ -281,7 +281,7 @@ export class PatronsService {
   async createPatronDonation(patronId: string, data: unknown, userEmail: string) {
     try {
       const validatedData = insertPatronDonationSchema.parse({
-        ...(data as Record<string, any>),
+        ...(data as Record<string, unknown>),
         patronId,
         recordedBy: userEmail,
       });
@@ -346,7 +346,7 @@ export class PatronsService {
   async createPatronUpdate(patronId: string, data: unknown, userEmail: string) {
     try {
       const validatedData = insertPatronUpdateSchema.parse({
-        ...(data as Record<string, any>),
+        ...(data as Record<string, unknown>),
         patronId,
         createdBy: userEmail,
       });
@@ -382,7 +382,7 @@ export class PatronsService {
   async createPatronSponsorship(patronId: string, data: unknown, userEmail: string) {
     try {
       const validatedData = insertEventSponsorshipSchema.parse({
-        ...(data as Record<string, any>),
+        ...(data as Record<string, unknown>),
         patronId,
         proposedByAdminEmail: userEmail,
       });

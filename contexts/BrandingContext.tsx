@@ -3,8 +3,10 @@ import { brandingCore } from '@/lib/config/branding-core';
 import type { BrandingCore } from '@/lib/config/branding-core';
 import { branding as defaultBranding } from '@/lib/config/branding';
 
+type BrandingAssets = Omit<typeof defaultBranding.assets, 'logo'> & { logo: string };
+
 interface BrandingContextType {
-  branding: BrandingCore & { assets?: typeof defaultBranding.assets };
+  branding: BrandingCore & { assets?: BrandingAssets };
   isLoading: boolean;
   isCustomized: boolean;
   reloadBranding: () => Promise<void>;
@@ -13,29 +15,31 @@ interface BrandingContextType {
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
 // Deep merge utility function
-function deepMerge<T extends Record<string, any>>(target: T, source: Partial<T>): T {
-  const result = { ...target };
-  
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function deepMerge<T extends Record<string, unknown>>(target: T, source: Partial<T>): T {
+  const result: Record<string, unknown> = { ...target };
+
   for (const key in source) {
     const sourceValue = source[key];
     const targetValue = result[key];
-    
-    if (sourceValue && typeof sourceValue === 'object' && !Array.isArray(sourceValue)) {
-      if (targetValue && typeof targetValue === 'object' && !Array.isArray(targetValue)) {
-        result[key] = deepMerge(targetValue, sourceValue) as any;
-      } else {
-        result[key] = sourceValue as any;
-      }
+
+    if (isPlainObject(sourceValue)) {
+      result[key] = isPlainObject(targetValue)
+        ? deepMerge(targetValue, sourceValue)
+        : sourceValue;
     } else if (sourceValue !== undefined && sourceValue !== null) {
-      result[key] = sourceValue as any;
+      result[key] = sourceValue;
     }
   }
-  
-  return result;
+
+  return result as T;
 }
 
 export function BrandingProvider({ children }: { children: ReactNode }) {
-  const [brandingState, setBrandingState] = useState<BrandingCore & { assets?: typeof defaultBranding.assets }>({
+  const [brandingState, setBrandingState] = useState<BrandingCore & { assets?: BrandingAssets }>({
     ...brandingCore,
     assets: defaultBranding.assets
   });
@@ -84,7 +88,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
             ...mergedConfig,
             assets: {
               ...defaultBranding.assets,
-              logo: logoUrl as any // Allow dynamic MinIO URLs
+              logo: logoUrl
             }
           });
           setIsCustomized(true);

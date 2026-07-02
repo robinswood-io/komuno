@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
 import { ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
@@ -38,6 +38,18 @@ import {
   type SurveyQuestionInput,
   type SurveyQuestionSnapshot,
 } from './forms.utils';
+
+function hasDatabaseCode(error: unknown, code: string): boolean {
+  if (!error || typeof error !== 'object') return false;
+  return 'code' in error && (error as { code?: unknown }).code === code;
+}
+
+function rowCountFromResult(result: unknown): number {
+  if (!result || typeof result !== 'object' || !('rowCount' in result)) return 0;
+  return typeof (result as { rowCount?: unknown }).rowCount === 'number'
+    ? (result as { rowCount: number }).rowCount
+    : 0;
+}
 
 @Injectable()
 export class FormsService {
@@ -140,7 +152,7 @@ export class FormsService {
   }
 
   async listForms(options?: { status?: string }) {
-    const conditions = [] as any[];
+    const conditions: SQL[] = [];
     if (options?.status && options.status !== 'all') conditions.push(eq(surveyForms.status, options.status));
 
     const forms = await db.select().from(surveyForms)
@@ -215,7 +227,7 @@ export class FormsService {
       });
       return await this.getForm(created.id);
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Un formulaire avec ce slug existe déjà');
+      if (hasDatabaseCode(error, '23505')) throw new ConflictException('Un formulaire avec ce slug existe déjà');
       return this.handleZodError(error);
     }
   }
@@ -303,7 +315,7 @@ export class FormsService {
       });
       return updatedForm;
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Un formulaire avec ce slug existe déjà');
+      if (hasDatabaseCode(error, '23505')) throw new ConflictException('Un formulaire avec ce slug existe déjà');
       return this.handleZodError(error);
     }
   }
@@ -587,7 +599,7 @@ export class FormsService {
 
     const data = {
       closedExpiredForms: closedForms.length,
-      purgedResponses: (deletedResponses as any)?.rowCount ?? 0,
+      purgedResponses: rowCountFromResult(deletedResponses),
     };
     this.audit({
       actorEmail: userEmail ?? null,

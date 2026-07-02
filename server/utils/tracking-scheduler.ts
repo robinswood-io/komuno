@@ -110,13 +110,13 @@ async function generateAlerts(): Promise<void> {
         }
       });
     }
-  } catch (error: any) {
+  } catch (error) {
     logger.error('Exception lors de la génération des alertes de tracking', {
       metadata: {
         service: 'TrackingScheduler',
         operation: 'generateAlerts',
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         timestamp: new Date().toISOString()
       }
     });

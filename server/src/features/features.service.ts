@@ -86,7 +86,7 @@ export class FeaturesService {
             enabled,
             updatedBy,
             updatedAt: new Date(),
-          } as any)
+          })
           .where(eq(featureConfig.featureKey, featureKey));
       } else {
         // Insert new
@@ -95,7 +95,7 @@ export class FeaturesService {
           enabled,
           updatedBy,
           updatedAt: new Date(),
-        } as any);
+        });
       }
 
       this.logger.log(`Feature ${featureKey} updated to ${enabled} by ${updatedBy}`);
@@ -118,7 +118,7 @@ export class FeaturesService {
             enabled: feature.enabled,
             updatedBy: 'system',
             updatedAt: new Date(),
-          } as any);
+          });
         }
         this.logger.log(`Initialized ${this.defaultFeatures.length} default features`);
       }

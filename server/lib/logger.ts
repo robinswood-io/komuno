@@ -14,25 +14,31 @@ if (!existsSync(logsDir)) {
 // List of sensitive fields to redact from logs
 const sensitiveFields = ['password', 'token', 'auth', 'p256dh', 'secret', 'apiKey', 'sessionId'];
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function redactSensitiveFields(value: Record<string, unknown>) {
+  const sanitized = { ...value };
+  sensitiveFields.forEach(field => {
+    if (sanitized[field]) {
+      sanitized[field] = '[REDACTED]';
+    }
+  });
+  return sanitized;
+}
+
 // Custom format to sanitize sensitive data
-const sanitizeMetadata = winston.format((info: any) => {
-  if (info.subscription && typeof info.subscription === 'object') {
-    info.subscription = { ...info.subscription };
-    sensitiveFields.forEach(field => {
-      if (info.subscription[field]) {
-        info.subscription[field] = '[REDACTED]';
-      }
-    });
+const sanitizeMetadata = winston.format((info) => {
+  if (isRecord(info.subscription)) {
+    info.subscription = redactSensitiveFields(info.subscription);
   }
   
-  // Recursively sanitize any object in metadata
+  // Recursively sanitize objects in metadata
   Object.keys(info).forEach(key => {
-    if (typeof info[key] === 'object' && info[key] !== null && key !== 'level' && key !== 'message') {
-      sensitiveFields.forEach(field => {
-        if (info[key][field]) {
-          info[key][field] = '[REDACTED]';
-        }
-      });
+    const value = info[key];
+    if (isRecord(value) && key !== 'level' && key !== 'message') {
+      info[key] = redactSensitiveFields(value);
     }
   });
   
@@ -40,12 +46,12 @@ const sanitizeMetadata = winston.format((info: any) => {
 });
 
 // Custom format to extract error details
-const errorFormat = winston.format((info: any) => {
-  if (info.error && info.error instanceof Error) {
+const errorFormat = winston.format((info) => {
+  if (info.error instanceof Error) {
     info.error = {
+      name: info.error.name,
       message: info.error.message,
       stack: info.error.stack,
-      ...info.error
     };
   }
   return info;

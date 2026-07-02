@@ -12,6 +12,25 @@ import { logger } from '../../lib/logger';
 /**
  * Service Tracking - Gestion du tracking
  */
+type TrackingMetricQueryOptions = {
+  entityType?: 'member' | 'patron';
+  entityId?: string;
+  entityEmail?: string;
+  metricType?: string;
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+};
+
+type TrackingAlertQueryOptions = {
+  entityType?: 'member' | 'patron';
+  entityId?: string;
+  isRead?: boolean;
+  isResolved?: boolean;
+  severity?: string;
+  limit?: number;
+};
+
 @Injectable()
 export class TrackingService {
   constructor(private readonly storageService: StorageService) {}
@@ -37,7 +56,7 @@ export class TrackingService {
     endDate?: string;
     limit?: number;
   }) {
-    const queryOptions: any = {};
+    const queryOptions: TrackingMetricQueryOptions = {};
     if (options.entityType) queryOptions.entityType = options.entityType;
     if (options.entityId) queryOptions.entityId = options.entityId;
     if (options.entityEmail) queryOptions.entityEmail = options.entityEmail;
@@ -55,7 +74,7 @@ export class TrackingService {
 
   async createTrackingMetric(data: unknown, userEmail: string) {
     try {
-      const dataObj = data as Record<string, any>;
+      const dataObj = data && typeof data === 'object' ? data as Record<string, unknown> : {};
       const validatedData = insertTrackingMetricSchema.parse({
         ...dataObj,
         recordedBy: userEmail,
@@ -93,7 +112,7 @@ export class TrackingService {
     severity?: string;
     limit?: number;
   }) {
-    const queryOptions: any = {};
+    const queryOptions: TrackingAlertQueryOptions = {};
     if (options.entityType) queryOptions.entityType = options.entityType;
     if (options.entityId) queryOptions.entityId = options.entityId;
     if (options.isRead !== undefined) queryOptions.isRead = options.isRead;
@@ -110,7 +129,7 @@ export class TrackingService {
 
   async createTrackingAlert(data: unknown, userEmail: string) {
     try {
-      const dataObj = data as Record<string, any>;
+      const dataObj = data && typeof data === 'object' ? data as Record<string, unknown> : {};
       const validatedData = insertTrackingAlertSchema.parse({
         ...dataObj,
         createdBy: userEmail,
@@ -147,7 +166,7 @@ export class TrackingService {
 
   async updateTrackingAlert(id: string, data: unknown, userEmail: string) {
     try {
-      const dataObj = data as Record<string, any>;
+      const dataObj = data && typeof data === 'object' ? data as Record<string, unknown> : {};
       const validatedData = updateTrackingAlertSchema.parse({
         ...dataObj,
         resolvedBy: dataObj.resolved ? userEmail : undefined,

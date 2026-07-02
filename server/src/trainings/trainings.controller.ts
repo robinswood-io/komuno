@@ -12,6 +12,10 @@ type RequestWithUser = {
   };
 };
 
+type RequestWithHeaders = {
+  headers?: Record<string, string | string[] | undefined>;
+};
+
 function actorFromRequest(req: RequestWithUser) {
   return req.user?.email || req.user?.role || 'admin';
 }
@@ -36,7 +40,7 @@ export class FederatedTrainingsController {
   constructor(private readonly trainingsService: TrainingsService) {}
 
   @Post('catalog/ingest')
-  async ingestCatalog(@Body() body: unknown, @Req() req: any) {
+  async ingestCatalog(@Body() body: unknown, @Req() req: RequestWithHeaders) {
     const tokenHeader = req.headers?.['x-komuno-federation-token'];
     const authorization = req.headers?.authorization;
     const bearerToken = typeof authorization === 'string' ? authorization.match(/^Bearer\s+(.+)$/i)?.[1] : undefined;
@@ -45,7 +49,7 @@ export class FederatedTrainingsController {
   }
 
   @Post('interests/ingest')
-  async ingestInterest(@Body() body: unknown, @Req() req: any) {
+  async ingestInterest(@Body() body: unknown, @Req() req: RequestWithHeaders) {
     const tokenHeader = req.headers?.['x-komuno-federation-token'];
     const authorization = req.headers?.authorization;
     const bearerToken = typeof authorization === 'string' ? authorization.match(/^Bearer\s+(.+)$/i)?.[1] : undefined;

@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
-import { exportToCSV, exportToExcel, exportToPDF, type ExportOptions } from '@/lib/export-utils';
+import { exportToCSV, exportToExcel, exportToPDF, type ExportOptions, type ExportRow } from '@/lib/export-utils';
 import { useToast } from './use-toast';
 
 export type ExportFormat = 'csv' | 'excel' | 'pdf';
 
 interface UseExportOptions extends Omit<ExportOptions, 'data'> {
-  getData: () => any[] | Promise<any[]>;
+  getData: () => ExportRow[] | Promise<ExportRow[]>;
 }
 
 export function useExport(options: UseExportOptions) {

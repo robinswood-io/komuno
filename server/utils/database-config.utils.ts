@@ -143,9 +143,9 @@ export function getPoolUtilizationPercent(): number {
  * const context = enrichContextWithPoolStats({ requestId: '123' });
  * logger.info('Request processing', context);
  */
-export function enrichContextWithPoolStats<T extends Record<string, any>>(
+export function enrichContextWithPoolStats<T extends Record<string, unknown>>(
   context: T
-): T & { poolStats: Record<string, any> } {
+): T & { poolStats: Record<string, unknown> } {
   return {
     ...context,
     poolStats: getPoolMetrics(),

@@ -162,7 +162,7 @@ export class TrainingsService {
 
   private async emitAutomationEvent(type: string, payload: Record<string, unknown>) {
     try {
-      await this.automationsService.emitEvent(type, payload as any, {
+      await this.automationsService.emitEvent(type, payload, {
         source: 'trainings',
         eventId: payload.id ? `${type}:${String(payload.id)}` : undefined,
       });

@@ -154,7 +154,7 @@ export class MemberStatusesController {
     status: 409,
     description: 'Un statut avec ce code existe déjà',
   })
-  async createStatus(@Body() body: any) {
+  async createStatus(@Body() body: unknown) {
     return this.memberStatusesService.createStatus(body);
   }
 
@@ -212,7 +212,7 @@ export class MemberStatusesController {
     status: 404,
     description: 'Statut non trouvé',
   })
-  async updateStatus(@Param('id') id: string, @Body() body: any) {
+  async updateStatus(@Param('id') id: string, @Body() body: unknown) {
     return this.memberStatusesService.updateStatus(id, body);
   }
 

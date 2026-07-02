@@ -23,9 +23,27 @@ interface IdeaDetailModalProps {
   idea: IdeaWithVotes | null;
 }
 
+interface IdeaVoteSummary {
+  id: string;
+  voterName: string;
+  voterEmail: string;
+  createdAt: string;
+}
+
+function isIdeaVoteSummaryArray(value: unknown): value is IdeaVoteSummary[] {
+  return Array.isArray(value) && value.every((item) => {
+    if (!item || typeof item !== 'object') return false;
+    const vote = item as Record<string, unknown>;
+    return typeof vote.id === 'string'
+      && typeof vote.voterName === 'string'
+      && typeof vote.voterEmail === 'string'
+      && typeof vote.createdAt === 'string';
+  });
+}
+
 export default function IdeaDetailModal({ open, onOpenChange, idea }: IdeaDetailModalProps) {
   const { toast } = useToast();
-  const [votes, setVotes] = useState<any[]>([]);
+  const [votes, setVotes] = useState<IdeaVoteSummary[]>([]);
   const [votesLoading, setVotesLoading] = useState(false);
 
   const updateIdeaStatusMutation = useMutation({
@@ -105,8 +123,8 @@ export default function IdeaDetailModal({ open, onOpenChange, idea }: IdeaDetail
       setVotesLoading(true);
       fetch(`/api/admin/ideas/${idea.id}/votes`)
         .then(res => res.json())
-        .then(data => {
-          setVotes(data);
+        .then((data: unknown) => {
+          setVotes(isIdeaVoteSummaryArray(data) ? data : []);
           setVotesLoading(false);
         })
         .catch(err => {
@@ -238,7 +256,7 @@ export default function IdeaDetailModal({ open, onOpenChange, idea }: IdeaDetail
             ) : votes.length > 0 ? (
               <div className="bg-gray-50 rounded-lg p-4 max-h-48 overflow-y-auto">
                 <div className="space-y-2">
-                  {votes.map((vote: any, index: number) => (
+                  {votes.map((vote, index) => (
                     <div key={vote.id} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-500">{index + 1}.</span>

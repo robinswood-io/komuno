@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { and, asc, count, desc, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
+import { hasErrorCode } from '../common/utils/error-utils';
 import { logger } from '../../lib/logger';
 import {
   EVENT_STATUS,
@@ -517,7 +518,7 @@ export class FederationService {
       const [created] = await db.insert(organizationNetworks).values(validated).returning();
       return { success: true, data: created };
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Un réseau avec ce slug existe déjà');
+      if (hasErrorCode(error, '23505')) throw new ConflictException('Un réseau avec ce slug existe déjà');
       return this.handleZodError(error);
     }
   }
@@ -567,7 +568,7 @@ export class FederationService {
       const [created] = await db.insert(organizations).values(validated).returning();
       return { success: true, data: created };
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Une organisation avec ce slug existe déjà');
+      if (hasErrorCode(error, '23505')) throw new ConflictException('Une organisation avec ce slug existe déjà');
       return this.handleZodError(error);
     }
   }
@@ -726,7 +727,7 @@ export class FederationService {
       });
       return { success: true, data: this.withoutRelationSecret(created) };
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Cette relation existe déjà');
+      if (hasErrorCode(error, '23505')) throw new ConflictException('Cette relation existe déjà');
       return this.handleZodError(error);
     }
   }
@@ -819,7 +820,7 @@ export class FederationService {
     includeInAgenda?: string;
     limit?: number;
   }) {
-    const conditions = [] as any[];
+    const conditions: SQL[] = [];
     if (options?.status && options.status !== 'all') conditions.push(eq(eventSyndications.status, options.status));
     if (options?.direction && options.direction !== 'all') conditions.push(eq(eventSyndications.direction, options.direction));
     if (options?.sourceOrganizationId && options.sourceOrganizationId !== 'all') conditions.push(eq(eventSyndications.sourceOrganizationId, options.sourceOrganizationId));
@@ -1013,7 +1014,7 @@ export class FederationService {
       const sync = await this.syncSyndicationBestEffort(created.id);
       return { success: true, data: created, sync: sync.data };
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Cet événement a déjà été proposé à cette organisation');
+      if (hasErrorCode(error, '23505')) throw new ConflictException('Cet événement a déjà été proposé à cette organisation');
       return this.handleZodError(error);
     }
   }
@@ -1063,7 +1064,7 @@ export class FederationService {
       const syncResults = await Promise.all(created.map((row) => this.syncSyndicationBestEffort(row.id)));
       return { success: true, data: created, sync: syncResults.map((result) => result.data) };
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Cet événement est déjà publié vers au moins une organisation ciblée');
+      if (hasErrorCode(error, '23505')) throw new ConflictException('Cet événement est déjà publié vers au moins une organisation ciblée');
       return this.handleZodError(error);
     }
   }
@@ -1412,7 +1413,7 @@ export class FederationService {
     syncStatus?: string;
     limit?: number;
   }) {
-    const conditions = [] as any[];
+    const conditions: SQL[] = [];
     if (options?.status && options.status !== 'all') conditions.push(eq(surveyFormSyndications.status, options.status));
     if (options?.direction && options.direction !== 'all') conditions.push(eq(surveyFormSyndications.direction, options.direction));
     if (options?.sourceOrganizationId && options.sourceOrganizationId !== 'all') conditions.push(eq(surveyFormSyndications.sourceOrganizationId, options.sourceOrganizationId));
@@ -1511,7 +1512,7 @@ export class FederationService {
       const sync = await this.syncFormSyndicationBestEffort(created.id);
       return { success: true, data: created, sync: sync.data };
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Ce formulaire a déjà été proposé à cette organisation');
+      if (hasErrorCode(error, '23505')) throw new ConflictException('Ce formulaire a déjà été proposé à cette organisation');
       return this.handleZodError(error);
     }
   }
@@ -1564,7 +1565,7 @@ export class FederationService {
       const syncResults = await Promise.all(created.map((row) => this.syncFormSyndicationBestEffort(row.id)));
       return { success: true, data: created, sync: syncResults.map((result) => result.data) };
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Ce formulaire est déjà publié vers au moins une organisation ciblée');
+      if (hasErrorCode(error, '23505')) throw new ConflictException('Ce formulaire est déjà publié vers au moins une organisation ciblée');
       return this.handleZodError(error);
     }
   }
@@ -2019,12 +2020,13 @@ export class FederationService {
     }
   }
 
-  private statusForReceivedEvent(payload: FederatedEventPayload) {
+  private statusForReceivedEvent(payload: FederatedEventPayload): typeof EVENT_STATUS[keyof typeof EVENT_STATUS] {
     if (payload.status === SYNDICATION_STATUS.REVOKED) return EVENT_STATUS.CANCELLED;
     if (payload.status === SYNDICATION_STATUS.REJECTED) return EVENT_STATUS.DRAFT;
     if (payload.includeInAgenda || payload.status === SYNDICATION_STATUS.ACCEPTED || payload.status === SYNDICATION_STATUS.AUTO_ACCEPTED) {
-      return Object.values(EVENT_STATUS).includes(payload.event.status as any)
-        ? payload.event.status
+      const allowedStatuses = Object.values(EVENT_STATUS) as string[];
+      return payload.event.status && allowedStatuses.includes(payload.event.status)
+        ? payload.event.status as typeof EVENT_STATUS[keyof typeof EVENT_STATUS]
         : EVENT_STATUS.PUBLISHED;
     }
     return EVENT_STATUS.DRAFT;
@@ -2444,12 +2446,13 @@ export class FederationService {
   }
 
   async getFederatedAgenda(organizationId?: string) {
-    const conditions = [eq(eventSyndications.includeInAgenda, true)] as any[];
+    const conditions: SQL[] = [eq(eventSyndications.includeInAgenda, true)];
     if (organizationId) {
-      conditions.push(or(
+      const organizationCondition = or(
         eq(eventSyndications.targetOrganizationId, organizationId),
         eq(eventSyndications.sourceOrganizationId, organizationId),
-      ));
+      );
+      if (organizationCondition) conditions.push(organizationCondition);
     }
 
     const data = await db.select({

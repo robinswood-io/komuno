@@ -9,7 +9,7 @@ import { logger } from '../../../lib/logger';
  */
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
     const { method, path } = request;
     const startTime = Date.now();
@@ -40,7 +40,7 @@ export class LoggingInterceptor implements NestInterceptor {
     );
   }
 
-  private sanitizeLogData(data: any): any {
+  private sanitizeLogData(data: unknown): unknown {
     if (!data || typeof data !== 'object') return data;
     
     const sensitiveFields = ['password', 'token', 'sessionid', 'apikey', 'secret', 'passwordhash', 'sessiontoken', 'accesstoken', 'refreshtoken', 'bearertoken'];
@@ -49,7 +49,7 @@ export class LoggingInterceptor implements NestInterceptor {
       return data.map(item => this.sanitizeLogData(item));
     }
     
-    const sanitized = { ...data };
+    const sanitized: Record<string, unknown> = { ...(data as Record<string, unknown>) };
     
     for (const key in sanitized) {
       const normalizedKey = key.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();

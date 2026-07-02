@@ -19,6 +19,17 @@ import { PermissionGuard } from '../auth/guards/permission.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { User } from '../auth/decorators/user.decorator';
 
+function memberEmailFromBody(body: unknown): string {
+  if (!body || typeof body !== 'object' || !('memberEmail' in body)) {
+    throw new BadRequestException('memberEmail requis');
+  }
+  const value = (body as { memberEmail?: unknown }).memberEmail;
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new BadRequestException('memberEmail requis');
+  }
+  return value;
+}
+
 /**
  * Controller Members - Routes membres/CRM
  */
@@ -733,7 +744,7 @@ export class AdminMemberTasksController {
     @Body() body: unknown,
     @User() user: { email?: string },
   ) {
-    return await this.membersService.createMemberTask((body as any)?.memberEmail, body, user.email);
+    return await this.membersService.createMemberTask(memberEmailFromBody(body), body, user.email);
   }
 
   @Patch(':id')
@@ -819,7 +830,7 @@ export class AdminMemberRelationsController {
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
   async createRelation(@Body() body: unknown, @User() user: { email?: string }) {
-    return await this.membersService.createMemberRelation((body as any)?.memberEmail, body, user.email);
+    return await this.membersService.createMemberRelation(memberEmailFromBody(body), body, user.email);
   }
 
   @Delete(':id')

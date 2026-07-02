@@ -175,7 +175,7 @@ export class AdminNotificationsController {
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Non autorisé (admin requis)' })
   async generateReminders(@Query('type') type: string = 'all') {
-    let result: any;
+    let result: Record<string, number>;
 
     switch (type) {
       case 'subscriptions':

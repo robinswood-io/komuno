@@ -53,6 +53,10 @@ export interface MemberRelation {
   createdAt: string;
 }
 
+type GraphRelation = Omit<MemberRelation, 'relationType'> & {
+  relationType: MemberRelation['relationType'] | 'patron_referral';
+};
+
 /**
  * Types pour le graphe Reagraph
  */
@@ -78,7 +82,7 @@ export interface GraphEdge {
   color: string;
   size: number;
   data: {
-    relation: MemberRelation;
+    relation: GraphRelation;
   };
 }
 
@@ -298,7 +302,7 @@ export function useRelationGraph() {
               id: patronId,
               memberEmail: referrer.email,
               relatedMemberEmail: patronId,
-              relationType: 'patron_referral' as any,
+              relationType: 'patron_referral',
               description: `Prescripteur de ${patron.firstName} ${patron.lastName}`,
               createdAt: patron.createdAt,
             },

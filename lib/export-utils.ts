@@ -2,24 +2,28 @@ import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
+export type ExportRow = Record<string, unknown>;
+type AutoTableOptions = Record<string, unknown>;
+
 // Extend jsPDF type to include autoTable
+// eslint-disable-next-line @typescript-eslint/no-shadow
 declare module 'jspdf' {
   interface jsPDF {
-    autoTable: (options: any) => jsPDF;
+    autoTable: (options: AutoTableOptions) => jsPDF;
   }
 }
 
 export interface ExportColumn {
   header: string;
   accessor: string;
-  format?: (value: any) => string;
+  format?: (value: unknown) => string;
 }
 
 export interface ExportOptions {
   filename: string;
   title?: string;
   columns: ExportColumn[];
-  data: any[];
+  data: ExportRow[];
 }
 
 /**
@@ -131,10 +135,21 @@ function downloadBlob(blob: Blob, filename: string): void {
 /**
  * Format date for export
  */
-export function formatExportDate(date: Date | string | null | undefined): string {
+export function formatExportDate(date: Date | string | number | null | undefined): string {
   if (!date) return '';
   const d = new Date(date);
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatUnknownDate(value: unknown): string {
+  return value instanceof Date || typeof value === 'string' || typeof value === 'number'
+    ? formatExportDate(value)
+    : '';
+}
+
+function valueOrDash(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
 }
 
 /**
@@ -198,15 +213,16 @@ export function exportVoters(
       { header: 'N°', accessor: 'index' },
       { header: 'Nom', accessor: 'voterName' },
       { header: 'Email', accessor: 'voterEmail' },
-      { header: 'Date de vote', accessor: 'createdAt', format: (value) =>
-        new Date(value).toLocaleDateString('fr-FR', {
+      { header: 'Date de vote', accessor: 'createdAt', format: (value) => {
+        if (!(value instanceof Date) && typeof value !== 'string' && typeof value !== 'number') return '';
+        return new Date(value).toLocaleDateString('fr-FR', {
           day: '2-digit',
           month: '2-digit',
           year: 'numeric',
           hour: '2-digit',
           minute: '2-digit'
-        })
-      },
+        });
+      } },
     ],
     data: votes.map((vote, index) => ({ ...vote, index: index + 1 })),
   };
@@ -234,10 +250,10 @@ export function exportInscriptions(
       { header: 'N°', accessor: 'index' },
       { header: 'Nom', accessor: 'name' },
       { header: 'Email', accessor: 'email' },
-      { header: 'Entreprise', accessor: 'company', format: (value) => value || '-' },
-      { header: 'Téléphone', accessor: 'phone', format: (value) => value || '-' },
-      { header: 'Commentaires', accessor: 'comments', format: (value) => value || '-' },
-      { header: 'Date d\'inscription', accessor: 'createdAt', format: formatExportDate },
+      { header: 'Entreprise', accessor: 'company', format: valueOrDash },
+      { header: 'Téléphone', accessor: 'phone', format: valueOrDash },
+      { header: 'Commentaires', accessor: 'comments', format: valueOrDash },
+      { header: 'Date d\'inscription', accessor: 'createdAt', format: formatUnknownDate },
     ],
     data: inscriptions.map((inscription, index) => ({ ...inscription, index: index + 1 })),
   };
@@ -265,8 +281,8 @@ export function exportUnsubscriptions(
       { header: 'N°', accessor: 'index' },
       { header: 'Nom', accessor: 'name' },
       { header: 'Email', accessor: 'email' },
-      { header: 'Raison de l\'absence', accessor: 'comments', format: (value) => value || '-' },
-      { header: 'Date de déclaration', accessor: 'createdAt', format: formatExportDate },
+      { header: 'Raison de l\'absence', accessor: 'comments', format: valueOrDash },
+      { header: 'Date de déclaration', accessor: 'createdAt', format: formatUnknownDate },
     ],
     data: unsubscriptions.map((unsub, index) => ({ ...unsub, index: index + 1 })),
   };

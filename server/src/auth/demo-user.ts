@@ -22,7 +22,7 @@ export function getDemoAdminUser(): Admin {
   } as Admin;
 }
 
-export function attachDemoUser(request: Record<string, any>): Admin {
+export function attachDemoUser(request: { user?: Admin; isAuthenticated?: () => boolean }): Admin {
   const user = getDemoAdminUser();
   request.user = user;
   request.isAuthenticated = () => true;

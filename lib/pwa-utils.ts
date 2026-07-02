@@ -1,12 +1,16 @@
 // Utilitaires PWA pour améliorer l'expérience utilisateur
 import { getShortAppName } from '@/config/branding';
 
+interface IOSNavigator extends Navigator {
+  standalone?: boolean;
+}
+
 export const PWAUtils = {
   // Vérifier si l'app est installée
   isAppInstalled(): boolean {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isInWebAppiOS = (window.navigator as any).standalone === true;
+    const isInWebAppiOS = (window.navigator as IOSNavigator).standalone === true;
     
     return isStandalone || (isIOS && isInWebAppiOS);
   },
@@ -132,7 +136,7 @@ export const PWAUtils = {
       hasNotifications: 'Notification' in window,
       hasVibration: 'vibrate' in navigator,
       isOnline: navigator.onLine,
-      storage: 'storage' in navigator ? `${Math.round((navigator as any).storage?.estimate?.() / 1024 / 1024)}MB` : 'Inconnu'
+      storage: 'storage' in navigator && typeof navigator.storage?.estimate === 'function' ? 'Disponible' : 'Inconnu'
     };
   },
 

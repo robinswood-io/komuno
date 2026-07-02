@@ -109,7 +109,7 @@ if (dbProvider === 'neon') {
     allowExitOnIdle: false, // Important pour serverless
   });
   pool = neonPool;
-  dbResilience = new DatabaseResilience(neonPool as any, 'neon-database');
+  dbResilience = new DatabaseResilience(neonPool, 'neon-database');
 } else {
   // Pool PostgreSQL standard (Supabase ou autre)
   const pgPool = new PgPool({
@@ -121,7 +121,7 @@ if (dbProvider === 'neon') {
     application_name: 'cjd-amiens-app',
   });
   pool = pgPool;
-  dbResilience = new DatabaseResilience(pgPool as any, 'postgresql-database');
+  dbResilience = new DatabaseResilience(pgPool, 'postgresql-database');
 }
 
 export { pool, dbResilience };
@@ -153,7 +153,7 @@ if (process.env.NODE_ENV === 'development') {
 
 // Gestion des erreurs du pool (compatible Neon et pg)
 if (dbProvider === 'neon') {
-  (pool as NeonPool).on('error', (err: Error, _client: any) => {
+  (pool as NeonPool).on('error', (err: Error, _client: unknown) => {
     const stats = {
       totalCount: (pool as NeonPool).totalCount,
       idleCount: (pool as NeonPool).idleCount,
@@ -170,7 +170,7 @@ if (dbProvider === 'neon') {
     });
   });
 } else {
-  (pool as PgPool).on('error', (err: Error, _client: any) => {
+  (pool as PgPool).on('error', (err: Error, _client: unknown) => {
     const stats = {
       totalCount: (pool as PgPool).totalCount,
       idleCount: (pool as PgPool).idleCount,

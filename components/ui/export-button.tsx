@@ -8,13 +8,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useExport, type ExportFormat } from '@/hooks/use-export';
-import type { ExportColumn } from '@/lib/export-utils';
+import type { ExportColumn, ExportRow } from '@/lib/export-utils';
 
 interface ExportButtonProps {
   filename: string;
   title?: string;
   columns: ExportColumn[];
-  getData: () => any[] | Promise<any[]>;
+  getData: () => ExportRow[] | Promise<ExportRow[]>;
   variant?: 'default' | 'outline' | 'secondary' | 'ghost';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;

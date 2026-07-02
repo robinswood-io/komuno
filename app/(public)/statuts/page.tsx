@@ -15,10 +15,11 @@ import {
   RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { StatusResponse } from "@/shared/schema";
+import type { ReactNode } from "react";
 
 export default function StatusPage() {
   const { data, isLoading, refetch, isFetching } = useQuery<StatusResponse>({
@@ -40,7 +41,7 @@ export default function StatusPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
+    const variants: Record<string, BadgeProps['variant']> = {
       healthy: 'default',
       warning: 'secondary',
       unhealthy: 'destructive',
@@ -62,7 +63,7 @@ export default function StatusPage() {
   };
 
   const getCheckIcon = (checkKey: string) => {
-    const icons: Record<string, any> = {
+    const icons: Record<string, ReactNode> = {
       application: <Server className="w-5 h-5" />,
       database: <Database className="w-5 h-5" />,
       databasePool: <Activity className="w-5 h-5" />,

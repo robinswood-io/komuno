@@ -5,6 +5,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { readdir, stat } from 'fs/promises';
 import { logger } from '../../../lib/logger';
+import { getErrorMessage, hasErrorCode } from '../../common/utils/error-utils';
 
 @Injectable()
 export class MinIOService implements OnModuleInit {
@@ -148,8 +149,8 @@ export class MinIOService implements OnModuleInit {
     try {
       await this.client.removeObject(bucket, filename);
       logger.debug('File deleted from MinIO', { bucket, filename });
-    } catch (error: any) {
-      if (error.code !== 'NoSuchKey') {
+    } catch (error) {
+      if (!hasErrorCode(error, 'NoSuchKey')) {
         logger.error('Failed to delete file from MinIO', { bucket, filename, error });
         throw error;
       }
@@ -227,13 +228,13 @@ export class MinIOService implements OnModuleInit {
         connected: true,
         buckets: bucketNames
       };
-    } catch (error: any) {
+    } catch (error) {
       logger.error('MinIO health check failed', { error });
       return {
         status: 'unhealthy',
         connected: false,
         buckets: [],
-        error: error.message || 'Unknown error'
+        error: getErrorMessage(error)
       };
     }
   }
@@ -275,8 +276,8 @@ export class MinIOService implements OnModuleInit {
             results.loanItems.errors++;
           }
         }
-      } catch (error: any) {
-        if (error.code !== 'ENOENT') {
+      } catch (error) {
+        if (!hasErrorCode(error, 'ENOENT')) {
           logger.warn('Loan items directory not found or not accessible', { path: loanItemsDir, error });
         }
       }
@@ -304,8 +305,8 @@ export class MinIOService implements OnModuleInit {
             results.assets.errors++;
           }
         }
-      } catch (error: any) {
-        if (error.code !== 'ENOENT') {
+      } catch (error) {
+        if (!hasErrorCode(error, 'ENOENT')) {
           logger.warn('Assets directory not found or not accessible', { path: assetsDir, error });
         }
       }

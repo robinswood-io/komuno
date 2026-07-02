@@ -39,14 +39,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.path,
       query: this.sanitizeLogData(request.query),
       body: this.sanitizeLogData(request.body),
-      user: (request as any).user?.email || 'anonymous',
+      user: (request as Request & { user?: { email?: string } }).user?.email || 'anonymous',
       timestamp: new Date().toISOString(),
       statusCode: status,
       errorName: exception instanceof Error ? exception.name : 'Unknown',
     });
 
     // Réponse formatée
-    const errorResponse: any = {
+    const errorResponse: { success: false; message: string; errorId: string; code?: string } = {
       success: false,
       message: status === 500 && isProduction ? 'Internal server error' : message,
       errorId,
@@ -59,7 +59,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json(errorResponse);
   }
 
-  private sanitizeLogData(data: any): any {
+  private sanitizeLogData(data: unknown): unknown {
     if (!data || typeof data !== 'object') return data;
     
     const sensitiveFields = ['password', 'token', 'sessionid', 'apikey', 'secret', 'passwordhash', 'sessiontoken', 'accesstoken', 'refreshtoken', 'bearertoken'];
@@ -68,7 +68,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return data.map(item => this.sanitizeLogData(item));
     }
     
-    const sanitized = { ...data };
+    const sanitized: Record<string, unknown> = { ...(data as Record<string, unknown>) };
     
     for (const key in sanitized) {
       const normalizedKey = key.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();

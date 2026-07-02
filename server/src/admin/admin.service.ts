@@ -37,6 +37,7 @@ import { emailService } from '../../email-service';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import type { UpdateEmailConfigDto } from './admin.dto';
+import { hasErrorCode } from '../common/utils/error-utils';
 
 /**
  * Service Admin - Gestion des routes d'administration
@@ -191,7 +192,7 @@ export class AdminService {
       throw new BadRequestException('eventId et inscriptions (array) requis');
     }
 
-    const results: any[] = [];
+    const results: unknown[] = [];
     const errors: string[] = [];
 
     for (const inscription of inscriptions) {
@@ -403,11 +404,12 @@ export class AdminService {
   }
 
   async approveAdministrator(email: string, role: unknown) {
-    if (!role || !Object.values(ADMIN_ROLES).includes(role as any)) {
+    const validRoles = Object.values(ADMIN_ROLES) as string[];
+    if (typeof role !== 'string' || !validRoles.includes(role)) {
       throw new BadRequestException('Rôle valide requis');
     }
 
-    const result = await this.storageService.instance.approveAdmin(email, role as string);
+    const result = await this.storageService.instance.approveAdmin(email, role);
     if (!result.success) {
       throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
     }
@@ -881,8 +883,8 @@ export class AdminService {
             errors: errors.reverse(),
           },
         };
-      } catch (fileError: any) {
-        if (fileError.code === 'ENOENT') {
+      } catch (fileError) {
+        if (hasErrorCode(fileError, 'ENOENT')) {
           return {
             success: true,
             data: {

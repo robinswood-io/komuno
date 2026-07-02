@@ -26,6 +26,7 @@ import {
   Receipt,
   TrendingDown,
   FileText,
+  type LucideIcon,
 } from "lucide-react";
 import { useBranding } from '@/contexts/BrandingContext';
 import {
@@ -38,7 +39,7 @@ import {
 interface MenuItem {
   id: string;
   label: string;
-  icon: any;
+  icon: LucideIcon;
   path: string;
   module?: string;
   feature?: string;

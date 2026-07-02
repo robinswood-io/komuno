@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { and, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import { z, ZodError } from 'zod';
 import { fromZodError } from 'zod-validation-error';
 import { db } from '../../db';
+import { hasErrorCode } from '../common/utils/error-utils';
 import { AuditService } from '../audit/audit.service';
 import {
   INTEGRATION_AUTH_TYPE,
@@ -184,7 +185,7 @@ export class IntegrationsService {
       });
       return { success: true, data: this.safeAccount(created) };
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Un compte existe déjà pour cette intégration et cette organisation');
+      if (hasErrorCode(error, '23505')) throw new ConflictException('Un compte existe déjà pour cette intégration et cette organisation');
       return this.handleZodError(error);
     }
   }
@@ -211,7 +212,7 @@ export class IntegrationsService {
       });
       return { success: true, data: this.safeAccount(updated) };
     } catch (error) {
-      if ((error as any)?.code === '23505') throw new ConflictException('Un compte existe déjà pour cette intégration et cette organisation');
+      if (hasErrorCode(error, '23505')) throw new ConflictException('Un compte existe déjà pour cette intégration et cette organisation');
       return this.handleZodError(error);
     }
   }
@@ -252,7 +253,7 @@ export class IntegrationsService {
   }
 
   async listSyncRuns(options?: { accountId?: string; provider?: string }) {
-    const conditions = [] as any[];
+    const conditions: SQL[] = [];
     if (options?.accountId) conditions.push(eq(integrationSyncRuns.accountId, options.accountId));
     if (options?.provider) conditions.push(eq(integrationSyncRuns.provider, providerSchema.parse(options.provider)));
     const runs = await db.select().from(integrationSyncRuns)
@@ -410,7 +411,7 @@ export class IntegrationsService {
   }
 
   async listOutboundWebhookDeliveries(options?: { accountId?: string; status?: string }) {
-    const conditions = [] as any[];
+    const conditions: SQL[] = [];
     if (options?.accountId) conditions.push(eq(integrationOutboundWebhookDeliveries.accountId, options.accountId));
     if (options?.status) conditions.push(eq(integrationOutboundWebhookDeliveries.status, options.status));
     const deliveries = await db.select().from(integrationOutboundWebhookDeliveries)
@@ -449,7 +450,7 @@ export class IntegrationsService {
     try {
       [delivery] = await db.insert(integrationOutboundWebhookDeliveries).values(validated).returning();
     } catch (error) {
-      if ((error as any)?.code === '23505') {
+      if (hasErrorCode(error, '23505')) {
         [delivery] = await db.select().from(integrationOutboundWebhookDeliveries)
           .where(and(eq(integrationOutboundWebhookDeliveries.accountId, account.id), eq(integrationOutboundWebhookDeliveries.eventId, String(payload.id))))
           .limit(1);
@@ -697,7 +698,7 @@ export class IntegrationsService {
       const [created] = await db.insert(integrationWebhookEvents).values(validated).returning();
       return { success: true, data: { id: created.id, status: created.status, duplicate: false } };
     } catch (error) {
-      if ((error as any)?.code === '23505' && provider && externalEventId) {
+      if (hasErrorCode(error, '23505') && provider && externalEventId) {
         const [existing] = await db.select().from(integrationWebhookEvents)
           .where(and(eq(integrationWebhookEvents.provider, provider), eq(integrationWebhookEvents.externalEventId, externalEventId)))
           .limit(1);

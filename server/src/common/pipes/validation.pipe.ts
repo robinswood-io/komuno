@@ -8,9 +8,9 @@ import { fromZodError } from 'zod-validation-error';
  */
 @Injectable()
 export class ZodValidationPipe implements PipeTransform {
-  constructor(private schema: z.ZodType<any>) {}
+  constructor(private schema: z.ZodType<unknown>) {}
 
-  transform(value: any, metadata: ArgumentMetadata) {
+  transform(value: unknown, metadata: ArgumentMetadata) {
     // Only validate explicit request data (body/query/param). Skip custom decorators like @Req/@User.
     if (metadata.type === 'custom') {
       return value;

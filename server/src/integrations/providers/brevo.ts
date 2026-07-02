@@ -37,6 +37,10 @@ function buildUrl(baseUrl: string, path: string, params?: Record<string, string 
   return url.toString();
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
+
 async function brevoGet(options: {
   settings: BrevoSettings;
   apiKey: string;
@@ -49,36 +53,41 @@ async function brevoGet(options: {
     method: 'GET',
     headers: { accept: 'application/json', 'content-type': 'application/json', 'api-key': options.apiKey },
   });
-  const data = await response.json().catch(() => ({}));
+  const data: unknown = await response.json().catch(() => ({}));
   if (!response.ok) throw new BadRequestException(`Appel Brevo échoué (${response.status} ${response.statusText})`);
   return data;
 }
 
-function accountSummary(account: any) {
+function accountSummary(account: unknown) {
+  const data = asRecord(account);
+  const relay = asRecord(data.relay);
+  const marketingAutomation = asRecord(data.marketingAutomation);
   return {
-    organizationId: account?.organization_id ?? account?.organizationId ?? null,
-    companyName: account?.companyName ?? null,
-    enterprise: Boolean(account?.enterprise),
-    planCount: Array.isArray(account?.plan) ? account.plan.length : 0,
-    relayEnabled: Boolean(account?.relay?.enabled ?? account?.relay),
-    marketingAutomationEnabled: Boolean(account?.marketingAutomation?.enabled ?? account?.marketingAutomation),
+    organizationId: data.organization_id ?? data.organizationId ?? null,
+    companyName: data.companyName ?? null,
+    enterprise: Boolean(data.enterprise),
+    planCount: Array.isArray(data.plan) ? data.plan.length : 0,
+    relayEnabled: Boolean(relay.enabled ?? data.relay),
+    marketingAutomationEnabled: Boolean(marketingAutomation.enabled ?? data.marketingAutomation),
   };
 }
 
-function listsFromPayload(payload: any): any[] {
-  if (Array.isArray(payload?.lists)) return payload.lists;
-  if (Array.isArray(payload?.data)) return payload.data;
+function listsFromPayload(payload: unknown): unknown[] {
+  const data = asRecord(payload);
+  if (Array.isArray(data.lists)) return data.lists;
+  if (Array.isArray(data.data)) return data.data;
   if (Array.isArray(payload)) return payload;
   return [];
 }
 
-function listSummary(list: any) {
+function listSummary(list: unknown) {
+  const data = asRecord(list);
   return {
-    id: list?.id ?? null,
-    name: list?.name ?? null,
-    totalSubscribers: Number(list?.totalSubscribers ?? list?.totalBlacklisted ?? list?.uniqueSubscribers ?? 0),
-    folderId: list?.folderId ?? null,
-    createdAt: list?.createdAt ?? null,
+    id: data.id ?? null,
+    name: data.name ?? null,
+    totalSubscribers: Number(data.totalSubscribers ?? data.totalBlacklisted ?? data.uniqueSubscribers ?? 0),
+    folderId: data.folderId ?? null,
+    createdAt: data.createdAt ?? null,
   };
 }
 
@@ -112,10 +121,11 @@ export async function syncBrevoLists(options: {
     fetchImpl: options.fetchImpl,
   });
   const lists = listsFromPayload(payload).map(listSummary);
+  const payloadRecord = asRecord(payload);
   return {
     baseUrl: settings.baseUrl,
     listsCount: lists.length,
-    totalCount: Number(payload?.count ?? lists.length),
+    totalCount: Number(payloadRecord.count ?? lists.length),
     lists,
     contactsSyncMode: 'list_metadata_only_no_contact_payload',
     senderConfigured: Boolean(settings.senderEmail),

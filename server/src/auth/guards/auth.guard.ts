@@ -7,13 +7,17 @@ import { attachDemoUser, isDemoModeEnabled } from '../demo-user';
  * Guard basé sur la session pour vérifier qu'un utilisateur est authentifié
  * Fonctionne avec l'authentification locale Passport/session.
  */
+type SessionRequest = Request & {
+  session?: { id?: string };
+};
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<SessionRequest>();
 
     if (isDemoModeEnabled()) {
-      attachDemoUser(request as unknown as Record<string, any>);
+      attachDemoUser(request);
       return true;
     }
 
@@ -25,8 +29,8 @@ export class JwtAuthGuard implements CanActivate {
     // Log pour debug
     const url = request.url;
     const method = request.method;
-    const hasSession = !!(request as any).session;
-    const sessionId = (request as any).session?.id?.substring(0, 8) || 'none';
+    const hasSession = Boolean(request.session);
+    const sessionId = request.session?.id?.substring(0, 8) || 'none';
     const hasCookie = !!request.headers.cookie;
 
     logger.debug('[AuthGuard] Request check', {

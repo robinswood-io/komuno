@@ -132,7 +132,7 @@ export class SetupService {
     await this.assertFirstInstall('La génération de configuration publique n’est disponible que lors de la première installation');
 
     const brandingResult = await this.storageService.instance.getBrandingConfig();
-    let brandingConfig: any = {};
+    let brandingConfig: Record<string, unknown> = {};
     
     if (brandingResult.success && brandingResult.data) {
       try {
@@ -162,9 +162,9 @@ export class SetupService {
         message: "Fichiers statiques générés avec succès",
         output: stdout || stderr
       };
-    } catch (error: any) {
+    } catch (error) {
       logger.error('Erreur lors de la génération des fichiers statiques', { error });
-      throw new InternalServerErrorException(error.message || "Erreur lors de la génération des fichiers statiques. Vous pouvez les générer manuellement avec 'npm run generate:config'.");
+      throw new InternalServerErrorException(error instanceof Error ? error.message : "Erreur lors de la génération des fichiers statiques. Vous pouvez les générer manuellement avec 'npm run generate:config'.");
     }
   }
 

@@ -1,22 +1,15 @@
 import { readFileSync } from 'fs';
 
+type ParsedFirebaseRecord = {
+  id: string;
+  data: unknown;
+};
+
 interface ParsedFirebaseData {
-  admins: Array<{
-    id: string;
-    data: any;
-  }>;
-  ideas: Array<{
-    id: string;
-    data: any;
-  }>;
-  votes: Array<{
-    id: string;
-    data: any;
-  }>;
-  inscriptions: Array<{
-    id: string;
-    data: any;
-  }>;
+  admins: ParsedFirebaseRecord[];
+  ideas: ParsedFirebaseRecord[];
+  votes: ParsedFirebaseRecord[];
+  inscriptions: ParsedFirebaseRecord[];
 }
 
 export class FirebaseDumpParser {
@@ -112,7 +105,7 @@ export class FirebaseDumpParser {
     return result;
   }
   
-  private static parseInsertStatement(line: string, table: string): { id: string; data: any } | null {
+  private static parseInsertStatement(line: string, table: string): ParsedFirebaseRecord | null {
     // Exemple: INSERT INTO `admins` (`doc_path`,`id`,`parent_path`,`data`) VALUES ('admins/benoit@goyheneche,fr','benoit@goyheneche,fr','','{"email":"benoit@goyheneche.fr","addedBy":"benoit@metio.fr","createdAt":"2025-06-23T16:12:58.363000Z"}');
     
     const valuesMatch = line.match(/VALUES\s*\((.*)\);?$/);

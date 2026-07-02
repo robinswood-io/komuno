@@ -29,8 +29,9 @@ import { fromZodError } from 'zod-validation-error';
 import { logger } from '../../lib/logger';
 import { emailNotificationService } from '../../email-notification-service';
 import { db } from '../../db';
+import { hasErrorCode } from '../common/utils/error-utils';
 import { members, memberGroups, memberGroupMemberships, memberTagAssignments, memberSubscriptions, subscriptionTypes } from '../../../shared/schema';
-import { inArray, sql, and, eq, asc, desc, ilike, or } from 'drizzle-orm';
+import { inArray, sql, and, eq, asc, desc, ilike, or, type SQL } from 'drizzle-orm';
 
 /**
  * Service Members - Gestion des membres/CRM
@@ -134,8 +135,8 @@ export class MembersService {
         department: validatedData.department,
         city: validatedData.city,
         postalCode: validatedData.postalCode,
-        firstContactDate: validatedData.firstContactDate as any,
-        meetingDate: validatedData.meetingDate as any,
+        firstContactDate: validatedData.firstContactDate,
+        meetingDate: validatedData.meetingDate,
         sector: validatedData.sector,
         phone: validatedData.phone,
         role: validatedData.role,
@@ -369,7 +370,7 @@ export class MembersService {
   async createMemberSubscription(email: string, data: unknown) {
     try {
       const validatedData = insertMemberSubscriptionSchema.parse({
-        ...(data as Record<string, any>),
+        ...(data as Record<string, unknown>),
         memberEmail: email,
       });
 
@@ -449,7 +450,7 @@ export class MembersService {
   async assignTagToMember(email: string, data: unknown, userEmail?: string) {
     try {
       const validatedData = assignMemberTagSchema.parse({
-        ...(data as Record<string, any>),
+        ...(data as Record<string, unknown>),
         memberEmail: email,
         assignedBy: userEmail,
       });
@@ -487,7 +488,7 @@ export class MembersService {
   async createMemberTask(email: string, data: unknown, userEmail?: string) {
     try {
       const validatedData = insertMemberTaskSchema.parse({
-        ...(data as Record<string, any>),
+        ...(data as Record<string, unknown>),
         memberEmail: email,
         createdBy: userEmail || 'system',
       });
@@ -550,7 +551,7 @@ export class MembersService {
   async createMemberRelation(email: string, data: unknown, userEmail?: string) {
     try {
       const validatedData = insertMemberRelationSchema.parse({
-        ...(data as Record<string, any>),
+        ...(data as Record<string, unknown>),
         memberEmail: email,
         createdBy: userEmail,
       });
@@ -833,7 +834,7 @@ export class MembersService {
     search?: string;
     includeInactive?: boolean;
   }) {
-    const conditions = [] as any[];
+    const conditions: SQL[] = [];
 
     if (!options?.includeInactive) {
       conditions.push(eq(memberGroups.isActive, true));
@@ -846,7 +847,8 @@ export class MembersService {
     }
     if (options?.search?.trim()) {
       const search = `%${options.search.trim()}%`;
-      conditions.push(or(ilike(memberGroups.name, search), ilike(memberGroups.description, search)));
+      const searchCondition = or(ilike(memberGroups.name, search), ilike(memberGroups.description, search));
+      if (searchCondition) conditions.push(searchCondition);
     }
 
     if (options?.memberEmail) {
@@ -903,7 +905,7 @@ export class MembersService {
       logger.info('Groupe membre créé', { groupId: created.id, name: created.name, year: created.year });
       return await this.getMemberGroup(created.id);
     } catch (error) {
-      if ((error as any)?.code === '23505') {
+      if (hasErrorCode(error, '23505')) {
         throw new ConflictException('Un groupe avec ce nom existe déjà pour cette année');
       }
       return this.handleZodError(error);
@@ -924,7 +926,7 @@ export class MembersService {
       }
       return await this.getMemberGroup(updated.id);
     } catch (error) {
-      if ((error as any)?.code === '23505') {
+      if (hasErrorCode(error, '23505')) {
         throw new ConflictException('Un groupe avec ce nom existe déjà pour cette année');
       }
       return this.handleZodError(error);
@@ -958,7 +960,7 @@ export class MembersService {
       logger.info('Membre ajouté à un groupe annuel', { groupId, memberEmail: created.memberEmail });
       return { success: true, data: created };
     } catch (error) {
-      if ((error as any)?.code === '23505') {
+      if (hasErrorCode(error, '23505')) {
         throw new ConflictException('Ce membre est déjà dans ce groupe');
       }
       return this.handleZodError(error);
@@ -1034,7 +1036,7 @@ export class MembersService {
       logger.info('Groupe membre dupliqué', { sourceGroupId: groupId, targetGroupId: created.id, targetYear });
       return await this.getMemberGroup(created.id);
     } catch (error) {
-      if ((error as any)?.code === '23505') {
+      if (hasErrorCode(error, '23505')) {
         throw new ConflictException('Un groupe avec ce nom existe déjà pour cette année');
       }
       return this.handleZodError(error);
@@ -1042,7 +1044,7 @@ export class MembersService {
   }
 
   async getMemberGroupSummary(year?: number) {
-    const conditions = [] as any[];
+    const conditions: SQL[] = [];
     if (year) {
       conditions.push(eq(memberGroups.year, year));
     }

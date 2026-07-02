@@ -28,7 +28,11 @@ const helloAssoSettingsSchema = z.object({
 });
 
 export type HelloAssoSettings = z.infer<typeof helloAssoSettingsSchema>;
-export type FetchLike = (input: string, init?: RequestInit) => Promise<{ ok: boolean; status: number; statusText: string; json: () => Promise<any>; text?: () => Promise<string> }>;
+export type FetchLike = (input: string, init?: RequestInit) => Promise<{ ok: boolean; status: number; statusText: string; json: () => Promise<unknown>; text?: () => Promise<string> }>;
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
 
 export function parseHelloAssoSettings(settings: Record<string, unknown>): HelloAssoSettings {
   try {
@@ -75,8 +79,8 @@ export async function requestHelloAssoToken(options: {
     headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
     body,
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data?.access_token) {
+  const data = asRecord(await response.json().catch(() => ({})));
+  if (!response.ok || !data.access_token) {
     throw new BadRequestException(`Authentification HelloAsso échouée (${response.status} ${response.statusText})`);
   }
   return {
@@ -100,36 +104,38 @@ export async function helloAssoGet(options: {
     method: 'GET',
     headers: { accept: 'application/json', authorization: `Bearer ${options.accessToken}` },
   });
-  const data = await response.json().catch(() => ({}));
+  const data: unknown = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new BadRequestException(`Appel HelloAsso échoué (${response.status} ${response.statusText})`);
   }
   return data;
 }
 
-function extractArray(payload: any): any[] {
+function extractArray(payload: unknown): unknown[] {
+  const data = asRecord(payload);
   if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.resources)) return payload.resources;
-  if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(data.data)) return data.data;
+  if (Array.isArray(data.resources)) return data.resources;
+  if (Array.isArray(data.results)) return data.results;
   return [];
 }
 
-function continuationToken(payload: any): string | null {
-  return payload?.pagination?.continuationToken
-    ?? payload?.continuationToken
-    ?? payload?.nextContinuationToken
-    ?? null;
+function continuationToken(payload: unknown): string | null {
+  const data = asRecord(payload);
+  const pagination = asRecord(data.pagination);
+  const token = pagination.continuationToken ?? data.continuationToken ?? data.nextContinuationToken;
+  return typeof token === 'string' ? token : null;
 }
 
-function publicFormSummary(form: any) {
+function publicFormSummary(form: unknown) {
+  const data = asRecord(form);
   return {
-    name: form?.title ?? form?.name ?? null,
-    slug: form?.formSlug ?? form?.slug ?? null,
-    type: form?.formType ?? form?.type ?? null,
-    state: form?.state ?? null,
-    updatedAt: form?.updateDate ?? form?.updatedAt ?? null,
-    url: form?.url ?? form?.widgetFullUrl ?? null,
+    name: data.title ?? data.name ?? null,
+    slug: data.formSlug ?? data.slug ?? null,
+    type: data.formType ?? data.type ?? null,
+    state: data.state ?? null,
+    updatedAt: data.updateDate ?? data.updatedAt ?? null,
+    url: data.url ?? data.widgetFullUrl ?? null,
   };
 }
 

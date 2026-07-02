@@ -24,6 +24,11 @@ interface CachedStatus {
   ttl: number;
 }
 
+type QueryClient = {
+  query: (text: string) => Promise<unknown>;
+  release: () => void;
+};
+
 export class DatabaseResilience {
   private circuitBreaker: CircuitBreaker;
   private statusCache: Map<string, CachedStatus> = new Map();
@@ -123,7 +128,7 @@ export class DatabaseResilience {
           try {
             // Type-safe query pour Neon et PostgreSQL standard
             // Les deux pools supportent query() avec une string simple
-            await (client as any).query('SELECT 1');
+            await (client as unknown as QueryClient).query('SELECT 1');
           } finally {
             client.release();
           }

@@ -27,6 +27,20 @@ import passport from 'passport';
 import type { Admin } from '@shared/schema';
 import { getDemoAdminUser, isDemoModeEnabled } from './demo-user';
 
+type PassportInfo = { message?: string } | undefined;
+type PassportError = { status?: number; name?: string; response?: { statusCode?: number }; message?: string };
+type PassportRequest = Request & {
+  user?: Admin;
+  sessionID?: string;
+  logIn: (user: Admin, callback: (error?: unknown) => void) => void;
+  logout: (callback: (error?: unknown) => void) => void;
+  isAuthenticated?: () => boolean;
+};
+
+function isUnauthorizedPassportError(error: PassportError): boolean {
+  return error.status === 401 || error.name === 'UnauthorizedException' || error.response?.statusCode === 401;
+}
+
 // Schémas de validation
 const loginSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -93,13 +107,15 @@ export class AuthController {
       const strategy = this.devLoginEnabled ? 'dev-login' : 'local';
 
       // Utiliser la stratégie via Passport
-      return new Promise<void>((resolve, reject) => {
-        passport.authenticate(strategy, (err: any, user: any, info: any) => {
+      return new Promise<void>((resolve) => {
+        const passportRequest = req as PassportRequest;
+        passport.authenticate(strategy, (err: unknown, user: Admin | false, info: PassportInfo) => {
           if (err) {
+            const authError = err as PassportError;
             // Gérer les UnauthorizedException de la stratégie Passport
-            if (err.status === 401 || err.name === 'UnauthorizedException' || err.response?.statusCode === 401) {
-              logger.warn('[Auth] Authentification échouée', { email: validatedData.email, message: err.message });
-              return res.status(401).json({ message: err.message || 'Identifiants invalides' });
+            if (isUnauthorizedPassportError(authError)) {
+              logger.warn('[Auth] Authentification échouée', { email: validatedData.email, message: authError.message });
+              return res.status(401).json({ message: authError.message || 'Identifiants invalides' });
             }
             logger.error('[Auth] Erreur authentification locale', { error: err });
             return res.status(500).json({ message: 'Erreur serveur' });
@@ -110,7 +126,7 @@ export class AuthController {
             return res.status(401).json({ message: info?.message || 'Identifiants invalides' });
           }
 
-          (req as any).logIn(user, (loginErr: any) => {
+          passportRequest.logIn(user, (loginErr?: unknown) => {
             if (loginErr) {
               logger.error('[Auth] Erreur établissement session', { error: loginErr });
               return res.status(500).json({ message: 'Erreur lors de la connexion' });
@@ -118,7 +134,7 @@ export class AuthController {
 
             logger.info('[Auth] Connexion locale réussie', {
               email: user.email,
-              hasSession: Boolean((req as any).sessionID),
+              hasSession: Boolean(passportRequest.sessionID),
             });
 
             res.json(this.authService.getUserWithoutPassword(user));
@@ -247,7 +263,8 @@ export class AuthController {
   @ApiResponse({ status: 500, description: 'Erreur lors de la déconnexion' })
   async logout(@Req() req: Request, @Res() res: Response) {
     return new Promise<void>((resolve) => {
-      (req as any).logout((err: any) => {
+      const passportRequest = req as PassportRequest;
+      passportRequest.logout((err?: unknown) => {
         if (err) {
           logger.error('[Auth] Erreur lors de la déconnexion', { error: err });
           return res.status(500).json({ message: 'Erreur lors de la déconnexion' });
@@ -279,9 +296,10 @@ export class AuthController {
       return this.authService.getUserWithoutPassword(getDemoAdminUser());
     }
 
-    const user = (req as any).user as Admin | undefined;
-    const isAuthenticated = typeof (req as any).isAuthenticated === 'function'
-      ? (req as any).isAuthenticated()
+    const passportRequest = req as PassportRequest;
+    const user = passportRequest.user;
+    const isAuthenticated = typeof passportRequest.isAuthenticated === 'function'
+      ? passportRequest.isAuthenticated()
       : !!user;
     if (!isAuthenticated || !user) {
       return { success: true, data: null };

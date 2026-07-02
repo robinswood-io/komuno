@@ -102,6 +102,10 @@ function buildUrl(baseUrl: string, path: string, params?: Record<string, string 
   return url.toString();
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
+
 async function stripeGet(options: {
   settings: StripeSettings;
   apiKey: string;
@@ -115,49 +119,56 @@ async function stripeGet(options: {
     method: 'GET',
     headers: { accept: 'application/json', authorization: `Basic ${auth}` },
   });
-  const data = await response.json().catch(() => ({}));
+  const data: unknown = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = data?.error?.message ? `: ${data.error.message}` : '';
+    const error = asRecord(asRecord(data).error);
+    const message = typeof error.message === 'string' ? `: ${error.message}` : '';
     throw new BadRequestException(`Appel Stripe échoué (${response.status} ${response.statusText})${message}`);
   }
   return data;
 }
 
-function accountSummary(account: any) {
+function accountSummary(account: unknown) {
+  const data = asRecord(account);
   return {
-    id: account?.id ?? null,
-    country: account?.country ?? null,
-    defaultCurrency: account?.default_currency ?? null,
-    chargesEnabled: Boolean(account?.charges_enabled),
-    payoutsEnabled: Boolean(account?.payouts_enabled),
-    detailsSubmitted: Boolean(account?.details_submitted),
-    businessType: account?.business_type ?? null,
+    id: data.id ?? null,
+    country: data.country ?? null,
+    defaultCurrency: data.default_currency ?? null,
+    chargesEnabled: Boolean(data.charges_enabled),
+    payoutsEnabled: Boolean(data.payouts_enabled),
+    detailsSubmitted: Boolean(data.details_submitted),
+    businessType: data.business_type ?? null,
   };
 }
 
-function listData(payload: any): any[] {
-  return Array.isArray(payload?.data) ? payload.data : [];
+function listData(payload: unknown): unknown[] {
+  const data = asRecord(payload);
+  return Array.isArray(data.data) ? data.data : [];
 }
 
-function productSummary(product: any) {
+function productSummary(product: unknown) {
+  const data = asRecord(product);
   return {
-    id: product?.id ?? null,
-    name: product?.name ?? null,
-    active: Boolean(product?.active),
-    type: product?.type ?? null,
-    created: product?.created ?? null,
+    id: data.id ?? null,
+    name: data.name ?? null,
+    active: Boolean(data.active),
+    type: data.type ?? null,
+    created: data.created ?? null,
   };
 }
 
-function priceSummary(price: any) {
+function priceSummary(price: unknown) {
+  const data = asRecord(price);
+  const product = asRecord(data.product);
+  const recurring = asRecord(data.recurring);
   return {
-    id: price?.id ?? null,
-    product: typeof price?.product === 'string' ? price.product : price?.product?.id ?? null,
-    active: Boolean(price?.active),
-    currency: price?.currency ?? null,
-    unitAmount: typeof price?.unit_amount === 'number' ? price.unit_amount : null,
-    recurringInterval: price?.recurring?.interval ?? null,
-    type: price?.type ?? null,
+    id: data.id ?? null,
+    product: typeof data.product === 'string' ? data.product : product.id ?? null,
+    active: Boolean(data.active),
+    currency: data.currency ?? null,
+    unitAmount: typeof data.unit_amount === 'number' ? data.unit_amount : null,
+    recurringInterval: recurring.interval ?? null,
+    type: data.type ?? null,
   };
 }
 
@@ -204,23 +215,26 @@ export async function syncStripeCatalog(options: {
   if (settings.syncProductsEnabled) {
     const productsPayload = await stripeGet({ settings, apiKey, path: '/v1/products', params: { limit: settings.pageSize }, fetchImpl: options.fetchImpl });
     const products = listData(productsPayload).map(productSummary);
+    const productsRecord = asRecord(productsPayload);
     metadata.productsCount = products.length;
-    metadata.productsHasMore = Boolean(productsPayload?.has_more);
+    metadata.productsHasMore = Boolean(productsRecord.has_more);
     metadata.products = products;
   }
 
   if (settings.syncPricesEnabled) {
     const pricesPayload = await stripeGet({ settings, apiKey, path: '/v1/prices', params: { limit: settings.pageSize }, fetchImpl: options.fetchImpl });
     const prices = listData(pricesPayload).map(priceSummary);
+    const pricesRecord = asRecord(pricesPayload);
     metadata.pricesCount = prices.length;
-    metadata.pricesHasMore = Boolean(pricesPayload?.has_more);
+    metadata.pricesHasMore = Boolean(pricesRecord.has_more);
     metadata.prices = prices;
   }
 
   if (settings.syncCustomersEnabled) {
     const customersPayload = await stripeGet({ settings, apiKey, path: '/v1/customers', params: { limit: Math.min(settings.pageSize, 25) }, fetchImpl: options.fetchImpl });
+    const customersRecord = asRecord(customersPayload);
     metadata.customersCount = listData(customersPayload).length;
-    metadata.customersHasMore = Boolean(customersPayload?.has_more);
+    metadata.customersHasMore = Boolean(customersRecord.has_more);
   }
 
   return metadata;
