@@ -2070,6 +2070,24 @@ const automationWorkflowStatusValues = [
   AUTOMATION_WORKFLOW_STATUS.PAUSED,
   AUTOMATION_WORKFLOW_STATUS.ARCHIVED
 ];
+const automationSensitiveConfigKeyPattern = /(password|secret|token|authorization|cookie|api[-_]?key|signing[-_]?secret)/i;
+function findAutomationSensitiveConfigPath(value, path = []) {
+  if (!value || typeof value !== "object") return null;
+  if (Array.isArray(value)) {
+    for (let index2 = 0; index2 < value.length; index2 += 1) {
+      const found = findAutomationSensitiveConfigPath(value[index2], [...path, String(index2)]);
+      if (found) return found;
+    }
+    return null;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    const nextPath = [...path, key];
+    if (automationSensitiveConfigKeyPattern.test(key)) return nextPath;
+    const found = findAutomationSensitiveConfigPath(child, nextPath);
+    if (found) return found;
+  }
+  return null;
+}
 const automationConditionSchema = import_zod.z.object({
   path: import_zod.z.string().min(1).max(240).transform(sanitizeText),
   operator: import_zod.z.enum(["equals", "not_equals", "contains", "exists", "not_exists", "gt", "gte", "lt", "lte", "in"]),
@@ -2090,11 +2108,19 @@ const automationDefinitionSchema = import_zod.z.object({
   steps: import_zod.z.array(automationStepSchema).min(1).max(25)
 }).superRefine((definition, ctx) => {
   const ids = /* @__PURE__ */ new Set();
+  const triggerSensitivePath = findAutomationSensitiveConfigPath(definition.trigger.config, ["trigger", "config"]);
+  if (triggerSensitivePath) {
+    ctx.addIssue({ code: import_zod.z.ZodIssueCode.custom, path: triggerSensitivePath, message: "Les secrets bruts sont interdits dans les d\xE9finitions Automations. Utilisez une int\xE9gration chiffr\xE9e." });
+  }
   for (const [index2, step] of definition.steps.entries()) {
     if (ids.has(step.id)) {
       ctx.addIssue({ code: import_zod.z.ZodIssueCode.custom, path: ["steps", index2, "id"], message: "Identifiant de step dupliqu\xE9" });
     }
     ids.add(step.id);
+    const sensitivePath = findAutomationSensitiveConfigPath(step.config, ["steps", index2.toString(), "config"]);
+    if (sensitivePath) {
+      ctx.addIssue({ code: import_zod.z.ZodIssueCode.custom, path: sensitivePath, message: "Les secrets bruts sont interdits dans les d\xE9finitions Automations. Utilisez une int\xE9gration chiffr\xE9e." });
+    }
   }
 });
 const insertAutomationWorkflowSchema = import_zod.z.object({

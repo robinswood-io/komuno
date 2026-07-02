@@ -1839,6 +1839,26 @@ const automationWorkflowStatusValues = [
   AUTOMATION_WORKFLOW_STATUS.ARCHIVED,
 ] as const;
 
+const automationSensitiveConfigKeyPattern = /(password|secret|token|authorization|cookie|api[-_]?key|signing[-_]?secret)/i;
+
+function findAutomationSensitiveConfigPath(value: unknown, path: string[] = []): string[] | null {
+  if (!value || typeof value !== 'object') return null;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const found = findAutomationSensitiveConfigPath(value[index], [...path, String(index)]);
+      if (found) return found;
+    }
+    return null;
+  }
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const nextPath = [...path, key];
+    if (automationSensitiveConfigKeyPattern.test(key)) return nextPath;
+    const found = findAutomationSensitiveConfigPath(child, nextPath);
+    if (found) return found;
+  }
+  return null;
+}
+
 export const automationConditionSchema = z.object({
   path: z.string().min(1).max(240).transform(sanitizeText),
   operator: z.enum(['equals', 'not_equals', 'contains', 'exists', 'not_exists', 'gt', 'gte', 'lt', 'lte', 'in']),
@@ -1861,11 +1881,19 @@ export const automationDefinitionSchema = z.object({
   steps: z.array(automationStepSchema).min(1).max(25),
 }).superRefine((definition, ctx) => {
   const ids = new Set<string>();
+  const triggerSensitivePath = findAutomationSensitiveConfigPath(definition.trigger.config, ['trigger', 'config']);
+  if (triggerSensitivePath) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: triggerSensitivePath, message: 'Les secrets bruts sont interdits dans les définitions Automations. Utilisez une intégration chiffrée.' });
+  }
   for (const [index, step] of definition.steps.entries()) {
     if (ids.has(step.id)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['steps', index, 'id'], message: 'Identifiant de step dupliqué' });
     }
     ids.add(step.id);
+    const sensitivePath = findAutomationSensitiveConfigPath(step.config, ['steps', index.toString(), 'config']);
+    if (sensitivePath) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: sensitivePath, message: 'Les secrets bruts sont interdits dans les définitions Automations. Utilisez une intégration chiffrée.' });
+    }
   }
 });
 

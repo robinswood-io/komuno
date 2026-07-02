@@ -219,11 +219,12 @@ export class AutomationsService {
 
   async updateWorkflow(id: string, body: unknown, userEmail?: string) {
     try {
-      await this.getWorkflowRow(id);
+      const currentWorkflow = await this.getWorkflowRow(id);
       const validated = updateAutomationWorkflowSchema.parse(body);
-      const nextDefinition = validated.draftDefinition;
-      const nextTriggerType = validated.triggerType ?? nextDefinition?.trigger.type;
-      if (nextDefinition && nextTriggerType && nextDefinition.trigger.type !== nextTriggerType) {
+      const currentDefinition = automationDefinitionSchema.parse(currentWorkflow.draftDefinition);
+      const nextDefinition = validated.draftDefinition ?? currentDefinition;
+      const nextTriggerType = validated.triggerType ?? nextDefinition.trigger.type;
+      if (nextDefinition.trigger.type !== nextTriggerType) {
         throw new BadRequestException('Le triggerType doit correspondre au trigger de la définition');
       }
       const patch: Partial<typeof automationWorkflows.$inferInsert> = {

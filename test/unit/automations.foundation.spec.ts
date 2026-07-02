@@ -55,6 +55,48 @@ describe('Automations foundation', () => {
     expect(parsed.success).toBe(false);
   });
 
+  it('refuse les secrets bruts dans les définitions de workflow', () => {
+    const parsed = automationDefinitionSchema.safeParse({
+      trigger: { type: 'member.created', config: {} },
+      steps: [
+        {
+          id: 'unsafe-webhook',
+          type: AUTOMATION_STEP_TYPE.WEBHOOK_EMIT,
+          config: {
+            data: {
+              apiKey: 'sk_should_not_be_stored_here',
+            },
+          },
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toContain('secrets bruts');
+  });
+
+  it('autorise les références templatisées non secrètes vers les données de formulaire', () => {
+    const parsed = automationDefinitionSchema.safeParse({
+      trigger: { type: 'form.response.created', config: {} },
+      steps: [
+        {
+          id: 'audit-form',
+          type: AUTOMATION_STEP_TYPE.AUDIT_RECORD,
+          config: {
+            action: 'automations.form.checked',
+            entityType: 'survey_response',
+            entityId: '{{data.id}}',
+            metadata: {
+              respondentEmail: '{{data.respondentEmail}}',
+            },
+          },
+        },
+      ],
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
   it('expose les permissions automations aux managers mais pas aux lecteurs', () => {
     expect(hasPermission(ADMIN_ROLES.SUPER_ADMIN, 'automations.manage')).toBe(true);
     expect(hasPermission(ADMIN_ROLES.IDEAS_MANAGER, 'automations.write')).toBe(true);
