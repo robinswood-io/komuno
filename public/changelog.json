@@ -1,23 +1,41 @@
 {
   "latest": {
-    "version": "2.26.5",
+    "version": "2.26.6",
     "releasedAt": "2026-07-03",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Keep relation filters sheet in viewport"
+        "Avoid noisy branding fallback errors"
       ],
       "ameliorations": [],
       "securite": [],
       "maintenance": [
-        "Detect frontend changes [skip ci]"
+        "Wait for mobile overlay animations [skip ci]"
       ]
     },
     "commitCount": 2
   },
   "history": [
+    {
+      "version": "2.26.6",
+      "releasedAt": "2026-07-03",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Avoid noisy branding fallback errors"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Wait for mobile overlay animations [skip ci]"
+        ]
+      },
+      "commitCount": 2
+    },
     {
       "version": "2.26.5",
       "releasedAt": "2026-07-03",
@@ -496,24 +514,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.16.1",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte des ajustements techniques.",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": [
-          "Route app tenant paths to Komuno"
-        ]
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-03T15:08:49.800Z",
+  "generatedAt": "2026-07-03T15:34:27.769Z",
   "source": "conventional-commits"
 }

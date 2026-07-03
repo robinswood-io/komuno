@@ -4,6 +4,20 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.26.6] - 2026-07-03
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Avoid noisy branding fallback errors
+
+### Maintenance
+
+- Wait for mobile overlay animations [skip ci]
+
 ## [2.26.5] - 2026-07-03
 
 ### En bref
