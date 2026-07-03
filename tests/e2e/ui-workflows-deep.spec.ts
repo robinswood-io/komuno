@@ -23,11 +23,15 @@ async function expectJsonOk(request: APIRequestContext, path: string) {
 
 async function collectPageIssues(page: Page, route: string, action: () => Promise<void>) {
   const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
   const failedRequests: string[] = [];
   const badResponses: string[] = [];
 
   const onConsole = (message: { type: () => string; text: () => string }) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
+  };
+  const onPageError = (error: Error) => {
+    pageErrors.push((error.stack || error.message || String(error)).slice(0, 1_000));
   };
   const onRequestFailed = (request: { method: () => string; url: () => string; failure: () => { errorText: string } | null }) => {
     const failure = request.failure()?.errorText ?? '';
@@ -46,6 +50,7 @@ async function collectPageIssues(page: Page, route: string, action: () => Promis
   };
 
   page.on('console', onConsole);
+  page.on('pageerror', onPageError);
   page.on('requestfailed', onRequestFailed);
   page.on('response', onResponse);
   try {
@@ -53,11 +58,13 @@ async function collectPageIssues(page: Page, route: string, action: () => Promis
     await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
   } finally {
     page.off('console', onConsole);
+    page.off('pageerror', onPageError);
     page.off('requestfailed', onRequestFailed);
     page.off('response', onResponse);
   }
 
   expect.soft(consoleErrors, `${route} console errors`).toEqual([]);
+  expect.soft(pageErrors, `${route} page errors`).toEqual([]);
   expect.soft(failedRequests, `${route} failed requests`).toEqual([]);
   expect.soft(badResponses, `${route} HTTP 4xx/5xx responses`).toEqual([]);
 }
@@ -133,7 +140,7 @@ test.describe('Deep UI workflows — demo/smoke', () => {
         const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         expect(response?.status(), `${route} document status`).toBeLessThan(400);
         await expect(page.locator('body')).toBeVisible();
-        await expect(page.locator('body')).not.toContainText(/Application error|Internal server error|Unhandled Runtime Error/i);
+        await expect(page.locator('body')).not.toContainText(/This page couldn.t load|Application error|Internal server error|Unhandled Runtime Error/i);
       });
     }
   });

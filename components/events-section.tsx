@@ -24,6 +24,17 @@ interface EventWithInscriptions extends Omit<Event, "inscriptionCount"> {
   inscriptionCount: number;
 }
 
+type PublicSponsorshipResponse = PublicSponsorship[] | {
+  success?: boolean;
+  data?: PublicSponsorship[];
+};
+
+function normalizePublicSponsorships(response: PublicSponsorshipResponse | null | undefined): PublicSponsorship[] {
+  if (Array.isArray(response)) return response;
+  if (response && typeof response === 'object' && Array.isArray(response.data)) return response.data;
+  return [];
+}
+
 // interface PaginatedEventsResponse {
 //   success: boolean;
 //   data: {
@@ -36,9 +47,11 @@ interface EventWithInscriptions extends Omit<Event, "inscriptionCount"> {
 
 // Sponsors Preview Component
 function SponsorsPreview({ eventId }: { eventId: string }) {
-  const { data: sponsors, isLoading } = useQuery({
+  const { data: sponsors = [], isLoading } = useQuery({
     queryKey: ['events', 'sponsorships', eventId],
-    queryFn: () => api.get<PublicSponsorship[]>(`/api/public/events/${eventId}/sponsorships`),
+    queryFn: async () => normalizePublicSponsorships(
+      await api.get<PublicSponsorshipResponse>(`/api/public/events/${eventId}/sponsorships`)
+    ),
     enabled: !!eventId,
   });
 
