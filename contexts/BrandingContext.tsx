@@ -46,10 +46,10 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isCustomized, setIsCustomized] = useState(false);
 
-  const loadBranding = async () => {
+  const loadBranding = async (signal?: AbortSignal) => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/admin/branding');
+      const response = await fetch('/api/admin/branding', { signal });
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -95,6 +95,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error) {
+      if (signal?.aborted) return;
+
       console.error('Failed to load branding config:', error);
       // Fallback to default values
       setBrandingState({
@@ -103,12 +105,14 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       });
       setIsCustomized(false);
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadBranding();
+    const controller = new AbortController();
+    loadBranding(controller.signal);
+    return () => controller.abort();
   }, []);
 
   // Appliquer les couleurs au CSS quand le branding change

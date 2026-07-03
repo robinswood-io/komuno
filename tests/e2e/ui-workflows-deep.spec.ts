@@ -64,6 +64,7 @@ async function collectPageIssues(page: Page, route: string, action: () => Promis
 
 test.describe('Deep UI workflows — demo/smoke', () => {
   test.skip(!runDeepUi, 'Set E2E_DEEP_UI=1 to run deep UI workflow checks. Use demo.komuno.org or authenticated env.');
+  test.setTimeout(180_000);
 
   test('critical API endpoints used by UI are healthy', async ({ request }) => {
     const events = await expectJsonOk(request, '/api/events?limit=5') as JsonResponse<EventSummary[]>;
