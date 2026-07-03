@@ -1,23 +1,37 @@
 {
   "latest": {
-    "version": "2.26.6",
+    "version": "2.26.7",
     "releasedAt": "2026-07-03",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Avoid noisy branding fallback errors"
+        "Normalize public sponsorship response"
       ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Wait for mobile overlay animations [skip ci]"
-      ]
+      "maintenance": []
     },
-    "commitCount": 2
+    "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.26.7",
+      "releasedAt": "2026-07-03",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Normalize public sponsorship response"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.26.6",
       "releasedAt": "2026-07-03",
@@ -498,24 +512,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.17.0",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add scoped organization admin onboarding"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-03T15:34:27.769Z",
+  "generatedAt": "2026-07-03T16:53:48.453Z",
   "source": "conventional-commits"
 }
