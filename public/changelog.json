@@ -1,32 +1,37 @@
 {
   "latest": {
-    "version": "2.26.0",
+    "version": "2.26.1",
     "releasedAt": "2026-07-03",
-    "summary": "Cette version apporte 2 nouveaute(s), 6 correction(s).",
+    "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [
-        "Add event operations planning",
-        "Add regional training module"
-      ],
+      "nouveautes": [],
       "corrections": [
-        "Avoid missing event detail prefetch",
-        "Restore workflow endpoints",
-        "Remove remaining any annotations",
-        "Remove unsafe any casts",
-        "Remove lint violations and unsafe casts",
-        "Fail closed on federated ingest"
+        "Align event budget seed type"
       ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Seed complete demo dataset",
-        "Stabilize deep ui workflow checks"
-      ]
+      "maintenance": []
     },
-    "commitCount": 10
+    "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.26.1",
+      "releasedAt": "2026-07-03",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Align event budget seed type"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.26.0",
       "releasedAt": "2026-07-03",
@@ -501,24 +506,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.14.0",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add HelloAsso connector"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-03T07:01:12.155Z",
+  "generatedAt": "2026-07-03T08:20:31.544Z",
   "source": "conventional-commits"
 }
