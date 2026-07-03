@@ -71,7 +71,8 @@ async function openScenario(page: Page, scenario: OverlayScenario) {
   await trigger.click();
 
   await page.locator(overlaySelector).first().waitFor({ state: 'visible', timeout: 10_000 });
-  await page.waitForTimeout(250);
+  // Sheet open animations can last 500ms; measure the settled layout, not the slide-in transition.
+  await page.waitForTimeout(700);
 }
 
 test.describe('Admin mobile responsive overlays', () => {
