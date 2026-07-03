@@ -97,7 +97,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (signal?.aborted) return;
 
-      console.error('Failed to load branding config:', error);
+      console.warn('Failed to load branding config, using defaults:', error);
       // Fallback to default values
       setBrandingState({
         ...brandingCore,
