@@ -292,7 +292,7 @@ jobs:
       always() &&
       (needs.validate-migrations.result == 'success' || needs.validate-migrations.result == 'skipped') &&
       (needs.test-critical.result == 'success' || needs.test-critical.result == 'skipped') &&
-      (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
+      needs.build.result == 'success' &&
       (github.event_name == 'push' ||
        (github.event_name == 'workflow_dispatch' &&
         (github.event.inputs.environment == 'cjd80' || github.event.inputs.environment == 'both' || github.event.inputs.environment == 'all')))
@@ -302,9 +302,6 @@ jobs:
       url: https://cjd80.fr
 
     steps:
-      - name: Skip (aucun changement)
-        if: needs.detect-changes.outputs.should_build == 'false'
-        run: echo "⏭️ Aucun changement détecté — déploiement ignoré"
 
       - name: Deploy to CJD80
         if: needs.detect-changes.outputs.should_build == 'true'
@@ -439,7 +436,7 @@ jobs:
       always() &&
       (needs.validate-migrations.result == 'success' || needs.validate-migrations.result == 'skipped') &&
       (needs.test-critical.result == 'success' || needs.test-critical.result == 'skipped') &&
-      (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
+      needs.build.result == 'success' &&
       (github.event_name == 'push' ||
        (github.event_name == 'workflow_dispatch' &&
         (github.event.inputs.environment == 'rep' || github.event.inputs.environment == 'both' || github.event.inputs.environment == 'all')))
@@ -449,9 +446,6 @@ jobs:
       url: https://repicardie.fr
 
     steps:
-      - name: Skip (aucun changement)
-        if: needs.detect-changes.outputs.should_build == 'false'
-        run: echo "⏭️ Aucun changement détecté — déploiement ignoré"
 
       - name: Pull latest code
         if: needs.detect-changes.outputs.should_build == 'true'
@@ -725,7 +719,7 @@ jobs:
       always() &&
       (needs.validate-migrations.result == 'success' || needs.validate-migrations.result == 'skipped') &&
       (needs.test-critical.result == 'success' || needs.test-critical.result == 'skipped') &&
-      (needs.build.result == 'success' || needs.detect-changes.outputs.should_build == 'false') &&
+      needs.build.result == 'success' &&
       (github.event_name == 'push' ||
        (github.event_name == 'workflow_dispatch' &&
         (github.event.inputs.environment == 'hdf' || github.event.inputs.environment == 'all')))
@@ -735,9 +729,6 @@ jobs:
       url: https://cjd-hdf.fr
 
     steps:
-      - name: Skip (aucun changement)
-        if: needs.detect-changes.outputs.should_build == 'false'
-        run: echo "⏭️ Aucun changement détecté — déploiement ignoré"
 
       - name: Build branded image and deploy HDF
         if: needs.detect-changes.outputs.should_build == 'true'

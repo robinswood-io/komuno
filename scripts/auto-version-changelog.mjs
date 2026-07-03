@@ -13,6 +13,21 @@ const publicDir = path.join(rootDir, 'public');
 const versionJsonPath = path.join(publicDir, 'version.json');
 const changelogJsonPath = path.join(publicDir, 'changelog.json');
 
+const RELEASE_IGNORED_PATH_PREFIXES = [
+  'deploy/demo/',
+  'coverage-',
+  '.tmpcov-',
+  '.tmp-security/',
+  'logs/',
+  'test-results/',
+  'dist/',
+  '.next/',
+];
+
+const RELEASE_IGNORED_EXACT_PATHS = new Set([
+  'tsconfig.tsbuildinfo',
+]);
+
 function run(cmd) {
   return execSync(cmd, { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
@@ -126,6 +141,41 @@ function getLatestVersionTag() {
   return null;
 }
 
+function getLatestReleaseCommit() {
+  const raw = run("git log --pretty=format:%H%x1f%s --max-count=80");
+  if (!raw) return null;
+  for (const line of raw.split('\n')) {
+    const [hash, subject] = line.split('\x1f');
+    const match = /^chore\(release\):\s*v(\d+\.\d+\.\d+)/i.exec(subject || '');
+    const version = match ? parseSemver(match[1]) : null;
+    if (hash && version) return { hash, version };
+  }
+  return null;
+}
+
+function maxVersion(...versions) {
+  return versions.filter(Boolean).reduce((current, candidate) => {
+    if (!current) return candidate;
+    return compareSemver(candidate, current) > 0 ? candidate : current;
+  }, null);
+}
+
+function getCommitFiles(hash) {
+  if (!/^[0-9a-f]{7,40}$/i.test(hash)) return [];
+  const raw = run(`git diff-tree --no-commit-id --name-only -r ${hash}`);
+  return raw ? raw.split('\n').map((file) => file.trim()).filter(Boolean) : [];
+}
+
+function isReleaseIgnoredFile(file) {
+  return RELEASE_IGNORED_EXACT_PATHS.has(file)
+    || RELEASE_IGNORED_PATH_PREFIXES.some((prefix) => file.startsWith(prefix));
+}
+
+function isReleaseRelevantCommit(commit) {
+  if (!commit.files.length) return true;
+  return commit.files.some((file) => !isReleaseIgnoredFile(file));
+}
+
 function getCommitsSince(tag) {
   const range = tag ? `${tag}..HEAD` : 'HEAD';
   const raw = run(`git log ${range} --pretty=format:%H%x1f%s%x1f%b%x1e`);
@@ -141,10 +191,12 @@ function getCommitsSince(tag) {
         hash,
         subject: (subject || '').trim(),
         body: (body || '').trim(),
+        files: getCommitFiles(hash),
       };
     })
     .filter((c) => c.subject)
-    .filter((c) => !/^chore\(release\):\s*v\d+\.\d+\.\d+/i.test(c.subject));
+    .filter((c) => !/^chore\(release\):\s*v\d+\.\d+\.\d+/i.test(c.subject))
+    .filter(isReleaseRelevantCommit);
 }
 
 function summaryForHumans(counts) {
@@ -214,13 +266,17 @@ function main() {
 
   const latestTag = getLatestVersionTag();
   const tagVersion = latestTag ? parseSemver(latestTag) : null;
+  const latestRelease = getLatestReleaseCommit();
 
-  const baseVersionObj = tagVersion && compareSemver(tagVersion, pkgVersion) > 0 ? tagVersion : pkgVersion;
+  const baseVersionObj = maxVersion(pkgVersion, tagVersion, latestRelease?.version) || pkgVersion;
   const baseVersion = semverToString(baseVersionObj);
+  const boundaryRef = latestRelease && (!tagVersion || compareSemver(latestRelease.version, tagVersion) >= 0)
+    ? latestRelease.hash
+    : latestTag;
 
-  const commits = getCommitsSince(latestTag);
+  const commits = getCommitsSince(boundaryRef);
   if (!commits.length) {
-    console.log('Aucun commit a versionner depuis le dernier tag.');
+    console.log('Aucun commit a versionner depuis la derniere release.');
     return;
   }
 

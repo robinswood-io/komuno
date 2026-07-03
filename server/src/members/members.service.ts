@@ -1070,7 +1070,24 @@ export class MembersService {
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(memberGroups.year), asc(memberGroups.name), asc(members.lastName));
 
-    const byMember = new Map<string, any>();
+    type GroupMatrixRow = (typeof rows)[number];
+    type GroupMatrixMember = {
+      memberEmail: string;
+      firstName: GroupMatrixRow['firstName'];
+      lastName: GroupMatrixRow['lastName'];
+      company: GroupMatrixRow['company'];
+      groups: Array<{
+        id: GroupMatrixRow['groupId'];
+        name: GroupMatrixRow['groupName'];
+        type: GroupMatrixRow['groupType'];
+        year: GroupMatrixRow['groupYear'];
+        color: GroupMatrixRow['groupColor'];
+        role: GroupMatrixRow['role'];
+        mission: GroupMatrixRow['mission'];
+      }>;
+    };
+
+    const byMember = new Map<string, GroupMatrixMember>();
     for (const row of rows) {
       if (!row.memberEmail) continue;
       const existing = byMember.get(row.memberEmail) ?? {

@@ -48,7 +48,7 @@ export default registerAs('app', () => ({
   // VAPID (Web Push)
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',
-  vapidSubject: process.env.VAPID_SUBJECT || 'mailto:admin@cjd-amiens.fr',
+  vapidSubject: process.env.VAPID_SUBJECT || 'mailto:admin@komuno.org',
 
   // OpenAI
   openaiApiKey: process.env.OPENAI_API_KEY || '',

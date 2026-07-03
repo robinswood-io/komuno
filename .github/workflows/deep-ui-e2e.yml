@@ -1,0 +1,66 @@
+name: Deep UI E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL to test'
+        required: false
+        default: 'https://demo.komuno.org'
+  schedule:
+    # Nightly smoke against the isolated demo instance (03:30 UTC on weekdays).
+    - cron: '30 3 * * 1-5'
+
+concurrency:
+  group: deep-ui-e2e-${{ github.event.inputs.base_url || 'demo' }}
+  cancel-in-progress: false
+
+jobs:
+  deep-ui-e2e:
+    name: Deep UI workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.1.38
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: bun x playwright install --with-deps chromium
+
+      - name: Run deep UI workflow checks
+        env:
+          E2E_DEEP_UI: '1'
+          E2E_BASE_URL: ${{ github.event.inputs.base_url || 'https://demo.komuno.org' }}
+        run: bun x playwright test tests/e2e/ui-workflows-deep.spec.ts --project=chromium
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: deep-ui-e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

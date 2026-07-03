@@ -89,7 +89,7 @@ export class AuthController {
     schema: {
       type: 'object',
       properties: {
-        email: { type: 'string', format: 'email', example: 'admin@cjd-amiens.fr' },
+        email: { type: 'string', format: 'email', example: 'admin@komuno.org' },
         password: { type: 'string', format: 'password', example: 'SecurePassword123' },
         returnTo: { type: 'string', example: '/admin' }
       },

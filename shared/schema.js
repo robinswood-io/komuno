@@ -4149,7 +4149,7 @@ const statusCheckSchema = import_zod.z.object({
   status: import_zod.z.enum(["healthy", "warning", "unhealthy", "unknown"]),
   message: import_zod.z.string(),
   responseTime: import_zod.z.number().optional(),
-  details: import_zod.z.record(import_zod.z.string(), import_zod.z.any()).optional(),
+  details: import_zod.z.record(import_zod.z.string(), import_zod.z.unknown()).optional(),
   error: import_zod.z.string().optional()
 });
 const statusResponseSchema = import_zod.z.object({

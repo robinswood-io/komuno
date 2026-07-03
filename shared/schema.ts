@@ -4728,7 +4728,7 @@ export const statusCheckSchema = z.object({
   status: z.enum(['healthy', 'warning', 'unhealthy', 'unknown']),
   message: z.string(),
   responseTime: z.number().optional(),
-  details: z.record(z.string(), z.any()).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
   error: z.string().optional(),
 });
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys, type PaginatedResponse } from '@/lib/api/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +56,7 @@ interface LoanItem {
  */
 export default function AdminLoansPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -201,8 +203,8 @@ export default function AdminLoansPage() {
       description: formData.description || undefined,
       lenderName: formData.lenderName,
       photoUrl: formData.photoUrl || undefined,
-      proposedBy: formData.proposedBy || 'Admin',
-      proposedByEmail: formData.proposedByEmail || 'admin@cjd-amiens.fr',
+      proposedBy: formData.proposedBy || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Admin',
+      proposedByEmail: formData.proposedByEmail || user?.email || 'admin@komuno.org',
     });
   };
 

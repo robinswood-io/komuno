@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -17,6 +18,16 @@ import { FinancialService } from './financial.service';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
 import { PermissionGuard } from '../auth/guards/permission.guard';
 import { Permissions } from '../auth/decorators/permissions.decorator';
+
+type RequestWithUser = { user?: { email?: string; role?: string } };
+
+function actorFromRequest(req: RequestWithUser) {
+  return req.user?.email || req.user?.role || 'admin@komuno.org';
+}
+
+function withActor(body: unknown, actor: string) {
+  return { ...(body as Record<string, unknown>), createdBy: actor, assignedBy: actor };
+}
 
 /**
  * Controller Financial - Routes financières
@@ -99,8 +110,8 @@ export class FinancialController {
   @ApiResponse({ status: 400, description: 'Données invalides' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
-  async createBudget(@Body() body: unknown) {
-    return await this.financialService.createBudget(body);
+  async createBudget(@Body() body: unknown, @Req() req: RequestWithUser) {
+    return await this.financialService.createBudget(withActor(body, actorFromRequest(req)));
   }
 
   @Put('budgets/:id')
@@ -219,8 +230,8 @@ export class FinancialController {
   @ApiResponse({ status: 400, description: 'Données invalides' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
-  async createExpense(@Body() body: unknown) {
-    return await this.financialService.createExpense(body);
+  async createExpense(@Body() body: unknown, @Req() req: RequestWithUser) {
+    return await this.financialService.createExpense(withActor(body, actorFromRequest(req)));
   }
 
   @Put('expenses/:id')
@@ -360,8 +371,8 @@ export class FinancialController {
   @ApiResponse({ status: 400, description: 'Données invalides' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
-  async createForecast(@Body() body: unknown) {
-    return await this.financialService.createForecast(body);
+  async createForecast(@Body() body: unknown, @Req() req: RequestWithUser) {
+    return await this.financialService.createForecast(withActor(body, actorFromRequest(req)));
   }
 
   @Put('forecasts/:id')
@@ -553,8 +564,8 @@ export class FinancialController {
   @ApiResponse({ status: 400, description: 'Données invalides' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
-  async createSubscription(@Body() body: unknown) {
-    return await this.financialService.createSubscription(body);
+  async createSubscription(@Body() body: unknown, @Req() req: RequestWithUser) {
+    return await this.financialService.createSubscription(withActor(body, actorFromRequest(req)));
   }
 
   @Put('subscriptions/:id')
@@ -667,8 +678,8 @@ export class FinancialController {
   @ApiResponse({ status: 400, description: 'Données invalides' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
-  async createRevenue(@Body() body: unknown) {
-    return await this.financialService.createRevenue(body);
+  async createRevenue(@Body() body: unknown, @Req() req: RequestWithUser) {
+    return await this.financialService.createRevenue(withActor(body, actorFromRequest(req)));
   }
 
   @Put('revenues/:id')
@@ -844,8 +855,8 @@ export class FinancialController {
   @ApiResponse({ status: 400, description: 'Données invalides' })
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
-  async assignSubscription(@Body() body: unknown) {
-    return await this.financialService.assignSubscriptionToMember(body);
+  async assignSubscription(@Body() body: unknown, @Req() req: RequestWithUser) {
+    return await this.financialService.assignSubscriptionToMember(withActor(body, actorFromRequest(req)));
   }
 
   @Delete('subscriptions/:id/revoke')

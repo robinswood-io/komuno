@@ -440,7 +440,6 @@ export default function AdminFinancialPage() {
       amountInCents: number;
       period: 'month' | 'quarter' | 'year';
       year: number;
-      createdBy: string;
     }) => api.post('/api/admin/finance/budgets', data),
     onSuccess: () => {
       toast({
@@ -466,7 +465,6 @@ export default function AdminFinancialPage() {
       amountInCents: number;
       category: string;
       expenseDate: string;
-      createdBy: string;
     }) => api.post('/api/admin/finance/expenses', data),
     onSuccess: () => {
       toast({
@@ -602,7 +600,6 @@ export default function AdminFinancialPage() {
       paymentMethod?: string;
       receiptUrl?: string;
       notes?: string;
-      createdBy: string;
     }) => api.post('/api/admin/finance/revenues', data),
     onSuccess: () => {
       toast({
@@ -695,7 +692,6 @@ export default function AdminFinancialPage() {
       paymentDate: string;
       paymentMethod: string;
       notes?: string;
-      createdBy: string;
     }) => api.post('/api/admin/finance/subscriptions', data),
     onSuccess: () => {
       toast({
@@ -908,7 +904,6 @@ export default function AdminFinancialPage() {
       amountInCents: Math.round(parseFloat(budgetForm.amount) * 100),
       period: budgetForm.period,
       year: budgetForm.year,
-      createdBy: 'admin@cjd-amiens.fr', // TODO: get from session
     });
   };
 
@@ -927,7 +922,6 @@ export default function AdminFinancialPage() {
       amountInCents: Math.round(parseFloat(expenseForm.amount) * 100),
       category: expenseForm.category,
       expenseDate: expenseForm.date,
-      createdBy: 'admin@cjd-amiens.fr', // TODO: get from session
     });
   };
 
@@ -1062,7 +1056,6 @@ export default function AdminFinancialPage() {
       paymentMethod: revenueForm.paymentMethod,
       receiptUrl: revenueForm.receiptUrl,
       notes: revenueForm.notes,
-      createdBy: 'admin@cjd-amiens.fr', // TODO: get from session
     });
   };
 
@@ -1196,7 +1189,6 @@ export default function AdminFinancialPage() {
       paymentDate: subscriptionForm.paymentDate,
       paymentMethod: subscriptionForm.paymentMethod,
       notes: subscriptionForm.notes,
-      createdBy: 'admin@cjd-amiens.fr', // TODO: get from session
     });
   };
 

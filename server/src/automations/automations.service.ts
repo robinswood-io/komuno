@@ -577,9 +577,9 @@ export class AutomationsService {
   private async executeStepAction(workflow: Workflow, event: AutomationEvent, step: AutomationStep, config: JsonObject, context: JsonObject): Promise<{ output: JsonObject; halt?: boolean; reason?: string }> {
     if (step.type === AUTOMATION_STEP_TYPE.CONDITION) {
       const all = Array.isArray(config.all) ? config.all : [];
-      const any = Array.isArray(config.any) ? config.any : [];
+      const anyConditions = Array.isArray(config.any) ? config.any : [];
       const allOk = all.length === 0 || all.every((item) => this.evaluateCondition(item, context));
-      const anyOk = any.length === 0 || any.some((item) => this.evaluateCondition(item, context));
+      const anyOk = anyConditions.length === 0 || anyConditions.some((item) => this.evaluateCondition(item, context));
       const passed = allOk && anyOk;
       return passed
         ? { output: { passed: true } }
