@@ -19,7 +19,7 @@ jobs:
   deep-ui-e2e:
     name: Deep UI workflows
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     permissions:
       contents: read
 
@@ -47,6 +47,43 @@ jobs:
 
       - name: Install Playwright Chromium
         run: bun x playwright install --with-deps chromium
+
+      - name: Wait outside demo reset window
+        env:
+          E2E_BASE_URL: ${{ github.event.inputs.base_url || 'https://demo.komuno.org' }}
+        run: |
+          if [[ "$E2E_BASE_URL" != *"demo.komuno.org"* ]]; then
+            exit 0
+          fi
+
+          minute=$((10#$(date -u +%M)))
+          sleep_seconds=0
+          if [ "$minute" -ge 55 ]; then
+            sleep_seconds=$(((66 - minute) * 60))
+          elif [ "$minute" -le 5 ]; then
+            sleep_seconds=$(((6 - minute) * 60))
+          fi
+
+          if [ "$sleep_seconds" -gt 0 ]; then
+            echo "Demo reset window detected at minute $minute UTC; sleeping ${sleep_seconds}s before E2E."
+            sleep "$sleep_seconds"
+          fi
+
+      - name: Preflight demo availability
+        env:
+          E2E_BASE_URL: ${{ github.event.inputs.base_url || 'https://demo.komuno.org' }}
+        run: |
+          for attempt in {1..36}; do
+            if curl --retry 2 --retry-delay 2 --retry-connrefused -fsS "$E2E_BASE_URL/api/version" >/dev/null \
+              && curl --retry 2 --retry-delay 2 --retry-connrefused -fsS "$E2E_BASE_URL/propose" >/dev/null; then
+              echo "Preflight OK on attempt $attempt"
+              exit 0
+            fi
+            echo "Preflight not ready yet (attempt $attempt/36), retrying..."
+            sleep 10
+          done
+          echo "Preflight failed for $E2E_BASE_URL" >&2
+          exit 1
 
       - name: Run deep UI workflow checks
         env:
