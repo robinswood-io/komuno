@@ -1,23 +1,41 @@
 {
   "latest": {
-    "version": "2.26.4",
+    "version": "2.26.5",
     "releasedAt": "2026-07-03",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Constrain mobile overlays"
+        "Keep relation filters sheet in viewport"
       ],
       "ameliorations": [],
       "securite": [],
       "maintenance": [
-        "Avoid demo reset window [skip ci]"
+        "Detect frontend changes [skip ci]"
       ]
     },
     "commitCount": 2
   },
   "history": [
+    {
+      "version": "2.26.5",
+      "releasedAt": "2026-07-03",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Keep relation filters sheet in viewport"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Detect frontend changes [skip ci]"
+        ]
+      },
+      "commitCount": 2
+    },
     {
       "version": "2.26.4",
       "releasedAt": "2026-07-03",
@@ -494,24 +512,8 @@
         ]
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.16.0",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add SaaS organization tenant route"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-03T14:51:12.274Z",
+  "generatedAt": "2026-07-03T15:08:49.800Z",
   "source": "conventional-commits"
 }
