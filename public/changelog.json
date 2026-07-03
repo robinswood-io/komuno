@@ -1,21 +1,41 @@
 {
   "latest": {
-    "version": "2.26.3",
+    "version": "2.26.4",
     "releasedAt": "2026-07-03",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Stabilize deep UI workflow"
+        "Constrain mobile overlays"
       ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": []
+      "maintenance": [
+        "Avoid demo reset window [skip ci]"
+      ]
     },
-    "commitCount": 1
+    "commitCount": 2
   },
   "history": [
+    {
+      "version": "2.26.4",
+      "releasedAt": "2026-07-03",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Constrain mobile overlays"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Avoid demo reset window [skip ci]"
+        ]
+      },
+      "commitCount": 2
+    },
     {
       "version": "2.26.3",
       "releasedAt": "2026-07-03",
@@ -490,24 +510,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.15.2",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte des ajustements techniques.",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": [
-          "Remove accidental tenant route changes"
-        ]
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-03T10:46:57.694Z",
+  "generatedAt": "2026-07-03T14:51:12.274Z",
   "source": "conventional-commits"
 }
