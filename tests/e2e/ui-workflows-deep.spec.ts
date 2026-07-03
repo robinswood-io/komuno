@@ -31,7 +31,17 @@ async function collectPageIssues(page: Page, route: string, action: () => Promis
     if (message.type() === 'error') consoleErrors.push(message.text());
   };
   const onPageError = (error: Error) => {
-    pageErrors.push((error.stack || error.message || String(error)).slice(0, 1_000));
+    const details = (error.stack || error.message || String(error)).slice(0, 1_000);
+    // Reagraph may emit a non-blocking blob/worker font fetch error in headless browsers.
+    // Keep all other runtime errors strict so real UI crashes (e.g. App Router error pages) fail the suite.
+    if (
+      details.includes('TypeError: Failed to fetch') &&
+      details.includes('blob:') &&
+      (details.includes('getFontsForString') || details.includes('typeset'))
+    ) {
+      return;
+    }
+    pageErrors.push(details);
   };
   const onRequestFailed = (request: { method: () => string; url: () => string; failure: () => { errorText: string } | null }) => {
     const failure = request.failure()?.errorText ?? '';
