@@ -4,6 +4,31 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.26.0] - 2026-07-03
+
+### En bref
+
+- Cette version apporte 2 nouveaute(s), 6 correction(s).
+
+### Nouveautes
+
+- Add event operations planning
+- Add regional training module
+
+### Corrections
+
+- Avoid missing event detail prefetch
+- Restore workflow endpoints
+- Remove remaining any annotations
+- Remove unsafe any casts
+- Remove lint violations and unsafe casts
+- Fail closed on federated ingest
+
+### Maintenance
+
+- Seed complete demo dataset
+- Stabilize deep ui workflow checks
+
 ## [2.25.6] - 2026-07-02
 
 ### En bref

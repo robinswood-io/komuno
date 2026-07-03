@@ -1,21 +1,59 @@
 {
   "latest": {
-    "version": "2.25.6",
-    "releasedAt": "2026-07-02",
-    "summary": "Cette version apporte des ajustements techniques.",
+    "version": "2.26.0",
+    "releasedAt": "2026-07-03",
+    "summary": "Cette version apporte 2 nouveaute(s), 6 correction(s).",
     "sections": {
       "majeurs": [],
-      "nouveautes": [],
-      "corrections": [],
+      "nouveautes": [
+        "Add event operations planning",
+        "Add regional training module"
+      ],
+      "corrections": [
+        "Avoid missing event detail prefetch",
+        "Restore workflow endpoints",
+        "Remove remaining any annotations",
+        "Remove unsafe any casts",
+        "Remove lint violations and unsafe casts",
+        "Fail closed on federated ingest"
+      ],
       "ameliorations": [],
       "securite": [],
       "maintenance": [
-        "Stabilize deep UI workflow checks"
+        "Seed complete demo dataset",
+        "Stabilize deep ui workflow checks"
       ]
     },
-    "commitCount": 1
+    "commitCount": 10
   },
   "history": [
+    {
+      "version": "2.26.0",
+      "releasedAt": "2026-07-03",
+      "summary": "Cette version apporte 2 nouveaute(s), 6 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [
+          "Add event operations planning",
+          "Add regional training module"
+        ],
+        "corrections": [
+          "Avoid missing event detail prefetch",
+          "Restore workflow endpoints",
+          "Remove remaining any annotations",
+          "Remove unsafe any casts",
+          "Remove lint violations and unsafe casts",
+          "Fail closed on federated ingest"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Seed complete demo dataset",
+          "Stabilize deep ui workflow checks"
+        ]
+      },
+      "commitCount": 10
+    },
     {
       "version": "2.25.6",
       "releasedAt": "2026-07-02",
@@ -479,104 +517,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.13.1",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Return raw calendar feeds and validate webhooks"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
-    },
-    {
-      "version": "2.13.0",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add integration foundation and calendar feeds"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
-    },
-    {
-      "version": "2.12.1",
-      "releasedAt": "2026-06-29",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Harden edge cases and duplicate urls"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
-    },
-    {
-      "version": "2.12.0",
-      "releasedAt": "2026-06-29",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Improve form builder UI"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
-    },
-    {
-      "version": "2.11.4",
-      "releasedAt": "2026-06-29",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Add application content security policy"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
-    },
-    {
-      "version": "2.11.3",
-      "releasedAt": "2026-06-28",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Remove unused private auth package"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-02T17:20:57.254Z",
+  "generatedAt": "2026-07-03T07:01:12.155Z",
   "source": "conventional-commits"
 }
