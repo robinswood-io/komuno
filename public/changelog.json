@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.26.2",
+    "version": "2.26.3",
     "releasedAt": "2026-07-03",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Harden deploy workflow and clean repo"
+        "Stabilize deep UI workflow"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.26.3",
+      "releasedAt": "2026-07-03",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Stabilize deep UI workflow"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.26.2",
       "releasedAt": "2026-07-03",
@@ -490,24 +506,8 @@
         ]
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.15.1",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Restore member edit workflow"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-03T10:13:33.463Z",
+  "generatedAt": "2026-07-03T10:46:57.694Z",
   "source": "conventional-commits"
 }

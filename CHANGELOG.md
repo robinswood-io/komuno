@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.26.3] - 2026-07-03
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Stabilize deep UI workflow
+
 ## [2.26.2] - 2026-07-03
 
 ### En bref
