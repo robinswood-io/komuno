@@ -115,7 +115,7 @@ export function RelationFiltersCompact({
             )}
           </Button>
         </SheetTrigger>
-        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+        <SheetContent className="w-[calc(100vw-1rem)] sm:w-[540px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Filtres avancés</SheetTitle>
             <SheetDescription>
