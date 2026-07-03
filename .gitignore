@@ -217,7 +217,6 @@ scripts/playwright-analyze.sh
 scripts/playwright-maintenance.sh
 scripts/playwright-test.sh
 tests/playwright-*.ts
-tests/e2e/
 
 # Archives de documentation (rapports temporaires)
 docs/archives/

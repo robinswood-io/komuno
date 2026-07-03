@@ -88,8 +88,9 @@ jobs:
       - name: Run deep UI workflow checks
         env:
           E2E_DEEP_UI: '1'
+          E2E_ADMIN_MOBILE: '1'
           E2E_BASE_URL: ${{ github.event.inputs.base_url || 'https://demo.komuno.org' }}
-        run: bun x playwright test tests/e2e/ui-workflows-deep.spec.ts --project=chromium
+        run: bun x playwright test tests/e2e/ui-workflows-deep.spec.ts tests/e2e/admin-mobile-responsive.spec.ts --project=chromium
 
       - name: Upload Playwright report
         if: always()
