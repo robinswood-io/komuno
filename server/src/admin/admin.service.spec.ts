@@ -4,6 +4,7 @@ import { AdminService } from './admin.service';
 import { StorageService } from '../common/storage/storage.service';
 import { IdeasService } from '../ideas/ideas.service';
 import { EventsService } from '../events/events.service';
+import type { PasswordResetService } from '../auth/password-reset.service';
 import { checkDatabaseHealth } from '../../utils/db-health';
 import { emailService } from '../../email-service';
 import { emailNotificationService } from '../../email-notification-service';
@@ -39,6 +40,7 @@ describe('AdminService', () => {
   let storageService: StorageService;
   let ideasService: IdeasService;
   let eventsService: EventsService;
+  let passwordResetService: PasswordResetService;
 
   beforeEach(() => {
     vi.mocked(emailService.reloadConfig).mockResolvedValue(undefined);
@@ -89,8 +91,32 @@ describe('AdminService', () => {
     } as unknown as IdeasService;
 
     eventsService = {} as unknown as EventsService;
+    passwordResetService = {
+      requestPasswordReset: vi.fn(),
+    } as unknown as PasswordResetService;
 
-    adminService = new AdminService(storageService, ideasService, eventsService);
+    vi.mocked(storageService.instance.approveAdmin).mockImplementation(async (email, role) => ({
+      success: true,
+      data: {
+        email,
+        firstName: 'New',
+        lastName: 'Admin',
+        password: null,
+        role,
+        status: 'active',
+        isActive: true,
+        addedBy: 'creator@example.com',
+        notificationEmail: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    }));
+    vi.mocked(passwordResetService.requestPasswordReset).mockResolvedValue({
+      accountExists: true,
+      emailSent: true,
+    });
+
+    adminService = new AdminService(storageService, ideasService, eventsService, passwordResetService);
   });
 
   describe('Ideas and events', () => {

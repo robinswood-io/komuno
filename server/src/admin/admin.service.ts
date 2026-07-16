@@ -38,6 +38,7 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import type { UpdateEmailConfigDto } from './admin.dto';
 import { hasErrorCode } from '../common/utils/error-utils';
+import { PasswordResetService } from '../auth/password-reset.service';
 
 /**
  * Service Admin - Gestion des routes d'administration
@@ -48,6 +49,7 @@ export class AdminService {
     private readonly storageService: StorageService,
     private readonly ideasService: IdeasService,
     private readonly eventsService: EventsService,
+    private readonly passwordResetService: PasswordResetService,
   ) {}
 
   // ===== Routes Admin Ideas =====
@@ -282,24 +284,46 @@ export class AdminService {
         throw new BadRequestException('Tous les champs sont requis');
       }
 
-      // Create user in database with hashed password via StorageService
-      const result = await this.storageService.instance.createUser({
+      // Un compte invité ne reçoit jamais de mot de passe fixe ou en clair.
+      const createResult = await this.storageService.instance.createUser({
         email,
-        password: 'temporary-password-must-be-changed', // User should reset password
+        password: undefined,
         firstName,
         lastName,
         role,
         addedBy,
       });
 
-      if (!result.success) {
-        throw new BadRequestException(('error' in result ? result.error : new Error('Unknown error')).message);
+      if (!createResult.success) {
+        throw new BadRequestException(('error' in createResult ? createResult.error : new Error('Unknown error')).message);
+      }
+
+      // Un super-admin authentifié vient de créer explicitement le compte : il peut
+      // être activé immédiatement, puis le destinataire définit son mot de passe.
+      const approvalResult = await this.storageService.instance.approveAdmin(email, role);
+      if (!approvalResult.success) {
+        await this.storageService.instance.deleteAdmin(email);
+        throw new BadRequestException(('error' in approvalResult ? approvalResult.error : new Error('Unknown error')).message);
+      }
+
+      let invitationSent = false;
+      try {
+        const invitationResult = await this.passwordResetService.requestPasswordReset(email);
+        invitationSent = invitationResult.emailSent;
+      } catch (error) {
+        logger.warn('[Admin] Compte créé mais invitation non envoyée', {
+          email,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
 
       return {
         success: true,
-        data: this.sanitizeAdmin(result.data),
-        message: 'Administrateur créé avec succès',
+        data: this.sanitizeAdmin(approvalResult.data),
+        invitationSent,
+        message: invitationSent
+          ? 'Administrateur créé et invitation envoyée avec succès'
+          : "Administrateur créé, mais l'email d'invitation n'a pas pu être envoyé",
       };
     } catch (error) {
       if (error instanceof ZodError) {
@@ -307,6 +331,21 @@ export class AdminService {
       }
       throw error;
     }
+  }
+
+  async sendAdministratorInvitation(email: string) {
+    const invitationResult = await this.passwordResetService.requestPasswordReset(email);
+    if (!invitationResult.accountExists) {
+      throw new NotFoundException('Administrateur non trouvé');
+    }
+
+    return {
+      success: invitationResult.emailSent,
+      data: { invitationSent: invitationResult.emailSent },
+      message: invitationResult.emailSent
+        ? 'Email de réinitialisation envoyé avec succès'
+        : "L'email de réinitialisation n'a pas pu être envoyé",
+    };
   }
 
   async updateAdministratorRole(email: string, role: unknown, currentUserEmail: string) {

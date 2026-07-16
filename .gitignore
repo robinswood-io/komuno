@@ -46,6 +46,11 @@ secrets/
 *secret*
 *token*
 *password*
+# Les routes applicatives de récupération de compte ne sont pas des secrets.
+!app/(auth)/forgot-password/
+!app/(auth)/forgot-password/**
+!app/(auth)/reset-password/
+!app/(auth)/reset-password/**
 credentials.json
 service-account*.json
 

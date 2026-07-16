@@ -438,6 +438,19 @@ export class AdminController {
     return await this.adminService.createAdministrator(body, user.email);
   }
 
+  @Post('administrators/:email/invitation')
+  @Permissions('admin.manage')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Renvoyer l'invitation de définition du mot de passe" })
+  @ApiParam({ name: 'email', description: "Email de l'administrateur", example: 'admin@example.com' })
+  @ApiResponse({ status: 200, description: 'État réel de livraison de l’invitation' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
+  @ApiResponse({ status: 403, description: 'Permission refusée' })
+  @ApiResponse({ status: 404, description: 'Administrateur non trouvé' })
+  async sendAdministratorInvitation(@Param('email') email: string) {
+    return await this.adminService.sendAdministratorInvitation(email);
+  }
+
   @Patch('administrators/:email/role')
   @Permissions('admin.manage')
   @UsePipes(new ZodValidationPipe(updateAdministratorRoleDto))

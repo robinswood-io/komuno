@@ -205,6 +205,14 @@ class EmailService {
       .trim();
   }
 
+  /**
+   * Indique si un transport SMTP est actuellement configuré.
+   * Ne révèle aucune information d'identification.
+   */
+  isConfigured(): boolean {
+    return Boolean(this.transporter && this.config);
+  }
+
   // Test de connectivité
   async testConnection(): Promise<Result<boolean>> {
     if (!this.transporter) {

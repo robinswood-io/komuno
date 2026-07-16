@@ -53,6 +53,12 @@ const ROLE_LABELS: Record<string, string> = {
   events_manager: "Gestionnaire Événements",
 };
 
+interface AdministratorCreationResponse extends ApiResponse<Administrator> {
+  invitationSent: boolean;
+}
+
+type InvitationResponse = ApiResponse<{ invitationSent: boolean }>;
+
 const ROLE_OPTIONS = [
   { value: 'super_admin', label: 'Super Administrateur' },
   { value: 'ideas_reader', label: 'Lecteur Idées' },
@@ -108,9 +114,9 @@ export function AdministratorsTab() {
   // Mutation - Créer un administrateur
   const createMutation = useMutation({
     mutationFn: async (data: CreateAdminFormData) => {
-      return api.post<ApiResponse<Administrator>>('/api/admin/administrators', data);
+      return api.post<AdministratorCreationResponse>('/api/admin/administrators', data);
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.administrators.all });
       setCreateDialogOpen(false);
       setCreateForm({
@@ -120,8 +126,13 @@ export function AdministratorsTab() {
         role: 'ideas_reader',
       });
       toast({
-        title: "Administrateur créé",
-        description: "Email de réinitialisation envoyé.",
+        title: response.invitationSent
+          ? "Administrateur créé"
+          : "Compte créé, invitation non envoyée",
+        description: response.message ?? (response.invitationSent
+          ? "Email de définition du mot de passe envoyé."
+          : "Configurez le service email puis renvoyez l’invitation."),
+        variant: response.invitationSent ? "default" : "destructive",
       });
     },
     onError: (error: Error) => {
@@ -222,12 +233,18 @@ export function AdministratorsTab() {
   // Mutation - Reset password
   const resetPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
-      return api.post<ApiResponse<void>>('/api/auth/forgot-password', { email });
+      return api.post<InvitationResponse>(
+        `/api/admin/administrators/${encodeURIComponent(email)}/invitation`,
+        {},
+      );
     },
-    onSuccess: (_, email) => {
+    onSuccess: (response, email) => {
       toast({
-        title: "Email envoyé",
-        description: `Email de réinitialisation envoyé à ${email}`,
+        title: response.data.invitationSent ? "Email envoyé" : "Email non envoyé",
+        description: response.message ?? (response.data.invitationSent
+          ? `Email de réinitialisation envoyé à ${email}`
+          : "Vérifiez la configuration du service email."),
+        variant: response.data.invitationSent ? "default" : "destructive",
       });
     },
     onError: (error: Error) => {
