@@ -1,21 +1,41 @@
 {
   "latest": {
-    "version": "2.26.7",
-    "releasedAt": "2026-07-03",
+    "version": "2.26.8",
+    "releasedAt": "2026-07-16",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Normalize public sponsorship response"
+        "Secure administrator invitations"
       ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": []
+      "maintenance": [
+        "Ignore reagraph headless font fetch noise [skip ci]"
+      ]
     },
-    "commitCount": 1
+    "commitCount": 2
   },
   "history": [
+    {
+      "version": "2.26.8",
+      "releasedAt": "2026-07-16",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Secure administrator invitations"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Ignore reagraph headless font fetch noise [skip ci]"
+        ]
+      },
+      "commitCount": 2
+    },
     {
       "version": "2.26.7",
       "releasedAt": "2026-07-03",
@@ -496,24 +516,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.18.0",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add organization invite acceptance routes"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-03T16:53:48.453Z",
+  "generatedAt": "2026-07-16T18:37:58.739Z",
   "source": "conventional-commits"
 }
