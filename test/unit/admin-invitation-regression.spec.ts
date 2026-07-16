@@ -36,6 +36,8 @@ describe('Administrateurs — invitation et définition du mot de passe', () => 
     expect(resetSource).toContain('emailSent: false');
     expect(adminUiSource).toContain('/invitation`');
     expect(adminUiSource).toContain('response.data.invitationSent');
+    expect(adminUiSource).not.toContain('Un email de réinitialisation sera envoyé automatiquement.');
+    expect(adminUiSource).toContain('Une invitation sera envoyée si le service email est configuré.');
   });
 
   it('publie les deux pages publiques nécessaires au parcours', () => {

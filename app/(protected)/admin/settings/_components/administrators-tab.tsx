@@ -437,7 +437,7 @@ export function AdministratorsTab() {
           <DialogHeader>
             <DialogTitle>Ajouter un administrateur</DialogTitle>
             <DialogDescription>
-              Un email de réinitialisation sera envoyé automatiquement.
+              Le compte sera créé sans mot de passe. Une invitation sera envoyée si le service email est configuré.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
