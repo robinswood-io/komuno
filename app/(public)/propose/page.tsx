@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, CheckCircle2, GraduationCap, Lightbulb } from 'lucide-react';
@@ -61,6 +61,7 @@ function formatDate(value: string) {
 export default function ProposePage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [isHydrated, setIsHydrated] = useState(false);
   const [mode, setMode] = useState<'idea' | 'training'>('idea');
   const [ideaForm, setIdeaForm] = useState<IdeaFormData>({
     title: '',
@@ -82,6 +83,10 @@ export default function ProposePage() {
     consentAccepted: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   const trainingsQuery = useQuery({
     queryKey: queryKeys.trainings.public(),
@@ -198,10 +203,22 @@ export default function ProposePage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 rounded-lg bg-muted p-1 text-sm">
-                <button className={`rounded-md px-3 py-2 ${mode === 'idea' ? 'bg-background shadow-sm' : ''}`} onClick={() => { setMode('idea'); setErrors({}); }}>
+                <button
+                  type="button"
+                  aria-pressed={mode === 'idea'}
+                  disabled={!isHydrated}
+                  className={`rounded-md px-3 py-2 disabled:cursor-wait disabled:opacity-60 ${mode === 'idea' ? 'bg-background shadow-sm' : ''}`}
+                  onClick={() => { setMode('idea'); setErrors({}); }}
+                >
                   Idée
                 </button>
-                <button className={`rounded-md px-3 py-2 ${mode === 'training' ? 'bg-background shadow-sm' : ''}`} onClick={() => { setMode('training'); setErrors({}); }}>
+                <button
+                  type="button"
+                  aria-pressed={mode === 'training'}
+                  disabled={!isHydrated}
+                  className={`rounded-md px-3 py-2 disabled:cursor-wait disabled:opacity-60 ${mode === 'training' ? 'bg-background shadow-sm' : ''}`}
+                  onClick={() => { setMode('training'); setErrors({}); }}
+                >
                   Formation
                 </button>
               </div>

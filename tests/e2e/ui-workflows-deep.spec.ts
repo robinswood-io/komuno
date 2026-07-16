@@ -159,9 +159,15 @@ test.describe('Deep UI workflows — demo/smoke', () => {
     await collectPageIssues(page, '/propose interactions', async () => {
       await page.goto('/propose', { waitUntil: 'domcontentloaded' });
       await expect(page.getByText('Proposer / Participer')).toBeVisible();
-      await page.getByRole('button', { name: /formation/i }).click();
+      const trainingTab = page.getByRole('button', { name: /formation/i });
+      await expect(trainingTab).toBeEnabled();
+      await trainingTab.click();
+      await expect(trainingTab).toHaveAttribute('aria-pressed', 'true');
       await expect(page.getByRole('button', { name: /manifester mon intérêt/i })).toBeVisible();
-      await page.getByRole('button', { name: /idée/i }).click();
+
+      const ideaTab = page.getByRole('button', { name: /idée/i });
+      await ideaTab.click();
+      await expect(ideaTab).toHaveAttribute('aria-pressed', 'true');
       await expect(page.getByText('Titre de l’idée *')).toBeVisible();
     });
   });
