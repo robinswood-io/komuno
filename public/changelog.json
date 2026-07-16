@@ -1,13 +1,13 @@
 {
   "latest": {
-    "version": "2.26.9",
+    "version": "2.26.10",
     "releasedAt": "2026-07-16",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Clarify invitation email availability"
+        "Prevent pre-hydration tab clicks"
       ],
       "ameliorations": [],
       "securite": [],
@@ -16,6 +16,22 @@
     "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.26.10",
+      "releasedAt": "2026-07-16",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Prevent pre-hydration tab clicks"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.26.9",
       "releasedAt": "2026-07-16",
@@ -498,24 +514,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.19.0",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add Stripe connector"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-16T19:09:37.226Z",
+  "generatedAt": "2026-07-16T19:36:19.035Z",
   "source": "conventional-commits"
 }
