@@ -1,23 +1,37 @@
 {
   "latest": {
-    "version": "2.26.8",
+    "version": "2.26.9",
     "releasedAt": "2026-07-16",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Secure administrator invitations"
+        "Clarify invitation email availability"
       ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": [
-        "Ignore reagraph headless font fetch noise [skip ci]"
-      ]
+      "maintenance": []
     },
-    "commitCount": 2
+    "commitCount": 1
   },
   "history": [
+    {
+      "version": "2.26.9",
+      "releasedAt": "2026-07-16",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Clarify invitation email availability"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": []
+      },
+      "commitCount": 1
+    },
     {
       "version": "2.26.8",
       "releasedAt": "2026-07-16",
@@ -500,24 +514,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.18.1",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 correction(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [],
-        "corrections": [
-          "Use configured Traefik network"
-        ],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-16T18:37:58.739Z",
+  "generatedAt": "2026-07-16T19:09:37.226Z",
   "source": "conventional-commits"
 }

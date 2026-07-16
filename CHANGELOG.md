@@ -4,6 +4,16 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.26.9] - 2026-07-16
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Clarify invitation email availability
+
 ## [2.26.8] - 2026-07-16
 
 ### En bref
