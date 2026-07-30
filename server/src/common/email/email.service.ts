@@ -57,7 +57,7 @@ export class EmailService {
         secure: this.config.get<string>('SMTP_SECURE') === 'true',
         auth: {
           user: this.config.get<string>('SMTP_USER'),
-          pass: this.config.get<string>('SMTP_PASS'),
+          pass: this.config.get<string>('SMTP_PASS') || this.config.get<string>('SMTP_PASSWORD'),
         },
         disableFileAccess: true,
         disableUrlAccess: true,
