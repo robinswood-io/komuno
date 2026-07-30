@@ -1,4 +1,5 @@
-import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
+import { notFound, redirect } from 'next/navigation';
 import { Pool } from 'pg';
 
 export const runtime = 'nodejs';
@@ -33,19 +34,104 @@ function getPool() {
   return pool;
 }
 
+export function parseTenantRedirects(raw = process.env.KOMUNO_TENANT_REDIRECTS || ''): Record<string, string> {
+  if (!raw.trim()) return {};
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return raw
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .reduce<Record<string, string>>((acc, entry) => {
+        const [slug, ...urlParts] = entry.split('=');
+        const url = urlParts.join('=').trim();
+        const normalizedSlug = normalizeSlug(slug);
+        if (normalizedSlug && isSafeTenantRedirectUrl(url)) acc[normalizedSlug] = url;
+        return acc;
+      }, {});
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+
+  return Object.entries(parsed as Record<string, unknown>).reduce<Record<string, string>>((acc, [slug, value]) => {
+    const normalizedSlug = normalizeSlug(slug);
+    if (normalizedSlug && typeof value === 'string' && isSafeTenantRedirectUrl(value)) {
+      acc[normalizedSlug] = value;
+    }
+    return acc;
+  }, {});
+}
+
+export function normalizeSlug(slug: string | undefined | null): string | null {
+  if (!slug) return null;
+  const normalized = slug.trim().toLowerCase();
+  if (!/^[a-z0-9-]{2,80}$/.test(normalized)) return null;
+  return normalized;
+}
+
+export function isSafeTenantRedirectUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function resolveDedicatedTenantRedirect(slug: string, redirects = parseTenantRedirects()): string | null {
+  const normalizedSlug = normalizeSlug(slug);
+  return normalizedSlug ? redirects[normalizedSlug] || null : null;
+}
+
 async function loadOrganization(slug: string): Promise<Organization | null> {
+  const normalizedSlug = normalizeSlug(slug);
+  if (!normalizedSlug) return null;
+
   const result = await getPool().query<Organization>(
     `SELECT id, slug, name, type, domain, instance_url, is_active, created_at
      FROM organizations
      WHERE slug = $1 AND is_active = true
      LIMIT 1`,
-    [slug],
+    [normalizedSlug],
   );
   return result.rows[0] || null;
 }
 
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const redirectUrl = resolveDedicatedTenantRedirect(slug);
+  if (redirectUrl) {
+    return {
+      title: 'Redirection espace Komuno',
+      description: 'Cet espace Komuno dispose d’une instance dédiée.',
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const organization = await loadOrganization(slug).catch(() => null);
+  if (organization) {
+    return {
+      title: `${organization.name} — Komuno`,
+      description: `Espace Komuno de ${organization.name}.`,
+      robots: { index: false, follow: false },
+    };
+  }
+
+  return {
+    title: 'Organisation introuvable — Komuno',
+    description: 'Aucun espace Komuno actif ne correspond à cette adresse.',
+    robots: { index: false, follow: false },
+  };
+}
+
 export default async function OrganizationTenantPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  const redirectUrl = resolveDedicatedTenantRedirect(slug);
+  if (redirectUrl) redirect(redirectUrl);
+
   const organization = await loadOrganization(slug).catch((error) => {
     console.error('[Komuno] tenant organization lookup failed', {
       slug,

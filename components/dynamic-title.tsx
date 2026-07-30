@@ -11,6 +11,10 @@ export function DynamicTitle() {
   const { branding, isLoading } = useBranding();
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/o/')) {
+      return;
+    }
+
     if (!isLoading && typeof document !== 'undefined' && branding?.app?.name) {
       document.title = branding.app.name;
     }
