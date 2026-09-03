@@ -1,21 +1,41 @@
 {
   "latest": {
-    "version": "2.26.10",
-    "releasedAt": "2026-07-16",
+    "version": "2.26.11",
+    "releasedAt": "2026-09-03",
     "summary": "Cette version apporte 1 correction(s).",
     "sections": {
       "majeurs": [],
       "nouveautes": [],
       "corrections": [
-        "Prevent pre-hydration tab clicks"
+        "Remove Amiens defaults"
       ],
       "ameliorations": [],
       "securite": [],
-      "maintenance": []
+      "maintenance": [
+        "Use exact proposal tab locators [skip ci]"
+      ]
     },
-    "commitCount": 1
+    "commitCount": 2
   },
   "history": [
+    {
+      "version": "2.26.11",
+      "releasedAt": "2026-09-03",
+      "summary": "Cette version apporte 1 correction(s).",
+      "sections": {
+        "majeurs": [],
+        "nouveautes": [],
+        "corrections": [
+          "Remove Amiens defaults"
+        ],
+        "ameliorations": [],
+        "securite": [],
+        "maintenance": [
+          "Use exact proposal tab locators [skip ci]"
+        ]
+      },
+      "commitCount": 2
+    },
     {
       "version": "2.26.10",
       "releasedAt": "2026-07-16",
@@ -498,24 +518,8 @@
         "maintenance": []
       },
       "commitCount": 1
-    },
-    {
-      "version": "2.20.0",
-      "releasedAt": "2026-06-30",
-      "summary": "Cette version apporte 1 nouveaute(s).",
-      "sections": {
-        "majeurs": [],
-        "nouveautes": [
-          "Add outbound webhooks"
-        ],
-        "corrections": [],
-        "ameliorations": [],
-        "securite": [],
-        "maintenance": []
-      },
-      "commitCount": 1
     }
   ],
-  "generatedAt": "2026-07-16T19:36:19.035Z",
+  "generatedAt": "2026-09-03T10:18:50.155Z",
   "source": "conventional-commits"
 }

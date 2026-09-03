@@ -4,6 +4,20 @@ Tous les changements notables de ce projet sont documentes dans ce fichier.
 
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/) et [Semantic Versioning](https://semver.org/lang/fr/).
 
+## [2.26.11] - 2026-09-03
+
+### En bref
+
+- Cette version apporte 1 correction(s).
+
+### Corrections
+
+- Remove Amiens defaults
+
+### Maintenance
+
+- Use exact proposal tab locators [skip ci]
+
 ## [2.26.10] - 2026-07-16
 
 ### En bref
