@@ -658,7 +658,7 @@ export class AdminService {
                 `**Demandé par:** ${result.data.requestedByName} (${result.data.requestedBy})`,
                 ``,
                 `---`,
-                `*Issue mise à jour automatiquement depuis l'interface d'administration CJD Amiens*`
+                `*Issue mise à jour automatiquement depuis l'interface d'administration*`
               ].join('\n')
               : undefined,
             labels,

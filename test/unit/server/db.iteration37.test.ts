@@ -223,7 +223,7 @@ describe('server/db.js iteration37 remaining branch-oriented runtime paths', () 
     expect(pool?.options).toMatchObject({
       min: 5,
       max: 20,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
     });
   });
 

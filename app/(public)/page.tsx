@@ -50,7 +50,7 @@ export default function HomePage() {
             <div className="mt-8 sm:mt-12 border-t-4 border-primary pt-8">
               <div className="text-center mb-6">
                 <h2 className="text-2xl sm:text-3xl font-bold text-primary">📅 Événements à venir</h2>
-                <p className="text-gray-600 mt-2">Inscrivez-vous aux prochains événements {branding?.app?.shortName || 'CJD Amiens'}</p>
+                <p className="text-gray-600 mt-2">Inscrivez-vous aux prochains événements {branding?.app?.shortName || ''}</p>
               </div>
               <EventsSection />
             </div>
@@ -65,7 +65,7 @@ export default function HomePage() {
                   <span className="text-white font-bold text-sm sm:text-base">CJD</span>
                 </div>
                 <div>
-                  <p className="font-medium text-sm sm:text-base">{branding?.organization?.fullName || "Centre des Jeunes Dirigeants d'Amiens"}</p>
+                  <p className="font-medium text-sm sm:text-base">{branding?.organization?.fullName || ""}</p>
                   <p className="text-xs sm:text-sm text-gray-400">© 2025 - Tous droits réservés</p>
                 </div>
               </div>

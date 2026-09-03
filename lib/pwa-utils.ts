@@ -71,7 +71,7 @@ export const PWAUtils = {
   // Précharger des ressources critiques
   async preloadCriticalResources(urls: string[]): Promise<void> {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      const cache = await caches.open('cjd-amiens-v1.0.0');
+      const cache = await caches.open('komuno-v1.0.0');
       
       const preloadPromises = urls.map(async (url) => {
         try {
@@ -160,7 +160,7 @@ export const PWAUtils = {
         registration.showNotification(title, {
           icon: '/icon-192.svg',
           badge: '/icon-192.svg',
-          tag: 'cjd-amiens-notification',
+          tag: 'komuno-notification',
           ...options
         });
       });

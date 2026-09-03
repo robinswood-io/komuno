@@ -32,7 +32,7 @@ export default registerAs('database', () => {
     validationInterval: 30000, // 30 secondes entre validations
 
     // Application metadata
-    application_name: 'cjd-amiens-app',
+    application_name: 'komuno-app',
   };
 
   // Configuration du pool (min/max connexions)

@@ -120,7 +120,7 @@ export default function AdminHeader() {
             <Shield className="w-8 h-8 text-primary" data-testid="icon-admin-shield" />
             <div>
               <h1 className="text-xl sm:text-2xl font-bold" data-testid="text-admin-title">
-                {branding?.app?.shortName || 'CJD Amiens'} - Administration
+                {branding?.app?.shortName || ''} - Administration
               </h1>
               <p className="text-gray-300 text-sm" data-testid="text-admin-subtitle">Espace de gestion</p>
             </div>

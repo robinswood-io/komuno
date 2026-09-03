@@ -312,7 +312,7 @@ describe('server/email-service.js', () => {
     });
 
     expect(sendMailMock).toHaveBeenCalledWith({
-      from: '"DB Sender" <noreply@cjd-amiens.fr>',
+      from: '"DB Sender" <db-user>',
       to: 'first@example.com, second@example.com',
       subject: 'Sujet',
       html: '<p>Hello&nbsp;<strong>World</strong> &amp; team</p>',

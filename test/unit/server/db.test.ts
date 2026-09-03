@@ -203,7 +203,7 @@ describe('server/db.ts', () => {
     expect(poolOptions).toMatchObject({
       max: 2,
       min: 1,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
       connectionString: 'postgresql://user:pass@localhost:5432/appdb',
     });
   });

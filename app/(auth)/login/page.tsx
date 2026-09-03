@@ -63,7 +63,7 @@ export default function LoginPage() {
             <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-white font-bold text-xl">CJD</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Administration {branding?.app?.shortName || 'CJD Amiens'}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Administration {branding?.app?.shortName || ''}</h1>
             <p className="text-gray-600">Connectez-vous pour accéder au back-office</p>
           </div>
 
@@ -176,7 +176,7 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col justify-center items-center h-full text-white p-12">
           <h2 className="text-4xl font-bold mb-6">{branding?.app?.ideaBoxName || 'Boîte à Kiffs'}</h2>
           <p className="text-xl mb-8 text-center max-w-md">
-            La plateforme collaborative du {branding?.organization?.fullName || "Centre des Jeunes Dirigeants d'Amiens"}
+            La plateforme collaborative du {branding?.organization?.fullName || ""}
           </p>
 
           <div className="space-y-6 max-w-sm">

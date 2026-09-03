@@ -1,4 +1,4 @@
-# Système de Thème Unifié - CJD Amiens
+# Système de thème unifié
 
 Ce dossier contient le système de thème centralisé de l'application, permettant une gestion cohérente des couleurs, typographies et styles à travers l'ensemble du projet.
 

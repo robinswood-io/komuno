@@ -238,7 +238,7 @@ describe('server/db.js iteration31 additional realistic runtime branches', () =>
       max: 5,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 60000,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
     });
 
     pool?.emit('connect');

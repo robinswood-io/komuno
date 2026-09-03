@@ -1264,7 +1264,7 @@ export default function SettingsPage() {
                   <Label htmlFor="from-name">Nom d'affichage</Label>
                   <Input
                     id="from-name"
-                    placeholder="CJD Amiens"
+                    placeholder=""
                     value={emailConfig.fromName}
                     onChange={e => setEmailConfig({ ...emailConfig, fromName: e.target.value })}
                   />

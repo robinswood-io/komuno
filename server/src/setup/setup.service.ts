@@ -33,7 +33,7 @@ export class SetupService {
     let hasEmailConfig = false;
     if (emailResult.success && emailResult.data) {
       const defaultHost = process.env.SMTP_HOST || 'ssl0.ovh.net';
-      const defaultFromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@cjd-amiens.fr';
+      const defaultFromEmail = process.env.SMTP_FROM_EMAIL || '';
       hasEmailConfig = emailResult.data.host !== defaultHost ||
                       emailResult.data.fromEmail !== defaultFromEmail;
     }

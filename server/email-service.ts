@@ -84,7 +84,7 @@ class EmailService {
           pass: dbConfig?.password || process.env.SMTP_PASSWORD || ''
         },
         fromName: dbConfig?.fromName || process.env.SMTP_FROM_NAME || getShortAppName(),
-        fromEmail: dbConfig?.fromEmail || process.env.SMTP_FROM_EMAIL || 'noreply@cjd-amiens.fr'
+        fromEmail: dbConfig?.fromEmail || process.env.SMTP_FROM_EMAIL || ''
       };
 
       if (!this.config.auth.user || !this.config.auth.pass) {

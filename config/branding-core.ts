@@ -5,18 +5,18 @@
 export const brandingCore = {
   // Informations de base
   organization: {
-    name: "CJD Amiens",
-    fullName: "Centre des Jeunes Dirigeants d'Amiens",
+    name: "",
+    fullName: "",
     tagline: "Application collaborative pour le partage d'idées et la gestion d'événements",
     url: "https://votre-domaine.com",
-    email: "contact@cjd-amiens.fr",
+    email: "",
   },
 
   // Application
   app: {
-    name: "CJD Amiens - Boîte à Kiffs",
-    shortName: "CJD Amiens",
-    description: "Application interne du Centre des Jeunes Dirigeants d'Amiens pour la gestion collaborative d'idées et d'événements",
+    name: "",
+    shortName: "",
+    description: "",
     ideaBoxName: "Boîte à Kiffs", // Nom de la fonctionnalité de partage d'idées
     showLogo: true, // Afficher ou masquer le logo dans le header
   },
@@ -86,8 +86,8 @@ export const brandingCore = {
 
   // Liens externes
   links: {
-    website: "https://cjd-amiens.fr",
-    support: "mailto:support@cjd-amiens.fr",
+    website: "",
+    support: "",
   },
 } as const;
 

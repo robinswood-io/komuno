@@ -234,7 +234,7 @@ export default function EventsSection() {
           <h2 className="text-2xl sm:text-3xl font-bold">Événements à venir</h2>
         </div>
         <p className="text-white text-base sm:text-lg opacity-90">
-          Découvrez les prochains événements de la section {branding?.app?.shortName || 'CJD Amiens'} et inscrivez-vous facilement
+          Découvrez les prochains événements de la section {branding?.app?.shortName || ''} et inscrivez-vous facilement
         </p>
       </div>
 

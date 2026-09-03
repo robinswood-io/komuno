@@ -19,7 +19,7 @@ describe('server/db.js wave26 zeno branch coverage', () => {
     expect(options.max).toBe(20);
     expect(options.connectionTimeoutMillis).toBe(30000);
     expect(options.idleTimeoutMillis).toBe(600000);
-    expect(options.application_name).toBe('cjd-amiens-app');
+    expect(options.application_name).toBe('komuno-app');
   });
 });
 

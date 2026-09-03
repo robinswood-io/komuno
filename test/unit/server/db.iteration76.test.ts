@@ -18,7 +18,7 @@ describe('server/db.js iteration76 standard pool wiring', () => {
       min: 1,
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
     });
   });
 });

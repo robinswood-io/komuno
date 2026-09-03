@@ -54,7 +54,7 @@ function buildIssueBody(request: {
     `**Demandé par:** ${request.requestedByName} (${request.requestedBy})`,
     ``,
     `---`,
-    `*Issue créée automatiquement depuis l'interface d'administration CJD Amiens*`
+    `*Issue créée automatiquement depuis l'interface d'administration*`
   ].join('\n');
 }
 
@@ -115,7 +115,7 @@ export async function createGitHubIssue(request: InsertDevelopmentRequest): Prom
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/vnd.github.v3+json',
         'Content-Type': 'application/json',
-        'User-Agent': 'CJD-Amiens-Bot/1.0'
+        'User-Agent': 'Komuno-Bot/1.0'
       },
       body: JSON.stringify(issuePayload)
     });
@@ -129,7 +129,7 @@ export async function createGitHubIssue(request: InsertDevelopmentRequest): Prom
         'Authorization': `Bearer ${token.substring(0, 10)}...`,
         'Accept': 'application/vnd.github.v3+json',
         'Content-Type': 'application/json',
-        'User-Agent': 'CJD-Amiens-Bot/1.0'
+        'User-Agent': 'Komuno-Bot/1.0'
       });
       
       return null;

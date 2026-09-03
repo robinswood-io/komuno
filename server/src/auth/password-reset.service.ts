@@ -222,12 +222,10 @@ export class PasswordResetService {
   }
 
   private fallbackBrandingIdentity(): BrandingIdentity {
-    const configuredName = process.env.APP_DISPLAY_NAME || process.env.APP_NAME || 'Komuno';
+    const configuredName = process.env.APP_DISPLAY_NAME || process.env.APP_NAME || '';
     const normalizedName = configuredName.trim().toLowerCase();
     const knownNames: Record<string, BrandingIdentity> = {
       'cjd-hdf': { shortName: 'CJD HDF', organizationName: 'CJD Hauts de France' },
-      cjd80: { shortName: 'CJD80', organizationName: 'CJD Amiens' },
-      'cjd-amiens': { shortName: 'CJD Amiens', organizationName: 'CJD Amiens' },
       repicardie: { shortName: 'REP Picardie', organizationName: 'Réseau Entreprendre Picardie' },
       'rep-picardie': { shortName: 'REP Picardie', organizationName: 'Réseau Entreprendre Picardie' },
       'komuno-demo': { shortName: 'Komuno Démo', organizationName: 'Komuno Démo' },
@@ -235,8 +233,8 @@ export class PasswordResetService {
     };
 
     return knownNames[normalizedName] ?? {
-      shortName: configuredName.trim() || 'Komuno',
-      organizationName: configuredName.trim() || 'Komuno',
+      shortName: configuredName.trim(),
+      organizationName: configuredName.trim(),
     };
   }
 

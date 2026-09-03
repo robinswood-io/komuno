@@ -567,7 +567,7 @@ describe('server/email-service.js (iteration 59)', () => {
 
     expect(sendMailMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: '"DB Name" <noreply@cjd-amiens.fr>',
+        from: '"DB Name" <db-user@example.com>',
       }),
     );
   });

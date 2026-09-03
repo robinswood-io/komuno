@@ -231,7 +231,7 @@ describe('server/db.js iteration9', () => {
       min: 2,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 60000,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
       connectionString: 'postgresql://user:pass@localhost:5432/appdb',
     });
   });

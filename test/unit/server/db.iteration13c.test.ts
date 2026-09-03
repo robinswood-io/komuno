@@ -233,7 +233,7 @@ describe('server/db.js iteration13c', () => {
       min: 5,
       connectionTimeoutMillis: 30000,
       idleTimeoutMillis: 600000,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
     });
   });
 

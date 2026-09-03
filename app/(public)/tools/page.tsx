@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { ToolCategory, ToolWithCategory } from '@/shared/schema';
 import { useModuleGuard } from '@/hooks/use-module-guard';
+import { useBranding } from '@/contexts/BrandingContext';
 
 export default function ToolsPage() {
   const { isEnabled, isLoading: moduleLoading } = useModuleGuard('tools');
+  const { branding } = useBranding();
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<ToolCategory[]>({
     queryKey: ['/api/tools/categories'],
   });
@@ -171,8 +173,13 @@ export default function ToolsPage() {
             Nous aimerions connaître vos besoins pour enrichir cette liste d'outils.
           </p>
           <button
-            onClick={() => window.location.href = 'mailto:contact@cjd-amiens.fr?subject=Suggestions pour les outils du dirigeant'}
-            className="bg-primary hover:bg-primary/90 text-white font-medium px-6 py-3 rounded-lg transition-colors duration-200"
+            onClick={() => {
+              if (branding?.organization?.email) {
+                window.location.href = `mailto:${branding.organization.email}?subject=Suggestions pour les outils du dirigeant`;
+              }
+            }}
+            disabled={!branding?.organization?.email}
+            className="bg-primary hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 text-white font-medium px-6 py-3 rounded-lg transition-colors duration-200"
           >
             Nous faire part de vos idées
           </button>

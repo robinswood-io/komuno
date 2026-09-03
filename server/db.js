@@ -132,7 +132,7 @@ else {
         min: poolConfig.min,
         idleTimeoutMillis: poolConfig.idleTimeoutMillis,
         connectionTimeoutMillis: poolConfig.connectionTimeoutMillis,
-        application_name: 'cjd-amiens-app',
+        application_name: 'komuno-app',
     });
     exports.pool = pool = pgPool;
     exports.dbResilience = dbResilience = new db_resilience_1.DatabaseResilience(pgPool, 'postgresql-database');

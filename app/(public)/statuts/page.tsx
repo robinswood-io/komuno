@@ -99,7 +99,7 @@ export default function StatusPage() {
                 État du Système
               </h1>
               <p className="text-gray-600 dark:text-gray-300">
-                Surveillance en temps réel des services CJD Amiens
+                Surveillance en temps réel des services
               </p>
             </div>
             <Button

@@ -236,7 +236,7 @@ describe('server/db.js - iteration34 uncovered global branches', () => {
       max: 2,
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
     });
   });
 
@@ -254,7 +254,7 @@ describe('server/db.js - iteration34 uncovered global branches', () => {
       max: 5,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 60000,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
     });
   });
 });

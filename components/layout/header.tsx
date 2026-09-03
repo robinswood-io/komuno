@@ -50,7 +50,7 @@ export default function Header() {
               {(branding?.app?.showLogo ?? true) && (
                 <img
                   src={branding.assets?.logo || '/logo-cjd.png'}
-                  alt="Logo CJD Amiens"
+                  alt={branding?.app?.shortName ? `Logo ${branding.app.shortName}` : ""}
                   className="h-8 sm:h-10 lg:h-12 w-auto rounded-[60px]"
                 />
               )}

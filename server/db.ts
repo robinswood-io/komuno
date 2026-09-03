@@ -118,7 +118,7 @@ if (dbProvider === 'neon') {
     min: poolConfig.min,
     idleTimeoutMillis: poolConfig.idleTimeoutMillis,
     connectionTimeoutMillis: poolConfig.connectionTimeoutMillis,
-    application_name: 'cjd-amiens-app',
+    application_name: 'komuno-app',
   });
   pool = pgPool;
   dbResilience = new DatabaseResilience(pgPool, 'postgresql-database');

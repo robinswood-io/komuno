@@ -238,7 +238,7 @@ describe('server/db.js iteration 8', () => {
       max: 5,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 60000,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
     });
     expect(setup.drizzlePgMock).toHaveBeenCalledWith(
       expect.objectContaining({

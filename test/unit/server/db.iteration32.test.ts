@@ -239,7 +239,7 @@ describe('server/db.js iteration32 targeted provider/runtime coverage', () => {
       max: 20,
       connectionTimeoutMillis: 30000,
       idleTimeoutMillis: 600000,
-      application_name: 'cjd-amiens-app',
+      application_name: 'komuno-app',
     });
   });
 

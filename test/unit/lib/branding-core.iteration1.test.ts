@@ -111,7 +111,7 @@ describe('lib/config/branding-core.js - iteration1', () => {
     expect(branding.brandingCore.fonts.weights.length).toBeGreaterThan(0);
     expect(branding.brandingCore.pwa.categories.length).toBeGreaterThan(0);
     expect(branding.brandingCore.social.ogType).toBe('website');
-    expect(branding.brandingCore.links.website.startsWith('https://')).toBe(true);
+    expect(branding.brandingCore.links.website).toBe('');
   });
 
   it('allows retrieving dynamically injected color tokens via generic helper', () => {

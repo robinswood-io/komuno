@@ -23,7 +23,7 @@ describe('server/db.js wave15 zeno branch coverage', () => {
     expect(setup.neonPools).toHaveLength(0);
 
     const options = setup.pgPools[0].options;
-    expect(options.application_name).toBe('cjd-amiens-app');
+    expect(options.application_name).toBe('komuno-app');
     expect(options.min).toBe(1);
     expect(options.max).toBe(2);
     expect(options.connectionTimeoutMillis).toBe(5000);

@@ -42,8 +42,8 @@ export default registerAs('app', () => ({
   smtpSecure: process.env.SMTP_SECURE !== 'false',
   smtpUser: process.env.SMTP_USER || '',
   smtpPassword: process.env.SMTP_PASSWORD || '',
-  smtpFromEmail: process.env.SMTP_FROM_EMAIL || 'noreply@cjd-amiens.fr',
-  smtpFromName: process.env.SMTP_FROM_NAME || 'CJD Amiens',
+  smtpFromEmail: process.env.SMTP_FROM_EMAIL || '',
+  smtpFromName: process.env.SMTP_FROM_NAME || '',
 
   // VAPID (Web Push)
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',

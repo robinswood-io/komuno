@@ -925,8 +925,8 @@ export class AdminController {
         smtpPort: { type: 'number', example: 587 },
         smtpUser: { type: 'string', example: 'user@example.com' },
         smtpPassword: { type: 'string', example: 'password' },
-        fromEmail: { type: 'string', example: 'noreply@cjd-amiens.fr' },
-        fromName: { type: 'string', example: 'CJD Amiens' }
+        fromEmail: { type: 'string', example: '' },
+        fromName: { type: 'string', example: '' }
       }
     }
   })
