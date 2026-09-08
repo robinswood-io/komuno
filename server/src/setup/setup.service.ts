@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { StorageService } from '../common/storage/storage.service';
 import { emailService } from '../../email-service';
 import { logger } from '../../lib/logger';
@@ -11,6 +11,18 @@ const execAsync = promisify(exec);
 @Injectable()
 export class SetupService {
   constructor(private readonly storageService: StorageService) {}
+
+  verifySetupToken(providedToken?: string) {
+    const configuredToken = process.env.SETUP_TOKEN || '';
+    const requiresToken = process.env.NODE_ENV === 'production' || Boolean(configuredToken);
+    if (!requiresToken) return;
+    if (!configuredToken) {
+      throw new InternalServerErrorException('SETUP_TOKEN doit être configuré avant le setup public en production');
+    }
+    if (!providedToken || providedToken !== configuredToken) {
+      throw new UnauthorizedException('Jeton de setup invalide');
+    }
+  }
 
   async getSetupStatus() {
     // Vérifier si le branding est configuré

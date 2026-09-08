@@ -6,6 +6,7 @@ import { db } from '../../db';
 import { AuditService } from '../audit/audit.service';
 import { AutomationsService } from '../automations/automations.service';
 import { FederationService } from '../federation/federation.service';
+import { requestFederationTarget, validateFederationTargetConnectionUrl } from '../federation/federation.utils';
 import {
   FEDERATION_STATUS,
   FEDERATION_VISIBILITY,
@@ -564,7 +565,11 @@ export class TrainingsService {
       },
     };
 
-    const endpoint = `${transport.targetInstanceUrl.replace(/\/$/, '')}/api/federation/trainings/catalog/ingest`;
+    const targetInstanceUrl = await validateFederationTargetConnectionUrl(transport.targetInstanceUrl);
+    if (!targetInstanceUrl) {
+      throw new BadRequestException('URL d’instance cible invalide');
+    }
+    const endpoint = `${targetInstanceUrl}/api/federation/trainings/catalog/ingest`;
     const runValues = {
       direction: TRAINING_SYNC_DIRECTION.DOWNSTREAM_CATALOG,
       status: TRAINING_SYNC_STATUS.RUNNING,
@@ -577,7 +582,7 @@ export class TrainingsService {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch(endpoint, {
+      const response = await requestFederationTarget(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Komuno-Federation-Token': transport.token },
         body: JSON.stringify(payload),
@@ -737,7 +742,11 @@ export class TrainingsService {
         createdAt: (row.interest.createdAt instanceof Date ? row.interest.createdAt : new Date(row.interest.createdAt)).toISOString(),
       },
     };
-    const endpoint = `${transport.targetInstanceUrl.replace(/\/$/, '')}/api/federation/trainings/interests/ingest`;
+    const targetInstanceUrl = await validateFederationTargetConnectionUrl(transport.targetInstanceUrl);
+    if (!targetInstanceUrl) {
+      throw new BadRequestException('URL d’instance cible invalide');
+    }
+    const endpoint = `${targetInstanceUrl}/api/federation/trainings/interests/ingest`;
     const [run] = await db.insert(trainingSyncRuns).values({
       direction: TRAINING_SYNC_DIRECTION.UPSTREAM_INTERESTS,
       status: TRAINING_SYNC_STATUS.RUNNING,
@@ -749,7 +758,7 @@ export class TrainingsService {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch(endpoint, {
+      const response = await requestFederationTarget(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Komuno-Federation-Token': transport.token },
         body: JSON.stringify(payload),

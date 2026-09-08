@@ -718,7 +718,7 @@ describe('MembersService', () => {
 
       await service.updateMember(email, updateData, 'admin@example.com');
 
-      expect(mockStorageService.instance.updateMember).toHaveBeenCalledWith(email, {});
+      expect(mockStorageService.instance.updateMember).toHaveBeenCalledWith(email, updateData);
     });
 
     it('should handle status change from active to inactive', async () => {
@@ -745,7 +745,7 @@ describe('MembersService', () => {
       await service.updateMember(email, updateData, 'admin@example.com');
 
       // Verify update was called with the email parameter
-      expect(mockStorageService.instance.updateMember).toHaveBeenCalledWith(email, {});
+      expect(mockStorageService.instance.updateMember).toHaveBeenCalledWith(email, updateData);
     });
 
   });
@@ -811,6 +811,7 @@ describe('MembersService', () => {
       const email = 'user@example.com';
       const subscriptionData = {
         amountInCents: 50000,
+        subscriptionType: 'yearly',
         startDate: '2026-01-01',
         endDate: '2026-12-31',
       };
@@ -844,6 +845,7 @@ describe('MembersService', () => {
       const email = 'user@example.com';
       const subscriptionData = {
         amountInCents: 50000,
+        subscriptionType: 'yearly',
         startDate: '2026-01-01',
         endDate: '2026-12-31',
       };

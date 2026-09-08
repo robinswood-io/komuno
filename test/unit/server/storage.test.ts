@@ -8,16 +8,14 @@ const mockDb: DbMock = {
   insert: vi.fn(),
 };
 
-vi.mock('../../../server/db', async () => {
-  const real = await vi.importActual<typeof import('../../../server/db')>('../../../server/db');
-  return {
-    ...real,
-    db: {
-      ...real.db,
-      insert: mockDb.insert,
-    },
-  };
-});
+vi.mock('../../../server/db', () => ({
+  db: {
+    insert: mockDb.insert,
+  },
+  pool: {},
+  dbResilience: {},
+  runDbQuery: (queryFn: () => Promise<unknown>) => queryFn(),
+}));
 
 vi.mock('../../../server/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -46,14 +44,14 @@ describe('server/storage.js - focused unit tests', () => {
     vi.resetModules();
     process.env.DATABASE_URL = 'postgresql://user:pwd@project.neon.tech/db';
 
-    await expect(import('../../../server/storage.js')).rejects.toThrow(
+    await expect(import('../../../server/storage.ts')).rejects.toThrow(
       'PostgresSessionStore ne supporte pas Neon',
     );
   });
 
   it('createUser returns DuplicateError and skips insert when user already exists', async () => {
     vi.resetModules();
-    const { DatabaseStorage } = await import('../../../server/storage.js');
+    const { DatabaseStorage } = await import('../../../server/storage.ts');
     const storage = new DatabaseStorage();
 
     vi.spyOn(storage, 'getUser').mockResolvedValue({
@@ -86,7 +84,7 @@ describe('server/storage.js - focused unit tests', () => {
 
   it('getUserByEmail delegates to getUser with same email', async () => {
     vi.resetModules();
-    const { DatabaseStorage } = await import('../../../server/storage.js');
+    const { DatabaseStorage } = await import('../../../server/storage.ts');
     const storage = new DatabaseStorage();
     const getUserSpy = vi.spyOn(storage, 'getUser').mockResolvedValue({
       success: true,
@@ -101,7 +99,7 @@ describe('server/storage.js - focused unit tests', () => {
 
   it('createUser wraps insert exceptions into DatabaseError', async () => {
     vi.resetModules();
-    const { DatabaseStorage } = await import('../../../server/storage.js');
+    const { DatabaseStorage } = await import('../../../server/storage.ts');
     const storage = new DatabaseStorage();
 
     vi.spyOn(storage, 'getUser').mockResolvedValue({

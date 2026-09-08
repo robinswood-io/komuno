@@ -16,7 +16,7 @@
   run: |
     echo "🔐 Authentification du VPS à GHCR..."
     ssh -p ${{ secrets.VPS_PORT }} \
-      -o StrictHostKeyChecking=no \
+      -o StrictHostKeyChecking=accept-new \
       ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
       "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin" || {
         echo "⚠️  Authentification échouée, mais on continue..."

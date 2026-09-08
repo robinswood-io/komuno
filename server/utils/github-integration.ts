@@ -124,14 +124,6 @@ export async function createGitHubIssue(request: InsertDevelopmentRequest): Prom
       const errorData = await response.json() as GitHubErrorResponse;
       console.error("[GitHub] Erreur création issue:", response.status, errorData);
       
-      // Debug supplémentaire
-      console.error("[GitHub] Headers envoyés:", {
-        'Authorization': `Bearer ${token.substring(0, 10)}...`,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json',
-        'User-Agent': 'Komuno-Bot/1.0'
-      });
-      
       return null;
     }
 

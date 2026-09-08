@@ -415,7 +415,7 @@ export class AdminService {
 
       return {
         success: true,
-        data: result.data,
+        data: this.sanitizeAdmin(result.data),
         message: 'Informations mises à jour avec succès',
       };
     } catch (error) {

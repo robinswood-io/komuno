@@ -40,7 +40,7 @@ describe('shared/schema.js iteration 108', () => {
       expect(insertResult.data.benefits).toBe('Logo sur roll-up');
       expect(insertResult.data.logoUrl).toBe('https://cdn.example.com/logo-silver.png');
       expect(insertResult.data.websiteUrl).toBe('https://partner-silver.example.com');
-      expect(insertResult.data.confirmedAt).toBeNull();
+      expect(insertResult.data.confirmedAt).toBeUndefined();
     }
 
     const updateResult = schema.updateEventSponsorshipSchema.safeParse({

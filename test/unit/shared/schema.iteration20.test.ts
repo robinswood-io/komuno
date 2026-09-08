@@ -49,14 +49,14 @@ describe('shared/schema.js iteration 20 - hard-to-hit transform fallback branche
   });
 
   it('executes logoUrl transform false/true ternary branches directly', () => {
-    const logoTransform = extractTransform(schema.insertEventSponsorshipSchema.shape.logoUrl);
+    const logoTransform = extractTransform((schema.insertEventSponsorshipSchema as any).def.in.shape.logoUrl);
 
     expect(logoTransform(undefined)).toBeUndefined();
     expect(logoTransform('https://example.org/logo.png')).toBe('https://example.org/logo.png');
   });
 
   it('executes websiteUrl transform false/true ternary branches directly', () => {
-    const websiteTransform = extractTransform(schema.insertEventSponsorshipSchema.shape.websiteUrl);
+    const websiteTransform = extractTransform((schema.insertEventSponsorshipSchema as any).def.in.shape.websiteUrl);
 
     expect(websiteTransform(undefined)).toBeUndefined();
     expect(websiteTransform('https://example.org')).toBe('https://example.org');

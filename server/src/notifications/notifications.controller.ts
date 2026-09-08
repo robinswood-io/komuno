@@ -15,6 +15,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
+import { AdminGuard } from '../auth/guards/admin.guard';
 import {
   Notification,
   InsertNotification,
@@ -207,6 +208,7 @@ export class NotificationsController {
    * Create a new notification (admin only)
    */
   @Post()
+  @UseGuards(AdminGuard)
   @HttpCode(HttpStatus.CREATED)
   async createNotification(@Body() data: Partial<InsertNotification>) {
     // In production, validate admin role
@@ -226,11 +228,17 @@ export class NotificationsController {
    */
   @Put(':id')
   async updateNotification(
+    @Req() req: AuthRequest,
     @Param('id') id: string,
     @Body() data: UpdateNotification
   ) {
-    const notification = await this.notificationsService.updateNotification(
+    const userId = req.user?.userId;
+    if (!userId) {
+      return { error: 'Unauthorized' };
+    }
+    const notification = await this.notificationsService.updateNotificationForUser(
       id,
+      userId,
       data
     );
     return notification;
@@ -241,8 +249,12 @@ export class NotificationsController {
    * Mark notification as read
    */
   @Put(':id/read')
-  async markAsRead(@Param('id') id: string) {
-    const notification = await this.notificationsService.markAsRead(id);
+  async markAsRead(@Req() req: AuthRequest, @Param('id') id: string) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return { error: 'Unauthorized' };
+    }
+    const notification = await this.notificationsService.markAsReadForUser(id, userId);
     return notification;
   }
 
@@ -266,12 +278,19 @@ export class NotificationsController {
    * Mark multiple notifications as read
    */
   @Post('read-bulk')
-  async markMultipleAsRead(@Body() { ids }: { ids: string[] }) {
+  async markMultipleAsRead(
+    @Req() req: AuthRequest,
+    @Body() { ids }: { ids: string[] }
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return { error: 'Unauthorized' };
+    }
     if (!ids || !Array.isArray(ids)) {
       return { error: 'Invalid IDs' };
     }
 
-    const count = await this.notificationsService.markMultipleAsRead(ids);
+    const count = await this.notificationsService.markMultipleAsReadForUser(userId, ids);
     return { marked: count };
   }
 
@@ -302,8 +321,12 @@ export class NotificationsController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteNotification(@Param('id') id: string) {
-    await this.notificationsService.deleteNotification(id);
+  async deleteNotification(@Req() req: AuthRequest, @Param('id') id: string) {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return { error: 'Unauthorized' };
+    }
+    await this.notificationsService.deleteNotificationForUser(id, userId);
   }
 
   /**
@@ -311,6 +334,7 @@ export class NotificationsController {
    * Delete old notifications (admin only)
    */
   @Post('cleanup')
+  @UseGuards(AdminGuard)
   async cleanupOldNotifications(@Query('days') days: number = 30) {
     const count = await this.notificationsService.deleteOldNotifications(days);
     return { deleted: count };

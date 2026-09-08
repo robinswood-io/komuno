@@ -69,7 +69,7 @@ describe('FeaturesService', () => {
       const result = await service.getAllFeatures();
       const byKey = new Map(result.map((feature) => [feature.featureKey, feature.enabled]));
 
-      expect(result).toHaveLength(8);
+      expect(result).toHaveLength(9);
       expect(byKey.get('ideas')).toBe(true);
       expect(byKey.get('events')).toBe(true);
       expect(byKey.get('loan')).toBe(false);
@@ -112,7 +112,7 @@ describe('FeaturesService', () => {
       expect(result[0].enabled).toBe(true);
     });
 
-    it('should return all 8 default features when database is empty', async () => {
+    it('should return all 9 default features when database is empty', async () => {
       const mockBuilder = {
         from: vi.fn().mockResolvedValue([]),
       };
@@ -120,7 +120,7 @@ describe('FeaturesService', () => {
 
       const result = await service.getAllFeatures();
 
-      expect(result).toHaveLength(8);
+      expect(result).toHaveLength(9);
       expect(result.map(f => f.featureKey)).toEqual([
         'ideas',
         'events',
@@ -128,6 +128,7 @@ describe('FeaturesService', () => {
         'patrons',
         'financial',
         'tracking',
+        'forms',
         'members',
         'crm',
       ]);
@@ -374,7 +375,7 @@ describe('FeaturesService', () => {
       await service.initializeDefaultFeatures();
 
       expect(db.insert).toHaveBeenCalledWith(featureConfig);
-      expect(insertBuilder.values).toHaveBeenCalledTimes(8);
+      expect(insertBuilder.values).toHaveBeenCalledTimes(9);
     });
 
     it('should not initialize when features exist', async () => {
@@ -389,7 +390,7 @@ describe('FeaturesService', () => {
       expect(db.insert).not.toHaveBeenCalled();
     });
 
-    it('should insert all 8 default features', async () => {
+    it('should insert all 9 default features', async () => {
       const selectBuilder = {
         from: vi.fn().mockResolvedValue([]),
       };
@@ -403,7 +404,7 @@ describe('FeaturesService', () => {
 
       await service.initializeDefaultFeatures();
 
-      expect(insertBuilder.values).toHaveBeenCalledTimes(8);
+      expect(insertBuilder.values).toHaveBeenCalledTimes(9);
 
       const calls = insertBuilder.values.mock.calls;
       const insertedFeatures = calls.map(call => call[0].featureKey);
@@ -579,7 +580,7 @@ describe('FeaturesService', () => {
 
       const byKey = new Map(result.map((feature) => [feature.featureKey, feature.enabled]));
 
-      expect(result).toHaveLength(8);
+      expect(result).toHaveLength(9);
       expect(byKey.get('ideas')).toBe(true);
       expect(byKey.get('events')).toBe(false);
       expect(byKey.get('loan')).toBe(true);

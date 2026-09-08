@@ -18,7 +18,7 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET doit faire au moins 32 caractères')
     .refine((val) => {
       if (process.env.NODE_ENV === 'production') {
-        return val !== 'your-secret-key-change-in-production' && val !== 'your-secret-session-key-change-this';
+        return val !== 'development-session-secret-change-me' && !val.toLowerCase().includes('change');
       }
       return true;
     }, 'SESSION_SECRET doit être changé en production'),
@@ -62,6 +62,23 @@ const envSchema = z.object({
   APP_URL: z.string().optional(),
   KOMUNO_DEMO_MODE: z.string().optional(),
 }).superRefine((env, ctx) => {
+  if (env.NODE_ENV === 'production') {
+    if (env.MINIO_ACCESS_KEY === 'minioadmin') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MINIO_ACCESS_KEY'],
+        message: 'MINIO_ACCESS_KEY doit être changé en production',
+      });
+    }
+    if (env.MINIO_SECRET_KEY === 'minioadmin') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['MINIO_SECRET_KEY'],
+        message: 'MINIO_SECRET_KEY doit être changé en production',
+      });
+    }
+  }
+
   if (env.NODE_ENV === 'production' && env.KOMUNO_DEMO_MODE === 'true' && !isProductionDemoStack(env)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

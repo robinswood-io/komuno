@@ -1,6 +1,70 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, type RequestHandler } from 'express';
 import helmet from 'helmet';
+import { getAllowedCorsOrigins, normalizeOrigin } from './cors';
+
+
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+type PassportSessionRequest = Request & {
+  isAuthenticated?: () => boolean;
+  user?: unknown;
+};
+
+function isAuthenticatedSessionRequest(req: Request): boolean {
+  const sessionReq = req as PassportSessionRequest;
+  if (typeof sessionReq.isAuthenticated === 'function') {
+    return sessionReq.isAuthenticated();
+  }
+  return Boolean(sessionReq.user);
+}
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizeRefererOrigin(value: string | string[] | undefined): string | null {
+  const referer = firstHeaderValue(value);
+  if (!referer) return null;
+  return normalizeOrigin(referer);
+}
+
+function getRequestTargetOrigin(req: Request): string | null {
+  const host = firstHeaderValue(req.headers.host);
+  if (!host) return null;
+  return normalizeOrigin(`${req.protocol}://${host}`);
+}
+
+/**
+ * Bloque les mutations authentifiées par cookie depuis une origine non autorisée.
+ *
+ * Le callback CORS `false` ne suffit pas pour les requêtes simples: le navigateur
+ * masque la réponse, mais le serveur reçoit quand même la mutation. Cette garde
+ * applique donc la recommandation OWASP Origin puis Referer fallback uniquement
+ * aux méthodes unsafe déjà authentifiées par Passport. Les webhooks serveur-à-serveur
+ * signés, les appels sans session applicative et les tentatives pré-auth ne sont pas concernés.
+ */
+export function cookieBackedCsrfOriginGuard(env: NodeJS.ProcessEnv = process.env): RequestHandler {
+  const allowedOrigins = new Set(getAllowedCorsOrigins(env));
+
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!UNSAFE_METHODS.has(req.method.toUpperCase()) || !isAuthenticatedSessionRequest(req)) {
+      next();
+      return;
+    }
+
+    const originHeader = firstHeaderValue(req.headers.origin);
+    const origin = normalizeOrigin(originHeader);
+    const sourceOrigin = originHeader ? origin : normalizeRefererOrigin(req.headers.referer);
+    const requestTargetOrigin = getRequestTargetOrigin(req);
+
+    if (sourceOrigin && (allowedOrigins.has(sourceOrigin) || sourceOrigin === requestTargetOrigin)) {
+      next();
+      return;
+    }
+
+    res.status(403).json({ message: 'Origine de requête refusée' });
+  };
+}
 
 /**
  * Middleware de sécurité HTTP

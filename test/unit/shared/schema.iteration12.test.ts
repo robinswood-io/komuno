@@ -122,7 +122,7 @@ describe('shared/schema.js iteration 12 - top-level export coverage sweep', () =
     expect(schema.getRoleDisplayName('x')).toBe('Rôle inconnu');
 
     expect(schema.getRolePermissions(schema.ADMIN_ROLES.IDEAS_MANAGER)).toContain('Gestion des votes');
-    expect(schema.getRolePermissions(schema.ADMIN_ROLES.EVENTS_READER)).toEqual(['Consultation des événements']);
+    expect(schema.getRolePermissions(schema.ADMIN_ROLES.EVENTS_READER)).toEqual(['Consultation des événements', 'Consultation du pilotage événements', 'Consultation des formulaires']);
     expect(schema.getRolePermissions('x')).toEqual([]);
   });
 

@@ -10,10 +10,17 @@ set -e
 VPS_HOST="${VPS_HOST:-141.94.31.162}"
 VPS_USER="${VPS_USER:-thibault}"
 VPS_PORT="${VPS_PORT:-22}"
-VPS_PASS="${VPS_PASS:-@Tibo4713234}"
+VPS_PASS="${VPS_PASS:-}"
+
+require_vps_password() {
+    if [ -z "${VPS_PASS:-}" ]; then
+        echo "VPS_PASS doit être fourni via l’environnement" >&2
+        exit 1
+    fi
+}
 DEPLOY_DIR="${DEPLOY_DIR:-/docker/cjd80}"
 
-# Clé SSH (optionnelle, utilise sshpass par défaut)
+# Clé SSH (optionnelle, utilise sshpass uniquement si VPS_PASS est fourni)
 SSH_KEY="${SSH_KEY:-}"
 
 # Couleurs
@@ -36,13 +43,14 @@ print_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
 
 # Fonction pour exécuter des commandes SSH
 ssh_exec() {
-    local ssh_opts="-o StrictHostKeyChecking=no -o ConnectTimeout=10"
+    local ssh_opts="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
     
     # Utiliser la clé SSH si spécifiée, sinon utiliser sshpass
     if [ -n "$SSH_KEY" ]; then
         ssh $ssh_opts -i "$SSH_KEY" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$@"
     else
-        # Utiliser sshpass avec mot de passe
+        # Utiliser sshpass avec mot de passe fourni par l’environnement
+        require_vps_password
         if ! command -v sshpass &> /dev/null; then
             print_error "sshpass n'est pas installé"
             print_info "Installation: brew install hudochenkov/sshpass/sshpass (Mac) ou apt-get install sshpass (Linux)"
@@ -214,7 +222,7 @@ case "${1:-}" in
         echo "  VPS_HOST            Adresse du VPS (défaut: 141.94.31.162)"
         echo "  VPS_USER            Utilisateur SSH (défaut: thibault)"
         echo "  VPS_PORT            Port SSH (défaut: 22)"
-        echo "  VPS_PASS            Mot de passe SSH (défaut: @Tibo4713234)"
+        echo "  VPS_PASS            Mot de passe SSH (obligatoire si SSH_KEY non défini)"
         echo "  DEPLOY_DIR          Répertoire de déploiement (défaut: /docker/cjd80)"
         echo "  SSH_KEY             Chemin vers la clé SSH (optionnel, utilise sshpass si non défini)"
         echo ""

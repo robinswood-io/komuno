@@ -67,7 +67,7 @@ const prepareModules = async (): Promise<PreparedModules> => {
 
   const moduleTools = await import('module');
   const require = moduleTools.createRequire(import.meta.url);
-  const dbModule = require('/srv/workspace/komuno/server/db.js') as {
+  const dbModule = require(`${process.cwd()}/server/db.js`) as {
     runDbQuery: (...args: unknown[]) => Promise<unknown>;
   };
 
