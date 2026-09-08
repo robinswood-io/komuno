@@ -50,6 +50,8 @@ import {
   isFederationOrganizationOnInstance,
   isRemoteFederationInstance,
   normalizeFederationInstanceUrl,
+  requestFederationTarget,
+  validateFederationTargetConnectionUrl,
   safeCompareFederationRelationSecret,
   safeCompareFederationToken,
   withoutFederationRelationSecret,
@@ -261,6 +263,10 @@ export class FederationService {
 
   private normalizeInstanceUrl(value?: string | null): string | null {
     return normalizeFederationInstanceUrl(value);
+  }
+
+  private async normalizeOutboundInstanceUrl(value?: string | null): Promise<string | null> {
+    return validateFederationTargetConnectionUrl(value);
   }
 
   private getCurrentInstanceUrl(): string | null {
@@ -1112,7 +1118,7 @@ export class FederationService {
     if (!relation.syncEnabled) throw new ForbiddenException('Synchronisation désactivée sur cette relation');
     const token = await this.resolveOutboundFederationToken(relation);
     if (!token) throw new BadRequestException('Jeton de fédération sortant manquant ou indéchiffrable sur la relation');
-    const targetInstanceUrl = this.normalizeInstanceUrl(targetOrganization.instanceUrl);
+    const targetInstanceUrl = await this.normalizeOutboundInstanceUrl(targetOrganization.instanceUrl);
     if (!targetInstanceUrl) throw new BadRequestException('URL d’instance cible invalide');
     return { relation, targetOrganization, targetInstanceUrl, token };
   }
@@ -1300,7 +1306,7 @@ export class FederationService {
       throw error;
     }
 
-    const targetInstanceUrl = this.normalizeInstanceUrl(syndication.targetInstanceUrl || targetOrganization.instanceUrl);
+    const targetInstanceUrl = await this.normalizeOutboundInstanceUrl(syndication.targetInstanceUrl || targetOrganization.instanceUrl);
     const sourceInstanceUrl = this.normalizeInstanceUrl(sourceOrganization.instanceUrl) || this.getCurrentInstanceUrl();
 
     if (!targetInstanceUrl || !this.isRemoteInstance(targetInstanceUrl, sourceInstanceUrl)) {
@@ -1338,7 +1344,7 @@ export class FederationService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch(endpoint, {
+      const response = await requestFederationTarget(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1638,7 +1644,7 @@ export class FederationService {
       throw error;
     }
 
-    const targetInstanceUrl = this.normalizeInstanceUrl(syndication.targetInstanceUrl || targetOrganization.instanceUrl);
+    const targetInstanceUrl = await this.normalizeOutboundInstanceUrl(syndication.targetInstanceUrl || targetOrganization.instanceUrl);
     const sourceInstanceUrl = this.normalizeInstanceUrl(sourceOrganization.instanceUrl) || this.getCurrentInstanceUrl();
 
     if (!targetInstanceUrl || !this.isRemoteInstance(targetInstanceUrl, sourceInstanceUrl)) {
@@ -1683,7 +1689,7 @@ export class FederationService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch(endpoint, {
+      const response = await requestFederationTarget(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1810,7 +1816,7 @@ export class FederationService {
       return { success: false, data: { skipped: true, reason: 'missing_outbound_federation_token', relationId } };
     }
 
-    const remoteInstanceUrl = this.getRemoteInstanceUrlForRelation(fromOrganization, toOrganization);
+    const remoteInstanceUrl = await validateFederationTargetConnectionUrl(this.getRemoteInstanceUrlForRelation(fromOrganization, toOrganization));
     if (!remoteInstanceUrl) {
       const [updated] = await db.update(organizationRelations).set({
         syncStatus: FEDERATION_SYNC_STATUS.LOCAL,
@@ -1840,7 +1846,7 @@ export class FederationService {
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await requestFederationTarget(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

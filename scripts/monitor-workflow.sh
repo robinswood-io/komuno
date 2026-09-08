@@ -10,7 +10,14 @@ set -e
 VPS_HOST="141.94.31.162"
 VPS_USER="thibault"
 VPS_PORT="22"
-VPS_PASS="@Tibo4713234"
+VPS_PASS="${VPS_PASS:-}"
+
+require_vps_password() {
+    if [ -z "${VPS_PASS:-}" ]; then
+        echo "VPS_PASS doit être fourni via l’environnement" >&2
+        exit 1
+    fi
+}
 DEPLOY_DIR="/docker/cjd80"
 
 # Couleurs
@@ -32,7 +39,8 @@ print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 print_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
 
 ssh_exec() {
-    sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$@"
+    require_vps_password
+    sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=accept-new -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$@"
 }
 
 # ============================================================================

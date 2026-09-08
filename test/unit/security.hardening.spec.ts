@@ -1,6 +1,8 @@
+import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { buildCorsOptions, getAllowedCorsOrigins } from '../../server/src/config/cors';
+import { cookieBackedCsrfOriginGuard } from '../../server/src/config/security-middleware';
 import { isDemoModeEnabled } from '../../server/src/auth/demo-user';
 
 describe('Sécurité — durcissement transversal', () => {
@@ -57,4 +59,83 @@ describe('Sécurité — durcissement transversal', () => {
     await expect(resolveOrigin('https://evil.example')).resolves.toBe(false);
     await expect(resolveOrigin(undefined)).resolves.toBe(true);
   });
+
+
+  it('installe le garde CSRF après la session Passport pour cibler les vraies sessions authentifiées', () => {
+    const main = fs.readFileSync('server/src/main.ts', 'utf8');
+    expect(main.indexOf('expressApp.use(passport.session()')).toBeLessThan(main.indexOf('expressApp.use(cookieBackedCsrfOriginGuard())'));
+  });
+
+  it('bloque les mutations de session authentifiée sans Origin/Referer autorisé sans casser les webhooks sans session', () => {
+    const guard = cookieBackedCsrfOriginGuard({
+      NODE_ENV: 'production',
+      DOMAIN: 'cjd80.fr',
+      APP_URL: 'https://cjd80.fr',
+    } as NodeJS.ProcessEnv);
+
+    const run = (method: string, headers: Record<string, string | undefined>, authenticated = true) => {
+      const req = {
+        method,
+        headers: { host: 'cjd80.fr', ...headers },
+        protocol: 'https',
+        isAuthenticated: () => authenticated,
+      } as any;
+      const res = { statusCode: 200, body: undefined as unknown, status(code: number) { this.statusCode = code; return this; }, json(body: unknown) { this.body = body; return this; } } as any;
+      const next = { called: false };
+      guard(req, res, () => { next.called = true; });
+      return { res, next };
+    };
+
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      expect(run(method, { origin: 'https://cjd80.fr' }).next.called).toBe(true);
+      expect(run(method, { referer: 'https://www.cjd80.fr/admin' }).next.called).toBe(true);
+      expect(run(method, { origin: 'https://evil.example' }).res.statusCode).toBe(403);
+      expect(run(method, { origin: 'https://cjd80.fr.evil.example' }).res.statusCode).toBe(403);
+      expect(run(method, { origin: 'null' }).res.statusCode).toBe(403);
+      expect(run(method, {}).res.statusCode).toBe(403);
+    }
+
+    expect(run('POST', { origin: 'https://evil.example', referer: 'https://cjd80.fr/admin' }).res.statusCode).toBe(403);
+    expect(run('POST', { origin: 'https://cjd80.fr' }, false).next.called).toBe(true);
+    expect(run('POST', { origin: 'https://evil.example' }, false).next.called).toBe(true);
+    expect(run('GET', { origin: 'https://evil.example' }).next.called).toBe(true);
+  });
+
+
+  it('réserve les contournements dev-login localStorage au développement', () => {
+    for (const file of ['app/(authenticated)/layout.tsx', 'app/(protected)/layout.tsx']) {
+      const source = fs.readFileSync(file, 'utf8');
+      expect(source).toContain("process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true'");
+    }
+  });
+
+  it('durcit les familles restantes exploitables sans refonte arbitraire', () => {
+    const brandingController = fs.readFileSync('server/src/branding/branding.controller.ts', 'utf8');
+    expect(brandingController).toContain('PUBLIC_LOGO_FILENAME_REGEX');
+    expect(brandingController).toContain('Nom de fichier logo invalide');
+
+    const adminController = fs.readFileSync('server/src/admin/admin.controller.ts', 'utf8');
+    expect(adminController).toContain('sanitizeFrontendLogField');
+    expect(adminController).toContain('@Throttle({ default: { limit: 10, ttl: 60_000 } })');
+
+    const adminService = fs.readFileSync('server/src/admin/admin.service.ts', 'utf8');
+    expect(adminService).toContain('data: this.sanitizeAdmin(result.data)');
+
+    const healthController = fs.readFileSync('server/src/health/health.controller.ts', 'utf8');
+    expect(healthController).toContain("@Get('db')\n  @UseGuards(JwtAuthGuard)");
+    expect(healthController).toContain('return this.healthService.getPublicStatus();');
+
+    const healthService = fs.readFileSync('server/src/health/health.service.ts', 'utf8');
+    expect(healthService).toContain('async getPublicStatus(): Promise<StatusResponse>');
+    expect(healthService).toContain("environment: 'public'");
+
+    const integrationsService = fs.readFileSync('server/src/integrations/integrations.service.ts', 'utf8');
+    expect(integrationsService).toContain("Webhook entrant non signé non accepté");
+
+    const membersController = fs.readFileSync('server/src/members/members.controller.ts', 'utf8');
+    expect(membersController).toContain("@Patch('bulk-status')\n  @Permissions('admin.edit')");
+    expect(membersController).toContain("@Patch(':email/assign')\n  @Permissions('admin.edit')");
+    expect(membersController).toContain("@Post(':email/subscriptions')\n  @Permissions('admin.edit')");
+  });
+
 });

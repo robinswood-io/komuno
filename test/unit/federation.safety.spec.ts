@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -7,11 +9,16 @@ import {
   hashFederationToken,
   isAutoShareEventsToParentEnabledForRelation,
   isFederationOrganizationOnInstance,
+  createFederationPinnedLookup,
+  isBlockedFederationAddress,
   isRemoteFederationInstance,
   normalizeFederationInstanceUrl,
+  resolveFederationPinnedAddress,
   safeCompareFederationRelationSecret,
   safeCompareFederationToken,
   safeCompareFederationTokenHash,
+  validateFederationTargetConnectionUrl,
+  validateFederationTargetInstanceUrl,
   withoutFederationRelationSecret,
 } from '../../server/src/federation/federation.utils';
 
@@ -47,6 +54,77 @@ describe('Fédération — invariants de sécurité sans DB', () => {
     expect(encrypted?.keyId).toHaveLength(12);
     expect(decryptFederationToken(encrypted!.encrypted, env)).toBe(token);
     expect(decryptFederationToken(encrypted!.encrypted, { FEDERATION_TOKEN_ENCRYPTION_KEY: 'y'.repeat(48) } as NodeJS.ProcessEnv)).toBeNull();
+  });
+
+
+  it('refuse les cibles de fédération SSRF IPv6, IPv4-mapped et DNS privé sans requête réseau', async () => {
+    expect(validateFederationTargetInstanceUrl('https://[fd00::1]')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://[fc00::1]')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://[fec0::1]')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://[::ffff:127.0.0.1]')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://[::]')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://[2001:1::1]')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://[2002::1]')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://[3fff::1]')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://[64:ff9b::808:808]')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://169.254.169.254')).toBeNull();
+    expect(validateFederationTargetInstanceUrl('https://example.org')).toBe('https://example.org');
+
+    expect(isBlockedFederationAddress('10.0.0.4')).toBe(true);
+    expect(isBlockedFederationAddress('172.20.0.4')).toBe(true);
+    expect(isBlockedFederationAddress('192.168.1.4')).toBe(true);
+    expect(isBlockedFederationAddress('8.8.8.8')).toBe(false);
+    expect(isBlockedFederationAddress('fd00::1')).toBe(true);
+    expect(isBlockedFederationAddress('fc00::1')).toBe(true);
+    expect(isBlockedFederationAddress('::ffff:127.0.0.1')).toBe(true);
+    expect(isBlockedFederationAddress('fec0::1')).toBe(true);
+    expect(isBlockedFederationAddress('2001:1::1')).toBe(true);
+    expect(isBlockedFederationAddress('2002::1')).toBe(true);
+    expect(isBlockedFederationAddress('3fff::1')).toBe(true);
+    expect(isBlockedFederationAddress('64:ff9b::808:808')).toBe(true);
+    expect(isBlockedFederationAddress('2001:db8::1')).toBe(true);
+    expect(isBlockedFederationAddress('2606:2800:220:1:248:1893:25c8:1946')).toBe(false);
+
+    await expect(validateFederationTargetConnectionUrl('https://tenant.example', async () => [
+      { address: '93.184.216.34' },
+      { address: '2606:2800:220:1:248:1893:25c8:1946' },
+    ])).resolves.toBe('https://tenant.example');
+    await expect(validateFederationTargetConnectionUrl('https://tenant.example', async () => [
+      { address: '93.184.216.34' },
+      { address: '10.0.0.7' },
+    ])).resolves.toBeNull();
+    await expect(validateFederationTargetConnectionUrl('https://tenant.example', async () => [
+      { address: 'fd00::7' },
+    ])).resolves.toBeNull();
+  });
+
+  it('épingle la résolution DNS utilisée par la connexion fédérée sortante', async () => {
+    const publicLookup = async () => [{ address: '93.184.216.34', family: 4 }];
+    await expect(resolveFederationPinnedAddress('tenant.example', publicLookup)).resolves.toEqual({ address: '93.184.216.34', family: 4 });
+
+    const pinnedLookup = createFederationPinnedLookup(publicLookup);
+    await expect(new Promise((resolve, reject) => {
+      pinnedLookup('tenant.example', { family: 4 }, (error, address, family) => {
+        if (error) reject(error);
+        else resolve({ address, family });
+      });
+    })).resolves.toEqual({ address: '93.184.216.34', family: 4 });
+
+    await expect(validateFederationTargetConnectionUrl('https://tenant.example', publicLookup)).resolves.toBe('https://tenant.example');
+    await expect(new Promise((resolve, reject) => {
+      createFederationPinnedLookup(async () => [{ address: '10.0.0.7', family: 4 }])('tenant.example', { family: 4 }, (error, address, family) => {
+        if (error) reject(error);
+        else resolve({ address, family });
+      });
+    })).rejects.toThrow(/non-global address/);
+  });
+
+  it('centralise les appels fédérés sur le transport épinglé sans suivi de redirection', () => {
+    const federationService = fs.readFileSync('server/src/federation/federation.service.ts', 'utf8');
+    const trainingsService = fs.readFileSync('server/src/trainings/trainings.service.ts', 'utf8');
+    expect(federationService.match(/requestFederationTarget\(endpoint/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(trainingsService.match(/requestFederationTarget\(endpoint/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(fs.readFileSync('server/src/federation/federation.utils.ts', 'utf8')).toContain('Federation redirects are not allowed');
   });
 
   it('normalise les URLs d’instance sans inférer de relation métier', () => {

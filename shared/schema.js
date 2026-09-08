@@ -1,4 +1,3 @@
-"use strict";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -2448,6 +2447,16 @@ const isHttpUrl = (url) => {
     return false;
   }
 };
+const isHelloAssoUrl = (url) => {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    return (parsed.protocol === "https:" || parsed.protocol === "http:") && (host === "helloasso.com" || host.endsWith(".helloasso.com"));
+  } catch {
+    return false;
+  }
+};
 const organizationTypeValues = Object.values(ORGANIZATION_TYPE);
 const relationTypeValues = Object.values(ORGANIZATION_RELATION_TYPE);
 const syndicationDirectionValues = Object.values(SYNDICATION_DIRECTION);
@@ -2494,7 +2503,7 @@ const insertEventSyndicationSchema = import_zod.z.object({
   localTitleOverride: optionalSanitizedText(200),
   localDescriptionOverride: optionalSanitizedText(5e3),
   localDateOverride: import_zod.z.string().datetime().optional().nullable(),
-  localRegistrationUrlOverride: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  localRegistrationUrlOverride: import_zod.z.string().url().refine(isHttpUrl, "L'adresse web doit utiliser http ou https").optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
   targetInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
   remoteEventId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
   remoteSyndicationId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
@@ -2510,7 +2519,7 @@ const updateEventSyndicationSchema = import_zod.z.object({
   localTitleOverride: optionalSanitizedText(200),
   localDescriptionOverride: optionalSanitizedText(5e3),
   localDateOverride: import_zod.z.string().datetime().optional().nullable(),
-  localRegistrationUrlOverride: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
+  localRegistrationUrlOverride: import_zod.z.string().url().refine(isHttpUrl, "L'adresse web doit utiliser http ou https").optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
   targetInstanceUrl: import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
   remoteEventId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
   remoteSyndicationId: import_zod.z.string().max(120).optional().nullable().transform((val) => val ? sanitizeText(val) : void 0),
@@ -2771,7 +2780,7 @@ const eventBudgetLineTypeValues = Object.values(EVENT_BUDGET_LINE_TYPE);
 const eventBudgetLineStatusValues = Object.values(EVENT_BUDGET_LINE_STATUS);
 const isoDateOnlySchema = import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const currencySchema = import_zod.z.string().length(3).regex(/^[A-Z]{3}$/).default("EUR");
-const optionalSanitizedUrlSchema = import_zod.z.string().url().optional().nullable().transform((val) => val ? sanitizeText(val) : val);
+const optionalSanitizedUrlSchema = import_zod.z.string().url().refine(isHttpUrl, "L'adresse web doit utiliser http ou https").optional().nullable().transform((val) => val ? sanitizeText(val) : val);
 const upsertEventOperationPlanSchema = import_zod.z.object({
   status: import_zod.z.enum(eventOperationStatusValues).default(EVENT_OPERATION_STATUS.PLANNING),
   ownerEmail: import_zod.z.string().email().optional().nullable().transform((val) => val ? sanitizeText(val) : val),
@@ -2936,7 +2945,7 @@ const insertEventSchema = import_zod.z.object({
   date: import_zod.z.string().datetime("La date n'est pas valide. Veuillez s\xE9lectionner une date et heure correctes."),
   location: import_zod.z.string().max(200, "Le nom du lieu est trop long (maximum 200 caract\xE8res)").optional().transform((val) => val ? sanitizeText(val) : void 0),
   maxParticipants: import_zod.z.number().min(1, "Le nombre maximum de participants doit \xEAtre d'au moins 1 personne").max(1e3, "Le nombre maximum de participants ne peut pas d\xE9passer 1000 personnes").optional(),
-  helloAssoLink: import_zod.z.string().optional().refine((url) => !url || url.includes("helloasso.com"), "L'adresse doit \xEAtre un lien HelloAsso valide (contenant 'helloasso.com')").refine((url) => !url || import_zod.z.string().url().safeParse(url).success, "L'adresse web n'est pas valide. Veuillez saisir une URL compl\xE8te (ex: https://exemple.com)").refine(isHttpUrl, "L'adresse web doit utiliser http ou https").transform((val) => val ? sanitizeText(val) : void 0),
+  helloAssoLink: import_zod.z.string().optional().refine((url) => !url || import_zod.z.string().url().safeParse(url).success, "L'adresse web n'est pas valide. Veuillez saisir une URL compl\xE8te (ex: https://exemple.com)").refine(isHelloAssoUrl, "L'adresse doit \xEAtre un lien HelloAsso valide").transform((val) => val ? sanitizeText(val) : void 0),
   enableExternalRedirect: import_zod.z.boolean().optional(),
   externalRedirectUrl: import_zod.z.string().optional().refine((url) => !url || import_zod.z.string().url().safeParse(url).success, "L'adresse web de redirection n'est pas valide. Veuillez saisir une URL compl\xE8te (ex: https://exemple.com)").refine(isHttpUrl, "L'adresse web de redirection doit utiliser http ou https").transform((val) => val ? sanitizeText(val) : void 0),
   showInscriptionsCount: import_zod.z.boolean().optional(),
@@ -3211,8 +3220,8 @@ const insertEventSponsorshipSchema = import_zod.z.object({
   benefits: import_zod.z.string().max(2e3, "Les contreparties ne peuvent pas d\xE9passer 2000 caract\xE8res").transform((val) => val ? sanitizeText(val) : void 0).optional(),
   isPubliclyVisible: import_zod.z.boolean().default(true),
   status: import_zod.z.enum(["proposed", "confirmed", "completed", "cancelled"]).default("proposed"),
-  logoUrl: import_zod.z.string().url("URL du logo invalide").max(500, "L'URL du logo est trop longue").transform((val) => val ? sanitizeText(val) : void 0).optional(),
-  websiteUrl: import_zod.z.string().url("URL du site web invalide").max(500, "L'URL du site web est trop longue").transform((val) => val ? sanitizeText(val) : void 0).optional(),
+  logoUrl: import_zod.z.string().url("URL du logo invalide").refine(isHttpUrl, "L'adresse web du logo doit utiliser http ou https").max(500, "L'URL du logo est trop longue").transform((val) => val ? sanitizeText(val) : void 0).optional(),
+  websiteUrl: import_zod.z.string().url("URL du site web invalide").refine(isHttpUrl, "L'adresse web du site doit utiliser http ou https").max(500, "L'URL du site web est trop longue").transform((val) => val ? sanitizeText(val) : void 0).optional(),
   notes: import_zod.z.string().max(2e3, "Les notes ne peuvent pas d\xE9passer 2000 caract\xE8res").transform((val) => val ? sanitizeText(val) : void 0).optional(),
   proposedByAdminEmail: import_zod.z.string().email("Email de l'administrateur invalide").transform(sanitizeText),
   confirmedAt: import_zod.z.string().optional().nullable().transform((val) => {
@@ -3245,8 +3254,8 @@ const updateEventSponsorshipSchema = import_zod.z.object({
   benefits: import_zod.z.string().max(2e3, "Les contreparties ne peuvent pas d\xE9passer 2000 caract\xE8res").transform((val) => sanitizeText(val)).optional(),
   isPubliclyVisible: import_zod.z.boolean().optional(),
   status: import_zod.z.enum(["proposed", "confirmed", "completed", "cancelled"]).optional(),
-  logoUrl: import_zod.z.string().url("URL du logo invalide").max(500).transform((val) => sanitizeText(val)).optional(),
-  websiteUrl: import_zod.z.string().url("URL du site web invalide").max(500).transform((val) => sanitizeText(val)).optional(),
+  logoUrl: import_zod.z.string().url("URL du logo invalide").refine(isHttpUrl, "L'adresse web du logo doit utiliser http ou https").max(500).transform((val) => sanitizeText(val)).optional(),
+  websiteUrl: import_zod.z.string().url("URL du site web invalide").refine(isHttpUrl, "L'adresse web du site doit utiliser http ou https").max(500).transform((val) => sanitizeText(val)).optional(),
   confirmedAt: import_zod.z.string().optional().nullable()
 });
 const insertMemberSchema = import_zod.z.object({

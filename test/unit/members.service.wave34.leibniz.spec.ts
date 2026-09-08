@@ -18,6 +18,7 @@ describe('Wave34 Leibniz - MembersService.createMemberSubscription adds memberEm
 
     const result = await service.createMemberSubscription('member@example.com', {
       amountInCents: 50000,
+      subscriptionType: 'yearly',
       startDate: '2026-01-01',
       endDate: '2026-12-31',
     });

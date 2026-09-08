@@ -641,7 +641,9 @@ export class IntegrationsService {
   }
 
   private async verifyInboundWebhookSignature(provider: string, headers: Record<string, unknown>, rawBody?: string | Buffer | null) {
-    if (provider !== INTEGRATION_PROVIDER.STRIPE) return { accountId: null, signatureVerified: false };
+    if (provider !== INTEGRATION_PROVIDER.STRIPE) {
+      throw new UnauthorizedException('Webhook entrant non signé non accepté');
+    }
     const stripeSignature = this.headerValue(headers, 'stripe-signature');
     const rawBodyString = this.rawBodyToString(rawBody);
     if (!stripeSignature || !rawBodyString) throw new UnauthorizedException('Signature Stripe manquante ou body brut absent');

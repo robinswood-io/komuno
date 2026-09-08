@@ -79,7 +79,7 @@ describe('shared/schema.js iteration 18 - remaining table callback and fk refere
     const subscriptionsConfig = getTableConfig(schema.memberSubscriptions);
     const tagsConfig = getTableConfig(schema.memberTags);
 
-    expect(membersConfig.indexes).toHaveLength(5);
+    expect(membersConfig.indexes).toHaveLength(6);
     expect(membersConfig.indexes.map((indexDef) => indexDef.config.name)).toEqual(
       expect.arrayContaining([
         'members_email_idx',
@@ -104,11 +104,12 @@ describe('shared/schema.js iteration 18 - remaining table callback and fk refere
     expect(activityFk?.columns.map((column) => column.name)).toEqual(['member_email']);
     expect(activityFk?.foreignColumns.map((column) => column.name)).toEqual(['email']);
 
-    expect(subscriptionsConfig.foreignKeys).toHaveLength(1);
+    expect(subscriptionsConfig.foreignKeys).toHaveLength(2);
     expect(subscriptionsConfig.indexes.map((indexDef) => indexDef.config.name)).toEqual(
       expect.arrayContaining([
         'member_subscriptions_member_email_idx',
         'member_subscriptions_start_date_idx',
+        'member_subscriptions_subscription_type_id_idx',
       ]),
     );
 

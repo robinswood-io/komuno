@@ -36,7 +36,7 @@ describe('shared/schema.js iteration 129', () => {
       expect(withNullConfirm.data.benefits).toBe('Pack Gold');
       expect(withNullConfirm.data.logoUrl).toBe('https://cdn.example.com/logo-gold.png');
       expect(withNullConfirm.data.websiteUrl).toBe('https://gold.example.com');
-      expect(withNullConfirm.data.confirmedAt).toBeNull();
+      expect(withNullConfirm.data.confirmedAt).toBeUndefined();
     }
 
     const withStringConfirm = schema.insertEventSponsorshipSchema.safeParse({

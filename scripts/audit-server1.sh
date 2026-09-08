@@ -43,8 +43,7 @@ print_info() {
 # Fonction pour exécuter une commande SSH
 ssh_exec() {
     ssh -p "$VPS_PORT" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=accept-new \
         -o ConnectTimeout=10 \
         "$VPS_USER@$VPS_HOST" "$@"
 }

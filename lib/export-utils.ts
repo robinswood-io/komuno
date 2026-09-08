@@ -26,6 +26,15 @@ export interface ExportOptions {
   data: ExportRow[];
 }
 
+function sanitizeSpreadsheetCell(value: unknown): string {
+  const text = String(value ?? '');
+  return /^\s*[=+\-@]/.test(text) || /^[\t\r\n]/.test(text) ? `'${text}` : text;
+}
+
+function formatCellForExport(value: unknown, format?: (value: unknown) => string): string {
+  return sanitizeSpreadsheetCell(format ? format(value) : value);
+}
+
 /**
  * Export data to CSV format
  */
@@ -34,7 +43,7 @@ export function exportToCSV({ filename, columns, data }: ExportOptions): void {
   const rows = data.map(row => 
     columns.map(col => {
       const value = row[col.accessor];
-      return col.format ? col.format(value) : (value ?? '');
+      return formatCellForExport(value, col.format);
     })
   );
 
@@ -62,7 +71,7 @@ export function exportToExcel({ filename, title, columns, data }: ExportOptions)
       worksheet.addRow(
         columns.map(col => {
           const value = row[col.accessor];
-          return col.format ? col.format(value) : (value ?? '');
+          return formatCellForExport(value, col.format);
         })
       );
     }
@@ -103,7 +112,7 @@ export function exportToPDF({ filename, title, columns, data }: ExportOptions): 
   const tableData = data.map(row =>
     columns.map(col => {
       const value = row[col.accessor];
-      return col.format ? col.format(value) : String(value ?? '');
+      return formatCellForExport(value, col.format);
     })
   );
 

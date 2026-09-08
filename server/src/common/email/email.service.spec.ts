@@ -85,6 +85,8 @@ describe('EmailService', () => {
       to: 'recipient@example.com',
       subject: 'Test Subject',
       html: '<p>Hello</p>',
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
 
     expect(createTransportMock).toHaveBeenCalledWith({
@@ -95,6 +97,8 @@ describe('EmailService', () => {
         user: 'smtp-user@example.com',
         pass: 'smtp-secret',
       },
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
 
     expect(sendMailMock).toHaveBeenCalledWith({
@@ -102,6 +106,8 @@ describe('EmailService', () => {
       to: 'recipient@example.com',
       subject: 'Test Subject',
       html: '<p>Hello</p>',
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
   });
 
@@ -145,6 +151,8 @@ describe('EmailService', () => {
       to: 'recipient@example.com',
       subject: 'Default DB',
       html: '<p>Hi</p>',
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
 
     expect(createTransportMock).toHaveBeenCalledWith({
@@ -155,6 +163,8 @@ describe('EmailService', () => {
         user: 'smtp-user@example.com',
         pass: 'smtp-secret',
       },
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
 
     expect(sendMailMock).toHaveBeenCalledWith({
@@ -162,6 +172,8 @@ describe('EmailService', () => {
       to: 'recipient@example.com',
       subject: 'Default DB',
       html: '<p>Hi</p>',
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
   });
 
@@ -190,6 +202,8 @@ describe('EmailService', () => {
       to: 'recipient@example.com',
       subject: 'Env fallback',
       html: '<p>Env</p>',
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
 
     expect(createTransportMock).toHaveBeenCalledWith({
@@ -200,6 +214,8 @@ describe('EmailService', () => {
         user: 'env-user',
         pass: 'env-pass',
       },
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
 
     expect(sendMailMock).toHaveBeenCalledWith({
@@ -207,6 +223,8 @@ describe('EmailService', () => {
       to: 'recipient@example.com',
       subject: 'Env fallback',
       html: '<p>Env</p>',
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
   });
 
@@ -236,6 +254,8 @@ describe('EmailService', () => {
         user: 'env-user',
         pass: 'env-pass',
       },
+      disableFileAccess: true,
+      disableUrlAccess: true,
     });
   });
 

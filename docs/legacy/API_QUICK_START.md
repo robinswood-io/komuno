@@ -37,7 +37,7 @@ Configuration minimale requise:
 
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cjd80
-SESSION_SECRET=your-secret-key-here
+SESSION_SECRET=generate-a-unique-32-character-minimum-secret
 AUTHENTIK_BASE_URL=http://localhost:9002
 AUTHENTIK_CLIENT_ID=your-client-id
 AUTHENTIK_CLIENT_SECRET=your-client-secret

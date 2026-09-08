@@ -36,7 +36,7 @@ describe('shared/schema.js iteration 99', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.benefits).toBe('Visibilité scène principale');
-      expect(result.data.confirmedAt).toBeNull();
+      expect(result.data.confirmedAt).toBeUndefined();
     }
   });
 });

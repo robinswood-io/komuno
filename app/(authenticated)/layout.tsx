@@ -18,7 +18,7 @@ export default function AuthenticatedLayout({
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const devLoginEnabled = useMemo(
-    () => process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true',
+    () => process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true',
     []
   );
   const [devUser, setDevUser] = useState<{ role: string } | null>(null);

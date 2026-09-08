@@ -16,6 +16,16 @@ import { logger } from '../../lib/logger';
 const authMode = 'local';
 const devLoginEnabled = process.env.ENABLE_DEV_LOGIN === 'true' && process.env.NODE_ENV !== 'production';
 
+function getSessionSecret(): string {
+  if (process.env.SESSION_SECRET) {
+    return process.env.SESSION_SECRET;
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET must be set in production');
+  }
+  return 'development-session-secret-change-me';
+}
+
 logger.info('[AuthModule] Mode authentification: LOCAL (Passport session)');
 if (devLoginEnabled) {
   logger.warn('[AuthModule] ⚠️  DEV LOGIN ENABLED - Password bypass active for development');
@@ -41,7 +51,7 @@ if (devLoginEnabled) {
       provide: 'SESSION_CONFIG',
       useFactory: (storageService: StorageService) => {
         const sessionSettings: session.SessionOptions = {
-          secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
+          secret: getSessionSecret(),
           resave: false,
           saveUninitialized: false,
           store: storageService.sessionStore,

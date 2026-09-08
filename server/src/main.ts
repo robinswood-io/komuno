@@ -11,7 +11,7 @@ import { startTrackingAlertsGeneration } from '../utils/tracking-scheduler';
 import { AuthService } from './auth/auth.service';
 import { validateEnvironment, checkExternalDependencies } from './config/env-validation';
 import { setupGracefulShutdown, rejectDuringShutdown } from './config/graceful-shutdown';
-import { getHelmetConfig } from './config/security-middleware';
+import { cookieBackedCsrfOriginGuard, getHelmetConfig } from './config/security-middleware';
 import { buildCorsOptions, getAllowedCorsOrigins } from './config/cors';
 import session from 'express-session';
 import passport from 'passport';
@@ -58,7 +58,7 @@ async function bootstrap() {
   // Middleware pour rejeter les requêtes pendant le shutdown
   expressApp.use(rejectDuringShutdown());
 
-  // 5. Configuration CORS — fail-closed en production, jamais "*" avec credentials.
+  // 5.1 Configuration CORS — fail-closed en production, jamais "*" avec credentials.
   const corsOptions = buildCorsOptions();
   app.enableCors(corsOptions);
   logger.info('[CORS] Origines cross-origin autorisées:', getAllowedCorsOrigins());
@@ -103,6 +103,8 @@ async function bootstrap() {
   expressApp.use(session(sessionConfig) as unknown as RequestHandler);
   expressApp.use(passport.initialize() as unknown as RequestHandler);
   expressApp.use(passport.session() as unknown as RequestHandler);
+  // Protection Origin/Referer pour les mutations de sessions Passport authentifiées.
+  expressApp.use(cookieBackedCsrfOriginGuard());
 
   // Configurer Passport serialize/deserialize
   const authService = app.get(AuthService);

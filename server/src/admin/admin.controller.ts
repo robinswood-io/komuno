@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards, HttpCode, HttpStatus, Req, BadRequestException, UsePipes } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/auth.guard';
@@ -12,6 +13,11 @@ import { resolveRequestBody } from '../common/utils/request-body';
 import { frontendErrorSchema } from '@shared/schema';
 import { z } from 'zod';
 import type { DevRequestStatus } from '../../utils/development-request-status';
+
+function sanitizeFrontendLogField(value: string | undefined, maxLength: number, fallback = 'N/A'): string {
+  const normalized = (value ?? fallback).replace(/[\u0000-\u001F\u007F]/g, ' ');
+  return normalized.slice(0, maxLength);
+}
 import {
   updateIdeaStatusDto,
   updateEventStatusDto,
@@ -949,6 +955,7 @@ export class AdminController {
 @Controller('api/logs')
 export class LogsController {
   @Post('frontend-error')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Logger une erreur frontend' })
   @ApiBody({
     schema: {
@@ -970,15 +977,18 @@ export class LogsController {
     try {
       const validatedData = frontendErrorSchema.parse(body);
 
-      const sanitizedStack = validatedData.stack?.substring(0, 5000) || 'N/A';
-      const sanitizedComponentStack = validatedData.componentStack?.substring(0, 3000) || 'N/A';
+      const sanitizedMessage = sanitizeFrontendLogField(validatedData.message, 1000);
+      const sanitizedStack = sanitizeFrontendLogField(validatedData.stack, 5000);
+      const sanitizedComponentStack = sanitizeFrontendLogField(validatedData.componentStack, 3000);
+      const sanitizedUrl = sanitizeFrontendLogField(validatedData.url, 500);
+      const sanitizedUserAgent = sanitizeFrontendLogField(validatedData.userAgent, 500);
 
       logger.error('Frontend error', {
-        message: validatedData.message,
+        message: sanitizedMessage,
         stack: sanitizedStack,
         componentStack: sanitizedComponentStack,
-        url: validatedData.url,
-        userAgent: validatedData.userAgent,
+        url: sanitizedUrl,
+        userAgent: sanitizedUserAgent,
         timestamp: validatedData.timestamp,
         userEmail: req.user?.email || 'anonymous',
       });

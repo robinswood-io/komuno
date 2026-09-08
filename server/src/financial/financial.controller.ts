@@ -21,8 +21,8 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 
 type RequestWithUser = { user?: { email?: string; role?: string } };
 
-function actorFromRequest(req: RequestWithUser) {
-  return req.user?.email || req.user?.role || 'admin@komuno.org';
+function actorFromRequest(req?: RequestWithUser) {
+  return req?.user?.email || req?.user?.role || 'admin@komuno.org';
 }
 
 function withActor(body: unknown, actor: string) {

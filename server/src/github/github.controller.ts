@@ -60,7 +60,7 @@ export class GitHubController {
   private verifySignature(req: RawBodyRequest, signature: string | undefined): void {
     const secret = process.env.GITHUB_WEBHOOK_SECRET;
     if (!secret) {
-      return;
+      throw new UnauthorizedException('Webhook GitHub non configuré');
     }
 
     if (!signature) {

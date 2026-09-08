@@ -2180,6 +2180,18 @@ const isHttpUrl = (url: string | null | undefined) => {
   }
 };
 
+const isHelloAssoUrl = (url: string | null | undefined) => {
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    return (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      (host === 'helloasso.com' || host.endsWith('.helloasso.com'));
+  } catch {
+    return false;
+  }
+};
+
 const organizationTypeValues = Object.values(ORGANIZATION_TYPE) as [OrganizationType, ...OrganizationType[]];
 const relationTypeValues = Object.values(ORGANIZATION_RELATION_TYPE) as [typeof ORGANIZATION_RELATION_TYPE[keyof typeof ORGANIZATION_RELATION_TYPE], ...Array<typeof ORGANIZATION_RELATION_TYPE[keyof typeof ORGANIZATION_RELATION_TYPE]>];
 const syndicationDirectionValues = Object.values(SYNDICATION_DIRECTION) as [typeof SYNDICATION_DIRECTION[keyof typeof SYNDICATION_DIRECTION], ...Array<typeof SYNDICATION_DIRECTION[keyof typeof SYNDICATION_DIRECTION]>];
@@ -2233,7 +2245,7 @@ export const insertEventSyndicationSchema = z.object({
   localTitleOverride: optionalSanitizedText(200),
   localDescriptionOverride: optionalSanitizedText(5000),
   localDateOverride: z.string().datetime().optional().nullable(),
-  localRegistrationUrlOverride: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  localRegistrationUrlOverride: z.string().url().refine(isHttpUrl, "L'adresse web doit utiliser http ou https").optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
   targetInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
   remoteEventId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
   remoteSyndicationId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
@@ -2250,7 +2262,7 @@ export const updateEventSyndicationSchema = z.object({
   localTitleOverride: optionalSanitizedText(200),
   localDescriptionOverride: optionalSanitizedText(5000),
   localDateOverride: z.string().datetime().optional().nullable(),
-  localRegistrationUrlOverride: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
+  localRegistrationUrlOverride: z.string().url().refine(isHttpUrl, "L'adresse web doit utiliser http ou https").optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
   targetInstanceUrl: z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
   remoteEventId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
   remoteSyndicationId: z.string().max(120).optional().nullable().transform(val => val ? sanitizeText(val) : undefined),
@@ -2540,7 +2552,7 @@ const eventBudgetLineStatusValues = Object.values(EVENT_BUDGET_LINE_STATUS) as [
 
 const isoDateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const currencySchema = z.string().length(3).regex(/^[A-Z]{3}$/).default('EUR');
-const optionalSanitizedUrlSchema = z.string().url().optional().nullable().transform(val => val ? sanitizeText(val) : val);
+const optionalSanitizedUrlSchema = z.string().url().refine(isHttpUrl, "L'adresse web doit utiliser http ou https").optional().nullable().transform(val => val ? sanitizeText(val) : val);
 
 export const upsertEventOperationPlanSchema = z.object({
   status: z.enum(eventOperationStatusValues).default(EVENT_OPERATION_STATUS.PLANNING),
@@ -2796,9 +2808,8 @@ export const insertEventSchema = z.object({
     .optional(),
   helloAssoLink: z.string()
     .optional()
-    .refine(url => !url || url.includes('helloasso.com'), "L'adresse doit être un lien HelloAsso valide (contenant 'helloasso.com')")
     .refine(url => !url || z.string().url().safeParse(url).success, "L'adresse web n'est pas valide. Veuillez saisir une URL complète (ex: https://exemple.com)")
-    .refine(isHttpUrl, "L'adresse web doit utiliser http ou https")
+    .refine(isHelloAssoUrl, "L'adresse doit être un lien HelloAsso valide")
     .transform(val => val ? sanitizeText(val) : undefined),
   enableExternalRedirect: z.boolean().optional(),
   externalRedirectUrl: z.string()
@@ -3350,11 +3361,13 @@ export const insertEventSponsorshipSchema = z.object({
   status: z.enum(["proposed", "confirmed", "completed", "cancelled"]).default("proposed"),
   logoUrl: z.string()
     .url("URL du logo invalide")
+    .refine(isHttpUrl, "L'adresse web du logo doit utiliser http ou https")
     .max(500, "L'URL du logo est trop longue")
     .transform(val => val ? sanitizeText(val) : undefined)
     .optional(),
   websiteUrl: z.string()
     .url("URL du site web invalide")
+    .refine(isHttpUrl, "L'adresse web du site doit utiliser http ou https")
     .max(500, "L'URL du site web est trop longue")
     .transform(val => val ? sanitizeText(val) : undefined)
     .optional(),
@@ -3405,11 +3418,13 @@ export const updateEventSponsorshipSchema = z.object({
   status: z.enum(["proposed", "confirmed", "completed", "cancelled"]).optional(),
   logoUrl: z.string()
     .url("URL du logo invalide")
+    .refine(isHttpUrl, "L'adresse web du logo doit utiliser http ou https")
     .max(500)
     .transform(val => sanitizeText(val))
     .optional(),
   websiteUrl: z.string()
     .url("URL du site web invalide")
+    .refine(isHttpUrl, "L'adresse web du site doit utiliser http ou https")
     .max(500)
     .transform(val => sanitizeText(val))
     .optional(),

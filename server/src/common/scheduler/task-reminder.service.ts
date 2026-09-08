@@ -7,6 +7,29 @@ import type { DrizzleDb } from '../database/types';
 import { memberTasks, members, admins } from '../../../../shared/schema';
 import { EmailService } from '../email/email.service';
 
+const HTML_ESCAPE_MAP: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+const escapeHtml = (value: string | number | null | undefined): string =>
+  String(value ?? '').replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char]);
+
+const safeAppBaseUrl = (rawUrl: string | undefined): string => {
+  try {
+    const parsed = new URL(rawUrl ?? 'https://repicardie.fr');
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return 'https://repicardie.fr';
+    }
+    return parsed.origin + parsed.pathname.replace(/\/+$/, '');
+  } catch {
+    return 'https://repicardie.fr';
+  }
+};
+
 interface TaskRow {
   id: string;
   memberEmail: string;
@@ -139,7 +162,8 @@ export class TaskReminderService {
   private async sendReminderEmail(group: GroupedTask): Promise<void> {
     const { email, tasks } = group;
     const count = tasks.length;
-    const appUrl = this.config.get<string>('APP_URL') ?? 'https://repicardie.fr';
+    const appUrl = safeAppBaseUrl(this.config.get<string>('APP_URL'));
+    const tasksUrl = escapeHtml(`${appUrl}/admin/members/tasks`);
 
     const typeLabels: Record<string, string> = {
       call: 'Appel',
@@ -166,10 +190,10 @@ export class TaskReminderService {
         const typeLabel = typeLabels[task.taskType] ?? task.taskType;
 
         return `<tr>
-          <td style="padding: 8px; border: 1px solid #e2e8f0;">${memberName}</td>
-          <td style="padding: 8px; border: 1px solid #e2e8f0;">${task.title}</td>
-          <td style="padding: 8px; border: 1px solid #e2e8f0;">${typeLabel}</td>
-          <td style="padding: 8px; border: 1px solid #e2e8f0;">${dueLabel}</td>
+          <td style="padding: 8px; border: 1px solid #e2e8f0;">${escapeHtml(memberName)}</td>
+          <td style="padding: 8px; border: 1px solid #e2e8f0;">${escapeHtml(task.title)}</td>
+          <td style="padding: 8px; border: 1px solid #e2e8f0;">${escapeHtml(typeLabel)}</td>
+          <td style="padding: 8px; border: 1px solid #e2e8f0;">${escapeHtml(dueLabel)}</td>
         </tr>`;
       })
       .join('\n');
@@ -192,7 +216,7 @@ export class TaskReminderService {
     </tbody>
   </table>
   <p style="margin-top: 20px;">
-    <a href="${appUrl}/admin/members/tasks" style="background: #1e40af; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
+    <a href="${tasksUrl}" style="background: #1e40af; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
       Voir mes tâches →
     </a>
   </p>

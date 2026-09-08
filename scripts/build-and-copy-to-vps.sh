@@ -9,7 +9,14 @@ set -e
 VPS_HOST="${VPS_HOST:-141.94.31.162}"
 VPS_USER="${VPS_USER:-thibault}"
 VPS_PORT="${VPS_PORT:-22}"
-VPS_PASS="${VPS_PASS:-@Tibo4713234}"
+VPS_PASS="${VPS_PASS:-}"
+
+require_vps_password() {
+    if [ -z "${VPS_PASS:-}" ]; then
+        echo "VPS_PASS doit être fourni via l’environnement" >&2
+        exit 1
+    fi
+}
 DEPLOY_DIR="${DEPLOY_DIR:-/docker/cjd80}"
 
 echo "=================================================="
@@ -34,7 +41,7 @@ echo "✅ Archive créée: /tmp/cjd80-dist.tar.gz"
 
 # 3. Copier sur le VPS
 echo "📤 Copie sur le VPS..."
-sshpass -p "$VPS_PASS" scp -o StrictHostKeyChecking=no -P "$VPS_PORT" \
+sshpass -p "$VPS_PASS" scp -o StrictHostKeyChecking=accept-new -P "$VPS_PORT" \
     /tmp/cjd80-dist.tar.gz \
     Dockerfile.production \
     "$VPS_USER@$VPS_HOST:/tmp/" || {
@@ -45,7 +52,8 @@ echo "✅ Fichiers copiés sur le VPS"
 
 # 4. Déployer sur le VPS
 echo "🚀 Déploiement sur le VPS..."
-sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -p "$VPS_PORT" \
+require_vps_password
+sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=accept-new -p "$VPS_PORT" \
     "$VPS_USER@$VPS_HOST" << 'ENDSSH'
 cd /docker/cjd80
 

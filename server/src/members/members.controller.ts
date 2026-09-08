@@ -161,7 +161,7 @@ export class AdminMembersController {
   // ===== Routes admin - Opérations en masse (AVANT les routes :email) =====
 
   @Patch('bulk-status')
-  @Permissions('admin.view')
+  @Permissions('admin.edit')
   @ApiOperation({ summary: 'Mettre à jour le statut de plusieurs membres en masse' })
   @ApiBody({
     schema: {
@@ -315,7 +315,7 @@ export class AdminMembersController {
   }
 
   @Patch(':email/assign')
-  @Permissions('admin.view')
+  @Permissions('admin.edit')
   @ApiOperation({ summary: 'Attribuer un membre à un admin responsable' })
   @ApiParam({ name: 'email', description: 'Email du membre' })
   @ApiBody({
@@ -397,7 +397,7 @@ export class AdminMembersController {
   }
 
   @Post(':email/subscriptions')
-  @Permissions('admin.view')
+  @Permissions('admin.edit')
   @ApiOperation({ summary: 'Créer une souscription pour un membre' })
   @ApiParam({ name: 'email', description: 'Email du membre', example: 'jean.dupont@example.com' })
   @ApiBody({

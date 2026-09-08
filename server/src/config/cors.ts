@@ -10,10 +10,10 @@ const URL_ENV_KEYS = [
   'NEXTAUTH_URL',
 ] as const;
 
-function normalizeOrigin(value: string | null | undefined): string | null {
+export function normalizeOrigin(value: string | null | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
-  if (!trimmed || trimmed === '*') return null;
+  if (!trimmed || trimmed === '*' || trimmed.toLowerCase() === 'null') return null;
   try {
     const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
     if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
