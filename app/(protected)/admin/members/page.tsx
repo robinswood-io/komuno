@@ -318,12 +318,13 @@ export default function AdminMembersPage() {
   });
   const subscriptionTypesList = subscriptionTypesData?.data ?? [];
 
-  // Query pour le kanban — charge tous les membres sans pagination, exclut les prospects
+  // Query kanban bornée; le serveur retourne un curseur pour les pages suivantes
   const { data: kanbanData, isLoading: isKanbanLoading } = useQuery({
-    queryKey: queryKeys.members.list({ page: 1, limit: 500, kanban: true }),
+    queryKey: queryKeys.members.list({ page: 1, limit: 60, kanban: true }),
     queryFn: () => api.get<PaginatedResponse<Member>>('/api/admin/members', {
       page: 1,
-      limit: 500,
+      limit: 60,
+      projection: 'kanban',
       excludeProspects: true,
     }),
     enabled: viewMode === 'kanban',

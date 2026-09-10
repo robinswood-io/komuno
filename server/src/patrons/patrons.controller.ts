@@ -81,10 +81,13 @@ export class AdminPatronsController {
     @Query('limit') limit?: string,
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('projection') projection?: 'list' | 'directory',
   ) {
     const pageNum = parseInt(page || '1', 10);
     const limitNum = parseInt(limit || '20', 10);
-    return await this.patronsService.getPatrons(pageNum, limitNum, status, search);
+    return projection
+      ? await this.patronsService.getPatrons(pageNum, limitNum, status, search, projection)
+      : await this.patronsService.getPatrons(pageNum, limitNum, status, search);
   }
 
   @Get('search/email')

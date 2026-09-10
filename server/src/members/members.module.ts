@@ -13,9 +13,10 @@ import { StorageModule } from '../common/storage/storage.module';
 import { AuthModule } from '../auth/auth.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { AutomationsModule } from '../automations/automations.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [StorageModule, AuthModule, IntegrationsModule, AutomationsModule],
+  imports: [StorageModule, AuthModule, IntegrationsModule, AutomationsModule, AuditModule],
   controllers: [
     MembersController,
     AdminMembersController,

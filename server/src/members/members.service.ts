@@ -1,7 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException, Optional } from '@nestjs/common';
 import { StorageService } from '../common/storage/storage.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { AutomationsService } from '../automations/automations.service';
+import { AuditService } from '../audit/audit.service';
 import {
   proposeMemberSchema,
   insertMemberSchema,
@@ -42,6 +43,7 @@ export class MembersService {
     private readonly storageService: StorageService,
     private readonly integrationsService?: IntegrationsService,
     private readonly automationsService?: AutomationsService,
+    @Optional() private readonly auditService?: AuditService,
   ) {}
 
   private emitOutboundEventBestEffort(eventType: string, data: Record<string, unknown>) {
@@ -229,6 +231,7 @@ export class MembersService {
     assignedTo?: string,
     onlyProspects?: boolean,
     excludeProspects?: boolean,
+    options?: { cursor?: string; projection?: 'list' | 'directory' | 'kanban' | 'export' },
   ) {
     const result = await this.storageService.instance.getMembers({
       page,
@@ -243,6 +246,8 @@ export class MembersService {
       ...(assignedTo && assignedTo !== 'all' ? { assignedTo } : {}),
       ...(onlyProspects ? { onlyProspects: true } : {}),
       ...(excludeProspects ? { excludeProspects: true } : {}),
+      ...(options?.cursor ? { cursor: options.cursor } : {}),
+      ...(options?.projection ? { projection: options.projection } : {}),
     });
 
     if (!result.success) {
@@ -250,6 +255,42 @@ export class MembersService {
     }
 
     return { success: true, ...result.data };
+  }
+
+  async searchDirectory(search: string, cursor?: string, limit = 20) {
+    if (search.trim().length < 2) throw new BadRequestException('Saisissez au moins deux caractères.');
+    return this.getMembers(1, Math.min(limit, 20), undefined, search, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { cursor, projection: 'directory' });
+  }
+
+  async getMemberStats() {
+    const result = await this.storageService.instance.getMemberStats();
+    if (!result.success) throw new BadRequestException({ code: 'MEMBER_STATS_UNAVAILABLE' });
+    return { success: true, data: result.data };
+  }
+
+  async exportMembers(filters: Record<string, unknown>, actorEmail: string) {
+    const limit = Math.min(Math.max(Number(filters.limit) || 200, 1), 1000);
+    const result = await this.storageService.instance.getMembers({
+      limit, cursor: typeof filters.cursor === 'string' ? filters.cursor : undefined, projection: 'export',
+      status: typeof filters.status === 'string' ? filters.status : undefined,
+      search: typeof filters.search === 'string' ? filters.search : undefined,
+    });
+    if (!result.success) throw new BadRequestException({ code: 'MEMBER_EXPORT_FAILED' });
+    await this.auditService?.record({ actorEmail, action: 'members.export', entityType: 'member', metadata: { count: result.data.data.length, limitedTo: limit, hasNextPage: Boolean(result.data.nextCursor) } });
+    return { success: true, ...result.data };
+  }
+
+  async requestErasure(email: string, actorEmail: string, input: { confirm?: boolean; requestReference?: string }) {
+    if (!input.requestReference?.trim()) throw new BadRequestException('Une référence de demande précise est requise.');
+    if (!input.confirm) return { success: true, dryRun: true, message: 'Confirmez la demande après contrôle des obligations de conservation.', retainedFields: ['email', 'identifiants techniques', 'données financières et de cotisation liées'] };
+    const result = await this.storageService.instance.anonymizeMember(email);
+    if (!result.success) {
+      const error = 'error' in result ? result.error : new Error('Unknown error');
+      if (error.name === 'NotFoundError') throw new NotFoundException('Membre introuvable');
+      throw new BadRequestException({ code: 'MEMBER_ERASURE_FAILED' });
+    }
+    await this.auditService?.record({ actorEmail, action: 'members.erasure', entityType: 'member', entityId: email, metadata: { requestReference: input.requestReference, ...result.data, legalValidation: false } });
+    return { success: true, anonymized: true, retention: result.data, legalValidation: false };
   }
 
   async getMemberByEmail(email: string) {

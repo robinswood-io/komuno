@@ -142,7 +142,7 @@ import {
 } from "../shared/schema";
 import { z } from "zod";
 import { db, runDbQuery } from "./db";
-import { eq, desc, and, count, sql, or, asc, ne, like, ilike, isNull, isNotNull } from "drizzle-orm";
+import { eq, desc, and, count, sql, or, asc, ne, like, ilike, isNull, isNotNull, lt } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -305,8 +305,9 @@ export interface IStorage {
     limit?: number;
     status?: string;
     search?: string;
+    projection?: 'list' | 'directory';
   }): Promise<Result<{
-    data: Patron[];
+    data: Partial<Patron>[];
     total: number;
     page: number;
     limit: number;
@@ -354,19 +355,30 @@ export interface IStorage {
   // Gestion des membres
   createOrUpdateMember(memberData: Partial<InsertMember> & { email: string; createdBy?: string; assignedTo?: string }): Promise<Result<Member>>;
   proposeMember(memberData: Partial<InsertMember> & { email: string; firstName: string; lastName: string; proposedBy: string }): Promise<Result<Member>>;
-  getMembers(options?: { 
-    page?: number; 
+  getMembers(options?: {
+    page?: number;
     limit?: number;
     status?: string;
     search?: string;
     score?: 'high' | 'medium' | 'low';
     activity?: 'recent' | 'inactive';
+    prospectionStatus?: string;
+    onlyProspects?: boolean;
+    excludeProspects?: boolean;
+    city?: string;
+    department?: string;
+    assignedTo?: string;
+    cursor?: string;
+    projection?: 'list' | 'directory' | 'kanban' | 'export';
   }): Promise<Result<{
-    data: Member[];
+    data: Partial<Member>[];
     total: number;
     page: number;
     limit: number;
+    nextCursor: string | null;
   }>>;
+  getMemberStats(): Promise<Result<Record<string, unknown>>>;
+  anonymizeMember(email: string): Promise<Result<{ financialRecords: number; subscriptions: number; retainedFields: string[] }>>;
   getMemberDetails(email: string): Promise<Result<{
     member: Member;
     activities: MemberActivity[];
@@ -2169,6 +2181,7 @@ export class DatabaseStorage implements IStorage {
     limit?: number;
     status?: string;
     search?: string;
+    projection?: 'list' | 'directory';
   }): Promise<Result<{
     data: (Patron & { referrer?: { id: string; firstName: string; lastName: string; email: string; company: string | null } | null })[];
     total: number;
@@ -2177,7 +2190,7 @@ export class DatabaseStorage implements IStorage {
   }>> {
     try {
       const page = Math.max(1, options?.page || 1);
-      const limit = Math.min(100, Math.max(1, options?.limit || 20));
+      const limit = Math.min(options?.projection === 'directory' ? 20 : 100, Math.max(1, options?.limit || 20));
       const offset = (page - 1) * limit;
 
       // Construire les conditions WHERE
@@ -2215,8 +2228,20 @@ export class DatabaseStorage implements IStorage {
 
       logger.debug('Patrons retrieved', { limit, offset, page, filters: { status: options?.status, search: options?.search } });
       
-      // Get paginated results with referrer info
-      const patronsQuery = db
+      // La recherche réseau ne reçoit que les quatre champs utiles.
+      const directoryQuery = db
+        .select({
+          email: patrons.email,
+          firstName: patrons.firstName,
+          lastName: patrons.lastName,
+          company: patrons.company,
+        })
+        .from(patrons)
+        .orderBy(desc(patrons.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      const fullQuery = db
         .select({
           id: patrons.id,
           firstName: patrons.firstName,
@@ -2245,9 +2270,10 @@ export class DatabaseStorage implements IStorage {
         .limit(limit)
         .offset(offset);
 
+      const selectedQuery = options?.projection === 'directory' ? directoryQuery : fullQuery;
       const patronsList = whereClause
-        ? await patronsQuery.where(whereClause)
-        : await patronsQuery;
+        ? await selectedQuery.where(whereClause)
+        : await selectedQuery;
       
       return { 
         success: true, 
@@ -3019,143 +3045,131 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMembers(options?: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    search?: string;
-    score?: 'high' | 'medium' | 'low';
-    activity?: 'recent' | 'inactive';
-    prospectionStatus?: string;
-    onlyProspects?: boolean;
-    excludeProspects?: boolean;
-    city?: string;
-    department?: string;
-    assignedTo?: string;
-  }): Promise<Result<{
-    data: Member[];
-    total: number;
-    page: number;
-    limit: number;
-  }>> {
+    page?: number; limit?: number; status?: string; search?: string;
+    score?: 'high' | 'medium' | 'low'; activity?: 'recent' | 'inactive';
+    prospectionStatus?: string; onlyProspects?: boolean; excludeProspects?: boolean;
+    city?: string; department?: string; assignedTo?: string; cursor?: string;
+    projection?: 'list' | 'directory' | 'kanban' | 'export';
+  }): Promise<Result<{ data: Partial<Member>[]; total: number; page: number; limit: number; nextCursor: string | null }>> {
     try {
+      const projection = options?.projection ?? 'list';
+      const caps = { list: 100, directory: 20, kanban: 60, export: 1000 } as const;
       const page = Math.max(1, options?.page || 1);
-      const limit = Math.min(500, Math.max(1, options?.limit || 20));
-      const offset = (page - 1) * limit;
-
-      // Construire les conditions WHERE
+      const limit = Math.min(caps[projection], Math.max(1, options?.limit || 20));
       const conditions: unknown[] = [];
-
-      // Filtre par statut
-      if (options?.status && options.status !== 'all') {
-        conditions.push(eq(members.status, options.status));
+      if (options?.status && options.status !== 'all') conditions.push(eq(members.status, options.status));
+      if (options?.prospectionStatus && options.prospectionStatus !== 'all') conditions.push(eq(members.prospectionStatus, options.prospectionStatus));
+      if (options?.onlyProspects) conditions.push(isNotNull(members.prospectionStatus));
+      if (options?.excludeProspects) conditions.push(isNull(members.prospectionStatus));
+      if (options?.city) conditions.push(ilike(members.city, `%${options.city}%`));
+      if (options?.department) conditions.push(eq(members.department, options.department));
+      if (options?.assignedTo) conditions.push(eq(members.assignedTo, options.assignedTo));
+      if (options?.search?.trim()) {
+        const term = `%${options.search.trim()}%`;
+        conditions.push(or(ilike(members.firstName, term), ilike(members.lastName, term), ilike(members.email, term), ilike(members.company, term))!);
       }
-
-      // Filtre par statut de prospection
-      if (options?.prospectionStatus && options.prospectionStatus !== 'all') {
-        conditions.push(eq(members.prospectionStatus, options.prospectionStatus));
-      }
-
-      // Filtre prospects uniquement (Pipeline CRM)
-      if (options?.onlyProspects) {
-        conditions.push(isNotNull(members.prospectionStatus));
-      }
-
-      // Exclure les prospects (liste membres)
-      if (options?.excludeProspects) {
-        conditions.push(isNull(members.prospectionStatus));
-      }
-
-      // Filtre par ville
-      if (options?.city) {
-        conditions.push(ilike(members.city, `%${options.city}%`));
-      }
-
-      // Filtre par département
-      if (options?.department) {
-        conditions.push(eq(members.department, options.department));
-      }
-
-      // Filtre par responsable assigné
-      if (options?.assignedTo) {
-        conditions.push(eq(members.assignedTo, options.assignedTo));
-      }
-
-      // Filtre de recherche textuelle
-      if (options?.search && options.search.trim()) {
-        const searchTerm = `%${options.search.toLowerCase()}%`;
-        conditions.push(
-          or(
-            ilike(members.firstName, searchTerm),
-            ilike(members.lastName, searchTerm),
-            ilike(members.email, searchTerm),
-            ilike(members.company, searchTerm)
-          )!
-        );
-      }
-
-      // Filtre par score d'engagement
-      if (options?.score) {
-        if (options.score === 'high') {
-          conditions.push(sql`${members.engagementScore} >= 50`);
-        } else if (options.score === 'medium') {
-          conditions.push(sql`${members.engagementScore} >= 10 AND ${members.engagementScore} < 50`);
-        } else if (options.score === 'low') {
-          conditions.push(sql`${members.engagementScore} < 10`);
-        }
-      }
-
-      // Filtre par activité récente
+      if (options?.score === 'high') conditions.push(sql`${members.engagementScore} >= 50`);
+      if (options?.score === 'medium') conditions.push(sql`${members.engagementScore} >= 10 AND ${members.engagementScore} < 50`);
+      if (options?.score === 'low') conditions.push(sql`${members.engagementScore} < 10`);
       if (options?.activity) {
-        const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-        if (options.activity === 'recent') {
-          conditions.push(sql`${members.lastActivityAt} >= ${thirtyDaysAgo.toISOString()}`);
-        } else if (options.activity === 'inactive') {
-          conditions.push(
-            or(
-              sql`${members.lastActivityAt} < ${thirtyDaysAgo.toISOString()}`,
-              sql`${members.lastActivityAt} IS NULL`
-            )!
-          );
+        const threshold = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        conditions.push(options.activity === 'recent'
+          ? sql`${members.lastActivityAt} >= ${threshold}`
+          : or(sql`${members.lastActivityAt} < ${threshold}`, sql`${members.lastActivityAt} IS NULL`)!);
+      }
+      if (options?.cursor) {
+        try {
+          const decoded = JSON.parse(Buffer.from(options.cursor, 'base64url').toString('utf8')) as { lastActivityAt: string; email: string };
+          const cursorDate = new Date(decoded.lastActivityAt);
+          if (!decoded.email || Number.isNaN(cursorDate.getTime())) throw new Error('invalid');
+          conditions.push(or(lt(members.lastActivityAt, cursorDate), and(eq(members.lastActivityAt, cursorDate), sql`${members.email} > ${decoded.email}`))!);
+        } catch {
+          return { success: false, error: new ValidationError('Curseur de pagination invalide') };
         }
       }
-
-      // Construire la clause WHERE
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-      // Count total avec filtres
-      const countQuery = db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(members);
-      
-      const [countResult] = whereClause 
-        ? await countQuery.where(whereClause)
-        : await countQuery;
-
-      // Get paginated results avec filtres
-      const membersQuery = db
-        .select()
-        .from(members)
-        .orderBy(desc(members.lastActivityAt))
-        .limit(limit)
-        .offset(offset);
-
-      const membersList = whereClause
-        ? await membersQuery.where(whereClause)
-        : await membersQuery;
-
-      return { 
-        success: true, 
-        data: {
-          data: membersList,
-          total: countResult.count,
-          page,
-          limit
-        }
-      };
+      const where = conditions.length ? and(...conditions) : undefined;
+      const [countResult] = where
+        ? await db.select({ count: sql<number>`count(*)::int` }).from(members).where(where)
+        : await db.select({ count: sql<number>`count(*)::int` }).from(members);
+      const selection = projection === 'directory'
+        ? { email: members.email, firstName: members.firstName, lastName: members.lastName, company: members.company, lastActivityAt: members.lastActivityAt }
+        : projection === 'kanban'
+          ? { email: members.email, firstName: members.firstName, lastName: members.lastName, company: members.company, status: members.status, prospectionStatus: members.prospectionStatus, engagementScore: members.engagementScore, lastActivityAt: members.lastActivityAt }
+          : undefined;
+      const base = selection ? db.select(selection).from(members) : db.select().from(members);
+      const ordered = base.orderBy(desc(members.lastActivityAt), asc(members.email)).limit(limit + 1);
+      const rows = where ? await ordered.where(where) : await ordered.offset(options?.cursor ? 0 : (page - 1) * limit);
+      const hasMore = rows.length > limit;
+      const data = rows.slice(0, limit);
+      const tail = data[data.length - 1] as { email?: string; lastActivityAt?: Date | string } | undefined;
+      const nextCursor = hasMore && tail?.email && tail.lastActivityAt
+        ? Buffer.from(JSON.stringify({ lastActivityAt: new Date(tail.lastActivityAt).toISOString(), email: tail.email })).toString('base64url')
+        : null;
+      return { success: true, data: { data, total: countResult?.count ?? 0, page, limit, nextCursor } };
     } catch (error) {
-      return { success: false, error: new DatabaseError(`Erreur lors de la récupération des membres: ${error}`) };
+      logger.error('Member list query failed', { error });
+      return { success: false, error: new DatabaseError('Erreur lors de la récupération des membres') };
+    }
+  }
+
+  async getMemberStats(): Promise<Result<Record<string, unknown>>> {
+    try {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const [summary] = await db.select({
+        totalMembers: sql<number>`count(*)::int`,
+        totalActive: sql<number>`count(*) filter (where ${members.status} = 'active')::int`,
+        totalProspects: sql<number>`count(*) filter (where ${members.status} = 'proposed' or ${members.prospectionStatus} is not null)::int`,
+        newMembersThisMonth: sql<number>`count(*) filter (where ${members.createdAt} >= ${monthStart})::int`,
+        newMembersThisQuarter: sql<number>`count(*) filter (where ${members.createdAt} >= ${quarterStart})::int`,
+        newMembersLastMonth: sql<number>`count(*) filter (where ${members.createdAt} >= ${lastMonthStart} and ${members.createdAt} < ${monthStart})::int`,
+      }).from(members);
+      const monthly = await db.select({
+        month: sql<string>`to_char(date_trunc('month', ${members.createdAt}), 'Mon YY')`,
+        monthDate: sql<Date>`date_trunc('month', ${members.createdAt})`,
+        active: sql<number>`count(*) filter (where ${members.status} = 'active')::int`,
+        prospects: sql<number>`count(*) filter (where ${members.status} = 'proposed' or ${members.prospectionStatus} is not null)::int`,
+      }).from(members).where(sql`${members.createdAt} >= date_trunc('month', now()) - interval '5 months'`)
+        .groupBy(sql`date_trunc('month', ${members.createdAt})`).orderBy(asc(sql`date_trunc('month', ${members.createdAt})`));
+      const tagStats = await db.select({ tagName: memberTags.name, count: sql<number>`count(*)::int` })
+        .from(memberTagAssignments).innerJoin(memberTags, eq(memberTagAssignments.tagId, memberTags.id))
+        .groupBy(memberTags.name).orderBy(desc(sql`count(*)`)).limit(5);
+      const topMembers = await db.select({ firstName: members.firstName, lastName: members.lastName, email: members.email, engagementScore: members.engagementScore })
+        .from(members).where(and(eq(members.status, 'active'), sql`${members.engagementScore} > 0`))
+        .orderBy(desc(members.engagementScore)).limit(10);
+      const total = summary?.totalMembers ?? 0; const active = summary?.totalActive ?? 0;
+      const current = summary?.newMembersThisMonth ?? 0; const previous = summary?.newMembersLastMonth ?? 0;
+      return { success: true, data: {
+        totalMembers: total, totalActive: active, totalProspects: summary?.totalProspects ?? 0,
+        conversionRate: total ? (active / total) * 100 : 0,
+        newMembersThisMonth: current, newMembersThisQuarter: summary?.newMembersThisQuarter ?? 0,
+        monthlyGrowth: previous ? ((current - previous) / previous) * 100 : current ? 100 : 0,
+        monthlyData: monthly.map(({ month, active, prospects }) => ({ month, active, prospects })),
+        tagStats, topMembers: topMembers.map((member, index) => ({ rank: index + 1, ...member })),
+      } };
+    } catch (error) {
+      logger.error('Member statistics query failed', { error });
+      return { success: false, error: new DatabaseError('Erreur lors de la récupération des statistiques membres') };
+    }
+  }
+
+  async anonymizeMember(email: string): Promise<Result<{ financialRecords: number; subscriptions: number; retainedFields: string[] }>> {
+    try {
+      const [member] = await db.select({ email: members.email }).from(members).where(eq(members.email, email)).limit(1);
+      if (!member) return { success: false, error: new NotFoundError('Membre introuvable') };
+      const [financial] = await db.select({ count: sql<number>`count(*)::int` }).from(financialRevenues).where(eq(financialRevenues.memberEmail, email));
+      const [subscriptions] = await db.select({ count: sql<number>`count(*)::int` }).from(memberSubscriptions).where(eq(memberSubscriptions.memberEmail, email));
+      await db.update(members).set({
+        firstName: 'Données', lastName: 'effacées', company: null, department: null, city: null, postalCode: null,
+        phone: null, role: null, cjdRole: null, notes: null, proposedBy: null, soncasProfile: null, assignedTo: null,
+        status: 'inactive', prospectionStatus: null, updatedAt: sql`NOW()`,
+      }).where(eq(members.email, email));
+      return { success: true, data: { financialRecords: financial?.count ?? 0, subscriptions: subscriptions?.count ?? 0, retainedFields: ['email', 'identifiants techniques', 'données financières et de cotisation liées'] } };
+    } catch (error) {
+      logger.error('Member erasure failed', { error });
+      return { success: false, error: new DatabaseError("Erreur lors du traitement de la demande d’effacement") };
     }
   }
 
