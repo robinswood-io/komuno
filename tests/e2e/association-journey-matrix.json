@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "policy": "Chaque parcours prioritaire possède un scénario nominal et un scénario d'échec exécutables avant fusion et après déploiement d'essai.",
+  "journeys": [
+    {"id":"instance-first-admin","nominal":["server/src/admin/admin.service.spec.ts"],"failure":["test/unit/admin-invitation-regression.spec.ts","server/src/auth/guards/admin.guard.spec.ts"],"runOn":["ci","staging"]},
+    {"id":"member","nominal":["server/src/members/members.service.spec.ts"],"failure":["test/unit/members.edit-regression.spec.ts","server/src/auth/guards/permission.guard.spec.ts"],"runOn":["ci","staging"]},
+    {"id":"idea","nominal":["test/unit/ideas.controller.spec.ts"],"failure":["test/unit/ideas.service.spec.ts"],"runOn":["ci","staging"]},
+    {"id":"event","nominal":["test/unit/events.controller.spec.ts"],"failure":["test/unit/events.service.spec.ts"],"runOn":["ci","staging"]},
+    {"id":"membership-fee","nominal":["server/src/financial/financial.service.spec.ts"],"failure":["server/src/financial/financial.controller.spec.ts"],"runOn":["ci","staging"]},
+    {"id":"loan","nominal":["server/src/loans/loans.service.spec.ts"],"failure":["server/src/loans/loans.controller.spec.ts"],"runOn":["ci","staging"]},
+    {"id":"form","nominal":["tests/e2e/forms-admin.spec.ts"],"failure":["test/unit/forms.v2.schema-and-service.spec.ts"],"runOn":["ci","staging"]},
+    {"id":"permissions","nominal":["server/src/auth/guards/session.guard.spec.ts"],"failure":["server/src/auth/guards/permission.guard.spec.ts","server/src/auth/guards/admin.guard.spec.ts"],"runOn":["ci","staging"]},
+    {"id":"backup-restore","nominal":["scripts/test-backup-restore.sh"],"failure":["scripts/test-backup-restore.sh"],"runOn":["ci","staging"]},
+    {"id":"keyboard-mobile","nominal":["tests/e2e/accessibility-critical.spec.ts","tests/e2e/admin-mobile-responsive.spec.ts"],"failure":["tests/e2e/accessibility-critical.spec.ts"],"runOn":["ci","staging"]}
+  ]
+}

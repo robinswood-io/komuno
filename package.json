@@ -9,6 +9,8 @@
     "test:watch": "bun x vitest watch",
     "test:coverage": "bun x vitest run --coverage",
     "test:e2e": "bun x playwright test",
+    "test:e2e:a11y": "E2E_ACCESSIBILITY=1 bun x playwright test tests/e2e/accessibility-critical.spec.ts",
+    "test:journey-matrix": "node scripts/verify-association-journey-matrix.mjs",
     "test:e2e:forms": "bun x playwright test tests/e2e/forms-admin.spec.ts",
     "docs:check": "bash scripts/check-doc-links.sh",
     "docs:check:all": "bash scripts/check-doc-links-all.sh",
@@ -186,6 +188,7 @@
     "zod-validation-error": "^5.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
     "@nestjs/cli": "^11.0.19",
     "@nestjs/swagger": "^11.2.7",
     "@nestjs/testing": "^11.1.18",
