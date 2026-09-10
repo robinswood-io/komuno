@@ -1,4 +1,4 @@
-name: PR CI (Night Agent)
+name: PR CI
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,12 +13,51 @@ env:
 
 jobs:
   ci:
-    name: TypeScript + Tests + Build
-    if: startsWith(github.head_ref, 'night-agent/auto-fixes-')
+    name: TypeScript + Tests + Migrations + Build
     runs-on: self-hosted
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
+    env:
+      DATABASE_URL: postgres://ciuser:cipassword@localhost:5432/cidb
+      REDIS_URL: redis://localhost:6379
+      MINIO_ENDPOINT: localhost
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: ci-minio-access
+      MINIO_SECRET_KEY: ci-minio-secret-at-least-32-characters
+      SESSION_SECRET: ci-session-secret-at-least-32-characters
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ciuser
+          POSTGRES_PASSWORD: cipassword
+          POSTGRES_DB: cidb
+        options: >-
+          --health-cmd "pg_isready -U ciuser -d cidb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports: ["5432:5432"]
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports: ["6379:6379"]
+      minio:
+        image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+        env:
+          MINIO_ROOT_USER: ci-minio-access
+          MINIO_ROOT_PASSWORD: ci-minio-secret-at-least-32-characters
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports: ["9000:9000"]
 
     steps:
       - name: Checkout code
@@ -42,11 +81,30 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Secret scan
+        run: bash scripts/scan-secrets.sh
+
+      - name: Security dependencies
+        run: bun audit --production --audit-level=high
+
+      - name: Maintained contracts
+        run: |
+          node scripts/check-typescript-source-drift.mjs
+          node scripts/check-maintained-docs.mjs
+          node scripts/verify-association-journey-matrix.mjs
+          bash scripts/test-backup-restore.sh
+
       - name: TypeScript check
         run: bunx tsc --noEmit
 
+      - name: Validate migrations
+        run: sh scripts/run-migrations.sh
+
       - name: Run tests
-        run: bun test
+        run: bun run test
+
+      - name: Collect critical E2E scenarios
+        run: bun x playwright test --list
 
       - name: Build check
         run: bun run build

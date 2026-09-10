@@ -54,7 +54,7 @@ describe('http-exception.filter iteration112-121', () => {
     expect(response.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        message: 'Internal server error',
+        message: 'Une erreur interne est survenue. Réessayez ou contactez le support avec l’identifiant indiqué.',
       }),
     );
   });
@@ -140,13 +140,13 @@ describe('http-exception.filter iteration112-121', () => {
     expect(response.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        message: 'Internal server error',
+        message: 'Une erreur interne est survenue. Réessayez ou contactez le support avec l’identifiant indiqué.',
         code: 'DB_FAILURE',
       }),
     );
   });
 
-  it('iteration118: keeps ApiError 500 message in non-production', () => {
+  it('iteration118: masks ApiError 500 message in non-production', () => {
     vi.spyOn(logger, 'error').mockImplementation(() => logger);
     const filter = new HttpExceptionFilter();
     const response = createResponse();
@@ -160,7 +160,7 @@ describe('http-exception.filter iteration112-121', () => {
     expect(response.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        message: 'Detailed dev error',
+        message: 'Une erreur interne est survenue. Réessayez ou contactez le support avec l’identifiant indiqué.',
         code: 'DEV_500',
       }),
     );
@@ -204,7 +204,7 @@ describe('http-exception.filter iteration112-121', () => {
     const metadata = errorSpy.mock.calls[0]?.[1] as Record<string, unknown>;
     const payload = response.json.mock.calls[0]?.[0] as Record<string, unknown>;
 
-    expect(typeof metadata.errorId).toBe('string');
-    expect(metadata.errorId).toBe(payload.errorId);
+    expect(typeof metadata.correlationId).toBe('string');
+    expect(metadata.correlationId).toBe(payload.errorId);
   });
 });

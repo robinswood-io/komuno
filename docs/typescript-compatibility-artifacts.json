@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "policy": "TypeScript est canonique. Ces artefacts JavaScript restent suivis uniquement pour les tests CommonJS historiques; toute modification exige une mise \u00e0 jour explicite du registre.",
+  "reviewedAt": "2026-09-10",
+  "artifacts": [
+    {
+      "source": "server/storage.ts",
+      "artifact": "server/storage.js",
+      "sourceSha256": "3aefd5e4c2dbb4b354c93b52be4dd68da7617734f5284b4917bd9f7502397353",
+      "artifactSha256": "793cc545ef815865b323c89ebee43bc0b875ee8ec317238e3a6eba678afbc022",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/email-service.ts",
+      "artifact": "server/email-service.js",
+      "sourceSha256": "799369311c835994121a67c5537807dd714f4c1a0763fc1cdac67f9b78d22b56",
+      "artifactSha256": "c618e604e5548ae2da465db8185a341f98947fef9e2669449f1ee07011d72f91",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/parse-firebase-dump.ts",
+      "artifact": "server/parse-firebase-dump.js",
+      "sourceSha256": "e7846be36532cdb790ea989779dcba8db7e85bf7c40a8d9094c6f9e71f8ec9e1",
+      "artifactSha256": "9aa0a1a4acda878038a665d49a1ffdf75fd0295cdde15a43338c3a08705c4502",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/notification-service.ts",
+      "artifact": "server/notification-service.js",
+      "sourceSha256": "57506d702c9e40fc13279d202611ff672bc897e2acf98164feb90afe19b0f2d5",
+      "artifactSha256": "b00dfaa26063ccde88cff4acc8010cf3857510aafa8ae1d74ed92a8136e7bf87",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/index.ts",
+      "artifact": "server/index.js",
+      "sourceSha256": "44f963b548bd77d378472c3ffb75660569cd35be88c8e35df209e870ce5d4701",
+      "artifactSha256": "eab4beef5ca912a06dbe471efed059115f8d01c1304f2d53eb7ad4fe2a3bbb91",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/email-notification-service.ts",
+      "artifact": "server/email-notification-service.js",
+      "sourceSha256": "ef7fd38d4a07961af61ce0ddfd71fe16101465c8ddb4d2829c645cb0ddf29dc9",
+      "artifactSha256": "5ef0e841239ad35449d9a9cff1e1e9118a5e457d8df7835c5c2bc9cd60cc952a",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/db.ts",
+      "artifact": "server/db.js",
+      "sourceSha256": "ebb7fe587e3942eade231ded8001be944854aec55ec1bf83639836005430cc71",
+      "artifactSha256": "c6ea9c137b4adccff60c29c9f4803b81de97b07494696a364ba582039a411d99",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/email-templates.ts",
+      "artifact": "server/email-templates.js",
+      "sourceSha256": "a9a79d52801e8f8d68d6dfca4ba3fc89d8a5ba10fec6b0b93b14adb8e6141851",
+      "artifactSha256": "4a3f5629b1cdf75d9fa9e689e8c1b4a3038ddcaa90ecbc32bddb92092b769641",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "shared/schema.ts",
+      "artifact": "shared/schema.js",
+      "sourceSha256": "5b665bbe5c6c7e87820ef6bd4aaab4b1b1500053bbe8b0de7cf74bc84c9b14dd",
+      "artifactSha256": "007b1ef0cc61fbe62dfd7b28c6c92aeaa94d7dd1aa7c894848cd2a9e72e6e9c7",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "shared/errors.ts",
+      "artifact": "shared/errors.js",
+      "sourceSha256": "f07e291cee6c2f3a167000c5595c35f6c8ab16d8a12c992c1d52904a79928f1e",
+      "artifactSha256": "42a24c835553b0d1e9049eb886251edcb9df96053b67eddb6dec77815c493c28",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "lib/config/branding-core.ts",
+      "artifact": "lib/config/branding-core.js",
+      "sourceSha256": "b8133449b043c760203e3a02bfb7c4a31abbb7373ff5a69688af709d108f060a",
+      "artifactSha256": "122d880db25833fd2dac0bc8ab0f2ac9f08fcf63d483d61d02f41f8feeac0d58",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/middleware/db-monitoring.ts",
+      "artifact": "server/middleware/db-monitoring.js",
+      "sourceSha256": "1ba03e93da5f2a070aa6afe565a82d935d2867e0a27104f74a070cadef1f25e1",
+      "artifactSha256": "9747826022d62c4bdec50a2fac9f3f9ed75432a28e6b0bf8fbba54a1a59424df",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/middleware/rate-limit.ts",
+      "artifact": "server/middleware/rate-limit.js",
+      "sourceSha256": "29ff3847dbf04c65d8de22a6360ca252ce7edcf1fc083903ecc9bbed8002060b",
+      "artifactSha256": "ee3609a78973f3afd19b87011e808595b6a6e1c81a38e21f08024b63a906c4ce",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/utils/db-health.ts",
+      "artifact": "server/utils/db-health.js",
+      "sourceSha256": "b61e6990b3f2187cf8050541f6f5ab6c5beae4eb2884c6cfe79aa0ab99b46a10",
+      "artifactSha256": "cdf0c06e525a34c4c92d666e9f857ec4539c794f56f10d4a0ce1992c022cefc0",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/utils/database-config.utils.ts",
+      "artifact": "server/utils/database-config.utils.js",
+      "sourceSha256": "ba9ff14f4395bbf3bfeb5766134e4f61133182989934e62784bc31e0d4c0126e",
+      "artifactSha256": "39a268a5d09250f0d9faf1261ed2a318c55d7da4c7e5a737c9b0bb38dc27a834",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/utils/github-integration.ts",
+      "artifact": "server/utils/github-integration.js",
+      "sourceSha256": "5858ecf7f6da5f39b24236c754b319f1aa9105b7e2c735cae5b4b61a86e0ef53",
+      "artifactSha256": "47911c8b0a8d8f4c06e13f9b1a25958a1041558f5e7edf80f7e91272fbabd712",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/utils/auto-sync.ts",
+      "artifact": "server/utils/auto-sync.js",
+      "sourceSha256": "e580e5617a298e02a2ca62150cabdcd77fac8444712198be8d6ba407dc0f60d3",
+      "artifactSha256": "5a0c59d1002da8f1d48987fb3320247f9128a5e9ab0676017218eac233d83343",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/utils/tracking-scheduler.ts",
+      "artifact": "server/utils/tracking-scheduler.js",
+      "sourceSha256": "c08e5daa87041427d0423267165941f19f14fd476dbb1d45b7e5fad076f7b1e7",
+      "artifactSha256": "1bacccf377342746d24a27fafc6c1694946b375c343bb71a308585c8517ce00f",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/scripts/seed-test-users.ts",
+      "artifact": "server/scripts/seed-test-users.js",
+      "sourceSha256": "a09cbe80c517e8f4f870ea64e4d565726b5a4c464f6745cb5a314b7b6d1a82df",
+      "artifactSha256": "2b98bdbbdbd25503d1b9ccadbc67688b36ec75881bfb3a8426f59cc383cbe35d",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/lib/db-resilience.ts",
+      "artifact": "server/lib/db-resilience.js",
+      "sourceSha256": "453fb9c0223c949aae6301b032306fcc07418676087b389b66a8693319944a56",
+      "artifactSha256": "50d2ad37c1063c0c7709158042fab88f703340698dc5c06265bb1917cb1ea115",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/lib/circuit-breaker.ts",
+      "artifact": "server/lib/circuit-breaker.js",
+      "sourceSha256": "ca215f437b11f82af0a922a2ab54cb5e9dece632af253ad674f7241b74475fed",
+      "artifactSha256": "1ec0d8fc63e2bf461c81575fbb66eddf68290e6d32008e1486e1202c73a1bb56",
+      "disposition": "compatibility-registered"
+    },
+    {
+      "source": "server/lib/logger.ts",
+      "artifact": "server/lib/logger.js",
+      "sourceSha256": "aff545320936d5b30542067fe2d429d1c921e0683df6e7132e8776c50b02bc4a",
+      "artifactSha256": "a63deb9393878a0503f54de03d247cce303bc1073a45d747f7cac332ee0131a9",
+      "disposition": "compatibility-registered"
+    }
+  ]
+}

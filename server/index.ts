@@ -51,9 +51,13 @@ async function bootstrap() {
   }
 
   // 4. Configurer session + Passport
+  const sessionSecret = process.env.SESSION_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'test-secret-dev-only');
+  if (!sessionSecret) {
+    throw new Error('SESSION_SECRET est requis en production');
+  }
   expressApp.use(
     session({
-      secret: process.env.SESSION_SECRET || 'test-secret-dev-only',
+      secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
       rolling: true,

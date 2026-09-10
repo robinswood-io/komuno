@@ -128,8 +128,8 @@ jobs:
             GIT_TAG=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          provenance: false
-          sbom: false
+          provenance: true
+          sbom: true
 
       - name: Build summary
         run: |
@@ -412,7 +412,7 @@ jobs:
             fi
 
             echo "✅ Déploiement CJD80 réussi!"
-            docker image prune -f || true
+            echo "Nettoyage global désactivé : conserver image courante et image de retour arrière."
 
       - name: Deployment summary
         if: needs.detect-changes.outputs.should_build == 'true'
@@ -695,7 +695,7 @@ jobs:
           fi
 
           echo "✅ Déploiement REP réussi!"
-          docker image prune -f || true
+          echo "Nettoyage global désactivé : conserver image courante et image de retour arrière."
 
       - name: Deployment summary
         if: needs.detect-changes.outputs.should_build == 'true'
@@ -865,7 +865,7 @@ jobs:
           fi
 
           echo "✅ Déploiement HDF réussi!"
-          docker image prune -f || true
+          echo "Nettoyage global désactivé : conserver image courante et image de retour arrière."
 
       - name: Deployment summary
         if: needs.detect-changes.outputs.should_build == 'true'

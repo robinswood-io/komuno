@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "documents": [
+    {"path":"docs/OPERATIONS.md","owner":"exploitant","reviewedAt":"2026-09-10","maxAgeDays":183},
+    {"path":"docs/ADMIN_ASSOCIATION.md","owner":"responsable produit","reviewedAt":"2026-09-10","maxAgeDays":183},
+    {"path":"docs/CONTRIBUTING_MAINTAINED.md","owner":"mainteneur","reviewedAt":"2026-09-10","maxAgeDays":183},
+    {"path":"docs/data-governance-members.md","owner":"responsable des données","reviewedAt":"2026-09-10","maxAgeDays":183},
+    {"path":"docs/release-compatibility.json","owner":"exploitant","reviewedAt":"2026-09-10","maxAgeDays":183}
+  ]
+}

@@ -48,7 +48,7 @@ describe('http-exception.filter iteration 96', () => {
     const payload = response.json.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(payload).toMatchObject({
       success: false,
-      message: 'Internal server error',
+      message: 'Une erreur interne est survenue. Réessayez ou contactez le support avec l’identifiant indiqué.',
     });
 
     const metadata = errorSpy.mock.calls[0]?.[1] as Record<string, unknown>;

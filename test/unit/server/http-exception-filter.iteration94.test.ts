@@ -48,7 +48,7 @@ describe('http-exception.filter iteration 94', () => {
     expect(response.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        message: 'Internal server error',
+        message: 'Une erreur interne est survenue. Réessayez ou contactez le support avec l’identifiant indiqué.',
       }),
     );
 

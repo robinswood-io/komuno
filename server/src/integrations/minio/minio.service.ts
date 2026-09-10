@@ -25,8 +25,8 @@ export class MinIOService implements OnModuleInit {
     this.port = parseInt(process.env.MINIO_PORT || '9000', 10);
     this.externalPort = parseInt(process.env.MINIO_EXTERNAL_PORT || '9002', 10);
     this.useSSL = process.env.MINIO_USE_SSL === 'true';
-    this.accessKey = process.env.MINIO_ACCESS_KEY || 'minioadmin';
-    this.secretKey = process.env.MINIO_SECRET_KEY || 'minioadmin';
+    this.accessKey = process.env.MINIO_ACCESS_KEY || (process.env.NODE_ENV === 'production' ? '' : 'minioadmin');
+    this.secretKey = process.env.MINIO_SECRET_KEY || (process.env.NODE_ENV === 'production' ? '' : 'minioadmin');
     this.bucketLoanItems = process.env.MINIO_BUCKET_LOAN_ITEMS || 'loan-items';
     this.bucketAssets = process.env.MINIO_BUCKET_ASSETS || 'assets';
   }
@@ -41,6 +41,9 @@ export class MinIOService implements OnModuleInit {
   async initialize(): Promise<void> {
     if (this.initialized && this.client) {
       return;
+    }
+    if (!this.accessKey || !this.secretKey) {
+      throw new Error('Identifiants MinIO absents');
     }
 
     try {

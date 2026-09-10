@@ -225,3 +225,27 @@ tests/playwright-*.ts
 
 # Archives de documentation (rapports temporaires)
 docs/archives/
+
+# Artefacts historiques générés à côté des sources TypeScript canoniques
+/server/storage.js
+/server/email-service.js
+/server/parse-firebase-dump.js
+/server/notification-service.js
+/server/index.js
+/server/email-notification-service.js
+/server/db.js
+/server/email-templates.js
+/shared/schema.js
+/shared/errors.js
+/lib/config/branding-core.js
+/server/middleware/db-monitoring.js
+/server/middleware/rate-limit.js
+/server/utils/db-health.js
+/server/utils/database-config.utils.js
+/server/utils/github-integration.js
+/server/utils/auto-sync.js
+/server/utils/tracking-scheduler.js
+/server/scripts/seed-test-users.js
+/server/lib/db-resilience.js
+/server/lib/circuit-breaker.js
+/server/lib/logger.js

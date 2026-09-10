@@ -42,12 +42,12 @@ describe('http-exception.filter iteration 95', () => {
     const response = createResponse();
     const request: RequestShape = { method: 'PATCH', path: '/api/tasks/1', query: {}, body: {} };
 
-    filter.catch(new HttpException('Invalid payload', HttpStatus.BAD_REQUEST), createHost(request, response));
+    filter.catch(new HttpException('La demande est invalide. Vérifiez les informations saisies.', HttpStatus.BAD_REQUEST), createHost(request, response));
 
     expect(response.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
 
     const payload = response.json.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(payload.message).toBe('Invalid payload');
+    expect(payload.message).toBe('La demande est invalide. Vérifiez les informations saisies.');
     expect(payload.success).toBe(false);
   });
 });
