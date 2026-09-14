@@ -22,7 +22,6 @@ jobs:
       DATABASE_URL: postgres://ciuser:cipassword@localhost:5432/cidb
       REDIS_URL: redis://localhost:6379
       MINIO_ENDPOINT: localhost
-      MINIO_PORT: ${{ job.services.minio.ports[9000] }}
       MINIO_ACCESS_KEY: ci-minio-access
       MINIO_SECRET_KEY: ci-minio-secret-at-least-32-characters
       SESSION_SECRET: ci-session-secret-at-least-32-characters
@@ -62,6 +61,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout@v7
+
+      - name: Expose MinIO service port
+        run: echo "MINIO_PORT=${{ job.services.minio.ports[9000] }}" >> "$GITHUB_ENV"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # oven-sh/setup-bun@v2
