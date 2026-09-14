@@ -56,6 +56,7 @@ jobs:
 
       - name: Start MinIO
         run: |
+          docker rm -f komuno-ci-minio >/dev/null 2>&1 || true
           docker run -d --rm --name komuno-ci-minio \
             -e MINIO_ROOT_USER=ci-minio-access \
             -e MINIO_ROOT_PASSWORD=ci-minio-secret-at-least-32-characters \
@@ -114,6 +115,10 @@ jobs:
 
       - name: Build check
         run: bun run build
+
+      - name: Cleanup MinIO
+        if: always()
+        run: docker rm -f komuno-ci-minio >/dev/null 2>&1 || true
 
       - name: CI Summary
         if: always()
