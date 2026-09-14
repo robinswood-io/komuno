@@ -92,7 +92,7 @@ jobs:
         run: bash scripts/scan-secrets.sh
 
       - name: Security dependencies
-        run: bun audit --production --audit-level=high
+        run: bash scripts/check-dependencies.sh
 
       - name: Maintained contracts
         run: |
