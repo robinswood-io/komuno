@@ -22,7 +22,7 @@ jobs:
       DATABASE_URL: postgres://ciuser:cipassword@localhost:5432/cidb
       REDIS_URL: redis://localhost:6379
       MINIO_ENDPOINT: localhost
-      MINIO_PORT: "9000"
+      MINIO_PORT: ${{ job.services.minio.ports[9000] }}
       MINIO_ACCESS_KEY: ci-minio-access
       MINIO_SECRET_KEY: ci-minio-secret-at-least-32-characters
       SESSION_SECRET: ci-session-secret-at-least-32-characters
@@ -57,7 +57,7 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-        ports: ["9000:9000"]
+        ports: ["9000/tcp"]
 
     steps:
       - name: Checkout code
