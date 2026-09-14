@@ -46,17 +46,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
         ports: ["6379:6379"]
-      minio:
-        image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-        env:
-          MINIO_ROOT_USER: ci-minio-access
-          MINIO_ROOT_PASSWORD: ci-minio-secret-at-least-32-characters
-        options: >-
-          --health-cmd "curl -f http://localhost:9000/minio/health/live"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-        ports: ["9000/tcp"]
 
     steps:
       - name: Checkout code
@@ -64,6 +53,21 @@ jobs:
 
       - name: Expose MinIO service port
         run: echo "MINIO_PORT=${{ job.services.minio.ports[9000] }}" >> "$GITHUB_ENV"
+
+      - name: Start MinIO
+        run: |
+          docker run -d --rm --name komuno-ci-minio \
+            -e MINIO_ROOT_USER=ci-minio-access \
+            -e MINIO_ROOT_PASSWORD=ci-minio-secret-at-least-32-characters \
+            -p 127.0.0.1::9000 \
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          echo "MINIO_PORT=$(docker port komuno-ci-minio 9000/tcp | sed 's/.*://')" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 15); do
+            curl -fsS "http://127.0.0.1:$(docker port komuno-ci-minio 9000/tcp | sed 's/.*://')/minio/health/live" && exit 0
+            sleep 1
+          done
+          docker logs komuno-ci-minio
+          exit 1
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # oven-sh/setup-bun@v2
