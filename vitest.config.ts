@@ -42,7 +42,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     env: {
-      DATABASE_URL: 'postgresql://test:test@localhost:5432/test_db',
+      DATABASE_URL: process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test_db',
     },
     include: ['**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx'],
     exclude: [
