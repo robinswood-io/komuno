@@ -802,11 +802,11 @@ export class MembersService {
     const start = new Date(startDate);
     const end = new Date(start);
     if (durationType === 'monthly') {
-      end.setMonth(end.getMonth() + 1);
+      end.setUTCMonth(end.getUTCMonth() + 1);
     } else if (durationType === 'quarterly') {
-      end.setMonth(end.getMonth() + 3);
+      end.setUTCMonth(end.getUTCMonth() + 3);
     } else {
-      end.setFullYear(end.getFullYear() + 1);
+      end.setUTCFullYear(end.getUTCFullYear() + 1);
     }
     const endDate = end.toISOString().split('T')[0];
 
