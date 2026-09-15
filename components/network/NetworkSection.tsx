@@ -72,14 +72,19 @@ export function NetworkSection(props: NetworkSectionProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const normalizedSearch = searchTerm.trim();
+  const searchEnabled = open && normalizedSearch.length >= 2;
   const membersQuery = useQuery({
-    queryKey: ['network-search-members'],
-    queryFn: () => api.get<unknown>('/api/admin/members?limit=500'),
+    queryKey: ['network-search-members', normalizedSearch],
+    queryFn: () => api.get<unknown>('/api/admin/members/search', { search: normalizedSearch, limit: 20 }),
+    enabled: searchEnabled,
     staleTime: 60_000,
   });
   const patronsQuery = useQuery({
-    queryKey: ['network-search-patrons'],
-    queryFn: () => api.get<unknown>('/api/patrons?limit=1000'),
+    queryKey: ['network-search-patrons', normalizedSearch],
+    queryFn: () => api.get<unknown>('/api/patrons', { search: normalizedSearch, limit: 20, projection: 'directory' }),
+    enabled: searchEnabled,
     staleTime: 60_000,
   });
 

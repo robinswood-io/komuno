@@ -41,7 +41,7 @@ describe('shared/schema.js iteration 119', () => {
     if (sponsorshipDefault.success) {
       expect(sponsorshipDefault.data.status).toBe('proposed');
       expect(sponsorshipDefault.data.isPubliclyVisible).toBe(true);
-      expect(sponsorshipDefault.data.confirmedAt).toBeNull();
+      expect(sponsorshipDefault.data.confirmedAt).toBeUndefined();
     }
   });
 });

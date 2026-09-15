@@ -966,15 +966,15 @@ describe('FinancialService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should expose runtime parser failure when update subscription schema is unavailable', async () => {
+    it('should update subscription for valid payload', async () => {
       vi.mocked(storageService.instance.updateSubscription).mockResolvedValue({
         success: true,
         data: { id: 2, status: 'cancelled' },
       });
 
-      await expect(service.updateSubscription('2', { status: 'cancelled' })).rejects.toThrow(
-        TypeError,
-      );
+      const result = await service.updateSubscription('2', { status: 'cancelled' });
+      expect(result.success).toBe(true);
+      expect(storageService.instance.updateSubscription).toHaveBeenCalledWith('2', { status: 'cancelled' });
     });
 
     it('should delete subscription', async () => {
@@ -1039,24 +1039,26 @@ describe('FinancialService', () => {
       await expect(service.getRevenues()).rejects.toThrow(BadRequestException);
     });
 
-    it('should expose runtime parser failure when create revenue schema is unavailable', async () => {
+    it('should create revenue for valid payload', async () => {
       vi.mocked(storageService.instance.createRevenue).mockResolvedValue({
         success: true,
         data: { id: 'r1', ...validRevenue },
       });
 
-      await expect(service.createRevenue(validRevenue)).rejects.toThrow(TypeError);
+      const result = await service.createRevenue(validRevenue);
+      expect(result.success).toBe(true);
+      expect(storageService.instance.createRevenue).toHaveBeenCalledWith(validRevenue);
     });
 
-    it('should expose runtime parser failure when update revenue schema is unavailable', async () => {
+    it('should update revenue for valid payload', async () => {
       vi.mocked(storageService.instance.updateRevenue).mockResolvedValue({
         success: true,
         data: { id: 'r1', status: 'cancelled' },
       });
 
-      await expect(service.updateRevenue('r1', { status: 'cancelled' })).rejects.toThrow(
-        TypeError,
-      );
+      const result = await service.updateRevenue('r1', { status: 'cancelled' });
+      expect(result.success).toBe(true);
+      expect(storageService.instance.updateRevenue).toHaveBeenCalledWith('r1', { status: 'cancelled' });
     });
 
     it('should delete revenue', async () => {

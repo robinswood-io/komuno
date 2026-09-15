@@ -121,6 +121,32 @@ describe('server/utils/github-integration.js iteration 36', () => {
     expect(payload.body).toContain('⚠️ medium');
   });
 
+  it('createGitHubIssue does not log authorization headers or token prefixes when issue creation API fails', async () => {
+    setGitHubEnv();
+    fetchMock.mockResolvedValueOnce(makeResponse(true, 200, { id: 1 }));
+    fetchMock.mockResolvedValueOnce(makeResponse(false, 500, { message: 'server error' }));
+
+    const request: IntegrationRequest = {
+      title: 'Secret log regression',
+      description: 'Failure path must not reveal tokens',
+      type: 'bug',
+      priority: 'high',
+      requestedByName: 'Ops',
+      requestedBy: 'ops@example.com',
+    };
+
+    const result = await createGitHubIssue(request);
+
+    expect(result).toBeNull();
+    const loggedErrors = vi.mocked(console.error).mock.calls
+      .map((call) => call.map((value) => JSON.stringify(value)).join(' '))
+      .join('\n');
+    expect(loggedErrors).not.toContain('Headers envoyés');
+    expect(loggedErrors).not.toContain('Authorization');
+    expect(loggedErrors).not.toContain('Bearer');
+    expect(loggedErrors).not.toContain('ghp_test_t');
+  });
+
   it('createGitHubIssue maps labels and priority emojis and returns created issue', async () => {
     setGitHubEnv();
     const priorities: Array<{ priority: string; emoji: string; type: 'bug' | 'feature'; label: string }> = [
@@ -200,11 +226,11 @@ describe('server/utils/github-integration.js iteration 36', () => {
 
     fetchMock.mockResolvedValueOnce(makeResponse(true, 200, { state: 'open' }));
     const openStatus = await syncGitHubIssueStatus(2);
-    expect(openStatus).toEqual({ status: 'open', closed: false });
+    expect(openStatus).toEqual({ status: 'open', closed: false, labels: [] });
 
     fetchMock.mockResolvedValueOnce(makeResponse(true, 200, { state: 'closed' }));
     const closedStatus = await syncGitHubIssueStatus(3);
-    expect(closedStatus).toEqual({ status: 'closed', closed: true });
+    expect(closedStatus).toEqual({ status: 'closed', closed: true, labels: [] });
 
     fetchMock.mockRejectedValueOnce(new Error('sync network error'));
     const thrown = await syncGitHubIssueStatus(4);

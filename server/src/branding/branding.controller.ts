@@ -12,6 +12,7 @@ import type { Admin } from '@shared/schema';
 
 const ALLOWED_LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
 const MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024;
+const PUBLIC_LOGO_FILENAME_REGEX = /^logo-[a-zA-Z0-9_-]+\.(?:png|jpe?g|webp)$/i;
 
 @ApiTags('branding')
 @Controller('api/admin/branding')
@@ -33,8 +34,8 @@ export class BrandingController {
   @ApiResponse({ status: 200, description: 'Flux image du logo' })
   @ApiResponse({ status: 404, description: 'Logo introuvable' })
   async getLogoByFilename(@Param('filename') filename: string, @Res() res: Response) {
-    if (!/^[a-zA-Z0-9._-]+$/.test(filename)) {
-      throw new BadRequestException('Nom de fichier invalide');
+    if (!PUBLIC_LOGO_FILENAME_REGEX.test(filename)) {
+      throw new BadRequestException('Nom de fichier logo invalide');
     }
 
     try {

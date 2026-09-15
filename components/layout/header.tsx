@@ -34,7 +34,7 @@ export default function Header() {
     { id: 'propose' as const, label: 'Proposer une idée', route: '/propose' },
     { id: 'events' as const, label: 'Événements', route: '/events' },
     { id: 'loan' as const, label: 'Prêt', route: '/loan' },
-    { id: 'tools' as const, label: 'Les outils du dirigeants', route: '/tools' },
+    { id: 'tools' as const, label: 'Les outils des dirigeants', route: '/tools' },
   ];
 
   return (

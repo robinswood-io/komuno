@@ -18,7 +18,7 @@ La commande `ssh` dans le workflow n'utilisait pas l'option `-i ~/.ssh/id_rsa` p
 - name: Authenticate VPS to GHCR
   run: |
     ssh -p ${{ secrets.VPS_PORT }} \
-      -o StrictHostKeyChecking=no \
+      -o StrictHostKeyChecking=accept-new \
       -i ~/.ssh/id_rsa \  # ← Ajouté
       ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
       "echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u ${{ github.actor }} --password-stdin"
@@ -51,7 +51,7 @@ L'étape "Prepare VPS directories and repository" n'utilisait pas explicitement 
   run: |
     ssh -p ${{ secrets.VPS_PORT }} \
       -i ~/.ssh/id_rsa \  # ← Ajouté
-      -o StrictHostKeyChecking=no \  # ← Ajouté
+      -o StrictHostKeyChecking=accept-new \  # ← Ajouté
       ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
       'bash -s' << 'ENDSSH'
 ```

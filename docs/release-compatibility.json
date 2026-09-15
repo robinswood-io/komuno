@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-10",
+  "policy": "Une image ne peut être déployée ou restaurée que sur un schéma explicitement compatible.",
+  "releases": [
+    {
+      "application": "2.26.11-remediation",
+      "schema": "migrations-current",
+      "backwardCompatible": true,
+      "rollback": "image précédente autorisée si aucune migration postérieure non rétrocompatible n'a été appliquée; sinon restauration isolée puis décision de reprise"
+    }
+  ]
+}

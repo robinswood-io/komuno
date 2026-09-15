@@ -166,7 +166,11 @@ describe('FinancialController', () => {
         const result = await controller.createBudget(budgetData);
         expect(result.success).toBe(true);
         expect(result.data.id).toBe('1');
-        expect(service.createBudget).toHaveBeenCalledWith(budgetData);
+        expect(service.createBudget).toHaveBeenCalledWith({
+          ...budgetData,
+          createdBy: 'admin@komuno.org',
+          assignedBy: 'admin@komuno.org',
+        });
       });
 
       it('should handle validation errors on create', async () => {
@@ -976,7 +980,11 @@ describe('FinancialController', () => {
 
         const result = await controller.assignSubscription(payload);
         expect(result.success).toBe(true);
-        expect(service.assignSubscriptionToMember).toHaveBeenCalledWith(payload);
+        expect(service.assignSubscriptionToMember).toHaveBeenCalledWith({
+          ...payload,
+          createdBy: 'admin@komuno.org',
+          assignedBy: 'admin@komuno.org',
+        });
       });
     });
   });
@@ -1055,7 +1063,11 @@ describe('FinancialController', () => {
 
         const result = await controller.createRevenue(payload);
         expect(result.success).toBe(true);
-        expect(service.createRevenue).toHaveBeenCalledWith(payload);
+        expect(service.createRevenue).toHaveBeenCalledWith({
+          ...payload,
+          createdBy: 'admin@komuno.org',
+          assignedBy: 'admin@komuno.org',
+        });
       });
 
       it('should propagate bad request on createRevenue validation errors', async () => {

@@ -1,34 +1,46 @@
 import { registerAs } from '@nestjs/config';
 
+const nodeEnv = process.env.NODE_ENV || 'development';
+const isProduction = nodeEnv === 'production';
+
+function requiredInProduction(name: string, developmentFallback = ''): string {
+  const value = process.env[name];
+  if (value) return value;
+  if (isProduction) {
+    throw new Error(`${name} must be set in production`);
+  }
+  return developmentFallback;
+}
+
 /**
  * Configuration typée pour l'application
  * Utilise @nestjs/config pour la validation et le typage
  */
 export default registerAs('app', () => ({
   // Application
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
   port: parseInt(process.env.PORT || '5000', 10),
   corsOrigin: process.env.CORS_ORIGIN || '',
   siteUrl: process.env.SITE_URL || 'http://localhost:5000',
 
   // Base de données
-  databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5433/cjd80',
+  databaseUrl: requiredInProduction('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5433/cjd80'),
   postgresUser: process.env.POSTGRES_USER || 'postgres',
-  postgresPassword: process.env.POSTGRES_PASSWORD || 'postgres',
+  postgresPassword: requiredInProduction('POSTGRES_PASSWORD', 'postgres'),
   postgresDb: process.env.POSTGRES_DB || 'cjd80',
   postgresHost: process.env.PGHOST || 'localhost',
   postgresPort: parseInt(process.env.PGPORT || '5433', 10),
 
   // Session
-  sessionSecret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
+  sessionSecret: requiredInProduction('SESSION_SECRET', 'development-session-secret-change-me'),
 
   // MinIO
   minioEndpoint: process.env.MINIO_ENDPOINT || 'localhost',
   minioPort: parseInt(process.env.MINIO_PORT || '9000', 10),
   minioExternalPort: parseInt(process.env.MINIO_EXTERNAL_PORT || '9002', 10),
   minioUseSSL: process.env.MINIO_USE_SSL === 'true',
-  minioAccessKey: process.env.MINIO_ACCESS_KEY || 'minioadmin',
-  minioSecretKey: process.env.MINIO_SECRET_KEY || 'minioadmin',
+  minioAccessKey: requiredInProduction('MINIO_ACCESS_KEY', 'minioadmin'),
+  minioSecretKey: requiredInProduction('MINIO_SECRET_KEY', 'minioadmin'),
   minioBucketLoanItems: process.env.MINIO_BUCKET_LOAN_ITEMS || 'loan-items',
   minioBucketAssets: process.env.MINIO_BUCKET_ASSETS || 'assets',
 
@@ -65,4 +77,3 @@ export default registerAs('app', () => ({
   // Version
   appVersion: process.env.APP_VERSION || process.env.GIT_TAG || '1.0.0',
 }));
-

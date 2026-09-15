@@ -9,7 +9,7 @@ set -e
 VPS_HOST="141.94.31.162"
 VPS_USER="thibault"
 VPS_PORT="22"
-VPS_PASS="@Tibo4713234"
+VPS_PASS="${VPS_PASS:-}"
 DEPLOY_DIR="/docker/cjd80"
 
 # Couleurs pour l'affichage
@@ -18,6 +18,13 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+require_vps_password() {
+    if [ -z "${VPS_PASS:-}" ]; then
+        print_error "VPS_PASS doit être fourni via l’environnement ou utilisez SSH_KEY quand le script le supporte"
+        exit 1
+    fi
+}
 
 # Fonction d'affichage
 print_header() {
@@ -44,12 +51,14 @@ print_info() {
 
 # Fonction pour exécuter une commande SSH
 ssh_exec() {
-    sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$@"
+    require_vps_password
+    sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=accept-new -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$@"
 }
 
 # Fonction pour exécuter une commande SSH avec sortie interactive
 ssh_exec_interactive() {
-    sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$@"
+    require_vps_password
+    sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=accept-new -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$@"
 }
 
 # ============================================================================

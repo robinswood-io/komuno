@@ -379,4 +379,32 @@ export class HealthService {
 
     return results;
   }
+
+  async getPublicStatus(): Promise<StatusResponse> {
+    const internalStatus = await this.getAllStatus();
+    const publicChecks: StatusResponse['checks'] = {};
+
+    for (const [key, check] of Object.entries(internalStatus.checks) as Array<[keyof StatusResponse['checks'], StatusCheck | undefined]>) {
+      if (!check) continue;
+      publicChecks[key] = {
+        name: check.name,
+        status: check.status,
+        message: check.status === 'healthy'
+          ? 'Service opérationnel'
+          : check.status === 'warning'
+            ? 'Service dégradé'
+            : check.status === 'unhealthy'
+              ? 'Service indisponible'
+              : 'Statut en cours de vérification',
+      };
+    }
+
+    return {
+      timestamp: internalStatus.timestamp,
+      uptime: 0,
+      environment: 'public',
+      overallStatus: internalStatus.overallStatus,
+      checks: publicChecks,
+    };
+  }
 }

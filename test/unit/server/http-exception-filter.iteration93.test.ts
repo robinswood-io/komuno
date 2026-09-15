@@ -35,20 +35,20 @@ describe('http-exception.filter iteration 93', () => {
     delete process.env.NODE_ENV;
   });
 
-  it('n’ajoute pas le champ code quand ApiError.code est absent', () => {
+  it('ajoute un code stable quand ApiError.code est absent', () => {
     vi.spyOn(logger, 'error').mockImplementation(() => logger);
 
     const filter = new HttpExceptionFilter();
     const response = createResponse();
     const request: RequestShape = { method: 'PUT', path: '/api/tasks/1', query: {}, body: {} };
 
-    filter.catch(new ApiError(409, 'Conflict'), createHost(request, response));
+    filter.catch(new ApiError(409, 'Cette action est en conflit avec les données existantes. Actualisez puis réessayez.'), createHost(request, response));
 
     expect(response.status).toHaveBeenCalledWith(409);
 
     const payload = response.json.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(payload).toMatchObject({ success: false, message: 'Conflict' });
-    expect(payload).not.toHaveProperty('code');
+    expect(payload).toMatchObject({ success: false, message: 'Cette action est en conflit avec les données existantes. Actualisez puis réessayez.' });
+    expect(payload).toHaveProperty('code', 'RESOURCE_CONFLICT');
     expect(typeof payload.errorId).toBe('string');
   });
 });

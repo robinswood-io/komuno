@@ -106,10 +106,37 @@ export class AdminMembersController {
     @Query('assignedTo') assignedTo?: string,
     @Query('onlyProspects') onlyProspects?: string,
     @Query('excludeProspects') excludeProspects?: string,
+    @Query('cursor') cursor?: string,
+    @Query('projection') projection?: 'list' | 'directory' | 'kanban' | 'export',
   ) {
     const pageNum = parseInt(page || '1', 10);
     const limitNum = parseInt(limit || '20', 10);
-    return await this.membersService.getMembers(pageNum, limitNum, status, search, score, activity, prospectionStatus, city, department, assignedTo, onlyProspects === 'true', excludeProspects === 'true');
+    return await this.membersService.getMembers(pageNum, limitNum, status, search, score, activity, prospectionStatus, city, department, assignedTo, onlyProspects === 'true', excludeProspects === 'true', { cursor, projection });
+  }
+
+  @Get('search')
+  @Permissions('admin.view')
+  async searchDirectory(@Query('search') search = '', @Query('cursor') cursor?: string, @Query('limit') limit?: string) {
+    return this.membersService.searchDirectory(search, cursor, Math.min(parseInt(limit || '20', 10) || 20, 20));
+  }
+
+  @Get('stats')
+  @Permissions('admin.view')
+  async getMemberStats() { return this.membersService.getMemberStats(); }
+
+  @Post('export')
+  @Permissions('admin.view')
+  @HttpCode(HttpStatus.OK)
+  async exportMembers(@Body() filters: Record<string, unknown>, @User() user: { email: string }) {
+    return this.membersService.exportMembers(filters, user.email);
+  }
+
+  @Post('erasure')
+  @Permissions('admin.manage')
+  @HttpCode(HttpStatus.OK)
+  async requestErasure(@Body() body: { email?: string; confirm?: boolean; requestReference?: string }, @User() user: { email: string }) {
+    if (!body.email) throw new BadRequestException('Email requis');
+    return this.membersService.requestErasure(body.email, user.email, body);
   }
 
   @Post()
@@ -161,7 +188,7 @@ export class AdminMembersController {
   // ===== Routes admin - Opérations en masse (AVANT les routes :email) =====
 
   @Patch('bulk-status')
-  @Permissions('admin.view')
+  @Permissions('admin.edit')
   @ApiOperation({ summary: 'Mettre à jour le statut de plusieurs membres en masse' })
   @ApiBody({
     schema: {
@@ -315,7 +342,7 @@ export class AdminMembersController {
   }
 
   @Patch(':email/assign')
-  @Permissions('admin.view')
+  @Permissions('admin.edit')
   @ApiOperation({ summary: 'Attribuer un membre à un admin responsable' })
   @ApiParam({ name: 'email', description: 'Email du membre' })
   @ApiBody({
@@ -378,8 +405,8 @@ export class AdminMembersController {
   @ApiResponse({ status: 401, description: 'Non authentifié' })
   @ApiResponse({ status: 403, description: 'Permission refusée' })
   @ApiResponse({ status: 404, description: 'Membre non trouvé' })
-  async deleteMember(@Param('email') email: string) {
-    await this.membersService.deleteMember(email);
+  async deleteMember(@Param('email') email: string, @User() user: { email: string }) {
+    await this.membersService.requestErasure(email, user.email, { confirm: true, requestReference: `admin-delete:${email}` });
   }
 
   // ===== Routes admin - Subscriptions =====
@@ -397,7 +424,7 @@ export class AdminMembersController {
   }
 
   @Post(':email/subscriptions')
-  @Permissions('admin.view')
+  @Permissions('admin.edit')
   @ApiOperation({ summary: 'Créer une souscription pour un membre' })
   @ApiParam({ name: 'email', description: 'Email du membre', example: 'jean.dupont@example.com' })
   @ApiBody({

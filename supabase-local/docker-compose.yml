@@ -14,7 +14,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - supabase-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -32,11 +32,11 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY}
     ports:
-      - "9000:9000"  # API S3
-      - "9001:9001"  # Console MinIO
+      - "127.0.0.1:9000:9000"  # API S3
+      - "127.0.0.1:9001:9001"  # Console MinIO
     volumes:
       - supabase-storage-data:/data
     healthcheck:
@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD}
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - supabase-redis-data:/data
     healthcheck:
@@ -81,7 +81,7 @@ services:
       supabase-db:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     networks:
       - supabase-network
 
@@ -107,7 +107,7 @@ services:
       supabase-db:
         condition: service_healthy
     ports:
-      - "9999:9999"
+      - "127.0.0.1:9999:9999"
     networks:
       - supabase-network
 
@@ -127,7 +127,7 @@ services:
       API_JWT_SECRET: ${JWT_SECRET}
       FLY_ALLOC_ID: fly123
       FLY_APP_NAME: realtime
-      SECRET_KEY_BASE: UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYTuRgBiYa15BLrx8etQoXz3gZv1/u2oq
+      SECRET_KEY_BASE: ${REALTIME_SECRET_KEY:?set REALTIME_SECRET_KEY}
       ERL_AFLAGS: -proto_dist inet_tcp
       PORT: 4000
       DB_IP_VERSION: ipv4
@@ -135,7 +135,7 @@ services:
       supabase-db:
         condition: service_healthy
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     networks:
       - supabase-network
 
@@ -155,8 +155,8 @@ services:
       GLOBAL_S3_BUCKET: supabase-storage
       GLOBAL_S3_ENDPOINT: http://supabase-storage:9000
       GLOBAL_S3_REGION: us-east-1
-      GLOBAL_S3_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minioadmin}
-      GLOBAL_S3_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      GLOBAL_S3_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY}
+      GLOBAL_S3_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY}
       GLOBAL_S3_FORCE_PATH_STYLE: "true"
     depends_on:
       supabase-db:
@@ -166,7 +166,7 @@ services:
       supabase-rest:
         condition: service_started
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     networks:
       - supabase-network
 

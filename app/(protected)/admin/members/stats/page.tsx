@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, queryKeys, type PaginatedResponse } from '@/lib/api/client';
+import { api } from '@/lib/api/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -29,191 +28,22 @@ import {
   Area
 } from 'recharts';
 
-interface Member {
-  email: string;
-  firstName: string;
-  lastName: string;
-  company?: string;
-  status: 'active' | 'proposed';
-  engagementScore?: number;
-  phone?: string;
-  role?: string;
-  cjdRole?: string;
-  notes?: string;
-  proposedBy?: string;
-  createdAt?: string;
-  tags?: Array<{ id: string; name: string }>;
-}
-
 interface StatisticsData {
-  totalMembers: number;
-  totalActive: number;
-  totalProspects: number;
-  conversionRate: number;
-  newMembersThisMonth: number;
-  newMembersThisQuarter: number;
-  monthlyGrowth: number;
-  monthlyData: Array<{
-    month: string;
-    active: number;
-    prospects: number;
-  }>;
-  tagStats: Array<{
-    tagName: string;
-    count: number;
-  }>;
-  topMembers: Array<{
-    rank: number;
-    firstName: string;
-    lastName: string;
-    email: string;
-    engagementScore: number;
-  }>;
+  totalMembers: number; totalActive: number; totalProspects: number; conversionRate: number;
+  newMembersThisMonth: number; newMembersThisQuarter: number; monthlyGrowth: number;
+  monthlyData: Array<{ month: string; active: number; prospects: number }>;
+  tagStats: Array<{ tagName: string; count: number }>;
+  topMembers: Array<{ rank: number; firstName: string; lastName: string; email: string; engagementScore: number }>;
 }
+const EMPTY_STATS: StatisticsData = { totalMembers: 0, totalActive: 0, totalProspects: 0, conversionRate: 0, newMembersThisMonth: 0, newMembersThisQuarter: 0, monthlyGrowth: 0, monthlyData: [], tagStats: [], topMembers: [] };
 
-/**
- * Calcule les statistiques à partir de tous les membres
- */
-function calculateStatistics(members: Member[]): StatisticsData {
-  const totalActive = members.filter(m => m.status === 'active').length;
-  const totalProspects = members.filter(m => m.status === 'proposed').length;
-  const totalMembers = totalActive + totalProspects;
-
-  const conversionRate = totalMembers > 0 ? (totalActive / totalMembers) * 100 : 0;
-
-  // Calculer les nouveaux membres ce mois et trimestre
-  // TODO: Si l'API ne retourne pas createdAt, utiliser des données mockées
-  const now = new Date();
-  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const thisQuarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
-  const newMembersThisMonth = members.filter(m => {
-    if (!m.createdAt) return false;
-    const createdDate = new Date(m.createdAt);
-    return createdDate >= thisMonthStart && createdDate <= now;
-  }).length;
-
-  const newMembersThisQuarter = members.filter(m => {
-    if (!m.createdAt) return false;
-    const createdDate = new Date(m.createdAt);
-    return createdDate >= thisQuarterStart && createdDate <= now;
-  }).length;
-
-  const newMembersLastMonth = members.filter(m => {
-    if (!m.createdAt) return false;
-    const createdDate = new Date(m.createdAt);
-    return createdDate >= lastMonthStart && createdDate < thisMonthStart;
-  }).length;
-
-  const monthlyGrowth = newMembersLastMonth > 0
-    ? ((newMembersThisMonth - newMembersLastMonth) / newMembersLastMonth) * 100
-    : (newMembersThisMonth > 0 ? 100 : 0);
-
-  // Générer les données mensuelles (6 derniers mois)
-  const monthlyData: Array<{
-    month: string;
-    active: number;
-    prospects: number;
-  }> = [];
-
-  for (let i = 5; i >= 0; i--) {
-    const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-
-    const monthActiveCount = members.filter(m => {
-      if (m.status !== 'active' || !m.createdAt) return false;
-      const createdDate = new Date(m.createdAt);
-      return createdDate >= monthStart && createdDate <= monthEnd;
-    }).length;
-
-    const monthProspectsCount = members.filter(m => {
-      if (m.status !== 'proposed' || !m.createdAt) return false;
-      const createdDate = new Date(m.createdAt);
-      return createdDate >= monthStart && createdDate <= monthEnd;
-    }).length;
-
-    monthlyData.push({
-      month: monthDate.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' }),
-      active: monthActiveCount,
-      prospects: monthProspectsCount,
-    });
-  }
-
-  // Statistiques par tags
-  const tagMap = new Map<string, number>();
-  members.forEach(member => {
-    if (member.tags && Array.isArray(member.tags)) {
-      member.tags.forEach(tag => {
-        tagMap.set(tag.name, (tagMap.get(tag.name) || 0) + 1);
-      });
-    }
-  });
-
-  const tagStats = Array.from(tagMap.entries())
-    .map(([tagName, count]) => ({ tagName, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-
-  // Top 10 membres par score d'engagement
-  const topMembers = members
-    .filter(m => m.status === 'active' && (m.engagementScore || 0) > 0)
-    .sort((a, b) => (b.engagementScore || 0) - (a.engagementScore || 0))
-    .slice(0, 10)
-    .map((m, idx) => ({
-      rank: idx + 1,
-      firstName: m.firstName,
-      lastName: m.lastName,
-      email: m.email,
-      engagementScore: m.engagementScore || 0,
-    }));
-
-  return {
-    totalMembers,
-    totalActive,
-    totalProspects,
-    conversionRate,
-    newMembersThisMonth,
-    newMembersThisQuarter,
-    monthlyGrowth,
-    monthlyData,
-    tagStats,
-    topMembers,
-  };
-}
-
-/**
- * Dashboard de Statistiques et Analytics des Membres
- */
+/** Dashboard alimenté uniquement par des agrégats SQL serveur. */
 export default function MembersStatsPage() {
-  // Récupérer tous les membres avec pagination maximale
-  const { data: membersData, isLoading, error } = useQuery({
-    queryKey: queryKeys.members.list({ page: 1, limit: 10000 }),
-    queryFn: () => api.get<PaginatedResponse<Member>>('/api/admin/members', {
-      page: 1,
-      limit: 10000,
-    }),
+  const { data: statsResponse, isLoading, error } = useQuery({
+    queryKey: ['members', 'stats', 'server-aggregates'],
+    queryFn: () => api.get<{ success: boolean; data: StatisticsData }>('/api/admin/members/stats'),
   });
-
-  // Calculer les statistiques
-  const stats = useMemo(() => {
-    if (!membersData?.data) {
-      return {
-        totalMembers: 0,
-        totalActive: 0,
-        totalProspects: 0,
-        conversionRate: 0,
-        newMembersThisMonth: 0,
-        newMembersThisQuarter: 0,
-        monthlyGrowth: 0,
-        monthlyData: [],
-        tagStats: [],
-        topMembers: [],
-      };
-    }
-    return calculateStatistics(membersData.data);
-  }, [membersData?.data]);
+  const stats = statsResponse?.data ?? EMPTY_STATS;
 
   if (isLoading) {
     return (

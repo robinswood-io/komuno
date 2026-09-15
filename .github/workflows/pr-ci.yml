@@ -1,4 +1,4 @@
-name: PR CI (Night Agent)
+name: PR CI
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,24 +13,72 @@ env:
 
 jobs:
   ci:
-    name: TypeScript + Tests + Build
-    if: startsWith(github.head_ref, 'night-agent/auto-fixes-')
+    name: TypeScript + Tests + Migrations + Build
     runs-on: self-hosted
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
+    env:
+      DATABASE_URL: postgres://ciuser:cipassword@localhost:5432/cidb
+      MIGRATIONS_DIR: ./migrations
+      SKIP_HISTORICAL_SEED: "true"
+      REDIS_URL: redis://localhost:6379
+      MINIO_ENDPOINT: localhost
+      MINIO_ACCESS_KEY: ci-minio-access
+      MINIO_SECRET_KEY: ci-minio-secret-at-least-32-characters
+      SESSION_SECRET: ci-session-secret-at-least-32-characters
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ciuser
+          POSTGRES_PASSWORD: cipassword
+          POSTGRES_DB: cidb
+        options: >-
+          --health-cmd "pg_isready -U ciuser -d cidb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports: ["5432:5432"]
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports: ["6379:6379"]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout@v7
+
+      - name: Expose MinIO service port
+        run: echo "MINIO_PORT=${{ job.services.minio.ports[9000] }}" >> "$GITHUB_ENV"
+
+      - name: Start MinIO
+        run: |
+          docker rm -f komuno-ci-minio >/dev/null 2>&1 || true
+          docker run -d --rm --name komuno-ci-minio \
+            -e MINIO_ROOT_USER=ci-minio-access \
+            -e MINIO_ROOT_PASSWORD=ci-minio-secret-at-least-32-characters \
+            -p 127.0.0.1::9000 \
+            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          echo "MINIO_PORT=$(docker port komuno-ci-minio 9000/tcp | sed 's/.*://')" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 15); do
+            curl -fsS "http://127.0.0.1:$(docker port komuno-ci-minio 9000/tcp | sed 's/.*://')/minio/health/live" && exit 0
+            sleep 1
+          done
+          docker logs komuno-ci-minio
+          exit 1
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache Bun dependencies
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache
@@ -42,14 +90,37 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Secret scan
+        run: bash scripts/scan-secrets.sh
+
+      - name: Security dependencies
+        run: bash scripts/check-dependencies.sh
+
+      - name: Maintained contracts
+        run: |
+          node scripts/check-typescript-source-drift.mjs
+          node scripts/check-maintained-docs.mjs
+          node scripts/verify-association-journey-matrix.mjs
+          bash scripts/test-backup-restore.sh
+
       - name: TypeScript check
         run: bunx tsc --noEmit
 
+      - name: Validate migrations
+        run: sh scripts/run-migrations.sh
+
       - name: Run tests
-        run: bun test
+        run: bun run test
+
+      - name: Collect critical E2E scenarios
+        run: bun x playwright test --list
 
       - name: Build check
         run: bun run build
+
+      - name: Cleanup MinIO
+        if: always()
+        run: docker rm -f komuno-ci-minio >/dev/null 2>&1 || true
 
       - name: CI Summary
         if: always()

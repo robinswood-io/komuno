@@ -16,8 +16,8 @@ describe('FinancialService wave39 lorentz - updateRevenue zod-validation branch'
     service = new FinancialService(storageService);
   });
 
-  it('throws TypeError and does not call storage when payload is invalid', async () => {
-    await expect(service.updateRevenue('rev-7', undefined)).rejects.toThrow(TypeError);
+  it('throws BadRequestException and does not call storage when payload is invalid', async () => {
+    await expect(service.updateRevenue('rev-7', undefined)).rejects.toThrow('Validation error');
     expect(storageMock.updateRevenue).not.toHaveBeenCalled();
   });
 });

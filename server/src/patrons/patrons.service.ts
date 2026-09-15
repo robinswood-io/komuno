@@ -77,12 +77,14 @@ export class PatronsService {
     limit: number = 20,
     status?: string,
     search?: string,
+    projection?: 'list' | 'directory',
   ) {
     const result = await this.storageService.instance.getPatrons({
       page,
       limit,
       ...(status && status !== 'all' ? { status } : {}),
       ...(search && search.trim() ? { search } : {}),
+      ...(projection ? { projection } : {}),
     });
 
     if (!result.success) {

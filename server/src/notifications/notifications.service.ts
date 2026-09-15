@@ -182,6 +182,16 @@ export class NotificationsService {
   /**
    * Mark notification as read
    */
+  async markAsReadForUser(notificationId: string, userId: string): Promise<Notification> {
+    const result = await this.db
+      .update(notifications)
+      .set({ isRead: true, updatedAt: new Date() })
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
+      .returning();
+
+    return result[0];
+  }
+
   async markAsRead(notificationId: string): Promise<Notification> {
     const result = await this.db
       .update(notifications)
@@ -195,6 +205,18 @@ export class NotificationsService {
   /**
    * Mark multiple notifications as read
    */
+  async markMultipleAsReadForUser(userId: string, notificationIds: string[]): Promise<number> {
+    if (!notificationIds.length) return 0;
+
+    const result = await this.db
+      .update(notifications)
+      .set({ isRead: true, updatedAt: new Date() })
+      .where(and(eq(notifications.userId, userId), sql`${notifications.id} = ANY(${notificationIds})`))
+      .returning();
+
+    return result.length;
+  }
+
   async markMultipleAsRead(notificationIds: string[]): Promise<number> {
     if (!notificationIds.length) return 0;
 
@@ -247,6 +269,30 @@ export class NotificationsService {
   /**
    * Update notification metadata
    */
+  async updateNotificationForUser(
+    notificationId: string,
+    userId: string,
+    data: UpdateNotification
+  ): Promise<Notification> {
+    const updateData: Partial<Notification> = { updatedAt: new Date() };
+
+    if (data.isRead !== undefined) {
+      updateData.isRead = data.isRead;
+    }
+
+    if (data.metadata !== undefined) {
+      updateData.metadata = data.metadata;
+    }
+
+    const result = await this.db
+      .update(notifications)
+      .set(updateData)
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
+      .returning();
+
+    return result[0];
+  }
+
   async updateNotification(
     notificationId: string,
     data: UpdateNotification
@@ -273,6 +319,15 @@ export class NotificationsService {
   /**
    * Delete notification
    */
+  async deleteNotificationForUser(notificationId: string, userId: string): Promise<boolean> {
+    const result = await this.db
+      .delete(notifications)
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
+      .returning();
+
+    return result.length > 0;
+  }
+
   async deleteNotification(notificationId: string): Promise<boolean> {
     const result = await this.db
       .delete(notifications)

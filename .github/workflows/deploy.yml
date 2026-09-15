@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout@v7
         with:
           fetch-depth: 2
 
@@ -93,13 +93,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # docker/setup-buildx-action@v4
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -107,7 +107,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -117,7 +117,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
@@ -128,8 +128,8 @@ jobs:
             GIT_TAG=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          provenance: false
-          sbom: false
+          provenance: true
+          sbom: true
 
       - name: Build summary
         run: |
@@ -167,7 +167,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout@v7
 
       - name: Install postgresql-client
         run: |
@@ -247,15 +247,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # actions/checkout@v7
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Cache Bun dependencies
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache
@@ -305,7 +305,7 @@ jobs:
 
       - name: Deploy to CJD80
         if: needs.detect-changes.outputs.should_build == 'true'
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -412,7 +412,7 @@ jobs:
             fi
 
             echo "✅ Déploiement CJD80 réussi!"
-            docker image prune -f || true
+            echo "Nettoyage global désactivé : conserver image courante et image de retour arrière."
 
       - name: Deployment summary
         if: needs.detect-changes.outputs.should_build == 'true'
@@ -695,7 +695,7 @@ jobs:
           fi
 
           echo "✅ Déploiement REP réussi!"
-          docker image prune -f || true
+          echo "Nettoyage global désactivé : conserver image courante et image de retour arrière."
 
       - name: Deployment summary
         if: needs.detect-changes.outputs.should_build == 'true'
@@ -865,7 +865,7 @@ jobs:
           fi
 
           echo "✅ Déploiement HDF réussi!"
-          docker image prune -f || true
+          echo "Nettoyage global désactivé : conserver image courante et image de retour arrière."
 
       - name: Deployment summary
         if: needs.detect-changes.outputs.should_build == 'true'

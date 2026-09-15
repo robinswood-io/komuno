@@ -93,10 +93,7 @@ export default function HomePage() {
                     </a>
                     {version && (
                       <span className="text-xs text-gray-500" data-testid="version-tag">
-                        Version {version} ·{' '}
-                        <a href="/changelog" className="text-primary hover:underline">
-                          Notes de version
-                        </a>
+                        Version {version}
                       </span>
                     )}
                   </div>

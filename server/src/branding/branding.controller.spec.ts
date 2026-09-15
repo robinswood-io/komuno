@@ -157,9 +157,9 @@ describe('BrandingController', () => {
       const res = makeResponse();
       mockService.getLogoStream.mockResolvedValue(stream);
 
-      await controller.getLogoByFilename('logo.png', res);
+      await controller.getLogoByFilename('logo-123.png', res);
 
-      expect(mockService.getLogoStream).toHaveBeenCalledWith('logo.png');
+      expect(mockService.getLogoStream).toHaveBeenCalledWith('logo-123.png');
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/png');
       expect(res.setHeader).toHaveBeenCalledWith(
         'Cache-Control',
@@ -168,17 +168,16 @@ describe('BrandingController', () => {
       expect(pipeSpy).toHaveBeenCalledWith(res);
     });
 
-    it('applique application/octet-stream pour une extension inconnue', async () => {
-      const stream = ReadableStream.from([]);
+    it('rejette les noms qui ne correspondent pas à un logo applicatif généré', async () => {
       const res = makeResponse();
-      mockService.getLogoStream.mockResolvedValue(stream);
 
-      await controller.getLogoByFilename('logo.unknownext', res);
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Content-Type',
-        'application/octet-stream'
-      );
+      await expect(
+        controller.getLogoByFilename('avatar.png', res)
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.getLogoByFilename('logo.unknownext', res)
+      ).rejects.toThrow(BadRequestException);
+      expect(mockService.getLogoStream).not.toHaveBeenCalled();
     });
 
     it('retourne NotFoundException si le service échoue', async () => {
@@ -186,7 +185,7 @@ describe('BrandingController', () => {
       mockService.getLogoStream.mockRejectedValue(new Error('Not found'));
 
       await expect(
-        controller.getLogoByFilename('missing.png', res)
+        controller.getLogoByFilename('logo-missing.png', res)
       ).rejects.toThrow(NotFoundException);
     });
   });

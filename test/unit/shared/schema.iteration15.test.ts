@@ -33,6 +33,7 @@ describe('shared/schema.js iteration 15 - constraints/enums/defaults edge branch
     ]);
     expect(schema.getRolePermissions(schema.ADMIN_ROLES.IDEAS_READER)).toEqual([
       'Consultation des idées',
+      'Consultation des formulaires',
     ]);
     expect(schema.getRolePermissions(schema.ADMIN_ROLES.EVENTS_MANAGER)).toContain(
       'Gestion des inscriptions et absences',

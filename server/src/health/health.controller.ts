@@ -33,9 +33,12 @@ export class HealthController {
    * GET /api/health/db - Database health check
    */
   @Get('db')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Health check de la base de données' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Health check de la base de données (nécessite authentification)' })
   @ApiResponse({ status: 200, description: 'Statut de la connexion à la base de données' })
+  @ApiResponse({ status: 401, description: 'Non authentifié' })
   async getDatabaseHealth() {
     return this.healthService.getDatabaseHealth();
   }
@@ -102,6 +105,6 @@ export class StatusController {
   @ApiOperation({ summary: 'Obtenir le statut complet de tous les services' })
   @ApiResponse({ status: 200, description: 'Statut de tous les composants' })
   async getAllStatus() {
-    return this.healthService.getAllStatus();
+    return this.healthService.getPublicStatus();
   }
 }

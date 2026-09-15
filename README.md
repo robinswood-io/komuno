@@ -5,9 +5,9 @@
 [![NestJS](https://img.shields.io/badge/NestJS-11-red)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
 
-Plateforme collaborative multi-tenant pour associations et organisations.
+Plateforme collaborative pour associations et organisations, déployée en instance et base de données dédiées par client.
 
-Komuno centralise la gestion des idees, evenements, membres, cotisations et notifications dans une application web moderne, personnalisable par organisation.
+Komuno centralise la gestion des idées, événements, membres, cotisations et notifications dans une application web moderne. Plusieurs organisations de réseau peuvent coexister dans une même instance lorsqu’elles relèvent de la même autorité cliente.
 
 ## Fonctionnalites
 
@@ -18,7 +18,7 @@ Komuno centralise la gestion des idees, evenements, membres, cotisations et noti
 - Notifications: in-app + flux temps reel
 - Branding dynamique: logo, couleurs, textes, theming
 - Authentification OAuth2/OIDC (compatible Authentik)
-- Architecture multi-tenant
+- Architecture multi-instance isolée : une instance applicative et une base de données dédiées par client ; pas d’hébergement de clients indépendants dans une même base
 
 ## Stack technique
 

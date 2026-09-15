@@ -6,6 +6,16 @@ import type { NextRequest } from 'next/server';
  * Vérifie les routes protégées et redirige vers /login si non authentifié
  */
 export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Routes protégées (admin / onboarding): ne pas exposer les pages sans cookie de session.
+  if (pathname.startsWith('/admin') || pathname.startsWith('/onboarding')) {
+    const hasSessionCookie = request.cookies.has('connect.sid') || request.cookies.has('session');
+    if (!hasSessionCookie) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
+
   // Gestion des requêtes HEAD pour éviter les 502
   // Next.js en mode dev peut avoir des problèmes avec HEAD requests
   if (request.method === 'HEAD') {
@@ -18,18 +28,6 @@ export function proxy(request: NextRequest) {
     });
   }
 
-  const { pathname } = request.nextUrl;
-
-  // Routes protégées (admin)
-  if (pathname.startsWith('/admin') || pathname.startsWith('/onboarding')) {
-    // TODO: Vérifier la session/cookie d'authentification
-    // Pour l'instant, on laisse passer (à implémenter avec Authentik)
-
-    // const session = request.cookies.get('session');
-    // if (!session) {
-    //   return NextResponse.redirect(new URL('/login', request.url));
-    // }
-  }
 
   return NextResponse.next();
 }

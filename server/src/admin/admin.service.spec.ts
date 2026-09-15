@@ -758,6 +758,7 @@ describe('AdminService', () => {
       });
 
       expect(storageService.instance.updateDevelopmentRequest).toHaveBeenCalledWith('dev-2', {
+        title: 'Titre mis à jour',
         status: undefined,
       });
       expect(result.status).toBe('in_progress');
@@ -911,6 +912,7 @@ describe('AdminService', () => {
       const syncGitHubIssueStatusMock = vi.fn().mockResolvedValue(null);
       vi.doMock('../../utils/github-integration', () => ({
         syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       try {
@@ -979,6 +981,7 @@ describe('AdminService', () => {
       const syncGitHubIssueStatusMock = vi.fn().mockResolvedValue(null);
       vi.doMock('../../utils/github-integration', () => ({
         syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       try {
@@ -1016,6 +1019,7 @@ describe('AdminService', () => {
       });
       vi.doMock('../../utils/github-integration', () => ({
         syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       try {
@@ -1055,6 +1059,7 @@ describe('AdminService', () => {
       });
       vi.doMock('../../utils/github-integration', () => ({
         syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
       const loggerInfoSpy = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
 
@@ -2293,6 +2298,7 @@ describe('AdminService', () => {
         return {
           ...actual,
           createGitHubIssue: createGitHubIssueMock,
+          updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
         };
       });
       const loggerInfoSpy = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
@@ -2358,6 +2364,7 @@ describe('AdminService', () => {
         return {
           ...actual,
           createGitHubIssue: createGitHubIssueMock,
+          updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
         };
       });
 
@@ -2401,6 +2408,7 @@ describe('AdminService', () => {
         return {
           ...actual,
           createGitHubIssue: createGitHubIssueMock,
+          updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
         };
       });
       const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
@@ -2543,6 +2551,7 @@ describe('AdminService', () => {
       const updateGitHubIssueStatusMock = vi.fn().mockResolvedValue({ state: 'closed' });
       vi.doMock('../../utils/github-integration', () => ({
         updateGitHubIssueStatus: updateGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
@@ -2744,6 +2753,7 @@ describe('AdminService', () => {
       const closeGitHubIssueMock = vi.fn().mockResolvedValue(true);
       vi.doMock('../../utils/github-integration', () => ({
         closeGitHubIssue: closeGitHubIssueMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
@@ -2766,6 +2776,7 @@ describe('AdminService', () => {
       const closeGitHubIssueMock = vi.fn().mockRejectedValue(new Error('github close failed'));
       vi.doMock('../../utils/github-integration', () => ({
         closeGitHubIssue: closeGitHubIssueMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
       const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
@@ -3566,6 +3577,7 @@ describe('AdminService', () => {
       const updateGitHubIssueStatusMock = vi.fn().mockResolvedValue({ state: 'open' });
       vi.doMock('../../utils/github-integration', () => ({
         updateGitHubIssueStatus: updateGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
@@ -3621,6 +3633,7 @@ describe('AdminService', () => {
       const updateGitHubIssueStatusMock = vi.fn().mockResolvedValue(null);
       vi.doMock('../../utils/github-integration', () => ({
         updateGitHubIssueStatus: updateGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
@@ -3662,6 +3675,7 @@ describe('AdminService', () => {
       const updateGitHubIssueStatusMock = vi.fn().mockResolvedValue({ state: 'open' });
       vi.doMock('../../utils/github-integration', () => ({
         updateGitHubIssueStatus: updateGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
@@ -3706,6 +3720,7 @@ describe('AdminService', () => {
       const updateGitHubIssueStatusMock = vi.fn().mockResolvedValue({ state: 'closed' });
       vi.doMock('../../utils/github-integration', () => ({
         updateGitHubIssueStatus: updateGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       vi.mocked(storageService.instance.getDevelopmentRequests).mockResolvedValue({
@@ -3898,7 +3913,7 @@ describe('AdminService', () => {
         data: {
           id: 'dev-73',
           title: 'Titre feature',
-          description: 'Description feature',
+          description: 'Description feature détaillée',
           type: 'feature',
           status: 'open',
           priority: 'medium',
@@ -3909,7 +3924,7 @@ describe('AdminService', () => {
       });
 
       const result = await adminService.updateDevelopmentRequest('dev-73', {
-        description: 'Description feature',
+        description: 'Description feature détaillée',
         type: 'feature',
       });
 
@@ -4031,6 +4046,7 @@ describe('AdminService', () => {
       });
       vi.doMock('../../utils/github-integration', () => ({
         syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       try {
@@ -4069,6 +4085,7 @@ describe('AdminService', () => {
       });
       vi.doMock('../../utils/github-integration', () => ({
         syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       try {
@@ -4117,6 +4134,7 @@ describe('AdminService', () => {
       });
       vi.doMock('../../utils/github-integration', () => ({
         syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       try {
@@ -4204,7 +4222,7 @@ describe('AdminService', () => {
         data: {
           id: 'dev-81',
           title: 'Titre sync',
-          description: 'Description sync',
+          description: 'Description sync suffisamment longue',
           type: 'bug',
           status: 'in_progress',
           priority: 'high',
@@ -4214,7 +4232,7 @@ describe('AdminService', () => {
       });
 
       const result = await adminService.updateDevelopmentRequest('dev-81', {
-        description: 'Description sync',
+        description: 'Description sync suffisamment longue',
         type: 'bug',
         priority: 'high',
       });
@@ -4347,6 +4365,8 @@ describe('AdminService', () => {
 
       expect(result.status).toBe('pending');
       expect(storageService.instance.updateDevelopmentRequest).toHaveBeenCalledWith('dev-85', {
+        description: 'Description 85 mise à jour avec assez de contenu',
+        type: 'feature',
         status: undefined,
       });
     });
@@ -4477,6 +4497,7 @@ describe('AdminService', () => {
         });
 
         expect(storageService.instance.updateDevelopmentRequest).toHaveBeenCalledWith('dev-88', {
+          title: 'Titre 88 fermé',
           status: 'closed',
         });
         expect(updateGitHubIssueDetailsMock).toHaveBeenCalledWith(
@@ -4508,6 +4529,7 @@ describe('AdminService', () => {
       });
       vi.doMock('../../utils/github-integration', () => ({
         syncGitHubIssueStatus: syncGitHubIssueStatusMock,
+        updateGitHubIssueDetails: vi.fn().mockResolvedValue(null),
       }));
 
       try {

@@ -96,7 +96,7 @@ curl http://localhost:5001/api/health
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/cjd80
 
 # Session
-SESSION_SECRET=your-secret-key-here
+SESSION_SECRET=generate-a-unique-32-character-minimum-secret
 
 # Authentik (à configurer après démarrage)
 AUTHENTIK_BASE_URL=http://localhost:9002

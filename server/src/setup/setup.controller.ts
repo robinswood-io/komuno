@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, BadRequestException } from "@nestjs/common";
+import { Controller, Get, Post, Put, Body, BadRequestException, Headers } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from "@nestjs/swagger";
 import { SetupService } from "./setup.service";
 
@@ -30,7 +30,11 @@ export class SetupController {
   })
   @ApiResponse({ status: 201, description: "Admin créé avec succès" })
   @ApiResponse({ status: 400, description: "Données invalides" })
-  async createAdmin(@Body() body: { email: string; firstName: string; lastName: string }) {
+  async createAdmin(
+    @Body() body: { email: string; firstName: string; lastName: string },
+    @Headers('x-setup-token') setupToken?: string,
+  ) {
+    this.setupService.verifySetupToken(setupToken);
     const data = await this.setupService.createFirstAdmin(body.email, body.firstName, body.lastName);
     return {
       success: true,
@@ -52,7 +56,11 @@ export class SetupController {
   })
   @ApiResponse({ status: 200, description: "Branding configuré avec succès" })
   @ApiResponse({ status: 400, description: "Le branding ne peut être modifié que lors de la première installation" })
-  async updateBranding(@Body() body: { config: string }) {
+  async updateBranding(
+    @Body() body: { config: string },
+    @Headers('x-setup-token') setupToken?: string,
+  ) {
+    this.setupService.verifySetupToken(setupToken);
     // Only allow during first install
     const status = await this.setupService.getSetupStatus();
     if (!status.isFirstInstall) {
@@ -76,7 +84,11 @@ export class SetupController {
   @ApiResponse({ status: 200, description: "Email de test envoyé avec succès" })
   @ApiResponse({ status: 400, description: "Email invalide" })
   @ApiResponse({ status: 500, description: "Erreur lors de l'envoi de l'email" })
-  async testEmail(@Body() body: { email: string }) {
+  async testEmail(
+    @Body() body: { email: string },
+    @Headers('x-setup-token') setupToken?: string,
+  ) {
+    this.setupService.verifySetupToken(setupToken);
     const data = await this.setupService.testEmail(body.email);
     return { success: true, ...data };
   }
@@ -85,7 +97,8 @@ export class SetupController {
   @ApiOperation({ summary: "Générer la configuration de base du setup" })
   @ApiResponse({ status: 200, description: "Configuration générée avec succès" })
   @ApiResponse({ status: 500, description: "Erreur lors de la génération de la configuration" })
-  async generateConfig() {
+  async generateConfig(@Headers('x-setup-token') setupToken?: string) {
+    this.setupService.verifySetupToken(setupToken);
     const data = await this.setupService.generateConfig();
     return { success: true, ...data };
   }
