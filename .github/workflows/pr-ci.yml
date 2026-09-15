@@ -20,6 +20,8 @@ jobs:
       contents: read
     env:
       DATABASE_URL: postgres://ciuser:cipassword@localhost:5432/cidb
+      MIGRATIONS_DIR: ./migrations
+      SKIP_HISTORICAL_SEED: "true"
       REDIS_URL: redis://localhost:6379
       MINIO_ENDPOINT: localhost
       MINIO_ACCESS_KEY: ci-minio-access
