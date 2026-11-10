@@ -1,6 +1,12 @@
+// @rbw-module komuno:test/unit-security-hardening
+// @rbw-role Suite de tests unitaires du durcissement transversal de sécurité (CSP, CORS, CSRF, secrets production)
+// @rbw-bounds in=[next.config.js, server/src/config/*] | out=[Vitest assertions] | invariants=[Fail-closed en production, aucun wildcard CORS, compatibilité alias DB_PASSWORD/MINIO_ROOT_*]
+// @rbw-memory project:komuno#mod:test/unit-security-hardening
+
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { requiredInProduction } from '../../server/src/config/configuration';
 import { buildCorsOptions, getAllowedCorsOrigins } from '../../server/src/config/cors';
 import { cookieBackedCsrfOriginGuard } from '../../server/src/config/security-middleware';
 import { isDemoModeEnabled } from '../../server/src/auth/demo-user';
@@ -79,10 +85,21 @@ describe('Sécurité — durcissement transversal', () => {
         headers: { host: 'cjd80.fr', ...headers },
         protocol: 'https',
         isAuthenticated: () => authenticated,
-      } as any;
-      const res = { statusCode: 200, body: undefined as unknown, status(code: number) { this.statusCode = code; return this; }, json(body: unknown) { this.body = body; return this; } } as any;
+      } as unknown as Parameters<typeof guard>[0];
+      const res = {
+        statusCode: 200,
+        body: undefined as unknown,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(body: unknown) {
+          this.body = body;
+          return this;
+        },
+      };
       const next = { called: false };
-      guard(req, res, () => { next.called = true; });
+      guard(req, res as unknown as Parameters<typeof guard>[1], () => { next.called = true; });
       return { res, next };
     };
 
@@ -136,6 +153,35 @@ describe('Sécurité — durcissement transversal', () => {
     expect(membersController).toContain("@Patch('bulk-status')\n  @Permissions('admin.edit')");
     expect(membersController).toContain("@Patch(':email/assign')\n  @Permissions('admin.edit')");
     expect(membersController).toContain("@Post(':email/subscriptions')\n  @Permissions('admin.edit')");
+  });
+
+  it('résout les secrets de production avec support des alias legacy (DB_PASSWORD, MINIO_ROOT_*) et échoue en fail-closed si absents', () => {
+    expect(
+      requiredInProduction('POSTGRES_PASSWORD', 'postgres', ['DB_PASSWORD'], {
+        NODE_ENV: 'production',
+        DB_PASSWORD: 'prod-db-secret',
+      } as NodeJS.ProcessEnv),
+    ).toBe('prod-db-secret');
+
+    expect(
+      requiredInProduction('POSTGRES_PASSWORD', 'postgres', ['DB_PASSWORD'], {
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://postgres:url-db-secret@nhost-postgres-prod:5432/nhost',
+      } as NodeJS.ProcessEnv),
+    ).toBe('url-db-secret');
+
+    expect(
+      requiredInProduction('MINIO_ACCESS_KEY', 'minioadmin', ['MINIO_ROOT_USER', 'S3_ACCESS_KEY_ID'], {
+        NODE_ENV: 'production',
+        MINIO_ROOT_USER: 'minio-prod-user',
+      } as NodeJS.ProcessEnv),
+    ).toBe('minio-prod-user');
+
+    expect(() =>
+      requiredInProduction('POSTGRES_PASSWORD', 'postgres', ['DB_PASSWORD'], {
+        NODE_ENV: 'production',
+      } as NodeJS.ProcessEnv),
+    ).toThrow('POSTGRES_PASSWORD must be set in production');
   });
 
 });

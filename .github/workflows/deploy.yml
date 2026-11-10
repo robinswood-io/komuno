@@ -18,6 +18,7 @@ on:
           - cjd80
           - rep
           - hdf
+          - saint-omer
           - both
           - all
       force_build:
@@ -874,5 +875,184 @@ jobs:
           echo "| Champ | Valeur |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| URL | https://cjd-hdf.fr |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Digest | \`${{ needs.build.outputs.image-digest }}\` |" >> $GITHUB_STEP_SUMMARY
+
+  # ===================================
+  # Job 6: Deploy CJD Saint-Omer (saint-omer.cjd-hdf.fr)
+  # ===================================
+  deploy-saint-omer:
+    name: Deploy CJD Saint-Omer (saint-omer.cjd-hdf.fr)
+    runs-on: [self-hosted, rep]
+    timeout-minutes: 20
+    needs: [detect-changes, build, validate-migrations, test-critical]
+    if: |
+      always() &&
+      (needs.validate-migrations.result == 'success' || needs.validate-migrations.result == 'skipped') &&
+      (needs.test-critical.result == 'success' || needs.test-critical.result == 'skipped') &&
+      needs.build.result == 'success' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.event.inputs.environment == 'saint-omer' || github.event.inputs.environment == 'all')))
+
+    environment:
+      name: saint-omer
+      url: https://saint-omer.cjd-hdf.fr
+
+    steps:
+
+      - name: Build branded image and deploy CJD Saint-Omer
+        if: needs.detect-changes.outputs.should_build == 'true'
+        run: |
+          set -euo pipefail
+          cd /docker/apps/cjd-saint-omer
+
+          echo "🔐 Login GHCR..."
+          echo "${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" | \
+            docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:12}"
+          IMAGE_REF="ghcr.io/${{ github.repository }}@${{ needs.build.outputs.image-digest }}"
+          BASE_TAG="ghcr.io/${{ github.repository }}:latest"
+          STOMER_IMAGE="cjd-saint-omer:${SHORT_SHA}-saint-omer-branding"
+          STOMER_LATEST="cjd-saint-omer:latest-saint-omer-branding"
+          OLD_IMAGE=$(docker inspect cjd-saint-omer-app --format='{{.Config.Image}}' 2>/dev/null || echo "")
+          echo "Image CJD Saint-Omer actuelle: ${OLD_IMAGE:-aucune}"
+
+          echo "📥 Pull image applicative par digest (immuable)..."
+          docker pull "$IMAGE_REF"
+          docker tag "$IMAGE_REF" "$BASE_TAG"
+
+          echo "🎨 Build image branding CJD Saint-Omer..."
+          docker build --pull=false -t "$STOMER_IMAGE" -t "$STOMER_LATEST" -f branding-image/Dockerfile branding-image
+
+          if ! docker run --rm --entrypoint sh "$STOMER_IMAGE" -lc "grep -R \"CJD Saint-Omer\" -n /app/.next /app/public >/dev/null 2>&1"; then
+            echo "❌ L'image CJD Saint-Omer ne contient pas la marque attendue"
+            exit 1
+          fi
+
+          BACKUP="docker-compose.yml.bak-ci-saint-omer-${SHORT_SHA}-$(date +%Y%m%d%H%M%S)"
+          cp docker-compose.yml "$BACKUP"
+          sed -i "s#image: cjd-saint-omer:.*#image: ${STOMER_IMAGE}#" docker-compose.yml
+
+          rollback() {
+            echo "🔄 Rollback CJD Saint-Omer..."
+            if [ -n "${OLD_IMAGE:-}" ]; then
+              sed -i "s#image: cjd-saint-omer:.*#image: ${OLD_IMAGE}#" docker-compose.yml || true
+            elif [ -f "$BACKUP" ]; then
+              cp "$BACKUP" docker-compose.yml || true
+            fi
+            docker compose up -d --no-deps --force-recreate app || true
+          }
+
+          echo "🚀 Déploiement CJD Saint-Omer..."
+          docker compose up -d --no-deps --force-recreate app
+
+          echo "⏳ Attente démarrage backend (max 90s)..."
+          for i in $(seq 1 18); do
+            STATE=$(docker inspect --format='{{.State.Status}}' cjd-saint-omer-app 2>/dev/null || echo "not_found")
+            if [ "$STATE" != "running" ]; then
+              echo "  ⏳ Tentative $i/18 — container état: $STATE"
+              sleep 5
+              continue
+            fi
+            HEALTH=$(docker exec cjd-saint-omer-app wget -q -O - --timeout=5 \
+              http://localhost:5000/api/health 2>/dev/null || echo "")
+            if echo "$HEALTH" | grep -q '"status":"healthy"'; then
+              echo "  ✅ Backend CJD Saint-Omer prêt après $((i * 5))s"
+              break
+            fi
+            echo "  ⏳ Tentative $i/18 — backend pas encore prêt..."
+            sleep 5
+          done
+
+          CONTAINER_STATE=$(docker inspect --format='{{.State.Status}}' cjd-saint-omer-app 2>/dev/null || echo "not_found")
+          RESTART_COUNT=$(docker inspect --format='{{.RestartCount}}' cjd-saint-omer-app 2>/dev/null || echo "0")
+          if [ "$CONTAINER_STATE" != "running" ] || [ "$RESTART_COUNT" -gt "1" ]; then
+            echo "❌ Container CJD Saint-Omer instable (état=$CONTAINER_STATE, restarts=$RESTART_COUNT)"
+            docker logs cjd-saint-omer-app --tail 100 || true
+            rollback
+            exit 1
+          fi
+
+          echo "🔍 Smoke tests backend..."
+          FAIL=0
+          check_endpoint() {
+            local name="$1" url="$2"
+            local status
+            status=$(docker exec cjd-saint-omer-app wget -S -O /dev/null --timeout=10 "$url" 2>&1 \
+              | grep "HTTP/" | tail -1 | awk '{print $2}' || echo "000")
+            if [ "${status:0:1}" = "5" ] || [ "$status" = "000" ]; then
+              echo "  ❌ $name → HTTP $status"
+              FAIL=1
+            else
+              echo "  ✅ $name → HTTP $status"
+            fi
+          }
+
+          check_endpoint "GET /api/health"                       "http://localhost:5000/api/health"
+          check_endpoint "GET /api/admin/members"                "http://localhost:5000/api/admin/members"
+          check_endpoint "GET /api/admin/events"                 "http://localhost:5000/api/admin/events"
+          check_endpoint "GET /api/admin/ideas"                  "http://localhost:5000/api/admin/ideas"
+          check_endpoint "GET /api/admin/federation/overview"    "http://localhost:5000/api/admin/federation/overview"
+          check_endpoint "GET /api/admin/forms"                  "http://localhost:5000/api/admin/forms"
+          check_endpoint "GET /api/patrons"                      "http://localhost:5000/api/patrons"
+
+          echo "🌐 Smoke tests Traefik + branding..."
+          CURL_RESOLVE=()
+          if ! getent hosts saint-omer.cjd-hdf.fr >/dev/null 2>&1; then
+            CURL_RESOLVE=(-k --resolve "saint-omer.cjd-hdf.fr:443:127.0.0.1")
+          fi
+
+          check_public() {
+            local name="$1" url="$2" expected="$3" attempts="${4:-18}" delay="${5:-5}"
+            local status
+            for i in $(seq 1 "$attempts"); do
+              status=$(curl -sS "${CURL_RESOLVE[@]}" -o /tmp/saint-omer-public-check.html --max-time 20 -w "%{http_code}" "$url" || echo "000")
+              if [[ "$status" =~ $expected ]]; then
+                echo "  ✅ $name → HTTP $status (tentative $i/$attempts)"
+                return 0
+              fi
+              echo "  ⏳ $name → HTTP $status (tentative $i/$attempts), attente Traefik..."
+              sleep "$delay"
+            done
+            echo "  ❌ $name → HTTP $status après $attempts tentatives"
+            FAIL=1
+          }
+
+          check_public "GET /"           "https://saint-omer.cjd-hdf.fr/"           "^(2|3)[0-9][0-9]$"
+          check_public "GET /api/health" "https://saint-omer.cjd-hdf.fr/api/health" "^200$"
+
+          HOME_HTML=$(curl -fsSL "${CURL_RESOLVE[@]}" --max-time 20 https://saint-omer.cjd-hdf.fr/ || echo "")
+          if echo "$HOME_HTML" | grep -E "CJD Amiens|Boîte à Kiffs|Boite à Kiff" >/dev/null; then
+            echo "❌ Régression branding CJD Saint-Omer détectée"
+            rollback
+            exit 1
+          fi
+          if ! echo "$HOME_HTML" | grep -q "CJD Saint-Omer"; then
+            echo "❌ Marque CJD Saint-Omer non détectée sur la page publique"
+            rollback
+            exit 1
+          fi
+          echo "  ✅ Branding CJD Saint-Omer public validé"
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo "❌ Smoke tests CJD Saint-Omer échoués — rollback..."
+            docker logs cjd-saint-omer-app --tail 100 || true
+            rollback
+            exit 1
+          fi
+
+          echo "✅ Déploiement CJD Saint-Omer réussi!"
+          echo "Nettoyage global désactivé : conserver image courante et image de retour arrière."
+
+      - name: Deployment summary
+        if: needs.detect-changes.outputs.should_build == 'true'
+        run: |
+          echo "## Déploiement CJD Saint-Omer réussi" >> $GITHUB_STEP_SUMMARY
+          echo "| Champ | Valeur |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | https://saint-omer.cjd-hdf.fr |" >> $GITHUB_STEP_SUMMARY
           echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Digest | \`${{ needs.build.outputs.image-digest }}\` |" >> $GITHUB_STEP_SUMMARY

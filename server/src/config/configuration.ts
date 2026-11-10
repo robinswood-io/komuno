@@ -1,12 +1,32 @@
+// @rbw-module komuno:server/config-configuration
+// @rbw-role Configuration typée NestJS avec validation stricte des secrets en production et compatibilité des alias d'environnement
+// @rbw-bounds in=[process.env] | out=[registerAs('app') configuration] | invariants=[Fail-closed en production si secret requis absent, support POSTGRES_PASSWORD|DB_PASSWORD et MINIO_*|S3_*]
+// @rbw-memory project:komuno#mod:server/config-configuration
+
 import { registerAs } from '@nestjs/config';
 
-const nodeEnv = process.env.NODE_ENV || 'development';
-const isProduction = nodeEnv === 'production';
+export function extractPasswordFromDatabaseUrl(databaseUrl?: string): string {
+  if (!databaseUrl) return '';
+  try {
+    const parsed = new URL(databaseUrl);
+    return parsed.password ? decodeURIComponent(parsed.password) : '';
+  } catch {
+    return '';
+  }
+}
 
-function requiredInProduction(name: string, developmentFallback = ''): string {
-  const value = process.env[name];
+export function requiredInProduction(
+  name: string,
+  developmentFallback = '',
+  aliases: readonly string[] = [],
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const directOrAlias = env[name] || aliases.map((alias) => env[alias]).find(Boolean);
+  const value =
+    directOrAlias ||
+    (name === 'POSTGRES_PASSWORD' ? extractPasswordFromDatabaseUrl(env.DATABASE_URL) : '');
   if (value) return value;
-  if (isProduction) {
+  if ((env.NODE_ENV || 'development') === 'production') {
     throw new Error(`${name} must be set in production`);
   }
   return developmentFallback;
@@ -18,16 +38,16 @@ function requiredInProduction(name: string, developmentFallback = ''): string {
  */
 export default registerAs('app', () => ({
   // Application
-  nodeEnv,
+  nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '5000', 10),
   corsOrigin: process.env.CORS_ORIGIN || '',
   siteUrl: process.env.SITE_URL || 'http://localhost:5000',
 
   // Base de données
   databaseUrl: requiredInProduction('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5433/cjd80'),
-  postgresUser: process.env.POSTGRES_USER || 'postgres',
-  postgresPassword: requiredInProduction('POSTGRES_PASSWORD', 'postgres'),
-  postgresDb: process.env.POSTGRES_DB || 'cjd80',
+  postgresUser: process.env.POSTGRES_USER || process.env.DB_USER || 'postgres',
+  postgresPassword: requiredInProduction('POSTGRES_PASSWORD', 'postgres', ['DB_PASSWORD']),
+  postgresDb: process.env.POSTGRES_DB || process.env.DB_NAME || 'cjd80',
   postgresHost: process.env.PGHOST || 'localhost',
   postgresPort: parseInt(process.env.PGPORT || '5433', 10),
 
@@ -39,8 +59,8 @@ export default registerAs('app', () => ({
   minioPort: parseInt(process.env.MINIO_PORT || '9000', 10),
   minioExternalPort: parseInt(process.env.MINIO_EXTERNAL_PORT || '9002', 10),
   minioUseSSL: process.env.MINIO_USE_SSL === 'true',
-  minioAccessKey: requiredInProduction('MINIO_ACCESS_KEY', 'minioadmin'),
-  minioSecretKey: requiredInProduction('MINIO_SECRET_KEY', 'minioadmin'),
+  minioAccessKey: requiredInProduction('MINIO_ACCESS_KEY', 'minioadmin', ['MINIO_ROOT_USER', 'S3_ACCESS_KEY_ID']),
+  minioSecretKey: requiredInProduction('MINIO_SECRET_KEY', 'minioadmin', ['MINIO_ROOT_PASSWORD', 'S3_SECRET_ACCESS_KEY']),
   minioBucketLoanItems: process.env.MINIO_BUCKET_LOAN_ITEMS || 'loan-items',
   minioBucketAssets: process.env.MINIO_BUCKET_ASSETS || 'assets',
 
