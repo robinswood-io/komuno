@@ -249,3 +249,4 @@ docs/archives/
 /server/lib/db-resilience.js
 /server/lib/circuit-breaker.js
 /server/lib/logger.js
+tests/e2e/generated/
