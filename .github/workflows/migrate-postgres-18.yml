@@ -43,19 +43,49 @@ jobs:
             set -euo pipefail
             cd /docker/cjd80
 
-            COMPOSE_FILE=""
-            for f in docker-compose.prod.yml docker-compose.yml compose.yml; do
-              if [ -f "$f" ]; then
-                COMPOSE_FILE="$f"
-                break
-              fi
-            done
-            [ -n "$COMPOSE_FILE" ] || { echo "Compose introuvable dans /docker/cjd80"; exit 1; }
+            PG_CID=$(docker ps --filter "name=^/cjd-postgres$" --filter "status=running" -q | head -n1 || true)
+            if [ -z "$PG_CID" ]; then
+              PG_CID=$(docker ps --filter "status=running" --format '{{.ID}} {{.Names}} {{.Image}}' \
+                | awk '$3 ~ /(^|\/)postgres:/ && $2 ~ /cjd/ {print $1; exit}' || true)
+            fi
+            if [ -z "$PG_CID" ]; then
+              PG_CID=$(docker ps --filter "status=running" --format '{{.ID}} {{.Names}} {{.Image}}' \
+                | awk '$3 ~ /(^|\/)postgres:/ && $2 !~ /authentik|temporal|supabase/ {print $1; exit}' || true)
+            fi
+            if [ -z "$PG_CID" ]; then
+              echo "Conteneur PostgreSQL actif introuvable sur le VPS :"
+              docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+              exit 1
+            fi
 
-            PG_SVC=$(docker compose -f "$COMPOSE_FILE" config --services | grep -E '^(postgres|db)$' | head -n1 || true)
-            [ -n "$PG_SVC" ] || { echo "Service postgres introuvable dans $COMPOSE_FILE"; exit 1; }
-            PG_CID=$(docker compose -f "$COMPOSE_FILE" ps -q "$PG_SVC")
-            [ -n "$PG_CID" ] || { echo "Conteneur postgres inactif"; exit 1; }
+            PG_NAME=$(docker inspect "$PG_CID" --format '{{.Name}}' | sed 's|^/||')
+            PG_SVC=$(docker inspect "$PG_CID" --format '{{index .Config.Labels "com.docker.compose.service"}}')
+            PG_PROJ=$(docker inspect "$PG_CID" --format '{{index .Config.Labels "com.docker.compose.project"}}')
+            PG_CFG_RAW=$(docker inspect "$PG_CID" --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}')
+            PG_WORKDIR=$(docker inspect "$PG_CID" --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}')
+            echo "Conteneur PG détecté: name=$PG_NAME service=$PG_SVC project=$PG_PROJ cfg=$PG_CFG_RAW workdir=$PG_WORKDIR"
+
+            [ -n "$PG_CFG_RAW" ] || { echo "Label compose config_files absent sur $PG_NAME"; exit 1; }
+            IFS=',' read -ra COMPOSE_FILES <<< "$PG_CFG_RAW"
+            COMPOSE_ARGS=()
+            [ -n "$PG_PROJ" ] && COMPOSE_ARGS+=(-p "$PG_PROJ")
+            for cf in "${COMPOSE_FILES[@]}"; do
+              [ -f "$cf" ] || { echo "Fichier compose introuvable: $cf"; exit 1; }
+              COMPOSE_ARGS+=(-f "$cf")
+            done
+
+            APP_PROJ=""; APP_CFG_RAW=""; APP_COMPOSE_ARGS=()
+            if docker inspect cjd-app >/dev/null 2>&1; then
+              APP_PROJ=$(docker inspect cjd-app --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || true)
+              APP_CFG_RAW=$(docker inspect cjd-app --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}' 2>/dev/null || true)
+              if [ -n "$APP_CFG_RAW" ] && [ "$APP_CFG_RAW" != "$PG_CFG_RAW" ]; then
+                [ -n "$APP_PROJ" ] && APP_COMPOSE_ARGS+=(-p "$APP_PROJ")
+                IFS=',' read -ra APP_FILES <<< "$APP_CFG_RAW"
+                for cf in "${APP_FILES[@]}"; do
+                  [ -f "$cf" ] && APP_COMPOSE_ARGS+=(-f "$cf")
+                done
+              fi
+            fi
 
             PG_USER=$(docker inspect "$PG_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_USER"{print $2; exit}')
             PG_DB=$(docker inspect "$PG_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_DB"{print $2; exit}')
@@ -76,42 +106,96 @@ jobs:
             mkdir -p "$BACKUP_DIR" && chmod 700 "$BACKUP_DIR"
 
             docker exec "$PG_CID" pg_dumpall -U "$PG_USER" --roles-only > "${BACKUP_DIR}/roles.sql"
-            docker exec "$PG_CID" pg_dump -U "$PG_USER" --format=custom --no-owner --no-acl "$PG_DB" > "${BACKUP_DIR}/${PG_DB}.dump"
-            test -s "${BACKUP_DIR}/${PG_DB}.dump"
-            (cd "$BACKUP_DIR" && sha256sum roles.sql "${PG_DB}.dump" > SHA256SUMS && sha256sum -c SHA256SUMS)
+            DBS=$(docker exec "$PG_CID" psql -U "$PG_USER" -d postgres -tAc "SELECT datname FROM pg_database WHERE datistemplate=false ORDER BY datname;")
+            DUMP_FILES=(roles.sql)
+            for db in $DBS; do
+              docker exec "$PG_CID" pg_dump -U "$PG_USER" --format=custom --no-owner --no-acl "$db" > "${BACKUP_DIR}/${db}.dump"
+              test -s "${BACKUP_DIR}/${db}.dump"
+              DUMP_FILES+=("${db}.dump")
+            done
+            (cd "$BACKUP_DIR" && sha256sum "${DUMP_FILES[@]}" > SHA256SUMS && sha256sum -c SHA256SUMS)
 
-            cp "$COMPOSE_FILE" "${COMPOSE_FILE}.bak-pre-pg18-${TS}"
-            APP_SVCS=$(docker compose -f "$COMPOSE_FILE" config --services | grep -Ev "^(${PG_SVC}|redis|minio)$" | tr '\n' ' ')
-            [ -n "$APP_SVCS" ] && docker compose -f "$COMPOSE_FILE" stop $APP_SVCS
-            docker compose -f "$COMPOSE_FILE" stop "$PG_SVC"
+            for cf in "${COMPOSE_FILES[@]}"; do
+              cp "$cf" "${cf}.bak-pre-pg18-${TS}"
+            done
 
-            python3 - "$COMPOSE_FILE" <<'PY'
+            rollback_pg16() {
+              echo "⚠️ Échec détecté — rollback vers la configuration PG 16..."
+              for cf in "${COMPOSE_FILES[@]}"; do
+                [ -f "${cf}.bak-pre-pg18-${TS}" ] && cp "${cf}.bak-pre-pg18-${TS}" "$cf"
+              done
+              docker compose "${COMPOSE_ARGS[@]}" up -d || true
+              if [ ${#APP_COMPOSE_ARGS[@]} -gt 0 ]; then
+                docker compose "${APP_COMPOSE_ARGS[@]}" up -d || true
+              fi
+            }
+            trap rollback_pg16 ERR
+
+            if [ ${#APP_COMPOSE_ARGS[@]} -gt 0 ]; then
+              APP_STACK_SVCS=$(docker compose "${APP_COMPOSE_ARGS[@]}" config --services | grep -Ev '^(redis|minio|traefik|caddy)$' | tr '\n' ' ' || true)
+              [ -n "$APP_STACK_SVCS" ] && docker compose "${APP_COMPOSE_ARGS[@]}" stop $APP_STACK_SVCS || true
+            fi
+            PG_STACK_SVCS=$(docker compose "${COMPOSE_ARGS[@]}" config --services | grep -Ev "^(${PG_SVC}|redis|minio|traefik|caddy)$" | tr '\n' ' ' || true)
+            [ -n "$PG_STACK_SVCS" ] && docker compose "${COMPOSE_ARGS[@]}" stop $PG_STACK_SVCS || true
+            docker compose "${COMPOSE_ARGS[@]}" stop "$PG_SVC"
+
+            PG_MOUNT=$(docker inspect "$PG_CID" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Type}}|{{.Name}}|{{.Source}}{{end}}{{end}}')
+            python3 - "$PG_PROJ" "$PG_MOUNT" "${COMPOSE_FILES[@]}" <<'PY'
             import re, sys
-            path = sys.argv[1]
-            with open(path, encoding="utf-8") as fh:
-                content = fh.read()
-            content = re.sub(r'postgres:(?:1[4-7](?:\.[0-9]+)?(?:-alpine)?)', 'postgres:18.7-alpine', content)
-            content = content.replace('/var/lib/postgresql/data', '/var/lib/postgresql')
-            content = re.sub(r'(\bpostgres_data\b)(?!_pg18)', 'postgres_pg18_data', content)
-            with open(path, "w", encoding="utf-8") as fh:
-                fh.write(content)
+
+            proj = sys.argv[1]
+            pg_mount = sys.argv[2]
+            mount_parts = pg_mount.split("|") if pg_mount else ["", "", ""]
+            vol_full = mount_parts[1] if len(mount_parts) > 1 else ""
+
+            for path in sys.argv[3:]:
+                with open(path, encoding="utf-8") as fh:
+                    content = fh.read()
+                mounts = re.findall(r'^\s*-\s*([^\s:#]+):/var/lib/postgresql/data\b', content, flags=re.M)
+                content = re.sub(r'postgres:(?:1[4-7](?:\.[0-9]+)?(?:-alpine)?)(?:@sha256:[0-9a-f]+)?', 'postgres:18.7-alpine', content)
+                content = content.replace('/var/lib/postgresql/data', '/var/lib/postgresql')
+                vol_tokens = set()
+                for src in mounts:
+                    clean = src.rstrip('/')
+                    if clean.startswith(('/', '.', '~')):
+                        if not clean.endswith(('_pg18', '-pg18')):
+                            content = content.replace(f'{src}:/var/lib/postgresql', f'{clean}_pg18:/var/lib/postgresql')
+                    elif '${' not in clean:
+                        vol_tokens.add(clean)
+                if vol_full and not vol_full.endswith(('_pg18', '-pg18')):
+                    vol_tokens.add(vol_full)
+                    if proj and vol_full.startswith(f'{proj}_'):
+                        vol_tokens.add(vol_full[len(proj) + 1:])
+                for tok in sorted((t for t in vol_tokens if t and t not in {'postgres', 'db', 'data', 'pg', 'app'} and not t.endswith(('_pg18', '-pg18'))), key=len, reverse=True):
+                    new_tok = f'{tok}_pg18' if '_' in tok or '-' not in tok else f'{tok}-pg18'
+                    content = re.sub(rf'(?<![\w-]){re.escape(tok)}(?![\w-])', new_tok, content)
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write(content)
             PY
 
-            docker compose -f "$COMPOSE_FILE" up -d "$PG_SVC"
-            NEW_CID=$(docker compose -f "$COMPOSE_FILE" ps -q "$PG_SVC")
+            docker compose "${COMPOSE_ARGS[@]}" config -q
+            docker compose "${COMPOSE_ARGS[@]}" up -d "$PG_SVC"
+            NEW_CID=$(docker compose "${COMPOSE_ARGS[@]}" ps -q "$PG_SVC")
+            [ -n "$NEW_CID" ] || { echo "Nouveau conteneur $PG_SVC introuvable"; exit 1; }
             for i in $(seq 1 30); do
               docker exec "$NEW_CID" pg_isready -U "$PG_USER" -d "$PG_DB" >/dev/null 2>&1 && break
               sleep 2
             done
+            docker exec "$NEW_CID" pg_isready -U "$PG_USER" -d "$PG_DB"
 
             grep -Ev "^CREATE ROLE \"?${PG_USER}\"?;|^ALTER ROLE \"?${PG_USER}\"? " "${BACKUP_DIR}/roles.sql" \
               | docker exec -i "$NEW_CID" psql -U "$PG_USER" -d postgres -v ON_ERROR_STOP=0 >/dev/null || true
-            docker exec -i "$NEW_CID" pg_restore -U "$PG_USER" -d "$PG_DB" --clean --if-exists --no-owner --no-acl --exit-on-error < "${BACKUP_DIR}/${PG_DB}.dump"
 
-            HASURA_TBL=$(docker exec "$NEW_CID" psql -U "$PG_USER" -d "$PG_DB" -tAc "SELECT to_regclass('hdb_catalog.hdb_source_catalog_version') IS NOT NULL;")
-            if [ "$HASURA_TBL" = "t" ]; then
-              docker exec "$NEW_CID" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 -c "ALTER TABLE hdb_catalog.hdb_source_catalog_version REPLICA IDENTITY FULL;"
-            fi
+            for db in $DBS; do
+              [ "$db" = "postgres" ] && continue
+              exists=$(docker exec "$NEW_CID" psql -U "$PG_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${db}';" || true)
+              [ "$exists" = "1" ] || docker exec "$NEW_CID" psql -U "$PG_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${db}\";"
+              docker exec -i "$NEW_CID" pg_restore -U "$PG_USER" -d "$db" --clean --if-exists --no-owner --no-acl --exit-on-error < "${BACKUP_DIR}/${db}.dump"
+              HASURA_TBL=$(docker exec "$NEW_CID" psql -U "$PG_USER" -d "$db" -tAc "SELECT to_regclass('hdb_catalog.hdb_source_catalog_version') IS NOT NULL;")
+              if [ "$HASURA_TBL" = "t" ]; then
+                docker exec "$NEW_CID" psql -U "$PG_USER" -d "$db" -v ON_ERROR_STOP=1 -c "ALTER TABLE hdb_catalog.hdb_source_catalog_version REPLICA IDENTITY FULL;"
+              fi
+            done
 
             docker exec "$NEW_CID" vacuumdb -U "$PG_USER" --all --analyze-only
             NEW_VER=$(docker exec "$NEW_CID" psql -U "$PG_USER" -d postgres -tAc "SHOW server_version;")
@@ -119,9 +203,17 @@ jobs:
             echo "CJD80 PG version=$NEW_VER | data_checksums=$CHECKSUMS"
             [[ "$NEW_VER" == 18.* ]] && [ "$CHECKSUMS" = "on" ]
 
-            docker compose -f "$COMPOSE_FILE" up -d
-            for i in $(seq 1 20); do
-              curl -fsS --max-time 10 https://cjd80.fr/api/health >/dev/null && exit 0
+            docker compose "${COMPOSE_ARGS[@]}" up -d
+            if [ ${#APP_COMPOSE_ARGS[@]} -gt 0 ]; then
+              docker compose "${APP_COMPOSE_ARGS[@]}" up -d
+            fi
+            for i in $(seq 1 25); do
+              if curl -fsS --max-time 10 https://cjd80.fr/api/health >/dev/null 2>&1; then
+                trap - ERR
+                echo "CJD80 healthy sur PG $NEW_VER"
+                exit 0
+              fi
               sleep 3
             done
+            docker logs --tail 60 cjd-app 2>/dev/null || true
             exit 1
