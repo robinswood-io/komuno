@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 ARCHIVE="${1:?archive .age requise}"
 AGE_IDENTITY="${AGE_IDENTITY:?AGE_IDENTITY requis}"
-POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:16-alpine}"
+POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:18.7-alpine}"
 NAME="komuno-restore-$RANDOM-$$"
 WORK="$(mktemp -d)"
 cleanup(){ docker rm -f "$NAME" >/dev/null 2>&1 || true; rm -rf "$WORK"; }

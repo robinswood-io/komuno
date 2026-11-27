@@ -81,7 +81,7 @@ services:
       - db
 
   db:
-    image: postgres:15
+    image: postgres:18.7-alpine
     environment:
       POSTGRES_DB: myapp
       POSTGRES_USER: postgres
@@ -89,7 +89,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
 
 volumes:
   postgres_data:

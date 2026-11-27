@@ -1,0 +1,127 @@
+name: Migrate PostgreSQL 18.7 (CJD80)
+
+concurrency:
+  group: migrate-postgres-18-cjd80
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Taper MIGRATE_PG18 pour autoriser la bascule'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-cjd80-pg18:
+    name: Migrate CJD80 PostgreSQL -> 18.7
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: cjd80
+      url: https://cjd80.fr
+
+    steps:
+      - name: Validate manual confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "MIGRATE_PG18" ]; then
+            echo "Confirmation invalide: saisir exactement MIGRATE_PG18"
+            exit 1
+          fi
+
+      - name: Migrate PostgreSQL on CJD80 VPS
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -euo pipefail
+            cd /docker/cjd80
+
+            COMPOSE_FILE=""
+            for f in docker-compose.prod.yml docker-compose.yml compose.yml; do
+              if [ -f "$f" ]; then
+                COMPOSE_FILE="$f"
+                break
+              fi
+            done
+            [ -n "$COMPOSE_FILE" ] || { echo "Compose introuvable dans /docker/cjd80"; exit 1; }
+
+            PG_SVC=$(docker compose -f "$COMPOSE_FILE" config --services | grep -E '^(postgres|db)$' | head -n1 || true)
+            [ -n "$PG_SVC" ] || { echo "Service postgres introuvable dans $COMPOSE_FILE"; exit 1; }
+            PG_CID=$(docker compose -f "$COMPOSE_FILE" ps -q "$PG_SVC")
+            [ -n "$PG_CID" ] || { echo "Conteneur postgres inactif"; exit 1; }
+
+            PG_USER=$(docker inspect "$PG_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_USER"{print $2; exit}')
+            PG_DB=$(docker inspect "$PG_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_DB"{print $2; exit}')
+            PG_USER="${PG_USER:-postgres}"
+            PG_DB="${PG_DB:-postgres}"
+
+            CUR_VER=$(docker exec "$PG_CID" psql -U "$PG_USER" -d postgres -tAc "SHOW server_version;")
+            if [[ "$CUR_VER" == 18.* ]]; then
+              echo "Déjà sur PostgreSQL $CUR_VER — aucune migration nécessaire"
+              exit 0
+            fi
+
+            MD5_CNT=$(docker exec "$PG_CID" psql -U "$PG_USER" -d postgres -tAc "SELECT COUNT(*) FROM pg_authid WHERE rolcanlogin AND rolpassword LIKE 'md5%';")
+            [ "$MD5_CNT" -eq 0 ] || { echo "$MD5_CNT rôle(s) MD5 détecté(s) — convertir en SCRAM-SHA-256 avant bascule"; exit 1; }
+
+            TS=$(date -u +%Y%m%d-%H%M%S)
+            BACKUP_DIR="/docker/cjd80/backups/pg18-migration-${TS}"
+            mkdir -p "$BACKUP_DIR" && chmod 700 "$BACKUP_DIR"
+
+            docker exec "$PG_CID" pg_dumpall -U "$PG_USER" --roles-only > "${BACKUP_DIR}/roles.sql"
+            docker exec "$PG_CID" pg_dump -U "$PG_USER" --format=custom --no-owner --no-acl "$PG_DB" > "${BACKUP_DIR}/${PG_DB}.dump"
+            test -s "${BACKUP_DIR}/${PG_DB}.dump"
+            (cd "$BACKUP_DIR" && sha256sum roles.sql "${PG_DB}.dump" > SHA256SUMS && sha256sum -c SHA256SUMS)
+
+            cp "$COMPOSE_FILE" "${COMPOSE_FILE}.bak-pre-pg18-${TS}"
+            APP_SVCS=$(docker compose -f "$COMPOSE_FILE" config --services | grep -Ev "^(${PG_SVC}|redis|minio)$" | tr '\n' ' ')
+            [ -n "$APP_SVCS" ] && docker compose -f "$COMPOSE_FILE" stop $APP_SVCS
+            docker compose -f "$COMPOSE_FILE" stop "$PG_SVC"
+
+            python3 - "$COMPOSE_FILE" <<'PY'
+            import re, sys
+            path = sys.argv[1]
+            with open(path, encoding="utf-8") as fh:
+                content = fh.read()
+            content = re.sub(r'postgres:(?:1[4-7](?:\.[0-9]+)?(?:-alpine)?)', 'postgres:18.7-alpine', content)
+            content = content.replace('/var/lib/postgresql/data', '/var/lib/postgresql')
+            content = re.sub(r'(\bpostgres_data\b)(?!_pg18)', 'postgres_pg18_data', content)
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(content)
+            PY
+
+            docker compose -f "$COMPOSE_FILE" up -d "$PG_SVC"
+            NEW_CID=$(docker compose -f "$COMPOSE_FILE" ps -q "$PG_SVC")
+            for i in $(seq 1 30); do
+              docker exec "$NEW_CID" pg_isready -U "$PG_USER" -d "$PG_DB" >/dev/null 2>&1 && break
+              sleep 2
+            done
+
+            grep -Ev "^CREATE ROLE \"?${PG_USER}\"?;|^ALTER ROLE \"?${PG_USER}\"? " "${BACKUP_DIR}/roles.sql" \
+              | docker exec -i "$NEW_CID" psql -U "$PG_USER" -d postgres -v ON_ERROR_STOP=0 >/dev/null || true
+            docker exec -i "$NEW_CID" pg_restore -U "$PG_USER" -d "$PG_DB" --clean --if-exists --no-owner --no-acl --exit-on-error < "${BACKUP_DIR}/${PG_DB}.dump"
+
+            HASURA_TBL=$(docker exec "$NEW_CID" psql -U "$PG_USER" -d "$PG_DB" -tAc "SELECT to_regclass('hdb_catalog.hdb_source_catalog_version') IS NOT NULL;")
+            if [ "$HASURA_TBL" = "t" ]; then
+              docker exec "$NEW_CID" psql -U "$PG_USER" -d "$PG_DB" -v ON_ERROR_STOP=1 -c "ALTER TABLE hdb_catalog.hdb_source_catalog_version REPLICA IDENTITY FULL;"
+            fi
+
+            docker exec "$NEW_CID" vacuumdb -U "$PG_USER" --all --analyze-only
+            NEW_VER=$(docker exec "$NEW_CID" psql -U "$PG_USER" -d postgres -tAc "SHOW server_version;")
+            CHECKSUMS=$(docker exec "$NEW_CID" psql -U "$PG_USER" -d postgres -tAc "SHOW data_checksums;")
+            echo "CJD80 PG version=$NEW_VER | data_checksums=$CHECKSUMS"
+            [[ "$NEW_VER" == 18.* ]] && [ "$CHECKSUMS" = "on" ]
+
+            docker compose -f "$COMPOSE_FILE" up -d
+            for i in $(seq 1 20); do
+              curl -fsS --max-time 10 https://cjd80.fr/api/health >/dev/null && exit 0
+              sleep 3
+            done
+            exit 1

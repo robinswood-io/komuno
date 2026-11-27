@@ -34,7 +34,7 @@ if ! command -v pg_dump &> /dev/null; then
     echo "⚠️  pg_dump non trouvé localement, utilisation de Docker..."
     if command -v docker &> /dev/null; then
         USE_DOCKER=true
-        echo "✅ Docker disponible, utilisation du conteneur postgres:16-alpine"
+        echo "✅ Docker disponible, utilisation du conteneur postgres:18.7-alpine"
     else
         echo "❌ ERREUR: pg_dump et Docker ne sont pas disponibles"
         echo "   Veuillez installer postgresql-client ou Docker"
@@ -100,7 +100,7 @@ if [ "$USE_DOCKER" = true ]; then
     docker run --rm -i \
         -e PGPASSWORD="$DB_PASS" \
         -e PGSSLMODE=require \
-        postgres:16-alpine \
+        postgres:18.7-alpine \
         pg_dump \
         --host="$DB_HOST" \
         --port="$DB_PORT" \
