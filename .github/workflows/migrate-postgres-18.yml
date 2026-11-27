@@ -8,9 +8,17 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Taper MIGRATE_PG18 pour autoriser la bascule'
+        description: 'Taper MIGRATE_PG18 pour autoriser exécution ou inspection'
         required: true
         type: string
+      mode:
+        description: 'Mode exécution (inspect = lecture seule sans coupure)'
+        required: false
+        type: choice
+        default: migrate
+        options:
+          - migrate
+          - inspect
 
 permissions:
   contents: read
@@ -41,6 +49,75 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             set -euo pipefail
+            RUN_MODE="${{ github.event.inputs.mode || 'migrate' }}"
+
+            if [ "$RUN_MODE" = "inspect" ]; then
+              echo "=== HOST & PERMISSIONS ==="
+              id
+              if sudo -n true 2>/dev/null; then echo "SUDO=OK"; else echo "SUDO=NO"; fi
+              ls -ld /docker /docker/cjd80 /docker/cjd80/nhost /docker/cjd80/supabase 2>&1 || true
+              sudo -n ls -la /docker /docker/cjd80 /docker/cjd80/nhost /docker/cjd80/supabase 2>/dev/null || ls -la /docker /docker/cjd80 /docker/cjd80/nhost /docker/cjd80/supabase 2>&1 || true
+
+              echo "=== DOCKER PS ==="
+              docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+
+              echo "=== INSPECT cjd-app ==="
+              if docker inspect cjd-app >/dev/null 2>&1; then
+                docker inspect cjd-app --format 'project={{index .Config.Labels "com.docker.compose.project"}} service={{index .Config.Labels "com.docker.compose.service"}} workdir={{index .Config.Labels "com.docker.compose.project.working_dir"}} cfg={{index .Config.Labels "com.docker.compose.project.config_files"}}'
+                docker inspect cjd-app --format 'networks={{range $k,$v := .NetworkSettings.Networks}}{{$k}}(aliases={{json $v.Aliases}}) {{end}}'
+                docker inspect cjd-app --format '{{range .Config.Env}}{{println .}}{{end}}' | python3 -c '
+            import sys
+            from urllib.parse import urlsplit
+            for line in sys.stdin:
+                line = line.rstrip("\n")
+                if "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                if k in ("DATABASE_URL", "PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "POSTGRES_HOST", "POSTGRES_DB", "POSTGRES_USER"):
+                    if "://" in v:
+                        p = urlsplit(v)
+                        dbn = p.path.lstrip("/")
+                        print(f"{k}: scheme={p.scheme} user={p.username} host={p.hostname} port={p.port} db={dbn}")
+                    else:
+                        print(f"{k}={v}")
+            '
+              else
+                echo "cjd-app non trouvé"
+              fi
+
+              echo "=== INSPECT POSTGRES CONTAINERS ==="
+              for cid in $(docker ps --format '{{.ID}} {{.Names}} {{.Image}}' | awk 'tolower($2) ~ /(postgres|db)/ || tolower($3) ~ /postgres/ {print $1}'); do
+                cname=$(docker inspect "$cid" --format '{{.Name}}' | sed 's|^/||')
+                echo "--- CONTAINER $cname ($cid) ---"
+                docker inspect "$cid" --format 'image={{.Config.Image}} project={{index .Config.Labels "com.docker.compose.project"}} service={{index .Config.Labels "com.docker.compose.service"}} workdir={{index .Config.Labels "com.docker.compose.project.working_dir"}} cfg={{index .Config.Labels "com.docker.compose.project.config_files"}}'
+                docker inspect "$cid" --format 'mounts={{range .Mounts}}{{.Type}}|{{.Name}}|{{.Source}}->{{.Destination}} {{end}}'
+                docker inspect "$cid" --format 'networks={{range $k,$v := .NetworkSettings.Networks}}{{$k}}(aliases={{json $v.Aliases}}) {{end}}'
+                pguser=$(docker inspect "$cid" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_USER"{print $2; exit}')
+                pguser="${pguser:-postgres}"
+                docker exec "$cid" psql -U "$pguser" -d postgres -tAc "SELECT 'version=' || current_setting('server_version') || ' checksums=' || current_setting('data_checksums');" 2>&1 || true
+                docker exec "$cid" psql -U "$pguser" -d postgres -tAc "SELECT 'role=' || rolname || '|super=' || rolsuper || '|login=' || rolcanlogin || '|md5=' || (rolpassword LIKE 'md5%') FROM pg_authid WHERE rolname NOT LIKE 'pg_%' ORDER BY rolname;" 2>&1 || true
+                dbs=$(docker exec "$cid" psql -U "$pguser" -d postgres -tAc "SELECT datname FROM pg_database WHERE datistemplate=false ORDER BY datname;" 2>/dev/null || true)
+                for db in $dbs; do
+                  echo "  DB=$db extensions=$(docker exec "$cid" psql -U "$pguser" -d "$db" -tAc "SELECT string_agg(extname || ':' || extversion, ',') FROM pg_extension;" 2>&1 || true)"
+                done
+                docker exec "$cid" psql -U "$pguser" -d postgres -tAc "SELECT 'conn=' || COALESCE(datname,'') || '|' || COALESCE(usename,'') || '|' || COALESCE(application_name,'') || '|' || COALESCE(client_addr::text,'local') FROM pg_stat_activity WHERE pid <> pg_backend_pid() ORDER BY datname, usename;" 2>&1 || true
+              done
+
+              echo "=== COMPOSE FILES UNDER /docker/cjd80 ==="
+              for cf in /docker/cjd80/docker-compose*.yml /docker/cjd80/compose*.y*ml /docker/cjd80/*/docker-compose*.yml /docker/cjd80/*/compose*.y*ml; do
+                [ -e "$cf" ] || continue
+                ls -l "$cf" 2>/dev/null || sudo -n ls -l "$cf" 2>/dev/null || true
+                if [ -r "$cf" ]; then
+                  echo "services($cf)=$(docker compose -f "$cf" config --services 2>&1 | tr '\n' ' ')"
+                elif sudo -n test -r "$cf" 2>/dev/null; then
+                  echo "services($cf via sudo)=$(sudo -n docker compose -f "$cf" config --services 2>&1 | tr '\n' ' ')"
+                else
+                  echo "UNREADABLE: $cf"
+                fi
+              done
+              exit 0
+            fi
+
             cd /docker/cjd80
 
             PG_CID=$(docker ps --filter "name=^/cjd-postgres$" --filter "status=running" -q | head -n1 || true)
