@@ -1,0 +1,389 @@
+name: Migrate PostgreSQL 19.0 (CJD80)
+
+concurrency:
+  group: migrate-postgres-19-cjd80
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Taper MIGRATE_PG19 pour autoriser exécution ou inspection'
+        required: true
+        type: string
+      mode:
+        description: 'Mode exécution (inspect = lecture seule sans coupure)'
+        required: false
+        type: choice
+        default: migrate
+        options:
+          - migrate
+          - inspect
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-cjd80-pg19:
+    name: Migrate CJD80 PostgreSQL -> 19.0
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: cjd80
+      url: https://cjd80.fr
+
+    steps:
+      - name: Validate manual confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "MIGRATE_PG19" ]; then
+            echo "Confirmation invalide: saisir exactement MIGRATE_PG19"
+            exit 1
+          fi
+
+      - name: Migrate PostgreSQL on CJD80 VPS
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -euo pipefail
+            RUN_MODE="${{ github.event.inputs.mode || 'migrate' }}"
+            RUNNER_CMD=(bash -seu -s "$RUN_MODE")
+            if sudo -n true 2>/dev/null; then
+              RUNNER_CMD=(sudo -n bash -seu -s "$RUN_MODE")
+            fi
+            "${RUNNER_CMD[@]}" <<'REMOTE_PG19'
+            RUN_MODE="${1:-migrate}"
+
+            if [ "$RUN_MODE" = "inspect" ]; then
+              echo "=== HOST & PERMISSIONS ==="
+              id
+              if sudo -n true 2>/dev/null; then echo "SUDO=OK"; else echo "SUDO=NO"; fi
+              ls -ld /docker /docker/cjd80 /docker/cjd80/nhost /docker/cjd80/supabase 2>&1 || true
+
+              echo "=== DOCKER PS ==="
+              docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+
+              echo "=== INSPECT cjd-app ==="
+              if docker inspect cjd-app >/dev/null 2>&1; then
+                docker inspect cjd-app --format 'project={{index .Config.Labels "com.docker.compose.project"}} service={{index .Config.Labels "com.docker.compose.service"}} workdir={{index .Config.Labels "com.docker.compose.project.working_dir"}} cfg={{index .Config.Labels "com.docker.compose.project.config_files"}}'
+                docker inspect cjd-app --format 'networks={{range $k,$v := .NetworkSettings.Networks}}{{$k}}(aliases={{json $v.Aliases}}) {{end}}'
+              else
+                echo "cjd-app non trouvé"
+              fi
+
+              echo "=== INSPECT POSTGRES CONTAINERS ==="
+              for cid in $(docker ps --format '{{.ID}} {{.Names}} {{.Image}}' | awk 'tolower($2) ~ /(postgres|db)/ || tolower($3) ~ /postgres/ {print $1}'); do
+                cname=$(docker inspect "$cid" --format '{{.Name}}' | sed 's|^/||')
+                echo "--- CONTAINER $cname ($cid) ---"
+                docker inspect "$cid" --format 'image={{.Config.Image}} project={{index .Config.Labels "com.docker.compose.project"}} service={{index .Config.Labels "com.docker.compose.service"}} workdir={{index .Config.Labels "com.docker.compose.project.working_dir"}} cfg={{index .Config.Labels "com.docker.compose.project.config_files"}}'
+                docker inspect "$cid" --format 'mounts={{range .Mounts}}{{.Type}}|{{.Name}}|{{.Source}}->{{.Destination}} {{end}}'
+                docker inspect "$cid" --format 'networks={{range $k,$v := .NetworkSettings.Networks}}{{$k}}(aliases={{json $v.Aliases}}) {{end}}'
+                pguser=$(docker inspect "$cid" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_USER"{print $2; exit}')
+                pgpass=$(docker inspect "$cid" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_PASSWORD"{print $2; exit}')
+                pguser="${pguser:-postgres}"
+                docker exec -e "PGPASSWORD=$pgpass" "$cid" psql -U "$pguser" -d postgres -tAc "SELECT 'version=' || current_setting('server_version') || ' checksums=' || current_setting('data_checksums');" 2>&1 || true
+                docker exec -e "PGPASSWORD=$pgpass" "$cid" psql -U "$pguser" -d postgres -tAc "SELECT 'role=' || rolname || '|super=' || rolsuper || '|login=' || rolcanlogin || '|md5=' || (rolpassword LIKE 'md5%') FROM pg_authid WHERE rolname NOT LIKE 'pg_%' ORDER BY rolname;" 2>&1 || true
+              done
+              exit 0
+            fi
+
+            cd /docker/cjd80
+            PG_NAME=$(docker inspect cjd-app --format '{{range .Config.Env}}{{println .}}{{end}}' | python3 -c '
+            import sys
+            from urllib.parse import urlsplit
+            for line in sys.stdin:
+                if line.startswith("DATABASE_URL="):
+                    print(urlsplit(line.split("=", 1)[1].strip()).hostname or "")
+                    break
+            ')
+            PG_NAME="${PG_NAME:-nhost-postgres-prod}"
+            PG_CID=$(docker ps --filter "name=^/${PG_NAME}$" --filter "status=running" -q | head -n1 || true)
+            [ -n "$PG_CID" ] || { echo "Conteneur PG actif introuvable: $PG_NAME"; exit 1; }
+
+            PG_USER=$(docker inspect "$PG_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_USER"{print $2; exit}')
+            PG_DB=$(docker inspect "$PG_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_DB"{print $2; exit}')
+            PG_PASS=$(docker inspect "$PG_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' | awk -F= '$1=="POSTGRES_PASSWORD"{print $2; exit}')
+            PG_USER="${PG_USER:-postgres}"
+            PG_DB="${PG_DB:-nhost}"
+            PG_CFG=$(docker inspect "$PG_CID" --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}')
+
+            pg_exec() {
+              local c="$1"; shift
+              if [ -n "$PG_PASS" ]; then
+                docker exec -e "PGPASSWORD=$PG_PASS" "$c" "$@"
+              else
+                docker exec "$c" "$@"
+              fi
+            }
+            pg_exec_i() {
+              local c="$1"; shift
+              if [ -n "$PG_PASS" ]; then
+                docker exec -i -e "PGPASSWORD=$PG_PASS" "$c" "$@"
+              else
+                docker exec -i "$c" "$@"
+              fi
+            }
+
+            CUR_VER=$(pg_exec "$PG_CID" psql -U "$PG_USER" -d postgres -tAc "SHOW server_version;")
+            if [[ "$CUR_VER" == 19.* ]]; then
+              echo "Déjà sur PostgreSQL $CUR_VER ($PG_NAME) — aucune migration nécessaire"
+              exit 0
+            fi
+
+            MD5_CNT=$(pg_exec "$PG_CID" psql -U "$PG_USER" -d postgres -tAc "SELECT COUNT(*) FROM pg_authid WHERE rolcanlogin AND rolpassword LIKE 'md5%';")
+            [ "$MD5_CNT" -eq 0 ] || { echo "$MD5_CNT rôle(s) MD5 détecté(s)"; exit 1; }
+
+            TS=$(date -u +%Y%m%d-%H%M%S)
+            BACKUP_DIR="/docker/cjd80/backups/pg19-migration-${TS}"
+            mkdir -p "$BACKUP_DIR" && chmod 700 "$BACKUP_DIR"
+
+            HASURA_EXISTS=false
+            docker inspect nhost-hasura-prod >/dev/null 2>&1 && HASURA_EXISTS=true
+
+            collect_counts() {
+              local c="$1" out="$2" tmp="${2}.tmp" db tbl cnt
+              : > "$tmp"
+              while IFS= read -r db; do
+                [ -z "$db" ] || [ "$db" = "postgres" ] && continue
+                while IFS= read -r tbl; do
+                  [ -z "$tbl" ] && continue
+                  cnt=$(pg_exec "$c" psql -U "$PG_USER" -d "$db" -tAc "SELECT COUNT(*) FROM ${tbl};")
+                  printf '%s\t%s\t%s\n' "$db" "$tbl" "$cnt" >> "$tmp"
+                done < <(pg_exec "$c" psql -U "$PG_USER" -d "$db" -tAc "SELECT quote_ident(schemaname) || '.' || quote_ident(tablename) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') ORDER BY schemaname, tablename;")
+              done < <(pg_exec "$c" psql -U "$PG_USER" -d postgres -tAc "SELECT datname FROM pg_database WHERE datistemplate=false ORDER BY datname;")
+              LC_ALL=C sort -o "$tmp" "$tmp"
+              mv "$tmp" "$out"
+            }
+
+            dump_before() {
+              pg_exec "$PG_CID" pg_dumpall -U "$PG_USER" --roles-only > "${BACKUP_DIR}/roles.sql"
+              DBS=$(pg_exec "$PG_CID" psql -U "$PG_USER" -d postgres -tAc "SELECT datname FROM pg_database WHERE datistemplate=false ORDER BY datname;")
+              DUMP_FILES=(roles.sql manifest-counts.tsv)
+              for db in $DBS; do
+                pg_exec "$PG_CID" pg_dump -U "$PG_USER" --format=custom --no-owner --no-acl "$db" > "${BACKUP_DIR}/${db}.dump"
+                test -s "${BACKUP_DIR}/${db}.dump"
+                DUMP_FILES+=("${db}.dump")
+              done
+              collect_counts "$PG_CID" "${BACKUP_DIR}/manifest-counts.tsv"
+              (cd "$BACKUP_DIR" && sha256sum "${DUMP_FILES[@]}" > SHA256SUMS && sha256sum -c SHA256SUMS)
+            }
+
+            if [ -n "$PG_CFG" ] && [ -f "$PG_CFG" ]; then
+              echo "Mode A (compose sur disque: $PG_CFG)"
+              PG_SVC=$(docker inspect "$PG_CID" --format '{{index .Config.Labels "com.docker.compose.service"}}')
+              PG_PROJ=$(docker inspect "$PG_CID" --format '{{index .Config.Labels "com.docker.compose.project"}}')
+              cp "$PG_CFG" "${BACKUP_DIR}/compose.bak-pre-pg19-${TS}"
+              rollback_a() {
+                echo "⚠️ Rollback PG (Mode A)..."
+                cp "${BACKUP_DIR}/compose.bak-pre-pg19-${TS}" "$PG_CFG" || true
+                docker compose -p "$PG_PROJ" -f "$PG_CFG" up -d || true
+                $HASURA_EXISTS && docker start nhost-hasura-prod || true
+                docker compose -f /docker/cjd80/docker-compose.yml up -d cjd-app || true
+              }
+              trap rollback_a ERR
+              docker compose -f /docker/cjd80/docker-compose.yml stop cjd-app || true
+              $HASURA_EXISTS && docker stop nhost-hasura-prod || true
+              dump_before
+              docker compose -p "$PG_PROJ" -f "$PG_CFG" stop "$PG_SVC"
+              docker compose -p "$PG_PROJ" -f "$PG_CFG" rm -f "$PG_SVC" >/dev/null 2>&1 || true
+              python3 - "$PG_CFG" <<'PY'
+            import re, sys
+            path = sys.argv[1]
+            with open(path, encoding="utf-8") as fh:
+                content = fh.read()
+            mounts = re.findall(r'^\s*-\s*([^\s:#]+):/var/lib/postgresql(?:/data)?\b', content, flags=re.M)
+            content = re.sub(r'postgres:(?:1[4-8](?:\.[0-9]+)?(?:-alpine)?)(?:@sha256:[0-9a-f]+)?', 'postgres:19.0-alpine', content)
+            content = content.replace('/var/lib/postgresql/data', '/var/lib/postgresql')
+            for src in mounts:
+                if src.startswith(('/', '.', '~')):
+                    new_src = src[:-5] + '_pg19' if src.endswith('_pg18') else (src[:-5] + '-pg19' if src.endswith('-pg18') else (src if src.endswith(('_pg19', '-pg19')) else f'{src}_pg19'))
+                    if new_src != src:
+                        content = content.replace(f'{src}:/var/lib/postgresql', f'{new_src}:/var/lib/postgresql')
+                elif '${' not in src and src not in {'postgres', 'db', 'data'}:
+                    new_src = src[:-5] + '_pg19' if src.endswith('_pg18') else (src[:-5] + '-pg19' if src.endswith('-pg18') else (src if src.endswith(('_pg19', '-pg19')) else f'{src}_pg19'))
+                    if new_src != src:
+                        content = re.sub(rf'(?<![\w-]){re.escape(src)}(?![\w-])', new_src, content)
+            content = re.sub(
+                r'(name:\s*[^\s#]*?(?:postgres|pg|db)[^\s#]*?)(?:_pg18|-pg18)?(?=\s*(?:#.*)?$)',
+                lambda m: m.group(1) + '_pg19' if not m.group(1).endswith(('_pg19', '-pg19')) else m.group(1),
+                content,
+                flags=re.M,
+            )
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(content)
+            PY
+              docker compose -p "$PG_PROJ" -f "$PG_CFG" config -q
+              docker compose -p "$PG_PROJ" -f "$PG_CFG" up -d "$PG_SVC"
+              NEW_CID=$(docker compose -p "$PG_PROJ" -f "$PG_CFG" ps -q "$PG_SVC")
+              START_AFTER() { docker compose -p "$PG_PROJ" -f "$PG_CFG" up -d; }
+            else
+              echo "Mode B (compose absent: $PG_CFG — bascule atomique via docker-compose.nhost-pg19.yml)"
+              ENV_PG19="/docker/cjd80/.nhost-pg19.env"
+              COMPOSE_PG19="/docker/cjd80/docker-compose.nhost-pg19.yml"
+              INSPECT_JSON="${BACKUP_DIR}/pg-pre19-inspect.json"
+              docker inspect "$PG_CID" > "$INSPECT_JSON"
+              chmod 600 "$INSPECT_JSON"
+
+              python3 - "$INSPECT_JSON" "$ENV_PG19" "$COMPOSE_PG19" <<'PY'
+            import json, os, sys
+
+            inspect_path, env_path, compose_path = sys.argv[1:4]
+            data = json.load(open(inspect_path, encoding="utf-8"))[0]
+
+            skip_env = {"PATH", "GOSU_VERSION", "LANG", "PG_MAJOR", "PG_VERSION", "PG_SHA256", "PG_URL", "PGDATA"}
+            env_lines = []
+            for item in data.get("Config", {}).get("Env") or []:
+                k = item.split("=", 1)[0]
+                if k not in skip_env:
+                    env_lines.append(item)
+
+            fd = os.open(env_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write("\n".join(env_lines) + "\n")
+
+            nets = data.get("NetworkSettings", {}).get("Networks") or {}
+            ports = []
+            for cport, bindings in (data.get("HostConfig", {}).get("PortBindings") or {}).items():
+                if not bindings:
+                    continue
+                for b in bindings:
+                    hip = b.get("HostIp") or ""
+                    hport = b.get("HostPort") or ""
+                    if hport:
+                        host_pfx = f"{hip}:" if hip else ""
+                        ports.append(f"{host_pfx}{hport}:{cport.split('/')[0]}")
+
+            binds = []
+            for m in data.get("Mounts") or []:
+                if m.get("Type") == "bind" and m.get("Destination") not in ("/var/lib/postgresql/data", "/var/lib/postgresql"):
+                    binds.append(f"{m['Source']}:{m['Destination']}")
+
+            cmd_args = data.get("Config", {}).get("Cmd") or []
+            net_blocks = []
+            svc_nets = []
+            for idx, (nname, ndata) in enumerate(nets.items()):
+                nkey = f"net_{idx}"
+                aliases = sorted(set((ndata.get("Aliases") or []) + ["nhost-postgres-prod", "postgres"]))
+                svc_nets.append(f"      {nkey}:\n        aliases:\n" + "".join(f"          - {a}\n" for a in aliases))
+                net_blocks.append(f"  {nkey}:\n    external: true\n    name: {nname}\n")
+
+            yml = [
+                "services:",
+                "  postgres:",
+                "    image: postgres:19.0-alpine",
+                "    container_name: nhost-postgres-prod",
+                "    restart: unless-stopped",
+                f"    env_file:\n      - {env_path}",
+            ]
+            if cmd_args and cmd_args != ["postgres"]:
+                yml.append("    command: " + json.dumps(cmd_args))
+            if ports:
+                yml.append("    ports:")
+                yml.extend(f'      - "{p}"' for p in ports)
+            yml.append("    volumes:")
+            yml.append("      - cjd80_nhost_pg19_data:/var/lib/postgresql")
+            yml.extend(f"      - {b}" for b in binds)
+            if svc_nets:
+                yml.append("    networks:")
+                yml.extend(s.rstrip("\n") for s in svc_nets)
+            yml.extend([
+                "    healthcheck:",
+                '      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-nhost}"]',
+                "      interval: 10s",
+                "      timeout: 5s",
+                "      retries: 5",
+                "      start_period: 30s",
+                "",
+                "volumes:",
+                "  cjd80_nhost_pg19_data:",
+                "    name: nhost_postgres_data_prod_pg19",
+                "",
+                "networks:",
+            ])
+            yml.extend(n.rstrip("\n") for n in net_blocks)
+            with open(compose_path, "w", encoding="utf-8") as fh:
+                fh.write("\n".join(yml) + "\n")
+            PY
+
+              docker compose -p nhost_pg19 -f "$COMPOSE_PG19" config -q
+              BAK_NAME="${PG_NAME}-pre-pg19-bak-${TS}"
+
+              rollback_b() {
+                echo "⚠️ Rollback PG (Mode B)..."
+                docker compose -p nhost_pg19 -f "$COMPOSE_PG19" down || docker rm -f "$PG_NAME" || true
+                if docker inspect "$BAK_NAME" >/dev/null 2>&1; then
+                  docker rename "$BAK_NAME" "$PG_NAME" || true
+                  docker start "$PG_NAME" || true
+                fi
+                $HASURA_EXISTS && docker start nhost-hasura-prod || true
+                docker compose -f /docker/cjd80/docker-compose.yml up -d cjd-app || true
+              }
+              trap rollback_b ERR
+
+              docker compose -f /docker/cjd80/docker-compose.yml stop cjd-app || true
+              $HASURA_EXISTS && docker stop nhost-hasura-prod || true
+              dump_before
+              docker stop "$PG_NAME"
+              docker rename "$PG_NAME" "$BAK_NAME"
+
+              docker compose -p nhost_pg19 -f "$COMPOSE_PG19" up -d postgres
+              NEW_CID=$(docker compose -p nhost_pg19 -f "$COMPOSE_PG19" ps -q postgres)
+              START_AFTER() { true; }
+            fi
+
+            [ -n "$NEW_CID" ] || { echo "Nouveau conteneur PostgreSQL introuvable"; exit 1; }
+            pg_ready=0
+            for i in $(seq 1 45); do
+              if docker exec "$NEW_CID" pg_isready -h 127.0.0.1 -U "$PG_USER" -d postgres >/dev/null 2>&1 \
+                && [ "$(pg_exec "$NEW_CID" psql -U "$PG_USER" -d postgres -tAc "SELECT 1;" 2>/dev/null || true)" = "1" ]; then
+                sleep 2
+                if [ "$(pg_exec "$NEW_CID" psql -U "$PG_USER" -d postgres -tAc "SELECT 1;" 2>/dev/null || true)" = "1" ]; then
+                  pg_ready=1
+                  break
+                fi
+              fi
+              sleep 2
+            done
+            [ "$pg_ready" -eq 1 ] || { echo "Timeout readiness $NEW_CID"; exit 1; }
+
+            grep -Ev "^CREATE ROLE \"?${PG_USER}\"?;|^ALTER ROLE \"?${PG_USER}\"? " "${BACKUP_DIR}/roles.sql" \
+              | pg_exec_i "$NEW_CID" psql -U "$PG_USER" -d postgres -v ON_ERROR_STOP=0 >/dev/null || true
+
+            for db in $DBS; do
+              [ "$db" = "postgres" ] && continue
+              exists=$(pg_exec "$NEW_CID" psql -U "$PG_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${db}';" || true)
+              [ "$exists" = "1" ] || pg_exec "$NEW_CID" psql -U "$PG_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${db}\";"
+              pg_exec_i "$NEW_CID" pg_restore -U "$PG_USER" -d "$db" --clean --if-exists --no-owner --no-acl --exit-on-error < "${BACKUP_DIR}/${db}.dump"
+              HASURA_TBL=$(pg_exec "$NEW_CID" psql -U "$PG_USER" -d "$db" -tAc "SELECT to_regclass('hdb_catalog.hdb_source_catalog_version') IS NOT NULL;")
+              if [ "$HASURA_TBL" = "t" ]; then
+                pg_exec "$NEW_CID" psql -U "$PG_USER" -d "$db" -v ON_ERROR_STOP=1 -c "ALTER TABLE hdb_catalog.hdb_source_catalog_version REPLICA IDENTITY FULL;"
+              fi
+            done
+
+            pg_exec "$NEW_CID" vacuumdb -U "$PG_USER" --all --analyze-only
+            collect_counts "$NEW_CID" "${BACKUP_DIR}/manifest-counts.after.tsv"
+            diff -u "${BACKUP_DIR}/manifest-counts.tsv" "${BACKUP_DIR}/manifest-counts.after.tsv"
+
+            NEW_VER=$(pg_exec "$NEW_CID" psql -U "$PG_USER" -d postgres -tAc "SHOW server_version;")
+            CHECKSUMS=$(pg_exec "$NEW_CID" psql -U "$PG_USER" -d postgres -tAc "SHOW data_checksums;")
+            echo "CJD80 PG version=$NEW_VER | data_checksums=$CHECKSUMS | parity=OK"
+            [[ "$NEW_VER" == 19.* ]] && [ "$CHECKSUMS" = "on" ]
+
+            START_AFTER
+            $HASURA_EXISTS && docker start nhost-hasura-prod
+            docker compose -f /docker/cjd80/docker-compose.yml up -d cjd-app
+            for i in $(seq 1 25); do
+              if curl -fsS --max-time 10 https://cjd80.fr/api/health >/dev/null 2>&1; then
+                trap - ERR
+                echo "CJD80 healthy sur PG $NEW_VER"
+                exit 0
+              fi
+              sleep 3
+            done
+            docker logs --tail 60 cjd-app 2>/dev/null || true
+            $HASURA_EXISTS && docker logs --tail 40 nhost-hasura-prod 2>/dev/null || true
+            exit 1
+            REMOTE_PG19

@@ -81,7 +81,7 @@ services:
       - db
 
   db:
-    image: postgres:18.7-alpine
+    image: postgres:19.0-alpine
     environment:
       POSTGRES_DB: myapp
       POSTGRES_USER: postgres

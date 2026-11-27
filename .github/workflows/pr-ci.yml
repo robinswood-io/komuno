@@ -29,7 +29,7 @@ jobs:
       SESSION_SECRET: ci-session-secret-at-least-32-characters
     services:
       postgres:
-        image: postgres:18.7-alpine
+        image: postgres:19.0-alpine
         env:
           POSTGRES_USER: ciuser
           POSTGRES_PASSWORD: cipassword
